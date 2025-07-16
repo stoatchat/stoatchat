@@ -150,12 +150,6 @@ auto_derived!(
     }
 );
 
-static BLOCKED_USERNAME_PATTERNS: Lazy<Regex> = Lazy::new(|| {
-    RegexBuilder::new("`{3}|((discord|rvlt|guilded)\\.gg|https?:\\/\\/)")
-        .case_insensitive(true)
-        .build().unwrap()
-});
-
 pub static DISCRIMINATOR_SEARCH_SPACE: Lazy<HashSet<String>> = Lazy::new(|| {
     let mut set = (2..9999)
         .map(|v| format!("{:0>4}", v))
@@ -168,6 +162,12 @@ pub static DISCRIMINATOR_SEARCH_SPACE: Lazy<HashSet<String>> = Lazy::new(|| {
     }
 
     set.into_iter().collect()
+});
+
+static BLOCKED_USERNAME_PATTERNS: Lazy<Regex> = Lazy::new(|| {
+    RegexBuilder::new("`{3}|((discord|rvlt|guilded)\\.gg|https?:\\/\\/)")
+        .case_insensitive(true)
+        .build().unwrap()
 });
 
 #[allow(clippy::derivable_impls)]
@@ -290,7 +290,7 @@ impl User {
     }
 
     /// validate a username for blocked names
-    pub fn validate_username(username: &str) -> Result<()> {
+    fn validate_username(username: &str) -> Result<()> {
         // Copy the username for validation
         let username_lowercase = username.to_lowercase();
         // Ensure the username itself isn't blocked
@@ -306,10 +306,12 @@ impl User {
     }
 
     /// sanitise username
-    pub fn sanitise_username(username: &str) -> (bool, String) {
+    fn sanitise_username(username: &str) -> (bool, String) {
         let original_username = username;
         // sanitise homoglyphs
-        let mut username = decancer::cure(&username).into_str();
+        let options = decancer::Options::default()
+            .retain_capitalization();
+        let mut username = decancer::cure(&username, options).unwrap().to_string();
 
         if BLOCKED_USERNAME_PATTERNS.is_match(&username) {
             username = BLOCKED_USERNAME_PATTERNS.replace_all(&mut username, "").into_owned();
@@ -836,4 +838,112 @@ impl User {
 
         badges
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{User};
+
+    #[test]
+    fn username_validation() {
+        let username_admin = "Admin";
+        let username_revolt = "Revolt";
+        let username_allowed = "Allowed";
+
+        assert!(User::validate_username(username_admin).is_err());
+        assert!(User::validate_username(username_revolt).is_err());
+        assert!(User::validate_username(username_allowed).is_ok());
+    }
+
+    #[test]
+    fn username_sanitisation_clean() {
+        let username_clean = "Test";
+
+        let (is_sanitised, username_clean_sanitised) = User::sanitise_username(username_clean);
+
+        assert!(!is_sanitised);
+        assert_eq!(username_clean, username_clean_sanitised)
+    }
+
+    #[test]
+    fn username_sanitisation_hemoglyphs() {
+        let username_hemoglyphs = "𝔽𝕌Ňℕｙ";
+
+        let (is_hemoglyphs_sanitised, username_hemoglyphs_sanitised) = User::sanitise_username(username_hemoglyphs);
+
+        assert!(is_hemoglyphs_sanitised);
+        assert_eq!("funny", username_hemoglyphs_sanitised);
+    }
+
+    #[test]
+    fn username_blocked_patterns() {
+        let username_grave = "```_test";
+        let username_discord = "discord.gg_test";
+        let username_rvlt = "rvlt.gg_test";
+        let username_guilded = "guilded.gg_test";
+        let username_http = "http://_test";
+        let username_https = "https://_test";
+
+        let expected_username = "_test";
+
+        let (is_grave_sanitised, username_grave_sanitised) = User::sanitise_username(username_grave);
+        let (is_discord_sanitised, username_discord_sanitised) = User::sanitise_username(username_discord);
+        let (is_rvlt_sanitised, username_rvlt_sanitised) = User::sanitise_username(username_rvlt);
+        let (is_guilded_sanitised, username_guilded_sanitised) = User::sanitise_username(username_guilded);
+        let (is_http_sanitised, username_http_sanitised) = User::sanitise_username(username_http);
+        let (is_https_sanitised, username_https_sanitised) = User::sanitise_username(username_https);
+
+        assert!(is_grave_sanitised);
+        assert_eq!(expected_username, username_grave_sanitised);
+        assert!(is_discord_sanitised);
+        assert_eq!(expected_username, username_discord_sanitised);
+        assert!(is_rvlt_sanitised);
+        assert_eq!(expected_username, username_rvlt_sanitised);
+        assert!(is_guilded_sanitised);
+        assert_eq!(expected_username, username_guilded_sanitised);
+        assert!(is_http_sanitised);
+        assert_eq!(expected_username, username_http_sanitised);
+        assert!(is_https_sanitised);
+        assert_eq!(expected_username, username_https_sanitised);
+    }
+
+    #[test]
+    fn username_sanitisation_padding() {
+        let username_padding = "```a";
+
+        let (_, username) = User::sanitise_username(username_padding);
+
+        assert_eq!("a_", username);
+    }
+
+    #[async_std::test]
+    async fn create_user() {
+        database_test!(|db| async move {
+            let created_clean = User::create(&db, "Test".to_string(), None, None)
+                .await
+                .unwrap();
+
+            let mut updated_clean = User::create(&db, "Test".to_string(), None, None)
+                .await
+                .unwrap();
+            updated_clean.update_username(&db, "Test2".to_string()).await.unwrap();
+
+            let created_sanitised = User::create(&db, "http://test".to_string(), None, None)
+                .await
+                .unwrap();
+
+            let mut updated_sanitised = User::create(&db, "Test".to_string(), None, None)
+                .await
+                .unwrap();
+            updated_sanitised.update_username(&db, "http://test".to_string()).await.unwrap();
+
+            assert_eq!(None, created_clean.display_name);
+            assert_eq!(None, updated_clean.display_name);
+            assert_eq!("test", created_sanitised.username);
+            assert_eq!("http://test", created_sanitised.display_name.unwrap());
+            assert_eq!("test", updated_sanitised.username);
+            assert_eq!("http://test", updated_sanitised.display_name.unwrap());
+        });
+    }
+
 }
