@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use revolt_result::Result;
 #[cfg(feature = "rocket-impl")]
-use rocket::request::FromParam;
+use rocket::{form::FromFormField, request::FromParam};
 #[cfg(feature = "rocket-impl")]
 use schemars::{
     schema::{InstanceType, Schema, SchemaObject, SingleOrVec},
@@ -130,5 +130,12 @@ impl<'a> JsonSchema for Reference<'a> {
             instance_type: Some(SingleOrVec::Single(Box::new(InstanceType::String))),
             ..Default::default()
         })
+    }
+}
+
+#[cfg(feature = "rocket-impl")]
+impl<'r> FromFormField<'r> for Reference {
+    fn from_value(field: rocket::form::ValueField<'r>) -> rocket::form::Result<'r, Self> {
+        Ok(Reference::from_unchecked(field.value.into()))
     }
 }

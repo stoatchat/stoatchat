@@ -85,6 +85,7 @@ impl Member {
         server: &Server,
         user: &User,
         channels: Option<Vec<Channel>>,
+        create_alert: bool,
     ) -> Result<(Member, Vec<Channel>)> {
         if db.fetch_ban(&server.id, &user.id).await.is_ok() {
             return Err(create_error!(Banned));
@@ -148,18 +149,20 @@ impl Member {
         .private(user.id.clone())
         .await;
 
-        if let Some(id) = server
-            .system_messages
-            .as_ref()
-            .and_then(|x| x.user_joined.as_ref())
-        {
-            SystemMessage::UserJoined {
-                id: user.id.clone(),
+        if create_alert {
+            if let Some(id) = server
+                .system_messages
+                .as_ref()
+                .and_then(|x| x.user_joined.as_ref())
+            {
+                SystemMessage::UserJoined {
+                    id: user.id.clone(),
+                }
+                .into_message(id.to_string())
+                .send_without_notifications(db, None, None, false, false, false)
+                .await
+                .ok();
             }
-            .into_message(id.to_string())
-            .send_without_notifications(db, None, None, false, false, false)
-            .await
-            .ok();
         }
 
         Ok((member, channels))
@@ -305,8 +308,10 @@ mod tests {
             .unwrap()
             .0;
 
-            Member::create(&db, &server, &owner, None).await.unwrap();
-            let mut kickable_member = Member::create(&db, &server, &kickable_user, None)
+            Member::create(&db, &server, &owner, None, false)
+                .await
+                .unwrap();
+            let mut kickable_member = Member::create(&db, &server, &kickable_user, None, false)
                 .await
                 .unwrap()
                 .0;
@@ -330,7 +335,7 @@ mod tests {
                 .await
                 .unwrap();
 
-            let kickable_member = Member::create(&db, &server, &kickable_user, None)
+            let kickable_member = Member::create(&db, &server, &kickable_user, None, false)
                 .await
                 .unwrap()
                 .0;

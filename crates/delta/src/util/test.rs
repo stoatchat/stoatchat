@@ -178,7 +178,7 @@ impl TestHarness {
         server: &Server,
         channels: Vec<Channel>,
     ) -> (Channel, Member, Message) {
-        let (member, channels) = Member::create(&self.db, server, user, Some(channels))
+        let (member, channels) = Member::create(&self.db, server, user, Some(channels), true)
             .await
             .expect("Failed to create member");
         let channel = &channels[0];

@@ -101,11 +101,13 @@ pub enum ErrorType {
     NotInGroup,
     AlreadyPinned,
     NotPinned,
+    InviteExists,
 
     // ? Server related errors
     UnknownServer,
     InvalidRole,
     Banned,
+    NotAMember,
     TooManyServers {
         max: usize,
     },

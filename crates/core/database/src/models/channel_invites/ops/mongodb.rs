@@ -12,7 +12,14 @@ static COL: &str = "channel_invites";
 impl AbstractChannelInvites for MongoDb {
     /// Insert a new invite into the database
     async fn insert_invite(&self, invite: &Invite) -> Result<()> {
-        query!(self, insert_one, COL, &invite).map(|_| ())
+        self.insert_one(COL, &invite).await.or_else(|e| {
+            if e.to_string().contains("duplicate") {
+                return Err(create_error!(InviteExists));
+            } else {
+                return Err(create_database_error!("insert_one", COL));
+            }
+        })?;
+        Ok(())
     }
 
     /// Fetch an invite by the code

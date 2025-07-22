@@ -46,6 +46,15 @@ impl AbstractAdminCases for ReferenceDb {
         }
     }
 
+    async fn admin_case_fetch_from_shorthand(&self, short_id: &str) -> Result<AdminCase> {
+        let admin_cases = self.admin_cases.lock().await;
+        if let Some((_, case)) = admin_cases.iter().find(|(_, c)| c.short_id == short_id) {
+            Ok(case.clone())
+        } else {
+            Err(create_error!(NotFound))
+        }
+    }
+
     /// title is fuzzy, the rest of the arguments are direct matches
     /// before_id and limit are for paginating
     async fn admin_case_search(

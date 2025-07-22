@@ -1,3 +1,6 @@
+use iso8601_timestamp::Timestamp;
+use revolt_models::v0::AdminAuditItemActions;
+
 use crate::util::basic::transform_optional_string;
 
 auto_derived! {
@@ -7,7 +10,7 @@ auto_derived! {
         pub id: String,
         /// The moderator who performed the action
         pub mod_id: String,
-        /// The action performed (previously 'permission')
+        /// The action performed (previously 'permission'). Should be one of v0::AdminAuditActionAction
         pub action: String,
         /// The relevant case ID, if applicable
         pub case_id: Option<String>,
@@ -15,13 +18,15 @@ auto_derived! {
         pub target_id: Option<String>,
         /// The context of the action, if applicable (eg. search phrases)
         pub context: Option<String>,
+        /// When the action occurred, in iso8601.
+        pub timestamp: String
     }
 }
 
 impl AdminAuditItem {
     pub fn new(
         mod_id: &str,
-        action: &str,
+        action: AdminAuditItemActions,
         case_id: Option<&str>,
         target_id: Option<&str>,
         context: Option<&str>,
@@ -34,6 +39,7 @@ impl AdminAuditItem {
             case_id: transform_optional_string(case_id),
             target_id: transform_optional_string(target_id),
             context: transform_optional_string(context),
+            timestamp: Timestamp::now_utc().format_short().to_string(),
         }
     }
 }

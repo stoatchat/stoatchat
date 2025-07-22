@@ -19,7 +19,9 @@ pub async fn admin_revoke_token(
         &auth.on_behalf_of,
         v0::AdminUserPermissionFlags::CreateTokens,
     ) {
-        return Err(create_error!(NotFound));
+        return Err(create_error!(MissingPermission {
+            permission: "CreateTokens".to_string()
+        }));
     }
 
     let token = token.as_admin_token(db).await?;

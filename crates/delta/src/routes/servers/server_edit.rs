@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, File, PartialServer, User,
+    Database, File, PartialServer, Server, User,
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
@@ -69,6 +69,16 @@ pub async fn edit(
         permissions.throw_if_lacking_channel_permission(ChannelPermission::ManageChannel)?;
     }
 
+    edit_data(data, db, &mut server, &user).await?;
+    Ok(Json(server.into()))
+}
+
+pub async fn edit_data(
+    data: v0::DataEditServer,
+    db: &Database,
+    server: &mut Server,
+    user: &User,
+) -> Result<()> {
     let v0::DataEditServer {
         name,
         description,
@@ -150,5 +160,5 @@ pub async fn edit(
         .update(db, partial, remove.into_iter().map(Into::into).collect())
         .await?;
 
-    Ok(Json(server.into()))
+    Ok(())
 }

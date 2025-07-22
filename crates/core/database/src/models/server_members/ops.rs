@@ -129,4 +129,18 @@ pub trait AbstractServerMembers: Sync + Send {
 
     /// Fetch all members who have been marked for deletion.
     async fn remove_dangling_members(&self) -> Result<()>;
+
+    /// Fetch all participants of a server.
+    async fn fetch_server_participants(
+        &self,
+        server_id: &str,
+    ) -> Result<Vec<(crate::User, Option<Member>)>>;
+
+    /// Fetch all members of a server
+    async fn fetch_server_members(
+        &self,
+        server_id: &str,
+        page_size: u8,
+        after: Option<usize>,
+    ) -> Result<Vec<(crate::User, Member)>>;
 }

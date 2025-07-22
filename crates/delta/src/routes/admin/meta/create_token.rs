@@ -18,7 +18,9 @@ pub async fn admin_create_token(
         &auth.on_behalf_of,
         v0::AdminUserPermissionFlags::CreateTokens,
     ) {
-        return Err(create_error!(NotFound));
+        return Err(create_error!(MissingPermission {
+            permission: "CreateTokens".to_string()
+        }));
     }
 
     if body.expiry > Timestamp::now_utc() + Duration::days(30) {

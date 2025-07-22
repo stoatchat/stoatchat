@@ -34,8 +34,10 @@ impl IntoResponse for Error {
             ErrorType::GroupTooLarge { .. } => StatusCode::FORBIDDEN,
             ErrorType::AlreadyInGroup => StatusCode::CONFLICT,
             ErrorType::NotInGroup => StatusCode::NOT_FOUND,
+            ErrorType::NotAMember => StatusCode::BAD_REQUEST,
             ErrorType::AlreadyPinned => StatusCode::BAD_REQUEST,
             ErrorType::NotPinned => StatusCode::BAD_REQUEST,
+            ErrorType::InviteExists => StatusCode::BAD_REQUEST,
 
             ErrorType::UnknownServer => StatusCode::NOT_FOUND,
             ErrorType::InvalidRole => StatusCode::NOT_FOUND,

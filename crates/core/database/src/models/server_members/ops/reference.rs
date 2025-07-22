@@ -1,3 +1,6 @@
+use std::collections::HashSet;
+
+use iso8601_timestamp::Timestamp;
 use revolt_result::Result;
 
 use crate::ReferenceDb;
@@ -199,5 +202,92 @@ impl AbstractServerMembers for ReferenceDb {
 
     async fn remove_dangling_members(&self) -> Result<()> {
         todo!()
+    }
+
+    async fn fetch_server_participants(
+        &self,
+        server_id: &str,
+    ) -> Result<Vec<(crate::User, Option<Member>)>> {
+        let servers = self.servers.lock().await;
+        let server = servers.get(server_id).ok_or(create_error!(NotFound))?;
+
+        let mut hash = HashSet::new();
+        server.channels.iter().for_each(|c| {
+            hash.insert(c.clone());
+        });
+
+        drop(servers);
+
+        let messages = self.messages.lock().await;
+        let userids = messages
+            .iter()
+            .filter(|(_, message)| hash.contains(&message.channel))
+            .map(|(_, message)| message.author.clone())
+            .collect::<HashSet<String>>();
+
+        drop(messages);
+
+        let users = self.users.lock().await;
+        let members = self.server_members.lock().await;
+
+        let resp_users: Vec<(crate::User, Option<crate::Member>)> = users
+            .iter()
+            .filter(|(uid, _)| userids.contains(*uid))
+            .map(|(uid, user)| {
+                let key = MemberCompositeKey {
+                    server: server_id.to_string(),
+                    user: uid.clone(),
+                };
+                // fuck it we ball
+                (user.clone(), members.get(&key).map(|f| f.clone()))
+            })
+            .collect();
+
+        Ok(resp_users)
+    }
+
+    /// Fetch all members of a server
+    async fn fetch_server_members(
+        &self,
+        server_id: &str,
+        page_size: u8,
+        after: Option<usize>,
+    ) -> Result<Vec<(crate::User, Member)>> {
+        let members = self.server_members.lock().await;
+        let users = self.users.lock().await;
+
+        let mut server_members: Vec<&Member> = members
+            .iter()
+            .filter(|(_, f)| f.id.server == server_id)
+            .map(|(_, m)| m)
+            .collect();
+
+        server_members.sort_by(|a, b| a.joined_at.cmp(&b.joined_at));
+        let iterator = server_members.iter();
+
+        let mut resp: Vec<&&Member> = if let Some(after) = after {
+            iterator
+                .skip_while(|f| {
+                    f.joined_at
+                        .duration_since(Timestamp::UNIX_EPOCH)
+                        .whole_milliseconds()
+                        <= after as i128
+                })
+                .collect()
+        } else {
+            iterator.collect()
+        };
+
+        resp.truncate(page_size as usize);
+
+        Ok(resp
+            .iter()
+            .map(|f| {
+                (
+                    users.get(&f.id.user).unwrap().clone(),
+                    f.clone().clone().clone(),
+                )
+            })
+            .collect())
     }
 }

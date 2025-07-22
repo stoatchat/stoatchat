@@ -1448,12 +1448,38 @@ impl From<crate::AdminToken> for AdminToken {
     }
 }
 
-impl From<crate::AdminObjectNote> for AdminObjectNote {
-    fn from(value: crate::AdminObjectNote) -> Self {
-        AdminObjectNote {
-            edited_at: Timestamp::parse(&value.edited_at).unwrap(), // if it's invalid it shouldn't have made it to this point.
-            last_edited_by_id: value.last_edited_by_id,
+impl From<crate::AdminComment> for AdminComment {
+    fn from(value: crate::AdminComment) -> Self {
+        AdminComment {
+            id: value.id,
+            case_id: value.case_id,
+            object_id: value.object_id,
+            user_id: value.user_id,
+            edited_at: value.edited_at.map(|f| Timestamp::parse(&f).unwrap()),
             content: value.content,
+            system_message: value
+                .system_message
+                .map(|f| serde_json::from_str(&f).unwrap()),
+            system_message_target: value.system_message_target,
+            system_message_context: value.system_message_context,
+        }
+    }
+}
+
+impl From<AdminComment> for crate::AdminComment {
+    fn from(value: AdminComment) -> Self {
+        crate::AdminComment {
+            id: value.id,
+            object_id: value.object_id,
+            case_id: value.case_id,
+            user_id: value.user_id,
+            edited_at: value.edited_at.map(|f| f.format_short().to_string()),
+            content: value.content,
+            system_message: value
+                .system_message
+                .map(|f| serde_json::to_string(&f).unwrap()), // i'll eat my hat if this fails
+            system_message_target: value.system_message_target,
+            system_message_context: value.system_message_context,
         }
     }
 }

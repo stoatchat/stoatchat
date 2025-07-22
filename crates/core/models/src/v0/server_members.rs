@@ -128,4 +128,9 @@ auto_derived!(
         #[cfg_attr(feature = "serde", serde(default))]
         pub remove: Vec<FieldsMember>,
     }
+
+    pub struct MemberWithUserResponse {
+        pub user: crate::v0::User,
+        pub member: Member,
+    }
 );

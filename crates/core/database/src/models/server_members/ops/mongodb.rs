@@ -1,10 +1,12 @@
 use bson::Document;
+use std::collections::HashMap;
+
 use futures::StreamExt;
 use iso8601_timestamp::Timestamp;
 use mongodb::options::ReadConcern;
 use revolt_result::Result;
 
-use crate::{FieldsMember, Member, MemberCompositeKey, PartialMember};
+use crate::{AbstractUsers, FieldsMember, Member, MemberCompositeKey, PartialMember};
 use crate::{IntoDocumentPath, MongoDb};
 
 use super::{AbstractServerMembers, ChunkedServerMembersGenerator};
@@ -325,6 +327,88 @@ impl AbstractServerMembers for MongoDb {
             .await
             .map(|_| ())
             .map_err(|_| create_database_error!("count_documents", COL))
+    }
+
+    async fn fetch_server_participants(
+        &self,
+        server_id: &str,
+    ) -> Result<Vec<(crate::User, Option<Member>)>> {
+        let server: crate::Server = query!(self, find_one, "servers", doc! {"_id": server_id})?
+            .ok_or_else(|| create_database_error!("find", "servers"))?;
+        let ids: Vec<String> = self
+            .db()
+            .collection::<crate::Message>("messages")
+            .distinct("author", doc! {"channel": {"$in": server.channels}})
+            .await
+            .map_err(|_| create_database_error!("distinct", "messages"))?
+            .iter()
+            .map(|b| bson::from_bson::<String>(b.clone()).unwrap()) // json encoded string for some logic-defying reason
+            .collect();
+
+        println!("{:?}", &ids);
+
+        let users = self.fetch_users(&ids).await?;
+        let members = self
+            .fetch_members(server_id, &ids)
+            .await?
+            .iter()
+            .map(|f| (f.id.user.clone(), f.clone()))
+            .collect::<HashMap<String, Member>>();
+
+        Ok(users
+            .iter()
+            .map(|u| (u.clone(), members.get(&u.id).cloned()))
+            .collect())
+    }
+
+    async fn fetch_server_members(
+        &self,
+        server_id: &str,
+        page_size: u8,
+        after: Option<usize>,
+    ) -> Result<Vec<(crate::User, Member)>> {
+        let mut members_stream = if let Some(after) = after {
+            self.col::<crate::Member>(COL)
+                .find(doc! {"_id.server": server_id, "joined_at": {"$gt": after as i64}})
+                .sort(doc! {"joined_at": -1})
+                .limit(page_size as i64)
+                .await
+                .map_err(|_| create_database_error!("find", COL))?
+        } else {
+            self.col::<crate::Member>(COL)
+                .find(doc! {"_id.server": server_id})
+                .sort(doc! {"joined_at": -1})
+                .limit(page_size as i64)
+                .await
+                .map_err(|_| create_database_error!("find", COL))?
+        };
+
+        let mut members = vec![];
+        if members_stream.advance().await.is_ok_and(|f| f) {
+            loop {
+                if let Ok(x) = members_stream.deserialize_current() {
+                    members.push(x);
+                    if let Ok(r) = members_stream.advance().await {
+                        if !r {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
+        let user_ids: Vec<String> = members.iter().map(|m| m.id.user.clone()).collect();
+        let mut set = HashMap::new();
+        self.fetch_users(&user_ids).await?.iter().for_each(|f| {
+            set.insert(f.id.clone(), f.clone());
+        });
+
+        return Ok(members
+            .iter()
+            .map(|f| (set.remove(&f.id.user).unwrap(), f.clone()))
+            .collect());
     }
 }
 

@@ -22,7 +22,7 @@ mod roles_fetch;
 mod server_ack;
 mod server_create;
 mod server_delete;
-mod server_edit;
+pub mod server_edit;
 mod server_fetch;
 
 pub fn routes() -> (Vec<Route>, OpenApi) {

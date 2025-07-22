@@ -15,7 +15,9 @@ pub async fn admin_create_user(
 ) -> Result<Json<v0::AdminUser>> {
     let user = flatten_authorized_user(&auth);
     if !user_has_permission(user, v0::AdminUserPermissionFlags::ManageAdminUsers) {
-        return Err(create_error!(NotFound));
+        return Err(create_error!(MissingPermission {
+            permission: "ManageAdminUsers".to_string()
+        }));
     }
 
     // TODO: technically there's a privilege escalation here since anyone with the manageAdminUsers permission can assign whatever permissions they want.

@@ -28,6 +28,20 @@ impl AbstractMigrations for MongoDb {
             init::create_database(self).await;
         }
 
+        let config = revolt_config::config().await;
+
+        if config.features.admin_api_enabled {
+            let db = self.db();
+            let colls = db
+                .list_collection_names()
+                .await
+                .expect("Failed to fetch collection names.");
+            if !colls.iter().any(|x| x == "admin_audits") {
+                info!("You've enabled the admin api for the first time. Setting up database...");
+                init::create_admin_database(&db).await;
+            }
+        }
+
         Ok(())
     }
 }

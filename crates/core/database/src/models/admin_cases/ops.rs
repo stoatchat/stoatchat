@@ -14,6 +14,8 @@ pub trait AbstractAdminCases: Sync + Send {
 
     async fn admin_case_fetch(&self, case_id: &str) -> Result<AdminCase>;
 
+    async fn admin_case_fetch_from_shorthand(&self, short_id: &str) -> Result<AdminCase>;
+
     /// title is fuzzy, the rest of the arguments are direct matches
     /// before_id and limit are for paginating
     async fn admin_case_search(

@@ -35,6 +35,11 @@ impl AbstractAdminCases for MongoDb {
             .ok_or_else(|| create_database_error!("find_one", COL))
     }
 
+    async fn admin_case_fetch_from_shorthand(&self, short_id: &str) -> Result<AdminCase> {
+        query!(self, find_one, COL, doc! {"short_id": short_id})?
+            .ok_or_else(|| create_database_error!("find_one", COL))
+    }
+
     /// title is fuzzy, the rest of the arguments are direct matches
     async fn admin_case_search(
         &self,

@@ -8,6 +8,8 @@ pub async fn create_database(db: &MongoDb) {
     info!("Creating database.");
     let db = db.db();
 
+    let config = revolt_config::config().await;
+
     db.create_collection("accounts")
         .await
         .expect("Failed to create accounts collection.");
@@ -263,5 +265,135 @@ pub async fn create_database(db: &MongoDb) {
     .await
     .expect("Failed to create ratelimit_events index.");
 
+    // Only create these tables if the admin api is enabled
+    if config.features.admin_api_enabled {
+        create_admin_database(&db).await;
+    }
+
     info!("Created database.");
+}
+
+pub async fn create_admin_database(db: &mongodb::Database) {
+    db.create_collection("admin_audits")
+        .await
+        .expect("Failed to create admin_audits collection.");
+
+    db.create_collection("admin_comments")
+        .await
+        .expect("Failed to create admin_comments collection.");
+
+    db.create_collection("admin_cases")
+        .await
+        .expect("Failed to create admin_cases collection.");
+
+    db.create_collection("admin_strikes")
+        .await
+        .expect("Failed to create admin_strikes collection.");
+
+    db.create_collection("admin_tokens")
+        .await
+        .expect("Failed to create admin_tokens collection.");
+
+    db.create_collection("admin_users")
+        .await
+        .expect("Failed to create admin_users collection.");
+
+    db.run_command(doc! {
+        "createIndexes": "admin_comments",
+        "indexes": [
+            {
+                "key": {
+                    "case_id": 1_i32,
+                },
+                "unique": false,
+                "name": "case_id"
+            },
+            {
+                "key": {
+                    "object_id": 1_i32,
+                },
+                "unique": false,
+                "name": "object_id"
+            }
+        ]
+    })
+    .await
+    .expect("Failed to create admin_comments index.");
+
+    db.run_command(doc! {
+        "createIndexes": "admin_cases",
+        "indexes": [
+            {
+                "key": {
+                    "id": 1_i32,
+                },
+                "unique": true,
+                "name": "id"
+            },
+            {
+                "key": {
+                    "short_id": 1_i32,
+                },
+                "unique": true,
+                "name": "short_id"
+            }
+        ]
+    })
+    .await
+    .expect("Failed to create admin_cases index.");
+
+    db.run_command(doc! {
+        "createIndexes": "admin_users",
+        "indexes": [
+            {
+                "key": {
+                    "email": 1_i32,
+                },
+                "unique": true,
+                "name": "case_id"
+            },
+        ]
+    })
+    .await
+    .expect("Failed to create admin_comments index.");
+
+    db.run_command(doc! {
+        "createIndexes": "admin_audits",
+        "indexes": [
+            {
+                "key": {
+                    "mod_id": 1_i32,
+                },
+                "unique": false,
+                "name": "mod_id"
+            },
+            {
+                "key": {
+                    "target_id": 1_i32,
+                },
+                "unique": false,
+                "name": "target_id"
+            }
+        ]
+    })
+    .await
+    .expect("Failed to create admin_audits index.");
+
+    // indexes on regular data that are only needed for admin queries
+    db.run_command(doc! {
+        "createIndexes": "server_members",
+        "indexes": [
+            {
+                "key": {
+                    "joined_at": 1_i32,
+                },
+                "unique": false,
+                "name": "joined_at"
+            },
+        ]
+    })
+    .await
+    .expect("Failed to create server_members::joined_at index.");
+
+    info!("Created admin database.");
 }
