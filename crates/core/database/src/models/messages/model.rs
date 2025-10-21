@@ -440,13 +440,16 @@ impl Message {
         }
 
         // Verify replies are valid.
-        let mut replies = HashSet::new();
+        let mut replies = Vec::new();
+
         if let Some(entries) = data.replies {
             if entries.len() > config.features.limits.global.message_replies {
                 return Err(create_error!(TooManyReplies {
                     max: config.features.limits.global.message_replies,
                 }));
             }
+
+            replies.reserve(entries.len());
 
             for ReplyIntent {
                 id,
@@ -461,7 +464,12 @@ impl Message {
                             user_mentions.insert(message.author.to_owned());
                         }
 
-                        replies.insert(message.id);
+                        // This is O(n^2), but this is faster than a HashSet
+                        // when n < 20; as long as the message_replies limit
+                        // is reasonable, this will be fast.
+                        if !replies.contains(&message.id) {
+                            replies.push(message.id);
+                        }
                     }
                     // If the referenced message doesn't exist and fail_if_not_exists
                     // is set to false, send the message without the reply.
@@ -534,9 +542,7 @@ impl Message {
         }
 
         if !replies.is_empty() {
-            message
-                .replies
-                .replace(replies.into_iter().collect::<Vec<String>>());
+            message.replies.replace(replies);
         }
 
         // Calculate final message flags
