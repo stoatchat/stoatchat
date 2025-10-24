@@ -152,3 +152,388 @@ pub async fn edit(
 
     Ok(Json(server.into()))
 }
+
+#[cfg(test)]
+mod test {
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_models::v0;
+    use rocket::http::{Header, Status};
+
+    #[rocket::async_test]
+    async fn test_edit_empty_request() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, _) = harness.new_server(&user).await;
+
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(r#"{}"#)
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Ok);
+        let returned_server: v0::Server = response.into_json().await.expect("`Server`");
+        assert_eq!(returned_server.id, server.id);
+    }
+
+    #[rocket::async_test]
+    async fn test_edit_with_name() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, _) = harness.new_server(&user).await;
+
+        let new_name = "Updated Server Name";
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(format!(r#"{{"name": "{}"}}"#, new_name))
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Ok);
+        let returned_server: v0::Server = response.into_json().await.expect("`Server`");
+        assert_eq!(returned_server.name, new_name);
+    }
+
+    #[rocket::async_test]
+    async fn test_edit_with_description() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, _) = harness.new_server(&user).await;
+
+        let new_description = "This is an updated description";
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(format!(r#"{{"description": "{}"}}"#, new_description))
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Ok);
+        let returned_server: v0::Server = response.into_json().await.expect("`Server`");
+        assert_eq!(
+            returned_server.description,
+            Some(new_description.to_string())
+        );
+    }
+
+    #[rocket::async_test]
+    async fn test_edit_with_icon() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, _) = harness.new_server(&user).await;
+
+        let icon_id = "test_icon_id";
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(format!(r#"{{"icon": "{}"}}"#, icon_id))
+            .dispatch()
+            .await;
+
+        assert!(response.status() == Status::Ok || response.status() == Status::NotFound);
+    }
+
+    #[rocket::async_test]
+    async fn test_edit_with_banner() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, _) = harness.new_server(&user).await;
+
+        let banner_id = "test_banner_id";
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(format!(r#"{{"banner": "{}"}}"#, banner_id))
+            .dispatch()
+            .await;
+
+        assert!(response.status() == Status::Ok || response.status() == Status::NotFound);
+    }
+
+    #[rocket::async_test]
+    async fn test_edit_with_system_messages() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, channels) = harness.new_server(&user).await;
+
+        let channel_id = &channels[0].id();
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(format!(
+                r#"{{"system_messages": {{"user_joined": "{}"}}}}"#,
+                channel_id
+            ))
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Ok);
+    }
+
+    #[rocket::async_test]
+    async fn test_edit_with_categories() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, channels) = harness.new_server(&user).await;
+
+        let channel_id = &channels[0].id();
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(format!(
+                r#"{{"categories": [{{"id": "cat1", "title": "Category 1", "channels": ["{}"]}}]}}"#,
+                channel_id
+            ))
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Ok);
+    }
+
+    #[rocket::async_test]
+    async fn test_edit_with_flags_privileged() {
+        let harness = TestHarness::new().await;
+        let (_, session, mut user) = harness.new_user().await;
+
+        user.privileged = true;
+        user.update(
+            &harness.db,
+            revolt_database::PartialUser {
+                privileged: Some(true),
+                ..Default::default()
+            },
+            vec![],
+        )
+        .await
+        .unwrap();
+
+        let (server, _) = harness.new_server(&user).await;
+
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(r#"{"flags": 1}"#)
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Ok);
+    }
+
+    #[rocket::async_test]
+    async fn test_edit_with_analytics() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, _) = harness.new_server(&user).await;
+
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(r#"{"analytics": true}"#)
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Ok);
+    }
+
+    #[rocket::async_test]
+    async fn test_edit_with_discoverable_privileged() {
+        let harness = TestHarness::new().await;
+        let (_, session, mut user) = harness.new_user().await;
+
+        user.privileged = true;
+        user.update(
+            &harness.db,
+            revolt_database::PartialUser {
+                privileged: Some(true),
+                ..Default::default()
+            },
+            vec![],
+        )
+        .await
+        .unwrap();
+
+        let (server, _) = harness.new_server(&user).await;
+
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(r#"{"discoverable": true}"#)
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Ok);
+    }
+
+    #[rocket::async_test]
+    async fn test_edit_with_remove_icon() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, _) = harness.new_server(&user).await;
+
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(r#"{"remove": ["Icon"]}"#)
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Ok);
+    }
+
+    #[rocket::async_test]
+    async fn test_edit_flags_without_privilege() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, _) = harness.new_server(&user).await;
+
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(r#"{"flags": 1}"#)
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Forbidden);
+    }
+
+    #[rocket::async_test]
+    async fn test_edit_discoverable_without_privilege() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, _) = harness.new_server(&user).await;
+
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(r#"{"discoverable": true}"#)
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Forbidden);
+    }
+
+    #[rocket::async_test]
+    async fn test_edit_system_messages_invalid_channel() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, _) = harness.new_server(&user).await;
+
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(r#"{"system_messages": {"user_joined": "invalid_channel_id"}}"#)
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::NotFound);
+    }
+
+    #[rocket::async_test]
+    async fn test_edit_categories_duplicate_channel() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, channels) = harness.new_server(&user).await;
+
+        let channel_id = &channels[0].id();
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(format!(
+                r#"{{"categories": [
+                    {{"id": "cat1", "title": "Category 1", "channels": ["{}"]}},
+                    {{"id": "cat2", "title": "Category 2", "channels": ["{}"]}}
+                ]}}"#,
+                channel_id, channel_id
+            ))
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::BadRequest);
+    }
+
+    #[rocket::async_test]
+    async fn test_remove_existing_banner() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, _) = harness.new_server(&user).await;
+
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(r#"{"remove": ["Banner"]}"#)
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Ok);
+    }
+
+    #[rocket::async_test]
+    async fn test_edit_without_privilege_non_sensitive() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, _) = harness.new_server(&user).await;
+
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(r#"{"name": "New Name Without Privilege"}"#)
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Ok);
+    }
+
+    #[rocket::async_test]
+    async fn test_edit_flags_and_discoverable_without_privilege() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, _) = harness.new_server(&user).await;
+
+        let response = harness
+            .client
+            .patch(format!("/servers/{}", server.id))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(rocket::http::ContentType::JSON)
+            .body(r#"{"flags": 1, "discoverable": true}"#)
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Forbidden);
+    }
+}
