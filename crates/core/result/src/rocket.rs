@@ -69,6 +69,7 @@ impl<'r> Responder<'r, 'static> for Error {
             ErrorType::NotPrivileged => Status::Forbidden,
             ErrorType::CannotGiveMissingPermissions => Status::Forbidden,
             ErrorType::NotOwner => Status::Forbidden,
+            ErrorType::IsElevated => Status::Forbidden,
 
             ErrorType::DatabaseError { .. } => Status::InternalServerError,
             ErrorType::InternalError => Status::InternalServerError,

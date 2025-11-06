@@ -139,6 +139,7 @@ pub enum ErrorType {
     NotPrivileged,
     CannotGiveMissingPermissions,
     NotOwner,
+    IsElevated,
 
     // ? General errors
     DatabaseError {
