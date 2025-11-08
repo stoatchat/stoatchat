@@ -73,7 +73,7 @@ jobs:
         if: github.event_name != 'pull_request' && github.ref_name == 'main'
         uses: actions/checkout@v3
         with:
-          repository: stoatchat/api
+          repository: stoatchat/javascript-client-api
           path: api
           token: ${{ secrets.PAT }}
 
