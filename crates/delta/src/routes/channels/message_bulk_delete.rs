@@ -55,3 +55,88 @@ pub async fn bulk_delete_messages(
         .await
         .map(|_| EmptyResponse)
 }
+
+#[cfg(test)]
+mod test {
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_models::v0::OptionsBulkDelete;
+    use rocket::http::Status;
+
+    #[rocket::async_test]
+    async fn success_message_bulk_delete() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, channels) = harness.new_server(&user).await;
+        let (channel, _, message1) = harness.new_message(&user, &server, channels).await;
+
+        let (_, _, user2) = harness.new_user().await;
+        let (_, _, message2) = harness
+            .new_message(&user2, &server, vec![channel.clone()])
+            .await;
+
+        let body = OptionsBulkDelete {
+            ids: vec![message1.id, message2.id],
+        };
+
+        let delete_response = TestHarness::with_session(
+            session,
+            harness
+                .client
+                .delete(format!("/channels/{}/messages/bulk", channel.id()))
+                .body(json!(body).to_string()),
+        )
+        .await;
+
+        assert_eq!(delete_response.status(), Status::NoContent);
+    }
+
+    #[rocket::async_test]
+    async fn fail_message_bulk_delete() {
+        let harness = TestHarness::new().await;
+        let (_, _, user) = harness.new_user().await;
+        let (server, channels) = harness.new_server(&user).await;
+        let (channel, _, _) = harness.new_message(&user, &server, channels).await;
+
+        let (_, session2, _) = harness.new_user().await;
+
+        let body = OptionsBulkDelete {
+            ids: vec![TestHarness::rand_string()],
+        };
+
+        let delete_response = TestHarness::with_session(
+            session2,
+            harness
+                .client
+                .delete(format!("/channels/{}/messages/bulk", channel.id()))
+                .body(json!(body).to_string()),
+        )
+        .await;
+
+        assert_eq!(delete_response.status(), Status::BadRequest);
+    }
+
+    #[rocket::async_test]
+    async fn fail_forbidden_message_bulk_delete() {
+        let harness = TestHarness::new().await;
+        let (_, _, user) = harness.new_user().await;
+        let (server, channels) = harness.new_server(&user).await;
+        let (channel, _, message) = harness.new_message(&user, &server, channels).await;
+
+        let (_, session2, _) = harness.new_user().await;
+
+        let body = OptionsBulkDelete {
+            ids: vec![message.id],
+        };
+
+        let delete_response = TestHarness::with_session(
+            session2,
+            harness
+                .client
+                .delete(format!("/channels/{}/messages/bulk", channel.id()))
+                .body(json!(body).to_string()),
+        )
+        .await;
+
+        assert_eq!(delete_response.status(), Status::Forbidden);
+    }
+}

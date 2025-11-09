@@ -30,3 +30,71 @@ pub async fn delete(
 
     message.delete(db).await.map(|_| EmptyResponse)
 }
+
+#[cfg(test)]
+mod test {
+    use crate::{rocket, util::test::TestHarness};
+    use rocket::http::Status;
+
+    #[rocket::async_test]
+    async fn success_message_delete() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, channels) = harness.new_server(&user).await;
+        let (channel, _, message) = harness.new_message(&user, &server, channels).await;
+
+        let delete_response = TestHarness::with_session(
+            session,
+            harness.client.delete(format!(
+                "/channels/{}/messages/{}",
+                channel.id(),
+                message.id
+            )),
+        )
+        .await;
+
+        assert_eq!(delete_response.status(), Status::NoContent);
+    }
+
+    #[rocket::async_test]
+    async fn fail_not_found_message_delete() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+        let (server, channels) = harness.new_server(&user).await;
+        let (channel, _, _) = harness.new_message(&user, &server, channels).await;
+
+        let delete_response = TestHarness::with_session(
+            session,
+            harness.client.delete(format!(
+                "/channels/{}/messages/{}",
+                channel.id(),
+                TestHarness::rand_string()
+            )),
+        )
+        .await;
+
+        assert_eq!(delete_response.status(), Status::NotFound);
+    }
+
+    #[rocket::async_test]
+    async fn fail_forbidden_message_delete() {
+        let harness = TestHarness::new().await;
+        let (_, _, user) = harness.new_user().await;
+        let (server, channels) = harness.new_server(&user).await;
+        let (channel, _, message) = harness.new_message(&user, &server, channels).await;
+
+        let (_, session2, _) = harness.new_user().await;
+
+        let delete_response = TestHarness::with_session(
+            session2,
+            harness.client.delete(format!(
+                "/channels/{}/messages/{}",
+                channel.id(),
+                message.id
+            )),
+        )
+        .await;
+
+        assert_eq!(delete_response.status(), Status::Forbidden);
+    }
+}
