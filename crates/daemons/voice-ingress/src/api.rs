@@ -90,50 +90,51 @@ pub async fn ingress(
                 .await;
             };
 
+            // TODO: fix `num_participants` being incorrect sometimes see (#457)
             // First user who joined - send call started system message.
-            if event.room.as_ref().unwrap().num_participants == 1 {
-                let user = Reference::from_unchecked(user_id).as_user(db).await?;
+            // if event.room.as_ref().unwrap().num_participants == 1 {
+            //     let user = Reference::from_unchecked(user_id).as_user(db).await?;
 
-                let message_id =
-                    Ulid::from_datetime(DateTime::from_timestamp_secs(event.created_at).unwrap())
-                        .to_string();
+            //     let message_id =
+            //         Ulid::from_datetime(DateTime::from_timestamp_secs(event.created_at).unwrap())
+            //             .to_string();
 
-                let mut call_started_message = SystemMessage::CallStarted {
-                    by: user_id.to_string(),
-                    finished_at: None,
-                }
-                .into_message(channel.id().to_string());
+            //     let mut call_started_message = SystemMessage::CallStarted {
+            //         by: user_id.to_string(),
+            //         finished_at: None,
+            //     }
+            //     .into_message(channel.id().to_string());
 
-                call_started_message.id = message_id;
+            //     call_started_message.id = message_id;
 
-                set_channel_call_started_system_message(channel.id(), &call_started_message.id)
-                    .await?;
+            //     set_channel_call_started_system_message(channel.id(), &call_started_message.id)
+            //         .await?;
 
-                call_started_message
-                    .send(
-                        db,
-                        Some(amqp),
-                        v0::MessageAuthor::System {
-                            username: &user.username,
-                            avatar: user.avatar.as_ref().map(|file| file.id.as_ref()),
-                        },
-                        None,
-                        None,
-                        &channel,
-                        false,
-                    )
-                    .await?;
+            //     call_started_message
+            //         .send(
+            //             db,
+            //             Some(amqp),
+            //             v0::MessageAuthor::System {
+            //                 username: &user.username,
+            //                 avatar: user.avatar.as_ref().map(|file| file.id.as_ref()),
+            //             },
+            //             None,
+            //             None,
+            //             &channel,
+            //             false,
+            //         )
+            //         .await?;
 
-                let recipients = get_call_notification_recipients(&channel_id, &user_id).await?;
-                let now = joined_at.format_short().to_string();
+            //     let recipients = get_call_notification_recipients(&channel_id, &user_id).await?;
+            //     let now = joined_at.format_short().to_string();
 
-                if let Err(e) = amqp
-                    .dm_call_updated(&user.id, channel.id(), Some(&now), false, recipients)
-                    .await
-                {
-                    revolt_config::capture_error(&e);
-                }
-            }
+            //     if let Err(e) = amqp
+            //         .dm_call_updated(&user.id, channel.id(), Some(&now), false, recipients)
+            //         .await
+            //     {
+            //         revolt_config::capture_error(&e);
+            //     }
+            // }
         }
         // User left a channel
         "participant_left" => {
@@ -157,47 +158,49 @@ pub async fn ingress(
                 .await;
             };
 
-            // Update CallStarted system message if everyone has left with the end time
-            let members = get_voice_channel_members(channel_id).await?;
+            // See above for why this is commented out
 
-            if members.is_none_or(|m| m.is_empty()) {
-                // The channel is empty so send out an "end" message for ringing
-                if let Err(e) = amqp
-                    .dm_call_updated(user_id, channel_id, None, true, None)
-                    .await
-                {
-                    revolt_config::capture_internal_error!(&e);
-                }
+            // // Update CallStarted system message if everyone has left with the end time
+            // let members = get_voice_channel_members(channel_id).await?;
 
-                if let Some(system_message_id) =
-                    take_channel_call_started_system_message(channel_id).await?
-                {
-                    // Could have been deleted
-                    if let Ok(mut message) = Reference::from_unchecked(&system_message_id)
-                        .as_message(db)
-                        .await
-                    {
-                        if let Some(SystemMessage::CallStarted { finished_at, .. }) =
-                            &mut message.system
-                        {
-                            *finished_at = Some(Timestamp::now_utc());
+            // if members.is_none_or(|m| m.is_empty()) {
+            //     // The channel is empty so send out an "end" message for ringing
+            //     if let Err(e) = amqp
+            //         .dm_call_updated(user_id, channel_id, None, true, None)
+            //         .await
+            //     {
+            //         revolt_config::capture_internal_error!(&e);
+            //     }
 
-                            message
-                                .update(
-                                    db,
-                                    PartialMessage {
-                                        system: message.system.clone(),
-                                        ..Default::default()
-                                    },
-                                    Vec::new(),
-                                )
-                                .await?;
-                        } else {
-                            log::error!("Broken State: Call started message ID ({}) does not contain a CallStarted system message.", &message.id)
-                        }
-                    };
-                };
-            }
+            //     if let Some(system_message_id) =
+            //         take_channel_call_started_system_message(channel_id).await?
+            //     {
+            //         // Could have been deleted
+            //         if let Ok(mut message) = Reference::from_unchecked(&system_message_id)
+            //             .as_message(db)
+            //             .await
+            //         {
+            //             if let Some(SystemMessage::CallStarted { finished_at, .. }) =
+            //                 &mut message.system
+            //             {
+            //                 *finished_at = Some(Timestamp::now_utc());
+
+            //                 message
+            //                     .update(
+            //                         db,
+            //                         PartialMessage {
+            //                             system: message.system.clone(),
+            //                             ..Default::default()
+            //                         },
+            //                         Vec::new(),
+            //                     )
+            //                     .await?;
+            //             } else {
+            //                 log::error!("Broken State: Call started message ID ({}) does not contain a CallStarted system message.", &message.id)
+            //             }
+            //         };
+            //     };
+            // }
         }
         // Audio/video track was started/stopped/unmuted/muted
         "track_published" | "track_unpublished" | "track_unmuted" | "track_muted" => {
