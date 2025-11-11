@@ -1,4 +1,8 @@
-use revolt_database::{util::reference::Reference, voice::{delete_voice_state, get_channel_node, is_in_voice_channel, VoiceClient}, Channel, Database, User, AMQP};
+use revolt_database::{
+    util::reference::Reference,
+    voice::{is_in_voice_channel, remove_user_from_voice_channel, VoiceClient},
+    Channel, Database, User, AMQP,
+};
 use revolt_permissions::ChannelPermission;
 use revolt_result::{create_error, Result};
 
@@ -24,7 +28,10 @@ pub async fn remove_member(
 
     let channel = target.as_channel(db).await?;
 
-    if let Channel::Group { owner, recipients, .. } = &channel {
+    if let Channel::Group {
+        owner, recipients, ..
+    } = &channel
+    {
         if &user.id != owner {
             return Err(create_error!(MissingPermission {
                 permission: ChannelPermission::ManageChannel.to_string()
@@ -44,15 +51,11 @@ pub async fn remove_member(
             .remove_user_from_group(db, amqp, &member, Some(&user.id), false)
             .await?;
     } else {
-        return Err(create_error!(InvalidOperation))
+        return Err(create_error!(InvalidOperation));
     };
 
-    if is_in_voice_channel(&user.id, channel.id()).await? {
-        if let Some(node) = get_channel_node(channel.id()).await? {
-            let _ = voice_client.remove_user(&node, &user.id, channel.id()).await;
-        }
-
-        delete_voice_state(channel.id(), None, &user.id).await?;
+    if is_in_voice_channel(&member.id, channel.id()).await? {
+        remove_user_from_voice_channel(db, voice_client, channel.id(), &member.id).await?;
     };
 
     Ok(EmptyResponse)

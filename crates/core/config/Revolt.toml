@@ -94,7 +94,7 @@ message_queue = "notifications.origin.message"
 mass_mention_queue = "notifications.origin.mass_mention" # handles messages that contain role or everyone mentions
 fr_accepted_queue = "notifications.ingest.fr_accepted"   # friend request accepted
 fr_received_queue = "notifications.ingest.fr_received"   # friend request received
-dm_call_queue = "notifications.ingest.dm_call"   # friend request received
+dm_call_queue = "notifications.ingest.dm_call"   # direct message voice call
 generic_queue = "notifications.ingest.generic"           # generic messages (title + body)
 ack_queue = "notifications.process.ack"                  # updates badges for apple devices
 

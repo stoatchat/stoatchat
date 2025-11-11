@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use futures::future::join_all;
 use revolt_database::{
@@ -124,12 +124,7 @@ impl State {
             .unwrap_or_default();
 
         // Fetch all memberships with their corresponding servers.
-        let members: Vec<Member> = db.fetch_all_memberships(&user.id).await?;
-        self.cache.members = members
-            .iter()
-            .cloned()
-            .map(|x| (x.id.server.clone(), x))
-            .collect();
+        let mut members: Vec<Member> = db.fetch_all_memberships(&user.id).await?;
 
         let server_ids: Vec<String> = members.iter().map(|x| x.id.server.clone()).collect();
         let servers = db.fetch_servers(&server_ids).await?;
@@ -158,6 +153,51 @@ impl State {
             }
         }
 
+        let voice_states = if fields.voice_states {
+            let mut voice_state_server_members: HashMap<String, HashSet<String>> = HashMap::new();
+
+            // fetch voice states for all the channels we can see
+            let mut voice_states = Vec::new();
+
+            for channel in channels.iter().filter(|c| {
+                matches!(
+                    c,
+                    Channel::DirectMessage { .. }
+                        | Channel::Group { .. }
+                        | Channel::TextChannel { voice: Some(_), .. }
+                )
+            }) {
+                if let Ok(Some(voice_state)) = get_channel_voice_state(channel).await {
+                    if let Some(server) = channel.server() {
+                        let set = voice_state_server_members.entry(server.to_string()).or_default();
+
+                        for participant in &voice_state.participants {
+                            user_ids.insert(participant.id.clone());
+                            set.insert(participant.id.clone());
+                        }
+                    } else {
+                        for participant in &voice_state.participants {
+                            user_ids.insert(participant.id.clone());
+                        }
+                    }
+
+                    voice_states.push(voice_state);
+                }
+            }
+
+            // Fetch all the members for for the participants who are in a server
+            for (server, user_ids) in voice_state_server_members {
+                let user_ids = user_ids.into_iter().collect::<Vec<_>>();
+                let voice_members = db.fetch_members(&server, &user_ids).await?;
+
+                members.extend(voice_members);
+            }
+
+            Some(voice_states)
+        } else {
+            None
+        };
+
         // Fetch presence data for known users.
         let online_ids = filter_online(&user_ids.iter().cloned().collect::<Vec<String>>()).await;
 
@@ -170,6 +210,12 @@ impl State {
                     .collect::<Vec<String>>(),
             )
             .await?;
+
+        self.cache.members = members
+            .iter()
+            .cloned()
+            .map(|x| (x.id.server.clone(), x))
+            .collect();
 
         // Fetch customisations.
         let emojis = if fields.emojis {
@@ -208,28 +254,6 @@ impl State {
                     .map(|unread| unread.into())
                     .collect(),
             )
-        } else {
-            None
-        };
-
-        let voice_states = if fields.voice_states {
-            // fetch voice states for all the channels we can see
-            let mut voice_states = Vec::new();
-
-            for channel in channels.iter().filter(|c| {
-                matches!(
-                    c,
-                    Channel::DirectMessage { .. }
-                        | Channel::Group { .. }
-                        | Channel::TextChannel { voice: Some(_), .. }
-                )
-            }) {
-                if let Ok(Some(voice_state)) = get_channel_voice_state(channel).await {
-                    voice_states.push(voice_state)
-                }
-            }
-
-            Some(voice_states)
         } else {
             None
         };

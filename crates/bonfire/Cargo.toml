@@ -41,7 +41,7 @@ authifier = { version = "1.0.15" }
 revolt-result = { path = "../core/result" }
 revolt-models = { path = "../core/models" }
 revolt-config = { path = "../core/config" }
-revolt-database = { path = "../core/database" }
+revolt-database = { path = "../core/database", features = ["voice"] }
 revolt-permissions = { version = "0.8.9", path = "../core/permissions" }
 revolt-presence = { path = "../core/presence", features = ["redis-is-patched"] }
 

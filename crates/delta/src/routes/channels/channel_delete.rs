@@ -1,9 +1,7 @@
 use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference},
-    voice::{
-        delete_channel_voice_state, delete_voice_state, get_channel_node, get_voice_channel_members, is_in_voice_channel, VoiceClient
-    },
-    Channel, Database, PartialChannel, User, AMQP,
+    AMQP, Channel, Database, PartialChannel, User, util::{permissions::DatabasePermissionQuery, reference::Reference}, voice::{
+        VoiceClient, delete_voice_channel, is_in_voice_channel, remove_user_from_voice_channel
+    }
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
@@ -57,26 +55,14 @@ pub async fn delete(
                 .await?;
 
             if is_in_voice_channel(&user.id, channel.id()).await? {
-                let node = get_channel_node(channel.id()).await?.unwrap();
-
-                voice_client
-                    .remove_user(&node, &user.id, channel.id())
-                    .await?;
-
-                delete_voice_state(channel.id(), None, &user.id).await?;
+                remove_user_from_voice_channel(db, voice_client, channel.id(), &user.id).await?;
             };
         }
         Channel::TextChannel { .. } => {
             permissions.throw_if_lacking_channel_permission(ChannelPermission::ManageChannel)?;
             channel.delete(db).await?;
 
-            if let Some(users) = get_voice_channel_members(channel.id()).await? {
-                let node = get_channel_node(channel.id()).await?.unwrap();
-
-                voice_client.delete_room(&node, channel.id()).await?;
-
-                delete_channel_voice_state(channel.id(), channel.server(), &users).await?;
-            };
+            delete_voice_channel(voice_client, channel.id(), channel.server()).await?;
         }
     };
 

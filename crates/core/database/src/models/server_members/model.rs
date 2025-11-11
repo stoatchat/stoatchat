@@ -1,7 +1,6 @@
 use iso8601_timestamp::Timestamp;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
-use crate::voice::get_channel_voice_state;
 
 use crate::{
     events::client::EventV1, util::permissions::DatabasePermissionQuery, Channel,
@@ -148,10 +147,12 @@ impl Member {
 
         let emojis = db.fetch_emoji_by_parent_id(&server.id).await?;
 
+        #[allow(unused_mut)]
         let mut voice_states = Vec::new();
 
+        #[cfg(feature = "voice")]
         for channel in &channels {
-            if let Ok(Some(voice_state)) = get_channel_voice_state(channel).await {
+            if let Ok(Some(voice_state)) = crate::voice::get_channel_voice_state(channel).await {
                 voice_states.push(voice_state)
             }
         }

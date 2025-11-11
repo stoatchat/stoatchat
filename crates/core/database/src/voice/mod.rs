@@ -564,3 +564,35 @@ pub async fn get_call_notification_recipients(
         .await
         .to_internal_error()
 }
+
+pub async fn remove_user_from_voice_channels(db: &Database, voice_client: &VoiceClient, user_id: &str) -> Result<()> {
+    for channel_id in get_user_voice_channels(user_id).await? {
+        remove_user_from_voice_channel(db, voice_client, &channel_id, user_id).await?;
+    };
+
+    Ok(())
+}
+
+pub async fn remove_user_from_voice_channel(db: &Database, voice_client: &VoiceClient, channel_id: &str, user_id: &str) -> Result<()> {
+    if let Some(node) = get_channel_node(channel_id).await? {
+        let _ = voice_client.remove_user(&node, user_id, channel_id).await;
+    }
+
+    let channel = Reference::from_unchecked(channel_id).as_channel(db).await?;
+
+    delete_voice_state(channel_id, channel.server(), user_id).await?;
+
+    Ok(())
+}
+
+pub async fn delete_voice_channel(voice_client: &VoiceClient, channel_id: &str, server_id: Option<&str>) -> Result<()> {
+    if let Some(users) = get_voice_channel_members(channel_id).await? {
+        let node = get_channel_node(channel_id).await?.unwrap();
+
+        voice_client.delete_room(&node, channel_id).await?;
+
+        delete_channel_voice_state(channel_id, server_id, &users).await?;
+    };
+
+    Ok(())
+}

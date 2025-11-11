@@ -1,5 +1,7 @@
 use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference}, voice::{delete_channel_voice_state, get_channel_node, get_voice_channel_members, VoiceClient}, Channel, Database, File, PartialChannel, SystemMessage, User, AMQP
+    util::{permissions::DatabasePermissionQuery, reference::Reference},
+    voice::{delete_voice_channel, VoiceClient},
+    Channel, Database, File, PartialChannel, SystemMessage, User, AMQP,
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
@@ -253,21 +255,12 @@ pub async fn edit(
         .update(
             db,
             partial,
-            data.remove
-                .into_iter()
-                .map(|f| f.into())
-                .collect(),
+            data.remove.into_iter().map(|f| f.into()).collect(),
         )
         .await?;
 
     if channel.voice().is_none() {
-        if let Some(users) = get_voice_channel_members(channel.id()).await? {
-            let node = get_channel_node(channel.id()).await?.unwrap();
-
-            voice_client.delete_room(&node, channel.id()).await?;
-
-            delete_channel_voice_state(channel.id(), channel.server(), &users).await?;
-        };
+        delete_voice_channel(voice_client, channel.id(), channel.server()).await?;
     }
 
     Ok(Json(channel.into()))

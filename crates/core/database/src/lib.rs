@@ -112,6 +112,7 @@ pub mod tasks;
 mod amqp;
 pub use amqp::amqp::AMQP;
 
+#[cfg(feature = "voice")]
 pub mod voice;
 
 

@@ -54,7 +54,7 @@ use_starttls = false
 url = "http://livekit"
 lat = 0.0
 lon = 0.0
-key = "worldwide_key"
+key = "worldwide"
 secret = "ZjCofRlfm6GGtjlifmNpCDkcQbEIIVC0"
 
 [files.s3]

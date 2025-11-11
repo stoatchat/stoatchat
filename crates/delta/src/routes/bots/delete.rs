@@ -1,4 +1,4 @@
-use revolt_database::{util::reference::Reference, voice::{delete_voice_state, get_channel_node, get_user_voice_channels, VoiceClient}, Database, User};
+use revolt_database::{Database, User, util::reference::Reference, voice::{VoiceClient, remove_user_from_voice_channels}};
 use revolt_result::{create_error, Result};
 use rocket::State;
 use rocket_empty::EmptyResponse;
@@ -21,15 +21,7 @@ pub async fn delete_bot(
 
     bot.delete(db).await?;
 
-    for channel_id in get_user_voice_channels(&bot.id).await? {
-        if let Some(node) = get_channel_node(&channel_id).await? {
-            let _ = voice_client.remove_user(&node, &bot.id, &channel_id).await;
-        }
-
-        let channel = Reference::from_unchecked(&channel_id).as_channel(db).await?;
-
-        delete_voice_state(&channel_id, channel.server(), &bot.id).await?;
-    }
+    remove_user_from_voice_channels(db, voice_client, &bot.id).await?;
 
     Ok(EmptyResponse)
 }
