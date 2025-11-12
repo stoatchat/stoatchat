@@ -1,46 +1,45 @@
 <html>
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <style>
-      /* Add custom classes and styles that you want inlined here */
-    </style>
-  </head>
-  <body class="bg-light">
-    <div class="container">
-      <img
-        alt="Revolt Logo"
-        class="ax-center my-10 w-24"
-        src="https://app.revolt.chat/assets/logo_round.png"
-      />
-      <div class="card p-6 p-lg-10 space-y-4">
-        <h1 class="h3 fw-700">Account Suspended</h1>
-        <p>Your account has been suspended, for one or more reasons:</p>
-        <ul>
-          {{list}}
-        </ul>
-        <p style="display:{{duration_display}}">
-          You will be able to use your account again in {{duration}} days.
-        </p>
-        <p>
-          Further violations may result in a permanent ban depending on
-          severity, please abide by the
-          <a href="https://revolt.chat/aup">Acceptable Usage Policy</a>.
-        </p>
-        <p>Ban evasion is prohibited and will be dealt with accordingly.</p>
-      </div>
-      <div class="text-muted text-center my-6">
-        This email is intended for {{email}}<br />
-        Sent from Revolt<br />
-        Made in Europe
-      </div>
-      <div class="text-muted text-xs my-6 ax-center">
-        Revolt Platforms Ltd. is a company incorporated and registered under the
-        laws of England and Wales.<br />
-        Registered Company Number: 16260658<br />
-        Registered Office:<br />
-        Suite 5703 Unit 3A, 34-35 Hatton Garden,<br />
-        Holborn, United Kingdom, EC1N 8DX
-      </div>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <style>
+    /* Add custom classes and styles that you want inlined here */
+  </style>
+</head>
+
+<body class="bg-light">
+  <div class="container">
+    <img class="ax-center my-10 w-24" src="https://stoat.chat/favicon.svg" alt="Stoat Logo" />
+    <div class="card p-6 p-lg-10 space-y-4">
+      <h1 class="h3 fw-700">Account Suspended</h1>
+      <p>Your account has been suspended, for one or more reasons:</p>
+      <ul>
+        {{list}}
+      </ul>
+      <p style="display:{{duration_display}}">
+        You will be able to use your account again in {{duration}} days.
+      </p>
+      <p>
+        Further violations may result in a permanent ban depending on
+        severity, please abide by the
+        <a href="https://revolt.chat/aup">Acceptable Usage Policy</a>.
+      </p>
+      <p>Ban evasion is prohibited and will be dealt with accordingly.</p>
     </div>
-  </body>
+    <div class="text-muted text-center my-6">
+      This email is intended for {{email}}<br />
+      Sent from Stoat<br />
+      Made in Europe
+    </div>
+    <div class="text-muted text-xs my-6 ax-center">
+      Revolt Platforms Ltd. is a company incorporated and registered under the
+      laws of England and Wales.<br />
+      Registered Company Number: 16260658<br />
+      Registered Office:<br />
+      Suite 5703 Unit 3A, 34-35 Hatton Garden,<br />
+      Holborn, United Kingdom, EC1N 8DX
+    </div>
+  </div>
+</body>
+
 </html>
