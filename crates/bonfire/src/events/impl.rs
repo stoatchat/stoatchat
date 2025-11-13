@@ -1,9 +1,10 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use futures::future::join_all;
 use revolt_database::{
     events::client::{EventV1, ReadyPayloadFields},
     util::permissions::DatabasePermissionQuery,
+    voice::get_channel_voice_state,
     Channel, Database, Member, MemberCompositeKey, Presence, RelationshipStatus,
 };
 use revolt_models::v0;
@@ -17,8 +18,9 @@ use super::state::{Cache, State};
 impl Cache {
     /// Check whether the current user can view a channel
     pub async fn can_view_channel(&self, db: &Database, channel: &Channel) -> bool {
+        #[allow(deprecated)]
         match &channel {
-            Channel::TextChannel { server, .. } | Channel::VoiceChannel { server, .. } => {
+            Channel::TextChannel { server, .. } => {
                 let member = self.members.get(server);
                 let server = self.servers.get(server);
                 let mut query =
@@ -122,12 +124,7 @@ impl State {
             .unwrap_or_default();
 
         // Fetch all memberships with their corresponding servers.
-        let members: Vec<Member> = db.fetch_all_memberships(&user.id).await?;
-        self.cache.members = members
-            .iter()
-            .cloned()
-            .map(|x| (x.id.server.clone(), x))
-            .collect();
+        let mut members: Vec<Member> = db.fetch_all_memberships(&user.id).await?;
 
         let server_ids: Vec<String> = members.iter().map(|x| x.id.server.clone()).collect();
         let servers = db.fetch_servers(&server_ids).await?;
@@ -156,6 +153,51 @@ impl State {
             }
         }
 
+        let voice_states = if fields.voice_states {
+            let mut voice_state_server_members: HashMap<String, HashSet<String>> = HashMap::new();
+
+            // fetch voice states for all the channels we can see
+            let mut voice_states = Vec::new();
+
+            for channel in channels.iter().filter(|c| {
+                matches!(
+                    c,
+                    Channel::DirectMessage { .. }
+                        | Channel::Group { .. }
+                        | Channel::TextChannel { voice: Some(_), .. }
+                )
+            }) {
+                if let Ok(Some(voice_state)) = get_channel_voice_state(channel).await {
+                    if let Some(server) = channel.server() {
+                        let set = voice_state_server_members.entry(server.to_string()).or_default();
+
+                        for participant in &voice_state.participants {
+                            user_ids.insert(participant.id.clone());
+                            set.insert(participant.id.clone());
+                        }
+                    } else {
+                        for participant in &voice_state.participants {
+                            user_ids.insert(participant.id.clone());
+                        }
+                    }
+
+                    voice_states.push(voice_state);
+                }
+            }
+
+            // Fetch all the members for for the participants who are in a server
+            for (server, user_ids) in voice_state_server_members {
+                let user_ids = user_ids.into_iter().collect::<Vec<_>>();
+                let voice_members = db.fetch_members(&server, &user_ids).await?;
+
+                members.extend(voice_members);
+            }
+
+            Some(voice_states)
+        } else {
+            None
+        };
+
         // Fetch presence data for known users.
         let online_ids = filter_online(&user_ids.iter().cloned().collect::<Vec<String>>()).await;
 
@@ -168,6 +210,12 @@ impl State {
                     .collect::<Vec<String>>(),
             )
             .await?;
+
+        self.cache.members = members
+            .iter()
+            .cloned()
+            .map(|x| (x.id.server.clone(), x))
+            .collect();
 
         // Fetch customisations.
         let emojis = if fields.emojis {
@@ -268,6 +316,8 @@ impl State {
             } else {
                 None
             },
+            voice_states,
+
             emojis,
             user_settings,
             channel_unreads,
@@ -285,19 +335,14 @@ impl State {
 
             let id = &id.to_string();
             for (channel_id, channel) in &self.cache.channels {
-                match channel {
-                    Channel::TextChannel { server, .. } | Channel::VoiceChannel { server, .. } => {
-                        if server == id {
-                            channel_ids.insert(channel_id.clone());
+                if channel.server() == Some(id) {
+                    channel_ids.insert(channel_id.clone());
 
-                            if self.cache.can_view_channel(db, channel).await {
-                                added_channels.push(channel_id.clone());
-                            } else {
-                                removed_channels.push(channel_id.clone());
-                            }
-                        }
+                    if self.cache.can_view_channel(db, channel).await {
+                        added_channels.push(channel_id.clone());
+                    } else {
+                        removed_channels.push(channel_id.clone());
                     }
-                    _ => {}
                 }
             }
 
@@ -465,6 +510,7 @@ impl State {
                 server,
                 channels,
                 emojis: _,
+                voice_states: _,
             } => {
                 self.insert_subscription(id.clone()).await;
 

@@ -35,7 +35,7 @@ pub enum DatabaseInfo {
 }
 
 /// Database
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Database {
     /// Mock database
     Reference(ReferenceDb),

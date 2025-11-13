@@ -1,3 +1,4 @@
+use iso8601_timestamp::Timestamp;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
@@ -277,6 +278,19 @@ auto_derived!(
         /// Username and discriminator combo separated by #
         pub username: String,
     }
+);
+
+auto_derived_partial!(
+    /// Voice State information for a user
+    pub struct UserVoiceState {
+        pub id: String,
+        pub joined_at: Timestamp,
+        pub is_receiving: bool,
+        pub is_publishing: bool,
+        pub screensharing: bool,
+        pub camera: bool,
+    },
+    "PartialUserVoiceState"
 );
 
 pub trait CheckRelationship {

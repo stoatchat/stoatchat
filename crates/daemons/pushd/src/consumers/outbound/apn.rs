@@ -47,6 +47,32 @@ impl<'a> PayloadLike for MessagePayload<'a> {
     }
 }
 
+#[derive(Serialize, Debug)]
+struct CallStartStopPayload<'a> {
+    aps: APS<'a>,
+    #[serde(skip_serializing)]
+    options: NotificationOptions<'a>,
+    #[serde(skip_serializing)]
+    device_token: &'a str,
+
+    initiator_id: &'a str,
+    #[serde(rename = "camelCase")]
+    channel_id: &'a str,
+    #[serde(rename = "camelCase")]
+    started_at: &'a str,
+    #[serde(rename = "camelCase")]
+    ended: bool,
+}
+
+impl<'a> PayloadLike for CallStartStopPayload<'a> {
+    fn get_device_token(&self) -> &'a str {
+        self.device_token
+    }
+    fn get_options(&self) -> &NotificationOptions {
+        &self.options
+    }
+}
+
 // region: consumer
 
 pub struct ApnsOutboundConsumer {
@@ -63,10 +89,11 @@ impl ApnsOutboundConsumer {
         // in a dm it should just be "Sendername".
         // not sure how feasible all those are given the PushNotification object as it currently stands.
 
+        #[allow(deprecated)]
         match &notification.channel {
             Channel::DirectMessage { .. } => notification.author.clone(),
             Channel::Group { name, .. } => format!("{}, #{}", notification.author, name),
-            Channel::TextChannel { name, .. } | Channel::VoiceChannel { name, .. } => {
+            Channel::TextChannel { name, .. } => {
                 format!("{} in #{}", notification.author, name)
             }
             _ => "Unknown".to_string(),
@@ -309,6 +336,7 @@ impl ApnsOutboundConsumer {
                 );
                 resp = self.client.send(apn_payload).await;
             }
+
             PayloadKind::BadgeUpdate(badge) => {
                 let apn_payload = Payload {
                     aps: APS {
@@ -321,6 +349,35 @@ impl ApnsOutboundConsumer {
                 };
 
                 debug!("Sending badge update for user: {:}", &payload.user_id);
+                resp = self.client.send(apn_payload).await;
+            }
+
+            PayloadKind::DmCallStartEnd(alert) => {
+                let started_at = alert.started_at.map_or(String::new(), |f| f.clone());
+
+                let apn_payload = CallStartStopPayload {
+                    aps: APS {
+                        alert: None,
+                        badge: self.get_badge_count(&payload.user_id).await,
+                        sound: None,
+                        thread_id: None,
+                        content_available: None,
+                        category: None,
+                        mutable_content: Some(1),
+                        url_args: None,
+                    },
+                    device_token: &payload.token,
+                    options: payload_options.clone(),
+                    initiator_id: &alert.initiator_id,
+                    channel_id: &alert.channel_id,
+                    started_at: &started_at,
+                    ended: alert.ended,
+                };
+
+                debug!(
+                    "Sending call start/stop notification for user: {:}",
+                    &payload.user_id
+                );
                 resp = self.client.send(apn_payload).await;
             }
         }

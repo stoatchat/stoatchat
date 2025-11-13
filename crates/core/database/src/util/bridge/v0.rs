@@ -143,6 +143,7 @@ impl From<crate::FieldsWebhook> for FieldsWebhook {
 }
 
 impl From<crate::Channel> for Channel {
+    #[allow(deprecated)]
     fn from(value: crate::Channel) -> Self {
         match value {
             crate::Channel::SavedMessages { id, user } => Channel::SavedMessages { id, user },
@@ -188,6 +189,7 @@ impl From<crate::Channel> for Channel {
                 default_permissions,
                 role_permissions,
                 nsfw,
+                voice,
             } => Channel::TextChannel {
                 id,
                 server,
@@ -198,31 +200,14 @@ impl From<crate::Channel> for Channel {
                 default_permissions,
                 role_permissions,
                 nsfw,
-            },
-            crate::Channel::VoiceChannel {
-                id,
-                server,
-                name,
-                description,
-                icon,
-                default_permissions,
-                role_permissions,
-                nsfw,
-            } => Channel::VoiceChannel {
-                id,
-                server,
-                name,
-                description,
-                icon: icon.map(|file| file.into()),
-                default_permissions,
-                role_permissions,
-                nsfw,
+                voice: voice.map(|voice| voice.into()),
             },
         }
     }
 }
 
 impl From<Channel> for crate::Channel {
+    #[allow(deprecated)]
     fn from(value: Channel) -> crate::Channel {
         match value {
             Channel::SavedMessages { id, user } => crate::Channel::SavedMessages { id, user },
@@ -268,6 +253,7 @@ impl From<Channel> for crate::Channel {
                 default_permissions,
                 role_permissions,
                 nsfw,
+                voice,
             } => crate::Channel::TextChannel {
                 id,
                 server,
@@ -278,25 +264,7 @@ impl From<Channel> for crate::Channel {
                 default_permissions,
                 role_permissions,
                 nsfw,
-            },
-            Channel::VoiceChannel {
-                id,
-                server,
-                name,
-                description,
-                icon,
-                default_permissions,
-                role_permissions,
-                nsfw,
-            } => crate::Channel::VoiceChannel {
-                id,
-                server,
-                name,
-                description,
-                icon: icon.map(|file| file.into()),
-                default_permissions,
-                role_permissions,
-                nsfw,
+                voice: voice.map(|voice| voice.into()),
             },
         }
     }
@@ -315,6 +283,7 @@ impl From<crate::PartialChannel> for PartialChannel {
             role_permissions: value.role_permissions,
             default_permissions: value.default_permissions,
             last_message_id: value.last_message_id,
+            voice: value.voice.map(|voice| voice.into())
         }
     }
 }
@@ -332,6 +301,7 @@ impl From<PartialChannel> for crate::PartialChannel {
             role_permissions: value.role_permissions,
             default_permissions: value.default_permissions,
             last_message_id: value.last_message_id,
+            voice: value.voice.map(|voice| voice.into())
         }
     }
 }
@@ -342,6 +312,7 @@ impl From<FieldsChannel> for crate::FieldsChannel {
             FieldsChannel::Description => crate::FieldsChannel::Description,
             FieldsChannel::Icon => crate::FieldsChannel::Icon,
             FieldsChannel::DefaultPermissions => crate::FieldsChannel::DefaultPermissions,
+            FieldsChannel::Voice => crate::FieldsChannel::Voice,
         }
     }
 }
@@ -352,6 +323,7 @@ impl From<crate::FieldsChannel> for FieldsChannel {
             crate::FieldsChannel::Description => FieldsChannel::Description,
             crate::FieldsChannel::Icon => FieldsChannel::Icon,
             crate::FieldsChannel::DefaultPermissions => FieldsChannel::DefaultPermissions,
+            crate::FieldsChannel::Voice => FieldsChannel::Voice,
         }
     }
 }
@@ -543,6 +515,7 @@ impl From<crate::SystemMessage> for SystemMessage {
             crate::SystemMessage::UserRemove { id, by } => Self::UserRemove { id, by },
             crate::SystemMessage::MessagePinned { id, by } => Self::MessagePinned { id, by },
             crate::SystemMessage::MessageUnpinned { id, by } => Self::MessageUnpinned { id, by },
+            crate::SystemMessage::CallStarted { by, finished_at } => Self::CallStarted { by, finished_at }
         }
     }
 }
@@ -639,6 +612,8 @@ impl From<crate::Member> for Member {
             avatar: value.avatar.map(|f| f.into()),
             roles: value.roles,
             timeout: value.timeout,
+            can_publish: value.can_publish,
+            can_receive: value.can_receive,
         }
     }
 }
@@ -652,6 +627,8 @@ impl From<Member> for crate::Member {
             avatar: value.avatar.map(|f| f.into()),
             roles: value.roles,
             timeout: value.timeout,
+            can_publish: value.can_publish,
+            can_receive: value.can_receive,
         }
     }
 }
@@ -665,6 +642,8 @@ impl From<crate::PartialMember> for PartialMember {
             avatar: value.avatar.map(|f| f.into()),
             roles: value.roles,
             timeout: value.timeout,
+            can_publish: value.can_publish,
+            can_receive: value.can_receive,
         }
     }
 }
@@ -678,6 +657,8 @@ impl From<PartialMember> for crate::PartialMember {
             avatar: value.avatar.map(|f| f.into()),
             roles: value.roles,
             timeout: value.timeout,
+            can_publish: value.can_publish,
+            can_receive: value.can_receive,
         }
     }
 }
@@ -707,6 +688,8 @@ impl From<crate::FieldsMember> for FieldsMember {
             crate::FieldsMember::Nickname => FieldsMember::Nickname,
             crate::FieldsMember::Roles => FieldsMember::Roles,
             crate::FieldsMember::Timeout => FieldsMember::Timeout,
+            crate::FieldsMember::CanReceive => FieldsMember::CanReceive,
+            crate::FieldsMember::CanPublish => FieldsMember::CanPublish,
             crate::FieldsMember::JoinedAt => FieldsMember::JoinedAt,
         }
     }
@@ -719,6 +702,8 @@ impl From<FieldsMember> for crate::FieldsMember {
             FieldsMember::Nickname => crate::FieldsMember::Nickname,
             FieldsMember::Roles => crate::FieldsMember::Roles,
             FieldsMember::Timeout => crate::FieldsMember::Timeout,
+            FieldsMember::CanReceive => crate::FieldsMember::CanReceive,
+            FieldsMember::CanPublish => crate::FieldsMember::CanPublish,
             FieldsMember::JoinedAt => crate::FieldsMember::JoinedAt,
         }
     }
@@ -1384,6 +1369,22 @@ impl From<FieldsMessage> for crate::FieldsMessage {
     fn from(value: FieldsMessage) -> Self {
         match value {
             FieldsMessage::Pinned => crate::FieldsMessage::Pinned,
+        }
+    }
+}
+
+impl From<VoiceInformation> for crate::VoiceInformation {
+    fn from(value: VoiceInformation) -> Self {
+        crate::VoiceInformation {
+            max_users: value.max_users
+        }
+    }
+}
+
+impl From<crate::VoiceInformation> for VoiceInformation {
+    fn from(value: crate::VoiceInformation) -> Self {
+        VoiceInformation {
+            max_users: value.max_users
         }
     }
 }

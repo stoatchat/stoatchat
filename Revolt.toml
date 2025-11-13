@@ -26,6 +26,11 @@ january = "http://local.revolt.chat:14705"
 voso_legacy = ""
 voso_legacy_ws = ""
 
+# Public urls for livekit nodes
+# each entry here should have a corresponding entry under `api.livekit.nodes`
+[hosts.livekit]
+worldwide = "ws://local.revolt.chat:14706"
+
 [api]
 
 [api.smtp]
@@ -39,6 +44,18 @@ reply_to = "support@revolt.chat"
 port = 14025
 use_tls = false
 use_starttls = false
+
+[api.livekit]
+
+# Config for livekit nodes
+# Make sure to change the secret when deploying
+# The key and secret should match the values livekit is using
+[api.livekit.nodes.worldwide]
+url = "http://livekit"
+lat = 0.0
+lon = 0.0
+key = "worldwide"
+secret = "ZjCofRlfm6GGtjlifmNpCDkcQbEIIVC0"
 
 [files.s3]
 # S3 protocol endpoint

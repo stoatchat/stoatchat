@@ -76,6 +76,11 @@ impl IntoResponse for Error {
             ErrorType::NotFound => StatusCode::NOT_FOUND,
             ErrorType::NoEffect => StatusCode::OK,
             ErrorType::FailedValidation { .. } => StatusCode::BAD_REQUEST,
+            ErrorType::LiveKitUnavailable => StatusCode::BAD_REQUEST,
+            ErrorType::NotConnected => StatusCode::BAD_REQUEST,
+            ErrorType::NotAVoiceChannel => StatusCode::BAD_REQUEST,
+            ErrorType::AlreadyConnected => StatusCode::BAD_REQUEST,
+            ErrorType::UnknownNode => StatusCode::BAD_REQUEST,
             ErrorType::InvalidFlagValue => StatusCode::BAD_REQUEST,
             ErrorType::FeatureDisabled { .. } => StatusCode::BAD_REQUEST,
 

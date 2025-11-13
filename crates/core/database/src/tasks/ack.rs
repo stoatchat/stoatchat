@@ -14,7 +14,7 @@ use validator::HasLen;
 use revolt_result::Result;
 
 use super::DelayedTask;
-use crate::Channel::{TextChannel, VoiceChannel};
+use crate::Channel::TextChannel;
 
 /// Enumeration of possible events
 #[derive(Debug, Eq, PartialEq)]
@@ -191,17 +191,14 @@ pub async fn handle_ack_event(
                     .await
                     .expect("Failed to fetch channel from db");
 
-                match channel {
-                    TextChannel { server, .. } | VoiceChannel { server, .. } => {
-                        if let Err(err) =
-                            amqp.mass_mention_message_sent(server, mass_mentions).await
-                        {
-                            revolt_config::capture_error(&err);
-                        }
+                if let TextChannel { server, .. } = channel {
+                    if let Err(err) =
+                        amqp.mass_mention_message_sent(server, mass_mentions).await
+                    {
+                        revolt_config::capture_error(&err);
                     }
-                    _ => {
-                        panic!("Unknown channel type when sending mass mention event");
-                    }
+                } else {
+                    panic!("Unknown channel type when sending mass mention event");
                 }
             }
         }

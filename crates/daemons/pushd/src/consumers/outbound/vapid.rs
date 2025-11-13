@@ -8,7 +8,7 @@ use base64::{
     engine::{self},
     Engine as _,
 };
-use revolt_database::{events::rabbit::*, Database};
+use revolt_database::{events::rabbit::*, util::format_display_name, Database};
 use web_push::{
     ContentEncoding, IsahcWebPushClient, SubscriptionInfo, SubscriptionKeys, VapidSignatureBuilder,
     WebPushClient, WebPushError, WebPushMessageBuilder,
@@ -106,6 +106,33 @@ impl VapidOutboundConsumer {
             }
             PayloadKind::MessageNotification(alert) => {
                 payload_body = serde_json::to_string(&alert)?;
+            }
+            PayloadKind::DmCallStartEnd(alert) => {
+                let initiator_name = if let Some(server_id) =
+                    self.db.fetch_channel(&alert.channel_id).await?.server()
+                {
+                    format_display_name(&self.db, &alert.initiator_id, Some(server_id)).await
+                } else {
+                    format_display_name(&self.db, &alert.initiator_id, None).await
+                }?;
+
+                let channel = self.db.fetch_channel(&alert.channel_id).await?;
+                let mut body = HashMap::new();
+
+                match channel {
+                    revolt_database::Channel::DirectMessage { .. } => {
+                        body.insert("body", format!("{} is calling you", initiator_name));
+                    }
+                    revolt_database::Channel::Group { name, .. } => {
+                        body.insert(
+                            "body",
+                            format!("{} is calling your group, {}", initiator_name, name),
+                        );
+                    }
+                    _ => bail!("Invalid DmCallStart/End channel type"),
+                }
+
+                payload_body = serde_json::to_string(&body)?;
             }
             PayloadKind::BadgeUpdate(_) => {
                 bail!("Vapid cannot handle badge updates and they should not be sent here.");

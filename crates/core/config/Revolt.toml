@@ -22,6 +22,8 @@ january = "http://local.revolt.chat/january"
 voso_legacy = ""
 voso_legacy_ws = ""
 
+[hosts.livekit]
+
 [rabbit]
 host = "rabbit"
 port = 5672
@@ -68,8 +70,13 @@ hcaptcha_sitekey = ""
 # Maximum concurrent connections (to proxy server)
 max_concurrent_connections = 50
 
-[api.users]
+[api.livekit]
+# How long to ring devices for when calling in dms/groups, in seconds
+call_ring_duration = 30
 
+[api.livekit.nodes]
+
+[api.users]
 
 [pushd]
 # this changes the names of the queues to not overlap 
@@ -87,6 +94,7 @@ message_queue = "notifications.origin.message"
 mass_mention_queue = "notifications.origin.mass_mention" # handles messages that contain role or everyone mentions
 fr_accepted_queue = "notifications.ingest.fr_accepted"   # friend request accepted
 fr_received_queue = "notifications.ingest.fr_received"   # friend request received
+dm_call_queue = "notifications.ingest.dm_call"   # direct message voice call
 generic_queue = "notifications.ingest.generic"           # generic messages (title + body)
 ack_queue = "notifications.process.ack"                  # updates badges for apple devices
 
@@ -230,6 +238,18 @@ message_attachments = 5
 # Maximum number of servers the user can create/join
 servers = 50
 
+# Maximum audio frequency (Hz) in voice calls
+voice_quality = 16000
+
+# Whether the user can use video streams in voice calls
+video = true
+
+# Mamimum resolution (width, height) of video streams in voice calls
+video_resolution = [1080, 720]
+
+# Minimum and maximum aspect ratio of video streams in voice calls
+video_aspect_ratio = [0.3, 2.5]
+
 [features.limits.new_user.file_upload_size_limit]
 # Maximum file size limits (in bytes)
 attachments = 20_000_000
@@ -257,6 +277,18 @@ message_attachments = 5
 # Maximum number of servers the user can create/join
 servers = 100
 
+# Maximum audio frequency (Hz) in voice calls
+voice_quality = 16000
+
+# Whether the user can use video streams in voice calls
+video = true
+
+# Mamimum resolution (width, height) of video streams in voice calls
+video_resolution = [1080, 720]
+
+# Minimum and maximum aspect ratio of video streams in voice calls
+video_aspect_ratio = [0.3, 2.5]
+
 [features.limits.default.file_upload_size_limit]
 # Maximum file size limits (in bytes)
 attachments = 20_000_000
@@ -275,6 +307,7 @@ process_message_delay_limit = 5
 # Configuration for Sentry error reporting
 api = ""
 events = ""
+voice_ingress = ""
 files = ""
 proxy = ""
 pushd = ""

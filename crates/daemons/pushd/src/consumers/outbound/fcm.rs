@@ -5,11 +5,12 @@ use amqprs::{channel::Channel as AmqpChannel, consumer::AsyncConsumer, BasicProp
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
 use fcm_v1::{
-    android::AndroidConfig,
+    android::{AndroidConfig, AndroidMessagePriority},
     auth::{Authenticator, ServiceAccountKey},
     message::{Message, Notification},
     Client, Error as FcmError,
 };
+use revolt_config::config;
 use revolt_database::{events::rabbit::*, Database};
 use revolt_models::v0::{Channel, PushNotification};
 use serde_json::Value;
@@ -27,10 +28,11 @@ impl FcmOutboundConsumer {
         // in a dm it should just be "Sendername".
         // not sure how feasible all those are given the PushNotification object as it currently stands.
 
+        #[allow(deprecated)]
         match &notification.channel {
             Channel::DirectMessage { .. } => notification.author.clone(),
             Channel::Group { name, .. } => format!("{}, #{}", notification.author, name),
-            Channel::TextChannel { name, .. } | Channel::VoiceChannel { name, .. } => {
+            Channel::TextChannel { name, .. } => {
                 format!("{} in #{}", notification.author, name)
             }
             _ => "Unknown".to_string(),
@@ -161,6 +163,37 @@ impl FcmOutboundConsumer {
                     }),
                     android: Some(AndroidConfig {
                         collapse_key: Some(alert.tag),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                };
+
+                resp = self.client.send(&msg).await;
+            }
+
+            PayloadKind::DmCallStartEnd(alert) => {
+                let mut data: HashMap<String, Value> = HashMap::new();
+                data.insert(
+                    "initiator_id".to_string(),
+                    Value::String(alert.initiator_id),
+                );
+                data.insert("channel_id".to_string(), Value::String(alert.channel_id));
+                data.insert(
+                    "started_at".to_string(),
+                    Value::String(alert.started_at.unwrap_or_else(|| "".to_string())),
+                );
+                data.insert("ended".to_string(), Value::Bool(alert.ended));
+
+                let msg = Message {
+                    token: Some(payload.token),
+                    notification: None,
+                    data: Some(data),
+                    android: Some(AndroidConfig {
+                        priority: Some(AndroidMessagePriority::High),
+                        ttl: Some(format!(
+                            "{}s",
+                            config().await.api.livekit.call_ring_duration
+                        )),
                         ..Default::default()
                     }),
                     ..Default::default()

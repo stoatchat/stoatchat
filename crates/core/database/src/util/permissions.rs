@@ -185,9 +185,26 @@ impl PermissionQuery for DatabasePermissionQuery<'_> {
         }
     }
 
+    async fn do_we_have_publish_overwrites(&mut self) -> bool {
+        if let Some(member) = &self.member {
+            member.can_publish
+        } else {
+            true
+        }
+    }
+
+    async fn do_we_have_receive_overwrites(&mut self) -> bool {
+        if let Some(member) = &self.member {
+            member.can_receive
+        } else {
+            true
+        }
+    }
+
     // * For calculating channel permission
 
     /// Get the type of the channel
+    #[allow(deprecated)]
     async fn get_channel_type(&mut self) -> ChannelType {
         if let Some(channel) = &self.channel {
             match channel {
@@ -199,9 +216,7 @@ impl PermissionQuery for DatabasePermissionQuery<'_> {
                 Cow::Borrowed(Channel::SavedMessages { .. })
                 | Cow::Owned(Channel::SavedMessages { .. }) => ChannelType::SavedMessages,
                 Cow::Borrowed(Channel::TextChannel { .. })
-                | Cow::Owned(Channel::TextChannel { .. })
-                | Cow::Borrowed(Channel::VoiceChannel { .. })
-                | Cow::Owned(Channel::VoiceChannel { .. }) => ChannelType::ServerChannel,
+                | Cow::Owned(Channel::TextChannel { .. }) => ChannelType::ServerChannel,
             }
         } else {
             ChannelType::Unknown
@@ -225,14 +240,6 @@ impl PermissionQuery for DatabasePermissionQuery<'_> {
                 | Cow::Owned(Channel::TextChannel {
                     default_permissions,
                     ..
-                })
-                | Cow::Borrowed(Channel::VoiceChannel {
-                    default_permissions,
-                    ..
-                })
-                | Cow::Owned(Channel::VoiceChannel {
-                    default_permissions,
-                    ..
                 }) => default_permissions.unwrap_or_default().into(),
                 _ => Default::default(),
             }
@@ -249,12 +256,6 @@ impl PermissionQuery for DatabasePermissionQuery<'_> {
                     role_permissions, ..
                 })
                 | Cow::Owned(Channel::TextChannel {
-                    role_permissions, ..
-                })
-                | Cow::Borrowed(Channel::VoiceChannel {
-                    role_permissions, ..
-                })
-                | Cow::Owned(Channel::VoiceChannel {
                     role_permissions, ..
                 }) => {
                     if let Some(server) = &self.server {
@@ -343,11 +344,10 @@ impl PermissionQuery for DatabasePermissionQuery<'_> {
     /// (this will only ever be called for server channels, use unimplemented!() for other code paths)
     async fn set_server_from_channel(&mut self) {
         if let Some(channel) = &self.channel {
+            #[allow(deprecated)]
             match channel {
                 Cow::Borrowed(Channel::TextChannel { server, .. })
-                | Cow::Owned(Channel::TextChannel { server, .. })
-                | Cow::Borrowed(Channel::VoiceChannel { server, .. })
-                | Cow::Owned(Channel::VoiceChannel { server, .. }) => {
+                | Cow::Owned(Channel::TextChannel { server, .. }) => {
                     if let Some(known_server) =
                         // I'm not sure why I can't just pattern match both at once here?
                         // It throws some weird error and the provided fix doesn't work :/

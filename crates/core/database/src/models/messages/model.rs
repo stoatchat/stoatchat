@@ -114,6 +114,11 @@ auto_derived!(
         MessagePinned { id: String, by: String },
         #[serde(rename = "message_unpinned")]
         MessageUnpinned { id: String, by: String },
+        #[serde(rename = "call_started")]
+        CallStarted {
+            by: String,
+            finished_at: Option<Timestamp>,
+        },
     }
 
     /// Name and / or avatar override information
@@ -326,9 +331,7 @@ impl Message {
         }
 
         let server_id = match channel {
-            Channel::TextChannel { ref server, .. } | Channel::VoiceChannel { ref server, .. } => {
-                Some(server.clone())
-            }
+            Channel::TextChannel { ref server, .. } => Some(server.clone()),
             _ => None,
         };
 
@@ -486,6 +489,7 @@ impl Message {
 
         // Validate the mentions go to users in the channel/server
         if !user_mentions.is_empty() {
+            #[allow(deprecated)]
             match channel {
                 Channel::DirectMessage { ref recipients, .. }
                 | Channel::Group { ref recipients, .. } => {
@@ -493,8 +497,7 @@ impl Message {
                     user_mentions.retain(|m| recipients_hash.contains(m));
                     role_mentions.clear();
                 }
-                Channel::TextChannel { ref server, .. }
-                | Channel::VoiceChannel { ref server, .. } => {
+                Channel::TextChannel { ref server, .. }=> {
                     let mentions_vec = Vec::from_iter(user_mentions.iter().cloned());
 
                     let valid_members = db.fetch_members(server.as_str(), &mentions_vec[..]).await;
@@ -684,7 +687,6 @@ impl Message {
         )
         .await?;
 
-
         if !self.has_suppressed_notifications()
             && (self.mentions.is_some() || self.contains_mass_push_mention())
         {
@@ -800,7 +802,7 @@ impl Message {
         query: MessageQuery,
         perspective: &User,
         include_users: Option<bool>,
-        server_id: Option<String>,
+        server_id: Option<&str>,
     ) -> Result<BulkMessageResponse> {
         let messages: Vec<v0::Message> = db
             .fetch_messages(query)
@@ -843,6 +845,7 @@ impl Message {
                             v0::SystemMessage::MessageUnpinned { by, .. } => {
                                 users.push(by.clone());
                             }
+                            v0::SystemMessage::CallStarted { by, .. } => users.push(by.clone()),
                         }
                     }
                     users
@@ -857,7 +860,7 @@ impl Message {
                 users,
                 members: if let Some(server_id) = server_id {
                     Some(
-                        db.fetch_members(&server_id, &user_ids)
+                        db.fetch_members(server_id, &user_ids)
                             .await?
                             .into_iter()
                             .map(Into::into)

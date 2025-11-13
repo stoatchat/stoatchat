@@ -11,6 +11,7 @@ use serde::Serialize;
 
 database_derived!(
     /// MongoDB implementation
+    #[derive(Debug)]
     pub struct MongoDb(pub ::mongodb::Client, pub String);
 );
 

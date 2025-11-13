@@ -3,9 +3,17 @@ use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 
 use crate::{
-    events::client::EventV1, util::permissions::DatabasePermissionQuery, Channel, Database, File,
-    Server, SystemMessage, User,
+    events::client::EventV1, util::permissions::DatabasePermissionQuery, Channel,
+    Database, File, Server, SystemMessage, User,
 };
+
+fn default_true() -> bool {
+    true
+}
+
+fn is_true(x: &bool) -> bool {
+    *x
+}
 
 auto_derived_partial!(
     /// Server Member
@@ -30,6 +38,14 @@ auto_derived_partial!(
         /// Timestamp this member is timed out until
         #[serde(skip_serializing_if = "Option::is_none")]
         pub timeout: Option<Timestamp>,
+
+        /// Whether the member is server-wide voice muted
+        #[serde(skip_serializing_if = "is_true", default = "default_true")]
+        pub can_publish: bool,
+        /// Whether the member is server-wide voice deafened
+        #[serde(skip_serializing_if = "is_true", default = "default_true")]
+        pub can_receive: bool,
+        
         // This value only exists in the database, not the models.
         // If it is not-None, the database layer should return None to member fetching queries.
         // pub pending_deletion_at: Option<Timestamp>
@@ -53,6 +69,8 @@ auto_derived!(
         Avatar,
         Roles,
         Timeout,
+        CanReceive,
+        CanPublish,
         JoinedAt,
     }
 
@@ -73,6 +91,8 @@ impl Default for Member {
             avatar: None,
             roles: vec![],
             timeout: None,
+            can_publish: true,
+            can_receive: true,
         }
     }
 }
@@ -127,6 +147,16 @@ impl Member {
 
         let emojis = db.fetch_emoji_by_parent_id(&server.id).await?;
 
+        #[allow(unused_mut)]
+        let mut voice_states = Vec::new();
+
+        #[cfg(feature = "voice")]
+        for channel in &channels {
+            if let Ok(Some(voice_state)) = crate::voice::get_channel_voice_state(channel).await {
+                voice_states.push(voice_state)
+            }
+        }
+
         EventV1::ServerMemberJoin {
             id: server.id.clone(),
             user: user.id.clone(),
@@ -144,6 +174,7 @@ impl Member {
                 .map(|channel| channel.into())
                 .collect(),
             emojis: emojis.into_iter().map(|emoji| emoji.into()).collect(),
+            voice_states
         }
         .private(user.id.clone())
         .await;
@@ -198,6 +229,8 @@ impl Member {
             FieldsMember::Nickname => self.nickname = None,
             FieldsMember::Roles => self.roles.clear(),
             FieldsMember::Timeout => self.timeout = None,
+            FieldsMember::CanReceive => self.can_receive = true,
+            FieldsMember::CanPublish => self.can_publish = true,
         }
     }
 

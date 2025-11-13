@@ -11,4 +11,5 @@ venv/
 .vercel
 .DS_Store
 
+livekit.yml
 .idea

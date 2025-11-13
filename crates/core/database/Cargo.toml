@@ -18,6 +18,7 @@ async-std-runtime = ["async-std", "authifier/async-std-runtime"]
 rocket-impl = ["rocket", "schemars", "revolt_okapi", "revolt_rocket_okapi", "authifier/rocket_impl"]
 axum-impl = ["axum"]
 redis-is-patched = ["revolt-presence/redis-is-patched"]
+voice = ["livekit-api", "livekit-protocol", "livekit-runtime"]
 
 # Default Features
 default = ["mongodb", "async-std-runtime", "tasks"]
@@ -96,3 +97,8 @@ authifier = { version = "1.0.15" }
 
 # RabbitMQ
 amqprs = { version = "1.7.0" }
+
+# Voice
+livekit-api = { version = "0.4.4", optional = true}
+livekit-protocol = { version = "0.4.0", optional = true }
+livekit-runtime = { version = "0.3.1", features = ["tokio"], optional = true }

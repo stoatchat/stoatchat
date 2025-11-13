@@ -64,6 +64,14 @@ async fn validate_user_permissions() {
             unreachable!()
         }
 
+        async fn do_we_have_publish_overwrites(&mut self) -> bool {
+            true
+        }
+
+        async fn do_we_have_receive_overwrites(&mut self) -> bool {
+            true
+        }
+
         async fn get_channel_type(&mut self) -> ChannelType {
             ChannelType::DirectMessage
         }
@@ -151,6 +159,14 @@ async fn validate_group_permissions() {
 
         async fn are_we_timed_out(&mut self) -> bool {
             unreachable!()
+        }
+
+        async fn do_we_have_publish_overwrites(&mut self) -> bool {
+            true
+        }
+
+        async fn do_we_have_receive_overwrites(&mut self) -> bool {
+            true
         }
 
         async fn get_channel_type(&mut self) -> ChannelType {
@@ -254,6 +270,14 @@ async fn validate_server_permissions() {
             false
         }
 
+        async fn do_we_have_publish_overwrites(&mut self) -> bool {
+            true
+        }
+
+        async fn do_we_have_receive_overwrites(&mut self) -> bool {
+            true
+        }
+
         async fn get_channel_type(&mut self) -> ChannelType {
             ChannelType::ServerChannel
         }
@@ -343,6 +367,14 @@ async fn validate_timed_out_member() {
         }
 
         async fn are_we_timed_out(&mut self) -> bool {
+            true
+        }
+
+        async fn do_we_have_publish_overwrites(&mut self) -> bool {
+            true
+        }
+
+        async fn do_we_have_receive_overwrites(&mut self) -> bool {
             true
         }
 

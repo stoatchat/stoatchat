@@ -89,6 +89,8 @@ pub enum ChannelPermission {
     DeafenMembers = 1 << 34,
     /// Move members between voice channels
     MoveMembers = 1 << 35,
+    /// Listen to other users
+    Listen = 1 << 36,
 
     // * Channel permissions two electric boogaloo
     /// Mention everyone and online members
@@ -130,7 +132,9 @@ pub static DEFAULT_PERMISSION: Lazy<u64> = Lazy::new(|| {
             + ChannelPermission::SendEmbeds
             + ChannelPermission::UploadFiles
             + ChannelPermission::Connect
-            + ChannelPermission::Speak,
+            + ChannelPermission::Speak
+            + ChannelPermission::Listen
+            + ChannelPermission::Video
     )
 });
 

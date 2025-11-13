@@ -1,5 +1,6 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
+    voice::{get_user_voice_channel_in_server, remove_user_from_voice_channel, VoiceClient},
     Database, RemovalIntention, ServerBan, User,
 };
 use revolt_models::v0;
@@ -16,6 +17,7 @@ use validator::Validate;
 #[put("/<server>/bans/<target>", data = "<data>")]
 pub async fn ban(
     db: &State<Database>,
+    voice_client: &State<VoiceClient>,
     user: User,
     server: Reference<'_>,
     target: Reference<'_>,
@@ -54,6 +56,11 @@ pub async fn ban(
         member
             .remove(db, &server, RemovalIntention::Ban, false)
             .await?;
+
+        // If the member is in a voice channel while banned kick them from the voice channel
+        if let Some(channel_id) = get_user_voice_channel_in_server(&target.id, &server.id).await? {
+            remove_user_from_voice_channel(db, voice_client, &channel_id, &target.id).await?;
+        }
     }
 
     ServerBan::create(db, &server, target.id, data.reason)

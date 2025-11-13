@@ -39,7 +39,7 @@ pub enum DataPermissionPoly {
         permissions: u64,
     },
     Field {
-        /// Allow / deny values to set for members in this `TextChannel` or `VoiceChannel`
+        /// Allow / deny values to set for members in this server channel
         permissions: Override,
     },
 }

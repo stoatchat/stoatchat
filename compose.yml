@@ -40,7 +40,7 @@ services:
 
   # Rabbit
   rabbit:
-    image: rabbitmq:3-management
+    image: rabbitmq:4-management
     environment:
       RABBITMQ_DEFAULT_USER: rabbituser
       RABBITMQ_DEFAULT_PASS: rabbitpass
@@ -64,3 +64,10 @@ services:
       MAILDEV_WEB_PORT: 8080
       MAILDEV_INCOMING_USER: smtp
       MAILDEV_INCOMING_PASS: smtp
+
+  livekit:
+    image: ghcr.io/stoatchat/livekit-server:v1.9.9
+    command: --config /etc/livekit.yml
+    network_mode: "host"
+    volumes:
+      - ./livekit.yml:/etc/livekit.yml

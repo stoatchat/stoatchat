@@ -1,3 +1,4 @@
+use std::panic::Location;
 use std::fmt::Display;
 
 #[cfg(feature = "serde")]
@@ -159,6 +160,12 @@ pub enum ErrorType {
         error: String,
     },
 
+    // ? Voice errors
+    LiveKitUnavailable,
+    NotAVoiceChannel,
+    AlreadyConnected,
+    NotConnected,
+    UnknownNode,
     // ? Micro-service errors
     ProxyError,
     FileTooSmall,
@@ -196,6 +203,61 @@ macro_rules! create_database_error {
             collection: $collection.to_string()
         })
     };
+}
+
+#[macro_export]
+#[cfg(debug_assertions)]
+macro_rules! query {
+    ( $self: ident, $type: ident, $collection: expr, $($rest:expr),+ ) => {
+        Ok($self.$type($collection, $($rest),+).await.unwrap())
+    };
+}
+
+#[macro_export]
+#[cfg(not(debug_assertions))]
+macro_rules! query {
+    ( $self: ident, $type: ident, $collection: expr, $($rest:expr),+ ) => {
+        $self.$type($collection, $($rest),+).await
+            .map_err(|_| create_database_error!(stringify!($type), $collection))
+    };
+}
+
+pub trait ToRevoltError<T> {
+    #[track_caller]
+    fn to_internal_error(self) -> Result<T, Error>;
+}
+
+impl<T, E: std::fmt::Debug + std::error::Error> ToRevoltError<T> for Result<T, E> {
+    #[track_caller]
+    fn to_internal_error(self) -> Result<T, Error> {
+        let loc = Location::caller();
+
+        self
+            .map_err(|e| {
+                log::error!("{e:?}");
+                #[cfg(feature = "sentry")]
+                sentry::capture_error(&e);
+
+                Error {
+                    error_type: ErrorType::InternalError,
+                    location: format!("{}:{}:{}", loc.file(), loc.line(), loc.column())
+                }
+            })
+    }
+}
+
+impl<T> ToRevoltError<T> for Option<T> {
+    #[track_caller]
+    fn to_internal_error(self) -> Result<T, Error> {
+        let loc = Location::caller();
+
+        self.ok_or_else(|| {
+            Error {
+                error_type: ErrorType::InternalError,
+                location: format!("{}:{}:{}", loc.file(), loc.line(), loc.column())
+            }
+        })
+    }
 }
 
 #[cfg(test)]

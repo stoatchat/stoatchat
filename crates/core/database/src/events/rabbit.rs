@@ -37,6 +37,20 @@ pub struct GenericPayload {
     pub user: User,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DmCallPayload {
+    pub initiator_id: String,
+    pub channel_id: String,
+    pub started_at: Option<String>,
+    pub ended: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct InternalDmCallPayload {
+    pub payload: DmCallPayload,
+    pub recipients: Option<Vec<String>>,
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
 #[allow(clippy::large_enum_variant)]
@@ -46,6 +60,7 @@ pub enum PayloadKind {
     FRReceived(FRReceivedPayload),
     BadgeUpdate(usize),
     Generic(GenericPayload),
+    DmCallStartEnd(DmCallPayload),
 }
 
 #[derive(Serialize, Deserialize)]

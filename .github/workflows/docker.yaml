@@ -5,8 +5,6 @@ on:
     tags:
       - "*"
   pull_request:
-    branches:
-      - "main"
     paths:
       - "Dockerfile"
 
@@ -197,3 +195,22 @@ jobs:
           build-args: |
             BASE_IMAGE=ghcr.io/${{ github.repository_owner }}/base:latest
           labels: ${{ steps.meta-pushd.outputs.labels }}
+
+      # stoatchat/voice-ingress
+      - name: Docker meta
+        id: meta-voice-ingress
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            ghcr.io/stoatchat/voice-ingress
+      - name: Publish
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          file: crates/daemons/voice-ingress/Dockerfile
+          tags: ${{ steps.meta-voice-ingress.outputs.tags }}
+          build-args: |
+            BASE_IMAGE=ghcr.io/${{ github.repository_owner }}/base:latest
+          labels: ${{ steps.meta-voice-ingress.outputs.labels }}

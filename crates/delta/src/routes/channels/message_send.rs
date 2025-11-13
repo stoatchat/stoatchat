@@ -151,6 +151,7 @@ mod test {
                 name: "Hidden Channel".to_string(),
                 description: None,
                 nsfw: Some(false),
+                voice: None
             },
             true,
         )
@@ -193,6 +194,7 @@ mod test {
                 d: ChannelPermission::ViewChannel as i64,
             }),
             last_message_id: None,
+            voice: None,
         };
         locked_channel
             .update(&harness.db, partial, vec![])
@@ -287,6 +289,8 @@ mod test {
             avatar: None,
             timeout: None,
             roles: Some(second_member_roles),
+            can_publish: None,
+            can_receive: None
         };
         second_member
             .update(&harness.db, partial, vec![])
@@ -613,6 +617,8 @@ mod test {
                     nickname: None,
                     roles: Some(vec![role_id.clone()]),
                     timeout: None,
+                    can_publish: None,
+                    can_receive: None
                 },
                 vec![],
             )

@@ -1,6 +1,5 @@
 use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, User,
+    util::{permissions::DatabasePermissionQuery, reference::Reference}, voice::{sync_voice_permissions, VoiceClient}, Database, User
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
@@ -14,6 +13,7 @@ use rocket::{serde::json::Json, State};
 #[patch("/<target>/roles/ranks", data = "<data>")]
 pub async fn edit_role_ranks(
     db: &State<Database>,
+    voice_client: &State<VoiceClient>,
     user: User,
     target: Reference<'_>,
     data: Json<v0::DataEditRoleRanks>,
@@ -69,6 +69,12 @@ pub async fn edit_role_ranks(
     }
 
     server.set_role_ordering(db, new_order).await?;
+
+    for channel_id in &server.channels {
+        let channel = Reference::from_unchecked(channel_id).as_channel(db).await?;
+
+        sync_voice_permissions(db, voice_client, &channel, Some(&server), None).await?;
+    };
 
     Ok(Json(server.into()))
 }

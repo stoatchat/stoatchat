@@ -16,8 +16,9 @@ use tokio::sync::Notify;
 mod consumers;
 use consumers::{
     inbound::{
-        ack::AckConsumer, fr_accepted::FRAcceptedConsumer, fr_received::FRReceivedConsumer,
-        generic::GenericConsumer, mass_mention::MassMessageConsumer, message::MessageConsumer,
+        ack::AckConsumer, dm_call::DmCallConsumer, fr_accepted::FRAcceptedConsumer,
+        fr_received::FRReceivedConsumer, generic::GenericConsumer,
+        mass_mention::MassMessageConsumer, message::MessageConsumer,
     },
     outbound::{apn::ApnsOutboundConsumer, fcm::FcmOutboundConsumer, vapid::VapidOutboundConsumer},
 };
@@ -102,6 +103,7 @@ async fn main() {
         .await,
     );
 
+    // inbound: Mass Mentions
     connections.push(
         make_queue_and_consume(
             &config,
@@ -109,6 +111,18 @@ async fn main() {
             config.pushd.get_mass_mention_routing_key().as_str(),
             None,
             MassMessageConsumer::new(db.clone(), authifier.clone()),
+        )
+        .await,
+    );
+
+    // inbound: Dm Calls
+    connections.push(
+        make_queue_and_consume(
+            &config,
+            &config.pushd.dm_call_queue,
+            config.pushd.get_dm_call_routing_key().as_str(),
+            None,
+            DmCallConsumer::new(db.clone(), authifier.clone()),
         )
         .await,
     );

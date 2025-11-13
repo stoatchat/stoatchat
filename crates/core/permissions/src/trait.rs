@@ -39,6 +39,12 @@ pub trait PermissionQuery {
     /// Is our perspective user timed out on this server?
     async fn are_we_timed_out(&mut self) -> bool;
 
+    /// Is the member muted?
+    async fn do_we_have_publish_overwrites(&mut self) -> bool;
+
+    /// Is the member deafend?
+    async fn do_we_have_receive_overwrites(&mut self) -> bool;
+
     // * For calculating channel permission
 
     /// Get the type of the channel

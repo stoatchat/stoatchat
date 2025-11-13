@@ -1,6 +1,7 @@
 use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Channel, Database, PartialChannel, User, AMQP,
+    AMQP, Channel, Database, PartialChannel, User, util::{permissions::DatabasePermissionQuery, reference::Reference}, voice::{
+        VoiceClient, delete_voice_channel, is_in_voice_channel, remove_user_from_voice_channel
+    }
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
@@ -15,6 +16,7 @@ use rocket_empty::EmptyResponse;
 #[delete("/<target>?<options..>")]
 pub async fn delete(
     db: &State<Database>,
+    voice_client: &State<VoiceClient>,
     amqp: &State<AMQP>,
     user: User,
     target: Reference<'_>,
@@ -26,34 +28,45 @@ pub async fn delete(
 
     permissions.throw_if_lacking_channel_permission(ChannelPermission::ViewChannel)?;
 
+    #[allow(deprecated)]
     match &channel {
-        Channel::SavedMessages { .. } => Err(create_error!(NoEffect)),
-        Channel::DirectMessage { .. } => channel
-            .update(
-                db,
-                PartialChannel {
-                    active: Some(false),
-                    ..Default::default()
-                },
-                vec![],
-            )
-            .await
-            .map(|_| EmptyResponse),
-        Channel::Group { .. } => channel
-            .remove_user_from_group(
-                db,
-                amqp,
-                &user,
-                None,
-                options.leave_silently.unwrap_or_default(),
-            )
-            .await
-            .map(|_| EmptyResponse),
-        Channel::TextChannel { .. } | Channel::VoiceChannel { .. } => {
-            permissions.throw_if_lacking_channel_permission(ChannelPermission::ManageChannel)?;
-            channel.delete(db).await.map(|_| EmptyResponse)
+        Channel::SavedMessages { .. } => Err(create_error!(NoEffect))?,
+        Channel::DirectMessage { .. } => {
+            channel
+                .update(
+                    db,
+                    PartialChannel {
+                        active: Some(false),
+                        ..Default::default()
+                    },
+                    vec![],
+                )
+                .await?
         }
-    }
+        Channel::Group { .. } => {
+            channel
+                .remove_user_from_group(
+                    db,
+                    amqp,
+                    &user,
+                    None,
+                    options.leave_silently.unwrap_or_default(),
+                )
+                .await?;
+
+            if is_in_voice_channel(&user.id, channel.id()).await? {
+                remove_user_from_voice_channel(db, voice_client, channel.id(), &user.id).await?;
+            };
+        }
+        Channel::TextChannel { .. } => {
+            permissions.throw_if_lacking_channel_permission(ChannelPermission::ManageChannel)?;
+            channel.delete(db).await?;
+
+            delete_voice_channel(voice_client, channel.id(), channel.server()).await?;
+        }
+    };
+
+    Ok(EmptyResponse)
 }
 
 #[cfg(test)]

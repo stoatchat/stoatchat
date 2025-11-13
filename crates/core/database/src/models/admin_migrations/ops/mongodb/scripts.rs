@@ -9,14 +9,13 @@ use crate::{
         bson::{doc, from_bson, from_document, to_document, Bson, DateTime, Document},
         options::FindOptions,
     },
-    AbstractChannels, AbstractServers, Channel, Invite, MongoDb, User, DISCRIMINATOR_SEARCH_SPACE,
+    AbstractServers, Invite, MongoDb, User, DISCRIMINATOR_SEARCH_SPACE,
 };
 use bson::{oid::ObjectId, to_bson};
 use futures::StreamExt;
 use iso8601_timestamp::Timestamp;
 use rand::seq::SliceRandom;
-use revolt_permissions::DEFAULT_WEBHOOK_PERMISSIONS;
-use revolt_result::{Error, ErrorType};
+use revolt_permissions::{ChannelPermission, DEFAULT_WEBHOOK_PERMISSIONS};
 use serde::{Deserialize, Serialize};
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -26,7 +25,7 @@ struct MigrationInfo {
     revision: i32,
 }
 
-pub const LATEST_REVISION: i32 = 42; // MUST BE +1 to last migration
+pub const LATEST_REVISION: i32 = 49; // MUST BE +1 to last migration
 
 pub async fn migrate_database(db: &MongoDb) {
     let migrations = db.col::<Document>("migrations");
@@ -914,6 +913,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     }
 
     if revision <= 26 {
+        // Need to migrate fields on attachments, change `user_id`, `object_id`, etc to `parent`.
         info!("Running migration [revision 26 / 15-05-2024]: fix invites being incorrectly serialized with wrong enum tagging.");
 
         auto_derived!(
@@ -1080,6 +1080,14 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             channel_id: String,
         }
 
+        #[allow(clippy::enum_variant_names)]
+        #[derive(serde::Serialize, serde::Deserialize)]
+        enum Channel {
+            Group { owner: String },
+            TextChannel { server: String },
+            VoiceChannel { server: String }
+        }
+
         let webhooks = db
             .db()
             .collection::<WebhookShell>("channel_webhooks")
@@ -1091,8 +1099,8 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             .await;
 
         for webhook in webhooks {
-            match db.fetch_channel(&webhook.channel_id).await {
-                Ok(channel) => {
+            match db.col::<Channel>("channels").find_one(doc! { "_id": &webhook.channel_id }).await.unwrap() {
+                Some(channel) => {
                     let creator_id = match channel {
                         Channel::Group { owner, .. } => owner,
                         Channel::TextChannel { server, .. }
@@ -1100,7 +1108,6 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
                             let server = db.fetch_server(&server).await.expect("server");
                             server.owner
                         }
-                        _ => unreachable!("not server or group channel!"),
                     };
 
                     db.db()
@@ -1118,17 +1125,13 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
                         .await
                         .expect("update webhook");
                 }
-                Err(Error {
-                    error_type: ErrorType::NotFound,
-                    ..
-                }) => {
+                None => {
                     db.db()
                         .collection::<WebhookShell>("channel_webhooks")
                         .delete_one(doc! { "_id": webhook._id })
                         .await
                         .expect("failed to delete invalid webhook");
                 }
-                Err(err) => panic!("{err:?}"),
             }
         }
     }
@@ -1169,9 +1172,9 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             .expect("failed to update users");
     }
 
-    if revision <= 41 {
+    if revision <= 43 {
         info!(
-            "Running migration [revision 41 / 05-06-2025]: convert role ranks to uniform numbers."
+            "Running migration [revision 43 / 05-06-2025]: convert role ranks to uniform numbers."
         );
 
         #[derive(Serialize, Deserialize, Clone)]
@@ -1225,6 +1228,41 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
                 .unwrap();
         }
     }
+
+    if revision <= 46 {
+        info!("Running migration [revision 46 / 29-04-2025]: Convert all `VoiceChannel`'s into `TextChannel`");
+
+        db.col::<Document>("channels")
+            .update_many(
+                doc! { "channel_type": "VoiceChannel" },
+                doc! {
+                    "$set": {
+                        "channel_type": "TextChannel",
+                        "voice": {}
+                    }
+                }
+            )
+            .await
+            .expect("Failed to update voice channels");
+    };
+
+        if revision <= 48 {
+        info!("Running migration [revision 48 / 22-10-2025]: Add Video + Listen to default permissions");
+
+        db.col::<Document>("servers")
+            .update_many(
+                doc! { },
+                doc! {
+                    "$bit": {
+                        "default_permissions": {
+                            "or": (ChannelPermission::Video + ChannelPermission::Speak + ChannelPermission::Listen) as i64
+                        },
+                    }
+                }
+            )
+            .await
+            .expect("Failed to update default_permissions");
+    };
 
     // Reminder to update LATEST_REVISION when adding new migrations.
     LATEST_REVISION.max(revision)
