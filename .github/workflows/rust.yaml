@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+concurrency: 
+  group: ${{ github.head_ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 

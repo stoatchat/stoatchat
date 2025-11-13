@@ -12,6 +12,10 @@ permissions:
   contents: read
   packages: write
 
+concurrency: 
+  group: ${{ github.head_ref }}
+  cancel-in-progress: true
+
 jobs:
   base:
     name: Test base image build
