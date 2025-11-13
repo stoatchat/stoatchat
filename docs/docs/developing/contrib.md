@@ -12,22 +12,14 @@ This is the contribution guide for developers wanting to help out with Stoat.
 
 - Sign-off your commits ([Git flag](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---signoff)), [read here about DCO obligations](https://developercertificate.org/).
 - Sign commits where possible, [learn more about that here](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits).
-- Commit using [Conventional Commit style](https://www.conventionalcommits.org/en/v1.0.0-beta.2/).
-- Use `prettier` in relevant repositories using Typescript, use `cargo fmt` in those using Rust.
-  **Note:** PRs should only format files that have been changed to avoid conflicts.
+- Prefer to use [Conventional Commit style](https://www.conventionalcommits.org/en/v1.0.0-beta.2/).
+- If present, e.g. `prettier`, `cargo fmt`, use the formatter.
 - Try to keep each PR bound to a single feature or change, multiple bug fixes may be fine in some cases.
   This is to avoid your PR getting stuck due to parts of it having conflicts or other issues.
 
 ## Merging Pull Requests
 
-To keep commit history nice and tidy, always use [Conventional Commit style](https://www.conventionalcommits.org/en/v1.0.0-beta.2/) for any merge commit messages. And where possible:
-
-1. `Squash and Merge` for bug fixes / small features, especially if the fix has multiple iterations, [example](https://github.com/stoatchat/revite/pull/492), or if the commits don't follow conventional commit style.
-
-Beyond this point you should usually check with a maintainer on how to merge, and should only proceed with the following if the commits follow [Conventional Commit style](https://www.conventionalcommits.org/en/v1.0.0-beta.2/):
-
-2. Prefer to `Rebase and Merge` where possible.
-3. Create a merge request with commit message similar to `merge: remote-tracking branch abc into xyz (#1)`.
+All PR titles must use use [Conventional Commit style](https://www.conventionalcommits.org/en/v1.0.0-beta.2/) and will be squash merged!
 
 # What can I help with?
 
