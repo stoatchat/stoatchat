@@ -1,4 +1,4 @@
-# New API features
+# Adding new API features
 
 New API features must be documented where appropriate, this document aims to cover everywhere you need to update for new features.
 

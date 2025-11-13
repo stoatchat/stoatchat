@@ -1,0 +1,10 @@
+{
+    "label": "Developers",
+    "position": 10,
+    "link": {
+        "type": "generated-index",
+        "description": "Building with Stoat"
+    },
+    "collapsed": true,
+    "collapsible": true
+}
