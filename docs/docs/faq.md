@@ -67,7 +67,7 @@ All of these answers are written from the perspective of the project owner.
   - Please make explicit distinctions between Stoat (the platform, "stoat.chat") and the Stoat software.
   - The Stoat software is provided unbranded and only associated by name.
 
-  If you have any concerns or questions, please liase with us at [contact@stoat.chat](contact@stoat.chat).
+  If you have any concerns or questions, please liase with us at [contact@stoat.chat](mailto:contact@stoat.chat).
 
   As a third-party platform:
   - You **must** provide correct attribution in line with our software licenses:
@@ -96,7 +96,7 @@ All of these answers are written from the perspective of the project owner.
 
     Distinct means the community is unique and well-known (& has an active presence) off platform. This means we are not currently verifying generic servers that centre around a topic unless if it meets one of the first two criteria. Though in special circumstances, well known on platform communities may also be considered.
 
-  Server verification also comes with a vanity invite, so please have one ready if you want to apply. To apply, drop an email at [contact@stoat.chat](contact@stoat.chat).
+  Server verification also comes with a vanity invite, so please have one ready if you want to apply. To apply, drop an email at [contact@stoat.chat](mailto:contact@stoat.chat).
 
   We also periodically prune verification from servers that have fallen into disrepair and / or otherwise are no longer active.
 </details>

@@ -44,7 +44,7 @@ const config: Config = {
       '@scalar/docusaurus',
       {
         label: 'API Reference',
-        route: '/scalar',
+        route: '/api-reference',
         showNavLink: true,
         configuration: {
           url: 'https://stoat.chat/api/openapi.json',

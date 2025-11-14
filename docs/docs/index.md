@@ -10,7 +10,6 @@ Learn more about:
 
 - [Contributing as a developer](./developing/contrib)
 - [Other ways to help out](./help)
-- [Developing on Stoat](./developers)
 
 You may also be interested in the:
 
