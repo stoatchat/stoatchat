@@ -6,9 +6,9 @@ sidebar_position: 2
 
 This is the contribution guide for developers wanting to help out with Stoat.
 
-# Repository Lifecycle
+## Repository Lifecycle
 
-## Making Commits
+### Making Commits
 
 - Sign-off your commits ([Git flag](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---signoff)), [read here about DCO obligations](https://developercertificate.org/).
 - Sign commits where possible, [learn more about that here](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits).
@@ -17,11 +17,11 @@ This is the contribution guide for developers wanting to help out with Stoat.
 - Try to keep each PR bound to a single feature or change, multiple bug fixes may be fine in some cases.
   This is to avoid your PR getting stuck due to parts of it having conflicts or other issues.
 
-## Merging Pull Requests
+### Merging Pull Requests
 
 All PR titles must use use [Conventional Commit style](https://www.conventionalcommits.org/en/v1.0.0-beta.2/) and will be squash merged!
 
-# What can I help with?
+## What can I help with?
 
 Stuff is currently being moved around, for the mean time, come ask in the development server: https://stt.gg/API
 
@@ -36,7 +36,7 @@ Also typically `help wanted` labels are available on repo issues!
 
 Any issues marked with "Future Work" or with a milestone greater than the current milestone are out of bounds and should not be worked on since it's likely that the team already has a plan in place, any work you may do may conflict with prior ideas, and your work may potentially be rejected if it does fit the criteria exactly. In general, these issues are just postponed to reduce long term technical debt, i.e. allow current issues to be handled. -->
 
-# Project Guidance
+## Project Guidance
 
 Please read the additional relevant guidance on:
 
