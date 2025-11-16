@@ -491,6 +491,32 @@ async fn worker(
                             topic_signal_s.send(()).await.ok();
                         }
                     }
+                    ClientMessage::BeginEditing { channel, message } => {
+                        if !subscribed.read().await.contains(&channel) {
+                            continue;
+                        }
+
+                        EventV1::MessageStartEditing {
+                            id: message.clone(),
+                            channel: channel.clone(),
+                            user: user_id.clone(),
+                        }
+                        .p(channel.clone())
+                        .await;
+                    }
+                    ClientMessage::StopEditing { channel, message } => {
+                        if !subscribed.read().await.contains(&channel) {
+                            continue;
+                        }
+
+                        EventV1::MessageStopEditing {
+                            id: message.clone(),
+                            channel: channel.clone(),
+                            user: user_id.clone(),
+                        }
+                        .p(channel.clone())
+                        .await;
+                    }
                     ClientMessage::Ping { data, responded } => {
                         if responded.is_none() {
                             write
