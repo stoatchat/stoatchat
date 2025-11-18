@@ -15,6 +15,9 @@ use rocket::State;
 #[utoipa::path(
     tag = "Server Members",
     security(("Session-Token" = []), ("Bot-Token" = [])),
+    params(
+        ("target" = Reference, Path),
+    ),
     responses(
         (status = 200, body = v0::BanListResult),
     ),

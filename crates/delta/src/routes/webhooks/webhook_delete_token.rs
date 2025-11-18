@@ -8,6 +8,10 @@ use rocket_empty::EmptyResponse;
 /// Deletes a webhook with a token
 #[utoipa::path(
     tag = "Webhooks",
+    params(
+        ("webhook_id" = Reference, Path),
+        ("token" = String, Path),
+    ),
     responses(
         (status = 204),
     ),

@@ -17,6 +17,10 @@ use rocket_empty::EmptyResponse;
 #[utoipa::path(
     tag = "Voice",
     security(("Session-Token" = []), ("Bot-Token" = [])),
+    params(
+        ("target" = Reference, Path),
+        ("target_user." = Reference, Path),
+    ),
     responses(
         (status = 204),
     ),

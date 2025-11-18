@@ -14,6 +14,8 @@ use rocket::{serde::json::Json, State};
     tag = "Server Members",
     security(("Session-Token" = []), ("Bot-Token" = [])),
     params(
+        ("target" = Reference, Path),
+        ("member" = Reference, Path),
         (
             "roles" = bool,
             Query,

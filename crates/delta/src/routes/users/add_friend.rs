@@ -11,6 +11,9 @@ use rocket::State;
 #[utoipa::path(
     tag = "Relationships",
     security(("Session-Token" = [])),
+    params(
+        ("target" = Reference, Path),
+    ),
     responses(
         (status = 200, body = v0::User),
     ),

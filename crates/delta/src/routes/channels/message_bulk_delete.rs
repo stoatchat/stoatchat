@@ -20,6 +20,9 @@ use validator::Validate;
 #[utoipa::path(
     tag = "Messaging",
     security(("Session-Token" = []), ("Bot-Token" = [])),
+    params(
+        ("target" = Reference, Path),
+    ),
     responses(
         (status = 204),
     ),

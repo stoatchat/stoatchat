@@ -1,5 +1,5 @@
 use revolt_config::Settings;
-use revolt_database::util::utoipa::TokenSecurity;
+use revolt_database::util::{utoipa::TokenSecurity, reference::Reference};
 use revolt_result::ErrorAddon;
 pub use rocket::http::Status;
 pub use rocket::response::Redirect;
@@ -234,6 +234,11 @@ pub fn mount(config: Settings, mut rocket: Rocket<Build>) -> Rocket<Build> {
             api = webhooks::ApiDoc,
         ),
 
+    ),
+    components(
+        schemas(
+            Reference,
+        )
     ),
     modifiers(
         &Extensions,

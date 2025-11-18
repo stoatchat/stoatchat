@@ -16,6 +16,10 @@ use validator::Validate;
 #[utoipa::path(
     tag = "Server Members",
     security(("Session-Token" = []), ("Bot-Token" = [])),
+    params(
+        ("server" = Reference, Path),
+        ("target" = Reference, Path),
+    ),
     responses(
         (status = 200, body = v0::ServerBan),
     ),

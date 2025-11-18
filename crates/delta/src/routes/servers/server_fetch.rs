@@ -13,7 +13,10 @@ use rocket::{serde::json::Json, State};
 #[utoipa::path(
     tag = "Server Information",
     security(("Session-Token" = []), ("Bot-Token" = [])),
-    params(v0::OptionsFetchServer),
+    params(
+        ("target" = Reference, Path),
+        v0::OptionsFetchServer
+    ),
     responses(
         (status = 200, body = v0::Server),
     ),

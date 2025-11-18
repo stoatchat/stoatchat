@@ -19,6 +19,9 @@ use validator::Validate;
     tag = "Messaging",
     security(("Session-Token" = []), ("Bot-Token" = [])),
     params(IdempotencyKey),
+    params(
+        ("target" = Reference, Path),
+    ),
     responses(
         (status = 200, body = v0::Message),
     ),

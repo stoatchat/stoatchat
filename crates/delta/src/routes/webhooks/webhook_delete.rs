@@ -13,6 +13,9 @@ use rocket_empty::EmptyResponse;
 #[utoipa::path(
     tag = "Webhooks",
     security(("Session-Token" = []), ("Bot-Token" = [])),
+    params(
+        ("webhook_id" = Reference, Path),
+    ),
     responses(
         (status = 204),
     ),

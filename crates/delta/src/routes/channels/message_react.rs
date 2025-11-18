@@ -13,6 +13,11 @@ use rocket_empty::EmptyResponse;
 #[utoipa::path(
     tag = "Interactions",
     security(("Session-Token" = []), ("Bot-Token" = [])),
+    params(
+        ("target" = Reference, Path),
+        ("msg" = Reference, Path),
+        ("emoji" = Reference, Path),
+    ),
     responses(
         (status = 204),
     ),

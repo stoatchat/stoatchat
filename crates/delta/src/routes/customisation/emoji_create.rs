@@ -1,5 +1,5 @@
 use revolt_config::config;
-use revolt_database::{util::permissions::DatabasePermissionQuery, Database, Emoji, File, User};
+use revolt_database::{Database, Emoji, File, User, util::{permissions::DatabasePermissionQuery, reference::Reference}};
 use revolt_models::v0;
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
@@ -13,6 +13,9 @@ use rocket::{serde::json::Json, State};
 #[utoipa::path(
     tag = "Emojis",
     security(("Session-Token" = []), ("Bot-Token" = [])),
+    params(
+        ("id" = Reference, Path),
+    ),
     responses(
         (status = 200, body = v0::Emoji),
     ),

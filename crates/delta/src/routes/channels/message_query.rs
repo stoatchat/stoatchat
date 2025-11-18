@@ -14,7 +14,10 @@ use validator::Validate;
 #[utoipa::path(
     tag = "Messaging",
     security(("Session-Token" = []), ("Bot-Token" = [])),
-    params(v0::OptionsQueryMessages),
+    params(
+        ("target" = Reference, Path),
+        v0::OptionsQueryMessages,
+    ),
     responses(
         (status = 200, body = v0::BulkMessageResponse),
     ),

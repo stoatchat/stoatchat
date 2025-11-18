@@ -8,6 +8,9 @@ use rocket::{serde::json::Json, State};
 /// Retrieve a user's flags.
 #[utoipa::path(
     tag = "User Information",
+    params(
+        ("target" = Reference, Path),
+    ),
     responses(
         (status = 200, body = v0::FlagResponse),
     ),

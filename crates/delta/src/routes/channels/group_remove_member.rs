@@ -15,6 +15,10 @@ use rocket_empty::EmptyResponse;
 #[utoipa::path(
     tag = "Groups",
     security(("Session-Token" = [])),
+    params(
+        ("target" = Reference, Path),
+        ("member" = Reference, Path),
+    ),
     responses(
         (status = 204),
     ),

@@ -3,14 +3,6 @@ use std::str::FromStr;
 use revolt_result::Result;
 #[cfg(feature = "rocket-impl")]
 use rocket::request::FromParam;
-#[cfg(feature = "utoipa")]
-use utoipa::{
-    openapi::{
-        path::{Parameter, ParameterBuilder, ParameterIn},
-        Required,
-    },
-    IntoParams,
-};
 
 use crate::{
     Bot, Channel, Database, Emoji, Invite, Member, Message, Server, ServerBan, User, Webhook,
@@ -113,17 +105,5 @@ impl<'r> FromParam<'r> for Reference<'r> {
 
     fn from_param(param: &'r str) -> Result<Self, Self::Error> {
         Ok(Reference::from_unchecked(param))
-    }
-}
-
-#[cfg(feature = "utoipa")]
-impl IntoParams for Reference<'_> {
-    fn into_params(parameter_in_provider: impl Fn() -> Option<ParameterIn>) -> Vec<Parameter> {
-        vec![ParameterBuilder::new()
-            .name("id")
-            .required(Required::True)
-            .description(Some("An ID".to_string()))
-            .parameter_in(parameter_in_provider().unwrap_or_default())
-            .build()]
     }
 }

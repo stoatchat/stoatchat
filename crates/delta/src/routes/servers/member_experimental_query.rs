@@ -34,7 +34,10 @@ pub struct MemberQueryResponse {
 #[utoipa::path(
     tag = "Server Members",
     security(("Session-Token" = []), ("Bot-Token" = [])),
-    params(OptionsQueryMembers),
+    params(
+        ("target" = Reference, Path),
+        OptionsQueryMembers,
+    ),
     responses(
         (status = 200, body = MemberQueryResponse),
     ),

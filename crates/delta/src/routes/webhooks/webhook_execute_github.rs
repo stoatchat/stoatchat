@@ -713,7 +713,16 @@ fn convert_event(data: &str, event_name: &str) -> Result<Event> {
 /// Executes a webhook specific to github and sends a message containing the relevant info about the event
 #[utoipa::path(
     tag = "Webhooks",
-    params(EventHeader)
+    request_body(
+        content = String,
+        content_type = "application/json",
+        description = "Github event payload",
+    ),
+    params(
+        ("webhook_id" = Reference, Path),
+        ("token" = String, Path),
+        EventHeader,
+    ),
 )]
 #[post("/<webhook_id>/<token>/github", data = "<data>")]
 pub async fn webhook_execute_github(

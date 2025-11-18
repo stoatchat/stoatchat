@@ -1,3 +1,4 @@
+use revolt_database::util::reference::Reference;
 use rocket::http::ContentType;
 use rocket::response::{self, Responder};
 use rocket::{Request, Response};
@@ -22,6 +23,9 @@ impl<'r> Responder<'r, 'static> for CachedFile {
 #[utoipa::path(
     tag = "User Information",
     security(("Session-Token" = []), ("Bot-Token" = [])),
+    params(
+        ("target" = Reference, Path),
+    ),
     responses(
         (
             status = 200,

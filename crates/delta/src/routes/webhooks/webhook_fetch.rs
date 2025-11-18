@@ -13,6 +13,9 @@ use rocket::{serde::json::Json, State};
 #[utoipa::path(
     tag = "Webhooks",
     security(("Session-Token" = []), ("Bot-Token" = [])),
+    params(
+        ("webhook_id" = Reference, Path),
+    ),
     responses(
         (status = 200, body = Webhook),
     ),

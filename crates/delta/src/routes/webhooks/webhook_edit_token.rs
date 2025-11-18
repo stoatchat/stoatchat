@@ -10,6 +10,10 @@ use rocket::{serde::json::Json, State};
 /// Edits a webhook with a token
 #[utoipa::path(
     tag = "Webhooks",
+    params(
+        ("webhook_id" = Reference, Path),
+        ("token" = String, Path),
+    ),
     responses(
         (status = 200, body = Webhook),
     ),

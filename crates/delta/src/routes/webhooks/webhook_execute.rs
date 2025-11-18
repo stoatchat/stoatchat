@@ -15,7 +15,11 @@ use validator::Validate;
 /// Executes a webhook and sends a message
 #[utoipa::path(
     tag = "Webhooks",
-    params(IdempotencyKey),
+    params(
+        ("webhook_id" = Reference, Path),
+        ("token" = String, Path),
+        IdempotencyKey,
+    ),
     responses(
         (status = 200, body = v0::Message)
     )

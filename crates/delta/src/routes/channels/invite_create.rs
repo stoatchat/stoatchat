@@ -16,6 +16,9 @@ use rocket::{serde::json::Json, State};
 #[utoipa::path(
     tag = "Channel Invites",
     security(("Session-Token" = [])),
+    params(
+        ("target" = Reference, Path),
+    ),
     responses(
         (status = 200, body = v0::Invite),
     ),

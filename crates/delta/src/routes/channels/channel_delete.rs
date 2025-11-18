@@ -15,7 +15,10 @@ use rocket_empty::EmptyResponse;
 #[utoipa::path(
     tag = "Channel Information",
     security(("Session-Token" = []), ("Bot-Token" = [])),
-    params(v0::OptionsChannelDelete),
+    params(
+        ("target" = Reference, Path),
+        v0::OptionsChannelDelete,
+    ),
     responses(
         (status = 204),
     ),
