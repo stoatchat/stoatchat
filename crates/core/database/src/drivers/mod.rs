@@ -209,6 +209,8 @@ impl Database {
             } else {
                 EmailVerificationConfig::Disabled
             },
+            sso: config.api.sso.clone(),
+            server_url: Some(config.hosts.api.parse().expect("Failed to parse API host url.")),
             ..Default::default()
         };
 
@@ -244,6 +246,7 @@ impl Database {
             event_channel: Some(crate::tasks::authifier_relay::sender()),
             #[cfg(not(feature = "tasks"))]
             event_channel: None,
+            ..Default::default()
         }
     }
 }

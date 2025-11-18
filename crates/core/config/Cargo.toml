@@ -38,3 +38,6 @@ sentry-anyhow = { version = "0.38.1", optional = true }
 
 # Core
 revolt-result = { version = "0.8.9", path = "../result", optional = true }
+
+# Authifier
+authifier = "1.0.15"

@@ -70,6 +70,7 @@ max_concurrent_connections = 50
 
 [api.users]
 
+[api.sso]
 
 [pushd]
 # this changes the names of the queues to not overlap 

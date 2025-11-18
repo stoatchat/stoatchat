@@ -5,6 +5,7 @@ use config::{Config, File, FileFormat};
 use futures_locks::RwLock;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
+use authifier::config::SSO;
 
 #[cfg(feature = "sentry")]
 pub use sentry::{capture_error, capture_message, Level};
@@ -210,6 +211,7 @@ pub struct Api {
     pub security: ApiSecurity,
     pub workers: ApiWorkers,
     pub users: ApiUsers,
+    pub sso: SSO,
 }
 
 #[derive(Deserialize, Debug, Clone)]

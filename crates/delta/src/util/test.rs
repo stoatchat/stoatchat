@@ -104,6 +104,7 @@ impl TestHarness {
             mfa: Default::default(),
             password_reset: None,
             verification: EmailVerification::Verified,
+            id_providers: Default::default(),
         };
 
         self.authifier

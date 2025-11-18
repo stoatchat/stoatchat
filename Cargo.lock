@@ -443,22 +443,25 @@ dependencies = [
 [[package]]
 name = "authifier"
 version = "1.0.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1a03b810b342b4c584cdc1cfc40d1ec763b1d653ef4086f7494740f35d9e1f0"
 dependencies = [
  "async-std",
  "async-trait",
  "base32",
+ "base64 0.22.1",
  "bson",
  "chrono",
+ "form_urlencoded",
  "futures",
  "handlebars",
  "iso8601-timestamp",
+ "jsonwebtoken",
  "lazy_static",
  "lettre",
  "log",
+ "mime",
  "mongodb",
  "nanoid",
+ "oauth2-types",
  "rand 0.8.5",
  "regex",
  "reqwest 0.11.27",
@@ -469,7 +472,9 @@ dependencies = [
  "schemars 0.8.22",
  "serde",
  "serde_json",
+ "serde_urlencoded",
  "sha1",
+ "sha2",
  "totp-lite",
  "ulid 0.5.0",
  "validator 0.15.0",
@@ -3959,6 +3964,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonwebtoken"
+version = "9.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a87cc7a48537badeae96744432de36f4be2b4a34a05a5ef32e9dd8a1c169dde"
+dependencies = [
+ "base64 0.22.1",
+ "js-sys",
+ "pem 3.0.5",
+ "ring",
+ "serde",
+ "serde_json",
+ "simple_asn1",
+]
+
+[[package]]
 name = "jwt-simple"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3976,7 +3996,7 @@ dependencies = [
  "p256 0.13.2",
  "p384",
  "rand 0.8.5",
- "rsa",
+ "rsa 0.7.2",
  "serde",
  "serde_json",
  "spki 0.6.0",
@@ -4166,6 +4186,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0de8b303297635ad57c9f5059fd9cee7a47f8e8daa09df0fcd07dd39fb22977f"
 dependencies = [
  "log",
+]
+
+[[package]]
+name = "language-tags"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4345964bb142484797b161f473a503a434de77149dd8c7427788c6e13379388"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -4516,6 +4545,47 @@ dependencies = [
  "string_cache",
  "string_cache_codegen",
  "tendril",
+]
+
+[[package]]
+name = "mas-iana"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d41af7e8eb3584b648c563a1b97b8f60c7f3dcd7ea0ded525050418d90c5200"
+dependencies = [
+ "schemars 0.8.22",
+ "serde",
+]
+
+[[package]]
+name = "mas-jose"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb6a1c99221601a1e9ef284efaa6db5985389c839c299d71d5a4c2933ba88eda"
+dependencies = [
+ "base64ct",
+ "chrono",
+ "digest",
+ "ecdsa 0.16.9",
+ "elliptic-curve 0.13.8",
+ "generic-array 0.14.7",
+ "hmac",
+ "k256",
+ "mas-iana",
+ "p256 0.13.2",
+ "p384",
+ "rand 0.8.5",
+ "rsa 0.9.9",
+ "schemars 0.8.22",
+ "sec1 0.7.3",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "sha2",
+ "signature 2.2.0",
+ "thiserror 1.0.69",
+ "tracing",
+ "url",
 ]
 
 [[package]]
@@ -5003,6 +5073,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "oauth2-types"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db9baa46cfc1969e04a7f8c31ee6718a8b4cb52ef31d7d91772f878052d872e1"
+dependencies = [
+ "chrono",
+ "data-encoding",
+ "http 1.3.1",
+ "language-tags",
+ "mas-iana",
+ "mas-jose",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "sha2",
+ "thiserror 1.0.69",
+ "url",
+]
+
+[[package]]
 name = "object"
 version = "0.36.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5447,6 +5537,17 @@ dependencies = [
  "pkcs8 0.9.0",
  "spki 0.6.0",
  "zeroize",
+]
+
+[[package]]
+name = "pkcs1"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8ffb9f10fa047879315e6625af03c164b16962a5368d724ed16323b68ace47f"
+dependencies = [
+ "der 0.7.10",
+ "pkcs8 0.10.2",
+ "spki 0.7.3",
 ]
 
 [[package]]
@@ -6356,6 +6457,7 @@ name = "revolt-config"
 version = "0.8.9"
 dependencies = [
  "async-std",
+ "authifier",
  "cached",
  "config",
  "futures-locks",
@@ -6848,11 +6950,11 @@ dependencies = [
 [[package]]
 name = "rocket_authifier"
 version = "1.0.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1f98a5be96ac4144ee1adc809c1594e8212032b8a08d9bc4cef70735dfd976e"
 dependencies = [
+ "async-std",
  "authifier",
  "iso8601-timestamp",
+ "mongodb",
  "revolt_okapi",
  "revolt_rocket_okapi",
  "rocket",
@@ -6971,11 +7073,31 @@ dependencies = [
  "num-integer",
  "num-iter",
  "num-traits",
- "pkcs1",
+ "pkcs1 0.4.1",
  "pkcs8 0.9.0",
  "rand_core 0.6.4",
  "signature 1.6.4",
  "smallvec",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "rsa"
+version = "0.9.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40a0376c50d0358279d9d643e4bf7b7be212f1f4ff1da9070a7b54d22ef75c88"
+dependencies = [
+ "const-oid 0.9.6",
+ "digest",
+ "num-bigint-dig",
+ "num-integer",
+ "num-traits",
+ "pkcs1 0.7.5",
+ "pkcs8 0.10.2",
+ "rand_core 0.6.4",
+ "signature 2.2.0",
+ "spki 0.7.3",
  "subtle",
  "zeroize",
 ]
@@ -7217,11 +7339,13 @@ version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fbf2ae1b8bc8e02df939598064d22402220cd5bbcca1c76f7d6a310974d5615"
 dependencies = [
+ "chrono",
  "dyn-clone",
  "indexmap 1.9.3",
  "schemars_derive",
  "serde",
  "serde_json",
+ "url",
 ]
 
 [[package]]
@@ -7812,6 +7936,18 @@ name = "simdutf8"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
+
+[[package]]
+name = "simple_asn1"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "297f631f50729c8c99b84667867963997ec0b50f32b2a7dbcab828ef0541e8bb"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "thiserror 2.0.16",
+ "time",
+]
 
 [[package]]
 name = "simplecss"
