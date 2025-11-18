@@ -1,7 +1,7 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     voice::{get_user_voice_channel_in_server, remove_user_from_voice_channel, VoiceClient},
-    Database, RemovalIntention, ServerBan, User,
+    AuditLogEntryAction, Database, RemovalIntention, ServerBan, User,
 };
 use revolt_models::v0;
 
@@ -63,8 +63,13 @@ pub async fn ban(
         }
     }
 
-    ServerBan::create(db, &server, target.id, data.reason)
-        .await
-        .map(Into::into)
-        .map(Json)
+    let ban = ServerBan::create(db, &server, target.id, data.reason.clone()).await?;
+
+    AuditLogEntryAction::BanCreate {
+        user: target.id.to_string(),
+    }
+    .insert(db, server.id, data.reason, user.id)
+    .await;
+
+    Ok(Json(ban.into()))
 }

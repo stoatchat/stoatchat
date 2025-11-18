@@ -1,13 +1,14 @@
 use revolt_config::config;
 use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, Role, User,
+    AuditLogEntryAction, Database, Role, User, util::{permissions::DatabasePermissionQuery, reference::Reference}
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 use validator::Validate;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Create Role
 ///
@@ -17,6 +18,7 @@ use validator::Validate;
 pub async fn create(
     db: &State<Database>,
     user: User,
+    reason: AuditLogReason,
     target: Reference<'_>,
     data: Json<v0::DataCreateRole>,
 ) -> Result<Json<v0::NewRoleResponse>> {
@@ -49,8 +51,14 @@ pub async fn create(
         permissions: Default::default(),
     };
 
+    let role_id = role.create(db, &server.id).await?;
+
+    AuditLogEntryAction::RoleCreate { role: role_id.clone() }
+        .insert(db, server.id, reason.0, user.id)
+        .await;
+
     Ok(Json(v0::NewRoleResponse {
-        id: role.create(db, &server.id).await?,
+        id: role_id,
         role: role.into(),
     }))
 }

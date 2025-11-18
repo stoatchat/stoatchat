@@ -1,3 +1,4 @@
+use revolt_database::AuditLogEntryAction;
 use revolt_database::util::permissions::DatabasePermissionQuery;
 use revolt_database::{util::reference::Reference, Channel, Database, User};
 use revolt_models::v0;
@@ -8,6 +9,8 @@ use rocket::serde::json::Json;
 use rocket::State;
 use validator::Validate;
 
+use crate::util::audit_log_reason::AuditLogReason;
+
 /// # Create Channel
 ///
 /// Create a new Text or Voice channel.
@@ -16,6 +19,7 @@ use validator::Validate;
 pub async fn create_server_channel(
     db: &State<Database>,
     user: User,
+    reason: AuditLogReason,
     server: Reference<'_>,
     data: Json<v0::DataCreateServerChannel>,
 ) -> Result<Json<v0::Channel>> {
@@ -32,8 +36,12 @@ pub async fn create_server_channel(
         .await
         .throw_if_lacking_channel_permission(ChannelPermission::ManageChannel)?;
 
-    Channel::create_server_channel(db, &mut server, data, true)
-        .await
-        .map(|channel| channel.into())
-        .map(Json)
+    let channel = Channel::create_server_channel(db, &mut server, data, true)
+        .await?;
+
+    AuditLogEntryAction::ChannelCreate { channel: channel.id().to_string() }
+        .insert(db, server.id, reason.0, user.id)
+        .await;
+
+    Ok(Json(channel.into()))
 }

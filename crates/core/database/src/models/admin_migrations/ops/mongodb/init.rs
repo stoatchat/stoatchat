@@ -98,6 +98,10 @@ pub async fn create_database(db: &MongoDb) {
         .await
         .expect("Failed to create pubsub collection.");
 
+    db.create_collection("audit_logs")
+        .await
+        .expect("Failed to create audit_logs collection");
+
     db.run_command(doc! {
         "createIndexes": "users",
         "indexes": [
@@ -262,6 +266,27 @@ pub async fn create_database(db: &MongoDb) {
     })
     .await
     .expect("Failed to create ratelimit_events index.");
+
+    db.run_command(doc! {
+        "createIndexes": "audit_logs",
+        "indexes": [
+            {
+                "key": {
+                    "expires_at": 1_i32,
+                },
+                "name": "expires_at_ttl",
+                "expireAfterSeconds": 0
+            },
+            {
+                "key": {
+                    "server": 1_i32,
+                },
+                "name": "audit_log_server"
+            },
+        ]
+    })
+    .await
+    .expect("Failed to create audit_logs index");
 
     info!("Created database.");
 }
