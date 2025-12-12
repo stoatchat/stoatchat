@@ -1,14 +1,15 @@
 use std::collections::HashSet;
 
 use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, File, PartialServer, User,
+    AuditLogEntryAction, Database, FieldsServer, File, PartialServer, User, util::{permissions::DatabasePermissionQuery, reference::Reference}
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 use validator::Validate;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Edit Server
 ///
@@ -18,6 +19,7 @@ use validator::Validate;
 pub async fn edit(
     db: &State<Database>,
     user: User,
+    reason: AuditLogReason,
     target: Reference<'_>,
     data: Json<v0::DataEditServer>,
 ) -> Result<Json<v0::Server>> {
@@ -146,9 +148,15 @@ pub async fn edit(
         server.banner = partial.banner.clone();
     }
 
+    let remove = remove.into_iter().map(Into::into).collect::<Vec<FieldsServer>>();
+
     server
-        .update(db, partial, remove.into_iter().map(Into::into).collect())
+        .update(db, partial.clone(), remove.clone())
         .await?;
+
+    AuditLogEntryAction::ServerEdit { remove, partial }
+        .insert(db, server.id.clone(), reason.0, user.id)
+        .await;
 
     Ok(Json(server.into()))
 }

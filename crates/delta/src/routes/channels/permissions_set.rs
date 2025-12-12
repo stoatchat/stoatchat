@@ -1,10 +1,16 @@
 use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference}, voice::{sync_voice_permissions, VoiceClient}, Database, User
+    util::{permissions::DatabasePermissionQuery, reference::Reference},
+    voice::{sync_voice_permissions, VoiceClient},
+    AuditLogEntryAction, Database, User,
 };
 use revolt_models::v0;
-use revolt_permissions::{calculate_channel_permissions, ChannelPermission, Override};
+use revolt_permissions::{
+    calculate_channel_permissions, ChannelPermission, Override, OverrideField,
+};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Set Role Permission
 ///
@@ -17,13 +23,15 @@ pub async fn set_role_permissions(
     db: &State<Database>,
     voice_client: &State<VoiceClient>,
     user: User,
+    reason: AuditLogReason,
     target: Reference<'_>,
     role_id: String,
     data: Json<v0::DataSetRolePermissions>,
 ) -> Result<Json<v0::Channel>> {
     let channel = target.as_channel(db).await?;
     let mut query = DatabasePermissionQuery::new(db, &user).channel(&channel);
-    let permissions: revolt_permissions::PermissionValue = calculate_channel_permissions(&mut query).await;
+    let permissions: revolt_permissions::PermissionValue =
+        calculate_channel_permissions(&mut query).await;
 
     permissions.throw_if_lacking_channel_permission(ChannelPermission::ManagePermissions)?;
 
@@ -39,12 +47,23 @@ pub async fn set_role_permissions(
                 .await?;
 
             let mut new_channel = channel.clone();
+            let override_field: OverrideField = data.permissions.clone().into();
+            let server_id = server.id.clone();
 
             new_channel
                 .set_role_permission(db, &role_id, data.permissions.clone().into())
                 .await?;
 
-            sync_voice_permissions(db, voice_client, &new_channel, Some(server), Some(&role_id)).await?;
+            sync_voice_permissions(db, voice_client, &new_channel, Some(server), Some(&role_id))
+                .await?;
+
+            AuditLogEntryAction::ChannelRolePermissionsEdit {
+                channel: new_channel.id().to_string(),
+                role: role_id,
+                permissions: override_field,
+            }
+            .insert(db, server_id, reason.0, user.id)
+            .await;
 
             Ok(Json(new_channel.into()))
         } else {

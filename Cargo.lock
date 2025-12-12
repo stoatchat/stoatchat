@@ -6591,7 +6591,7 @@ name = "revolt-coalesced"
 version = "0.8.9"
 dependencies = [
  "indexmap 2.11.4",
- "lru 0.7.8",
+ "lru 0.12.5",
  "tokio 1.47.1",
 ]
 
