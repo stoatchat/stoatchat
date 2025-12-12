@@ -10,6 +10,8 @@ use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 use validator::Validate;
 
+use crate::util::audit_log_reason::AuditLogReason;
+
 /// # Ban User
 ///
 /// Ban a user by their id.
@@ -19,6 +21,7 @@ pub async fn ban(
     db: &State<Database>,
     voice_client: &State<VoiceClient>,
     user: User,
+    audit_log_reason: AuditLogReason,
     server: Reference<'_>,
     target: Reference<'_>,
     data: Json<v0::DataBanCreate>,
@@ -68,7 +71,7 @@ pub async fn ban(
     AuditLogEntryAction::BanCreate {
         user: target.id.to_string(),
     }
-    .insert(db, server.id, data.reason, user.id)
+    .insert(db, server.id, audit_log_reason.0.or(data.reason), user.id)
     .await;
 
     Ok(Json(ban.into()))
