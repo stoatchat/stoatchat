@@ -180,6 +180,7 @@ pub enum EventV1 {
     /// Server role created or updated
     ServerRoleUpdate {
         id: String,
+        #[deprecated = "Use data.id instead"]
         role_id: String,
         data: PartialRole,
         #[serde(default)]

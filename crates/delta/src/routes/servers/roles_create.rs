@@ -40,17 +40,10 @@ pub async fn create(
         }));
     };
 
-    let role = Role {
-        name: data.name,
-        // Rank of the new role should be below the lowest role
-        rank: server.roles.len() as i64,
-        colour: None,
-        hoist: false,
-        permissions: Default::default(),
-    };
+    let role = Role::create(db, &server, data.name).await?;
 
     Ok(Json(v0::NewRoleResponse {
-        id: role.create(db, &server.id).await?,
+        id: role.id.clone(),
         role: role.into(),
     }))
 }

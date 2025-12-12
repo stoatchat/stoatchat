@@ -29,7 +29,7 @@ pub trait AbstractServers: Sync + Send {
     async fn delete_server(&self, id: &str) -> Result<()>;
 
     /// Insert a new role into server object
-    async fn insert_role(&self, server_id: &str, role_id: &str, role: &Role) -> Result<()>;
+    async fn insert_role(&self, server_id: &str, role: &Role) -> Result<()>;
 
     /// Update an existing role on a server
     async fn update_role(

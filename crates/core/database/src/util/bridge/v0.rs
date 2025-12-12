@@ -896,6 +896,7 @@ impl From<SystemMessageChannels> for crate::SystemMessageChannels {
 impl From<crate::Role> for Role {
     fn from(value: crate::Role) -> Self {
         Role {
+            id: value.id,
             name: value.name,
             permissions: value.permissions,
             colour: value.colour,
@@ -908,6 +909,7 @@ impl From<crate::Role> for Role {
 impl From<Role> for crate::Role {
     fn from(value: Role) -> crate::Role {
         crate::Role {
+            id: value.id,
             name: value.name,
             permissions: value.permissions,
             colour: value.colour,
@@ -920,6 +922,7 @@ impl From<Role> for crate::Role {
 impl From<crate::PartialRole> for PartialRole {
     fn from(value: crate::PartialRole) -> Self {
         PartialRole {
+            id: value.id,
             name: value.name,
             permissions: value.permissions,
             colour: value.colour,
@@ -932,6 +935,7 @@ impl From<crate::PartialRole> for PartialRole {
 impl From<PartialRole> for crate::PartialRole {
     fn from(value: PartialRole) -> crate::PartialRole {
         crate::PartialRole {
+            id: value.id,
             name: value.name,
             permissions: value.permissions,
             colour: value.colour,

@@ -595,13 +595,14 @@ impl State {
             }
             EventV1::ServerRoleUpdate {
                 id,
-                role_id,
                 data,
                 clear,
                 ..
             } => {
+                let role_id = data.id.clone().unwrap();
+
                 if let Some(server) = self.cache.servers.get_mut(id) {
-                    if let Some(role) = server.roles.get_mut(role_id) {
+                    if let Some(role) = server.roles.get_mut(&role_id) {
                         for field in &clear.clone() {
                             role.remove_field(&field.clone().into());
                         }
@@ -612,7 +613,7 @@ impl State {
 
                 if data.rank.is_some() || data.permissions.is_some() {
                     if let Some(member) = self.cache.members.get(id) {
-                        if member.roles.contains(role_id) {
+                        if member.roles.contains(&role_id) {
                             queue_server = Some(id.clone());
                         }
                     }
