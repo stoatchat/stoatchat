@@ -61,7 +61,6 @@ pub async fn edit(
         role.update(
             db,
             &server.id,
-            &role_id,
             partial,
             remove.into_iter().map(Into::into).collect(),
         )

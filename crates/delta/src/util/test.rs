@@ -6,7 +6,7 @@ use futures::StreamExt;
 use rand::Rng;
 use redis_kiss::redis::aio::PubSub;
 use revolt_database::{
-    events::client::EventV1, Channel, Database, Member, Message, Server, User, AMQP,
+    events::client::EventV1, Channel, Database, Member, Message, PartialRole, Server, User, AMQP,
 };
 use revolt_database::{util::idempotency::IdempotencyKey, Role};
 use revolt_models::v0;
@@ -139,21 +139,26 @@ impl TestHarness {
         server: &Server,
         rank: i64,
         overrides: Option<OverrideField>,
-    ) -> (String, Role) {
-        let role = Role {
-            name: TestHarness::rand_string(),
-            permissions: overrides.unwrap_or(OverrideField { a: 0, d: 0 }),
-            rank,
-            colour: None,
-            hoist: false,
-        };
-
-        let id = role
-            .create(&self.db, &server.id)
+    ) -> Role {
+        let mut role = Role::create(&self.db, &server, TestHarness::rand_string())
             .await
             .expect("Failed to create test role");
 
-        (id, role)
+        if let Some(overrides) = overrides {
+            role.update(
+                &self.db,
+                &server.id,
+                PartialRole {
+                    permissions: Some(overrides),
+                    ..Default::default()
+                },
+                Vec::new(),
+            )
+            .await
+            .expect("Failed to set test role overrides");
+        };
+
+        role
     }
 
     pub async fn new_channel(&self, server: &Server) -> Channel {
@@ -165,7 +170,7 @@ impl TestHarness {
                 name: "Test Channel".to_string(),
                 description: None,
                 nsfw: Some(false),
-                voice: None
+                voice: None,
             },
             true,
         )

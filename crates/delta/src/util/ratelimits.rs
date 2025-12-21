@@ -75,7 +75,7 @@ impl<'a> RatelimitResolver<Request<'a>> for DeltaRatelimits {
             "swagger" => 100,
             "safety" => 15,
             "safety_report" => 3,
-            _ => 20,
+            _ => 1,
         }
     }
 }
