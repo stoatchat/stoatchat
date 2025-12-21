@@ -68,6 +68,9 @@ auto_derived_partial!(
 auto_derived_partial!(
     /// Role
     pub struct Role {
+        /// Unique Id
+        #[serde(rename = "_id")]
+        pub id: String,
         /// Role name
         pub name: String,
         /// Permissions available to this role
@@ -246,7 +249,6 @@ impl Server {
             role.update(
                 db,
                 &self.id,
-                role_id,
                 PartialRole {
                     permissions: Some(permissions),
                     ..Default::default()
@@ -297,6 +299,7 @@ impl Role {
     /// Into optional struct
     pub fn into_optional(self) -> PartialRole {
         PartialRole {
+            id: Some(self.id),
             name: Some(self.name),
             permissions: Some(self.permissions),
             colour: self.colour,
@@ -306,20 +309,29 @@ impl Role {
     }
 
     /// Create a role
-    pub async fn create(&self, db: &Database, server_id: &str) -> Result<String> {
-        let role_id = Ulid::new().to_string();
-        db.insert_role(server_id, &role_id, self).await?;
+    pub async fn create(db: &Database, server: &Server, name: String) -> Result<Self> {
+        let role = Role {
+            id: Ulid::new().to_string(),
+            name,
+            // Rank of the new role should be below the lowest role
+            rank: server.roles.len() as i64,
+            colour: None,
+            hoist: false,
+            permissions: Default::default(),
+        };
+
+        db.insert_role(&server.id, &role).await?;
 
         EventV1::ServerRoleUpdate {
-            id: server_id.to_string(),
-            role_id: role_id.to_string(),
-            data: self.clone().into_optional().into(),
+            id: server.id.clone(),
+            role_id: role.id.clone(),
+            data: role.clone().into_optional().into(),
             clear: vec![],
         }
-        .p(server_id.to_string())
+        .p(server.id.clone())
         .await;
 
-        Ok(role_id)
+        Ok(role)
     }
 
     /// Update server data
@@ -327,7 +339,6 @@ impl Role {
         &mut self,
         db: &Database,
         server_id: &str,
-        role_id: &str,
         partial: PartialRole,
         remove: Vec<FieldsRole>,
     ) -> Result<()> {
@@ -337,14 +348,14 @@ impl Role {
 
         self.apply_options(partial.clone());
 
-        db.update_role(server_id, role_id, &partial, remove.clone())
+        db.update_role(server_id, &self.id, &partial, remove.clone())
             .await?;
 
         EventV1::ServerRoleUpdate {
             id: server_id.to_string(),
-            role_id: role_id.to_string(),
+            role_id: self.id.clone(),
             data: partial.into(),
-            clear: vec![],
+            clear: remove.into_iter().map(Into::into).collect(),
         }
         .p(server_id.to_string())
         .await;
@@ -360,15 +371,15 @@ impl Role {
     }
 
     /// Delete a role
-    pub async fn delete(self, db: &Database, server_id: &str, role_id: &str) -> Result<()> {
+    pub async fn delete(self, db: &Database, server_id: &str) -> Result<()> {
         EventV1::ServerRoleDelete {
             id: server_id.to_string(),
-            role_id: role_id.to_string(),
+            role_id: self.id.clone(),
         }
         .p(server_id.to_string())
         .await;
 
-        db.delete_role(server_id, role_id).await
+        db.delete_role(server_id, &self.id).await
     }
 }
 

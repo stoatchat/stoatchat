@@ -151,29 +151,20 @@ mod test {
                 name: "Hidden Channel".to_string(),
                 description: None,
                 nsfw: Some(false),
-                voice: None
+                voice: None,
             },
             true,
         )
         .await
         .expect("Failed to make new channel");
 
-        let role = Role {
-            name: "Show Hidden Channel".to_string(),
-            permissions: OverrideField { a: 0, d: 0 },
-            colour: None,
-            hoist: false,
-            rank: 5,
-        };
-
-        let role_id = role
-            .create(&harness.db, &server.id)
+        let role = Role::create(&harness.db, &server, "Show Hidden Channel".to_string())
             .await
             .expect("Failed to create the role");
 
         let mut overrides = HashMap::new();
         overrides.insert(
-            role_id.clone(),
+            role.id.clone(),
             OverrideField {
                 a: (ChannelPermission::ViewChannel) as i64,
                 d: 0,
@@ -281,7 +272,7 @@ mod test {
             "Mention failed to be scrubbed when the user cannot see the channel"
         );
 
-        let second_member_roles = vec![role_id.clone()];
+        let second_member_roles = vec![role.id.clone()];
         let partial = PartialMember {
             id: None,
             joined_at: None,
@@ -290,7 +281,7 @@ mod test {
             timeout: None,
             roles: Some(second_member_roles),
             can_publish: None,
-            can_receive: None
+            can_receive: None,
         };
         second_member
             .update(&harness.db, partial, vec![])
@@ -496,7 +487,7 @@ mod test {
         let (_, _, other_user) = harness.new_user().await;
         let (server, _) = harness.new_server(&user).await;
         let channel = harness.new_channel(&server).await;
-        let (role_id, _role) = harness
+        let role = harness
             .new_role(
                 &server,
                 1,
@@ -518,7 +509,7 @@ mod test {
             Some(&harness.amqp),
             channel.clone(),
             v0::DataMessageSend {
-                content: Some(format!("Mentioning @everyone and role <%{}>", &role_id)),
+                content: Some(format!("Mentioning @everyone and role <%{}>", &role.id)),
                 nonce: None,
                 attachments: None,
                 replies: None,
@@ -563,7 +554,7 @@ mod test {
             Some(&harness.amqp),
             channel.clone(),
             v0::DataMessageSend {
-                content: Some(format!("Mentioning `@everyone` and role `<%{}>`", &role_id)),
+                content: Some(format!("Mentioning `@everyone` and role `<%{}>`", &role.id)),
                 nonce: None,
                 attachments: None,
                 replies: None,
@@ -605,7 +596,7 @@ mod test {
             "Role mentions detected when inside codeblock"
         );
 
-        other_member.roles.push(role_id.clone());
+        other_member.roles.push(role.id.clone());
         harness
             .db
             .update_member(
@@ -615,10 +606,10 @@ mod test {
                     id: None,
                     joined_at: None,
                     nickname: None,
-                    roles: Some(vec![role_id.clone()]),
+                    roles: Some(vec![role.id.clone()]),
                     timeout: None,
                     can_publish: None,
-                    can_receive: None
+                    can_receive: None,
                 },
                 vec![],
             )
@@ -632,7 +623,7 @@ mod test {
             Some(&harness.amqp),
             channel.clone(),
             v0::DataMessageSend {
-                content: Some(format!("Mentioning @everyone and role <%{}>", &role_id)),
+                content: Some(format!("Mentioning @everyone and role <%{}>", &role.id)),
                 nonce: None,
                 attachments: None,
                 replies: None,

@@ -47,6 +47,7 @@
     ],
     "roles": {
       "__ID:5__": {
+        "_id": "__ID:5__",
         "name": "Moderator",
         "permissions": {
           "a": 545270216,
@@ -55,6 +56,7 @@
         "rank": 1
       },
       "__ID:6__": {
+        "_id": "__ID:6__",
         "name": "Owner",
         "permissions": {
           "a": 0,
@@ -63,6 +65,7 @@
         "rank": 0
       },
       "__ID:7__": {
+        "_id": "__ID:7__",
         "name": "Lower Rank 1",
         "permissions": {
           "a": 0,
@@ -71,6 +74,7 @@
         "rank": 2
       },
       "__ID:8__": {
+        "_id": "__ID:8__",
         "name": "Lower Rank 2",
         "permissions": {
           "a": 0,
