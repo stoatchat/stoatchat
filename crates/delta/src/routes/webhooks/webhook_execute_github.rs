@@ -700,7 +700,7 @@ fn safe_from_str<T: for<'de> Deserialize<'de>>(data: &str) -> Result<T> {
     match serde_json::from_str(data) {
         Ok(output) => Ok(output),
         Err(err) => {
-            log::error!("{err:?}");
+            revolt_config::capture_internal_error!(err);
             Err(create_error!(InvalidOperation))
         }
     }
@@ -915,7 +915,7 @@ pub async fn webhook_execute_github(
                     event.repository.full_name,
                     discussion.number,
                     discussion.title,
-                    discussion.html_url,
+                    answer.comment.html_url,
                     shorten_text(&answer.comment.body, 450)
                 )),
                 colour: Some(LIGHT_ORANGE.to_string()),
@@ -935,7 +935,7 @@ pub async fn webhook_execute_github(
                     event.repository.full_name,
                     discussion.number,
                     discussion.title,
-                    discussion.html_url,
+                    comment.comment.html_url,
                     shorten_text(&comment.comment.body, 450)
                 )),
                 colour: Some(LIGHT_ORANGE.to_string()),
@@ -1004,7 +1004,7 @@ pub async fn webhook_execute_github(
                     event.repository.full_name,
                     issue.number,
                     issue.title,
-                    issue.html_url,
+                    comment.html_url,
                     shorten_text(&comment.body, 450)
                 )),
                 colour: Some(LIGHT_ORANGE.to_string()),
