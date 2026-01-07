@@ -28,7 +28,7 @@ default = ["mongodb", "async-std-runtime", "tasks"]
 revolt-config = { version = "0.8.9", path = "../config", features = [
     "report-macros",
 ] }
-revolt-result = { version = "0.8.9", path = "../result" }
+revolt-result = { version = "0.8.9", path = "../result", features = ["axum"] }
 revolt-models = { version = "0.8.9", path = "../models", features = [
     "validator",
 ] }
