@@ -31,8 +31,43 @@
                 },
                 {
                     "type": "toml",
+                    "path": "crates/core/config/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-result'].version"
+                },
+                {
+                    "type": "toml",
                     "path": "crates/core/database/Cargo.toml",
                     "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/database/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-config'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/database/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-result'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/database/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-models'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/database/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-presence'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/database/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-permissions'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/database/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-parser'].version"
                 },
                 {
                     "type": "toml",
@@ -41,8 +76,28 @@
                 },
                 {
                     "type": "toml",
+                    "path": "crates/core/files/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-config'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/files/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-result'].version"
+                },
+                {
+                    "type": "toml",
                     "path": "crates/core/models/Cargo.toml",
                     "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/models/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-config'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/models/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-permissions'].version"
                 },
                 {
                     "type": "toml",
@@ -56,13 +111,38 @@
                 },
                 {
                     "type": "toml",
+                    "path": "crates/core/permissions/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-result'].version"
+                },
+                {
+                    "type": "toml",
                     "path": "crates/core/presence/Cargo.toml",
                     "jsonpath": "$.package.version"
                 },
                 {
                     "type": "toml",
+                    "path": "crates/core/presence/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-config'].version"
+                },
+                {
+                    "type": "toml",
                     "path": "crates/core/ratelimits/Cargo.toml",
                     "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/ratelimits/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-database'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/ratelimits/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-result'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/ratelimits/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-config'].version"
                 },
                 {
                     "type": "toml",
@@ -76,8 +156,53 @@
                 },
                 {
                     "type": "toml",
+                    "path": "crates/daemons/crond/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-database'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/daemons/crond/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-result'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/daemons/crond/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-config'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/daemons/crond/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-files'].version"
+                },
+                {
+                    "type": "toml",
                     "path": "crates/daemons/pushd/Cargo.toml",
                     "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/daemons/pushd/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-result'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/daemons/pushd/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-config'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/daemons/pushd/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-database'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/daemons/pushd/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-models'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/daemons/pushd/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-presence'].version"
                 },
                 {
                     "type": "toml",
@@ -91,13 +216,88 @@
                 },
                 {
                     "type": "toml",
+                    "path": "crates/services/autumn/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-files'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/services/autumn/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-config'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/services/autumn/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-database'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/services/autumn/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-result'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/services/autumn/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-ratelimits'].version"
+                },
+                {
+                    "type": "toml",
                     "path": "crates/services/gifbox/Cargo.toml",
                     "jsonpath": "$.package.version"
                 },
                 {
                     "type": "toml",
+                    "path": "crates/services/gifbox/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-config'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/services/gifbox/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-models'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/services/gifbox/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-result'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/services/gifbox/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-coalesced'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/services/gifbox/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-database'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/services/gifbox/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-ratelimits'].version"
+                },
+                {
+                    "type": "toml",
                     "path": "crates/services/january/Cargo.toml",
                     "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/services/january/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-config'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/services/january/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-models'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/services/january/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-result'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/services/january/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-files'].version"
                 }
             ]
         }
