@@ -1,5 +1,4 @@
 {
-    "include-component-in-tag": false,
     "packages": {
         "crates/delta": {
             "changelog-path": "../../CHANGELOG.md",
@@ -8,6 +7,7 @@
             "bump-patch-for-minor-pre-major": false,
             "draft": false,
             "prerelease": false,
+            "include-component-in-tag": false,
             "extra-files": [
                 {
                     "type": "toml",
