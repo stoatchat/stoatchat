@@ -1,6 +1,6 @@
 [package]
 name = "revolt-bonfire"
-version = "0.8.9"
+version = "0.8.8"
 license = "AGPL-3.0-or-later"
 edition = "2021"
 
@@ -42,7 +42,7 @@ revolt-result = { path = "../core/result" }
 revolt-models = { path = "../core/models" }
 revolt-config = { path = "../core/config" }
 revolt-database = { path = "../core/database", features = ["voice"] }
-revolt-permissions = { version = "0.8.9", path = "../core/permissions" }
+revolt-permissions = { version = "0.8.8", path = "../core/permissions" }
 revolt-presence = { path = "../core/presence", features = ["redis-is-patched"] }
 
 # redis

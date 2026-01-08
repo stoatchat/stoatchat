@@ -1,0 +1,49 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main] # updates/opens the release PR when commits land on main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: release-please
+  cancel-in-progress: true
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GH_STOAT_RELEASE_APP_ID }}
+          private-key: ${{ secrets.GH_STOAT_RELEASE_APP_PRIVATE_KEY }}
+      - id: rp
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+
+  publish-stable:
+    name: Publish release to stable branch
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GH_STOAT_RELEASE_APP_ID }}
+          private-key: ${{ secrets.GH_STOAT_RELEASE_APP_PRIVATE_KEY }}
+      - uses: katyo/publish-crates@v2
+        with:
+          registry-token: ${{ secrets.CRATES_IO_PUBLISH_TOKEN }}
