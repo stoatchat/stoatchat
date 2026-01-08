@@ -1,14 +1,19 @@
 {
-    "include-component-in-tag": false,
     "packages": {
-        "crates/delta": {
-            "changelog-path": "../../CHANGELOG.md",
-            "release-type": "rust",
+        ".": {
+            "changelog-path": "CHANGELOG.md",
+            "release-type": "simple",
             "bump-minor-pre-major": false,
             "bump-patch-for-minor-pre-major": false,
             "draft": false,
             "prerelease": false,
+            "include-component-in-tag": false,
             "extra-files": [
+                {
+                    "type": "toml",
+                    "path": "crates/delta/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
                 {
                     "type": "toml",
                     "path": "crates/bonfire/Cargo.toml",
