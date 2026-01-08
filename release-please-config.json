@@ -1,0 +1,33 @@
+{
+    "packages": {
+        ".": {
+            "changelog-path": "CHANGELOG.md",
+            "release-type": "rust",
+            "bump-minor-pre-major": false,
+            "bump-patch-for-minor-pre-major": false,
+            "draft": false,
+            "prerelease": false,
+            "extra-files": [
+                "crates/bonfire/Cargo.toml",
+                "crates/core/coalesced/Cargo.toml",
+                "crates/core/config/Cargo.toml",
+                "crates/core/database/Cargo.toml",
+                "crates/core/files/Cargo.toml",
+                "crates/core/models/Cargo.toml",
+                "crates/core/parser/Cargo.toml",
+                "crates/core/permissions/Cargo.toml",
+                "crates/core/presence/Cargo.toml",
+                "crates/core/ratelimits/Cargo.toml",
+                "crates/core/result/Cargo.toml",
+                "crates/daemons/crond/Cargo.toml",
+                "crates/daemons/pushd/Cargo.toml",
+                "crates/daemons/voice-ingress/Cargo.toml",
+                "crates/delta/Cargo.toml",
+                "crates/services/autumn/Cargo.toml",
+                "crates/services/gifbox/Cargo.toml",
+                "crates/services/january/Cargo.toml"
+            ]
+        }
+    },
+    "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json"
+}

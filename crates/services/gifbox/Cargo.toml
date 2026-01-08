@@ -1,6 +1,6 @@
 [package]
 name = "revolt-gifbox"
-version = "0.8.9"
+version = "0.8.8"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 
@@ -16,19 +16,19 @@ tokio = { version = "1.0", features = ["full"] }
 reqwest = { version = "0.12", features = ["json"] }
 
 # Core crates
-revolt-config = { version = "0.8.9", path = "../../core/config" }
-revolt-models = { version = "0.8.9", path = "../../core/models" }
-revolt-result = { version = "0.8.9", path = "../../core/result", features = [
+revolt-config = { version = "0.8.8", path = "../../core/config" }
+revolt-models = { version = "0.8.8", path = "../../core/models" }
+revolt-result = { version = "0.8.8", path = "../../core/result", features = [
     "utoipa",
     "axum",
 ] }
-revolt-coalesced = { version = "0.8.9", path = "../../core/coalesced", features = [
+revolt-coalesced = { version = "0.8.8", path = "../../core/coalesced", features = [
     "queue",
 ] }
-revolt-database = { version = "0.8.9", path = "../../core/database", features = [
+revolt-database = { version = "0.8.8", path = "../../core/database", features = [
     "axum-impl",
 ] }
-revolt-ratelimits = { version = "0.8.9", path = "../../core/ratelimits", features = [
+revolt-ratelimits = { version = "0.8.8", path = "../../core/ratelimits", features = [
     "axum",
 ] }
 
