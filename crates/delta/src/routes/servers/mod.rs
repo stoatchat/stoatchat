@@ -1,6 +1,7 @@
 use revolt_rocket_okapi::revolt_okapi::openapi3::OpenApi;
 use rocket::Route;
 
+mod audit_log_query;
 mod ban_create;
 mod ban_list;
 mod ban_remove;
@@ -49,6 +50,7 @@ pub fn routes() -> (Vec<Route>, OpenApi) {
         permissions_set::set_role_permission,
         permissions_set_default::set_default_server_permissions,
         emoji_list::list_emoji,
-        roles_edit_positions::edit_role_ranks
+        roles_edit_positions::edit_role_ranks,
+        audit_log_query::query,
     ]
 }

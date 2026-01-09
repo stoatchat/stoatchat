@@ -25,7 +25,7 @@ struct MigrationInfo {
     revision: i32,
 }
 
-pub const LATEST_REVISION: i32 = 49; // MUST BE +1 to last migration
+pub const LATEST_REVISION: i32 = 50; // MUST BE +1 to last migration
 
 pub async fn migrate_database(db: &MongoDb) {
     let migrations = db.col::<Document>("migrations");
@@ -1263,6 +1263,35 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             .await
             .expect("Failed to update default_permissions");
     };
+
+    if revision <= 49 {
+        info!("Running migration [revision 49 / 28-11-2025]: Add audit logs collection");
+
+        db.db().create_collection("audit_logs")
+            .await
+            .expect("Failed to create audit_logs collection");
+
+        db.db().run_command(doc! {
+            "createIndexes": "audit_logs",
+            "indexes": [
+                {
+                    "key": {
+                        "expires_at": 1_i32,
+                    },
+                    "name": "expires_at_ttl",
+                    "expireAfterSeconds": 0
+                },
+                {
+                    "key": {
+                        "server": 1_i32,
+                    },
+                    "name": "audit_log_server"
+                },
+            ]
+        })
+        .await
+        .expect("Failed to create audit_logs index");
+    }
 
     // Reminder to update LATEST_REVISION when adding new migrations.
     LATEST_REVISION.max(revision)
