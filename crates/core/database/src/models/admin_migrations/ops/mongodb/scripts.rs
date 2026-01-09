@@ -1281,7 +1281,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             .find(doc! {
                 "roles": {
                     "$exists": true,
-                    "$ne": []
+                    "$ne": {}
                 }
             })
             .await
