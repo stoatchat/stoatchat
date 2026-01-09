@@ -25,7 +25,7 @@ struct MigrationInfo {
     revision: i32,
 }
 
-pub const LATEST_REVISION: i32 = 49; // MUST BE +1 to last migration
+pub const LATEST_REVISION: i32 = 50; // MUST BE +1 to last migration
 
 pub async fn migrate_database(db: &MongoDb) {
     let migrations = db.col::<Document>("migrations");
@@ -1246,7 +1246,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             .expect("Failed to update voice channels");
     };
 
-        if revision <= 48 {
+    if revision <= 48 {
         info!("Running migration [revision 48 / 22-10-2025]: Add Video + Listen to default permissions");
 
         db.col::<Document>("servers")
@@ -1262,6 +1262,48 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             )
             .await
             .expect("Failed to update default_permissions");
+    };
+
+    if revision <= 49 {
+        info!("Running migration [revision 49 / 12-12-2025]: Add _id key to roles");
+
+        #[derive(Serialize, Deserialize, Clone)]
+        struct Server {
+            #[serde(rename = "_id")]
+            pub id: String,
+            #[serde(default = "HashMap::<String, Document>::new")]
+            pub roles: HashMap<String, Document>,
+        }
+
+        let mut servers = db
+            .db()
+            .collection::<Server>("servers")
+            .find(doc! {
+                "roles": {
+                    "$exists": true,
+                    "$ne": {}
+                }
+            })
+            .await
+            .unwrap()
+            .map(|res| res.expect("Failed to decode Server { id, roles }"));
+
+        while let Some(server) = servers.next().await {
+            let mut doc = doc! {};
+
+            for id in server.roles.keys() {
+                doc.insert(
+                    format!("roles.{id}._id"),
+                    id,
+                );
+            }
+
+            db.db()
+                .collection::<Server>("servers")
+                .update_one(doc! { "_id": &server.id }, doc! { "$set": doc })
+                .await
+                .unwrap();
+        }
     };
 
     // Reminder to update LATEST_REVISION when adding new migrations.

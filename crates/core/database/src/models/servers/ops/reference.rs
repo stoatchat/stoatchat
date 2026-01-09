@@ -72,10 +72,10 @@ impl AbstractServers for ReferenceDb {
     }
 
     /// Insert a new role into server object
-    async fn insert_role(&self, server_id: &str, role_id: &str, role: &Role) -> Result<()> {
+    async fn insert_role(&self, server_id: &str, role: &Role) -> Result<()> {
         let mut servers = self.servers.lock().await;
         if let Some(server) = servers.get_mut(server_id) {
-            server.roles.insert(role_id.to_string(), role.clone());
+            server.roles.insert(role.id.clone(), role.clone());
             Ok(())
         } else {
             Err(create_error!(NotFound))

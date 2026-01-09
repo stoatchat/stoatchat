@@ -37,7 +37,7 @@ pub async fn delete(
         return Err(create_error!(NotElevated));
     }
 
-    role.delete(db, &server.id, &role_id).await?;
+    role.delete(db, &server.id).await?;
 
     for channel_id in &server.channels {
         let channel = Reference::from_unchecked(channel_id).as_channel(db).await?;

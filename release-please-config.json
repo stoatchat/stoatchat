@@ -123,7 +123,7 @@
                 {
                     "type": "toml",
                     "path": "crates/core/presence/Cargo.toml",
-                    "jsonpath": "$.dependencies['revolt-config'].version"
+                    "jsonpath": "$['dev-dependencies']['revolt-config'].version"
                 },
                 {
                     "type": "toml",
