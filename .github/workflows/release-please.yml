@@ -47,13 +47,6 @@ jobs:
           app-id: ${{ secrets.GH_STOAT_RELEASE_APP_ID }}
           private-key: ${{ secrets.GH_STOAT_RELEASE_APP_PRIVATE_KEY }}
       
-      - name: Send release notification webhook
-        run: |
-          RELEASE_URL="https://github.com/revoltchat/backend/releases/tag/${{ needs.release-please.outputs.tag_name }}"
-          curl -X POST "${{ secrets.STOAT_WEBHOOK_UPDATES_URL }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"content\": \"$RELEASE_URL\"}"
-      
       - name: Publish crates
         uses: katyo/publish-crates@v2
         with:
