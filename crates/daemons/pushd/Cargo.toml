@@ -1,20 +1,20 @@
 [package]
 name = "revolt-pushd"
-version = "0.8.8"
+version = "0.9.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-revolt-result = { version = "0.8.8", path = "../../core/result" }
-revolt-config = { version = "0.8.8", path = "../../core/config", features = [
+revolt-result = { version = "0.9.0", path = "../../core/result" }
+revolt-config = { version = "0.9.0", path = "../../core/config", features = [
     "report-macros",
     "anyhow"
 ] }
-revolt-database = { version = "0.8.8", path = "../../core/database" }
-revolt-models = { version = "0.8.8", path = "../../core/models", features = [
+revolt-database = { version = "0.9.0", path = "../../core/database" }
+revolt-models = { version = "0.9.0", path = "../../core/models", features = [
     "validator",
 ] }
-revolt-presence = { version = "0.8.8", path = "../../core/presence", features = [
+revolt-presence = { version = "0.9.0", path = "../../core/presence", features = [
     "redis-is-patched",
 ] }
 

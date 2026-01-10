@@ -1,6 +1,6 @@
 [package]
 name = "revolt-january"
-version = "0.8.8"
+version = "0.9.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 
@@ -32,13 +32,13 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Core crates
-revolt-config = { version = "0.8.8", path = "../../core/config" }
-revolt-models = { version = "0.8.8", path = "../../core/models" }
-revolt-result = { version = "0.8.8", path = "../../core/result", features = [
+revolt-config = { version = "0.9.0", path = "../../core/config" }
+revolt-models = { version = "0.9.0", path = "../../core/models" }
+revolt-result = { version = "0.9.0", path = "../../core/result", features = [
     "utoipa",
     "axum",
 ] }
-revolt-files = { version = "0.8.8", path = "../../core/files" }
+revolt-files = { version = "0.9.0", path = "../../core/files" }
 
 # Axum / web server
 axum = { version = "0.7.5" }

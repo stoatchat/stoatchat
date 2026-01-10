@@ -1,6 +1,6 @@
 [package]
 name = "revolt-database"
-version = "0.8.8"
+version = "0.9.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 authors = ["Paul Makles <me@insrt.uk>"]
@@ -25,19 +25,19 @@ default = ["mongodb", "async-std-runtime", "tasks"]
 
 [dependencies]
 # Core
-revolt-config = { version = "0.8.8", path = "../config", features = [
+revolt-config = { version = "0.9.0", path = "../config", features = [
     "report-macros",
 ] }
-revolt-result = { version = "0.8.8", path = "../result" }
-revolt-models = { version = "0.8.8", path = "../models", features = [
+revolt-result = { version = "0.9.0", path = "../result" }
+revolt-models = { version = "0.9.0", path = "../models", features = [
     "validator",
 ] }
-revolt-presence = { version = "0.8.8", path = "../presence" }
-revolt-permissions = { version = "0.8.8", path = "../permissions", features = [
+revolt-presence = { version = "0.9.0", path = "../presence" }
+revolt-permissions = { version = "0.9.0", path = "../permissions", features = [
     "serde",
     "bson",
 ] }
-revolt-parser = { version = "0.8.8", path = "../parser" }
+revolt-parser = { version = "0.9.0", path = "../parser" }
 
 # Utility
 log = "0.4"
