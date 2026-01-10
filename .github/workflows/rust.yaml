@@ -18,26 +18,24 @@ jobs:
     runs-on: arc-runner-set
     steps:
       - uses: actions/checkout@v2
-      - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+
+      # Using our own runners for now:
+      # - name: Free up disk space
+      #   run: |
+      #     sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
 
       - name: Install latest stable
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          override: true
           components: rustfmt, clippy
+      
       - name: Install cargo-nextest
-        uses: baptiste0928/cargo-install@v1
+        uses: taiki-e/install-action@v2
         with:
-          crate: cargo-nextest
-          args: --locked
+          tool: cargo-nextest@0.9.119
 
       - name: Run cargo build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
+        run: cargo build
 
       - name: Run services in background
         run: |
