@@ -1,13 +1,13 @@
 services:
   # Redis
   redis:
-    image: eqalpha/keydb
+    image: public.ecr.aws/docker/library/redis
     ports:
       - "6379:6379"
 
   # MongoDB
   database:
-    image: mongo
+    image: public.ecr.aws/docker/library/mongo
     ports:
       - "27017:27017"
     volumes:
@@ -15,7 +15,7 @@ services:
 
   # MinIO
   minio:
-    image: minio/minio
+    image: quay.io/minio/minio
     command: server /data
     environment:
       MINIO_ROOT_USER: minioautumn
@@ -29,7 +29,7 @@ services:
 
   # Create buckets for minio.
   createbuckets:
-    image: minio/mc
+    image: quay.io/minio/mc
     depends_on:
       - minio
     entrypoint: >
@@ -40,7 +40,7 @@ services:
 
   # Rabbit
   rabbit:
-    image: rabbitmq:4-management
+    image: public.ecr.aws/docker/library/rabbitmq:4-management
     environment:
       RABBITMQ_DEFAULT_USER: rabbituser
       RABBITMQ_DEFAULT_PASS: rabbitpass
@@ -55,7 +55,7 @@ services:
 
   # Mock SMTP server
   maildev:
-    image: soulteary/maildev
+    image: maildev/maildev
     ports:
       - "14025:25"
       - "14080:8080"
