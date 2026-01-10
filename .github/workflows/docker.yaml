@@ -19,7 +19,7 @@ concurrency:
 jobs:
   base:
     name: Test base image build
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set
     if: github.event_name == 'pull_request'
     steps:
       # Configure build environment
@@ -40,7 +40,7 @@ jobs:
           cache-to: type=gha,scope=buildx-base-multi-arch,mode=max
 
   publish:
-    runs-on: self-hosted
+    runs-on: arc-runner-set
     if: github.event_name != 'pull_request'
     name: Publish Docker images
     steps:

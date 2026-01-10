@@ -15,7 +15,7 @@ env:
 jobs:
   check:
     name: Rust project
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set
     steps:
       - uses: actions/checkout@v2
       - name: Free up disk space
