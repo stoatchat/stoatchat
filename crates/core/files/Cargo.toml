@@ -1,6 +1,6 @@
 [package]
 name = "revolt-files"
-version = "0.9.0"
+version = "0.9.1"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 authors = ["Paul Makles <me@insrt.uk>"]
@@ -20,10 +20,10 @@ typenum = "1.17.0"
 aws-config = "1.5.5"
 aws-sdk-s3 = { version = "1.46.0", features = ["behavior-version-latest"] }
 
-revolt-config = { version = "0.9.0", path = "../config", features = [
+revolt-config = { version = "0.9.1", path = "../config", features = [
     "report-macros",
 ] }
-revolt-result = { version = "0.9.0", path = "../result" }
+revolt-result = { version = "0.9.1", path = "../result" }
 
 # image processing
 jxl-oxide = "0.8.1"
