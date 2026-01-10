@@ -1,6 +1,6 @@
 [package]
 name = "revolt-ratelimits"
-version = "0.9.2"
+version = "0.9.3"
 edition = "2024"
 
 [features]
@@ -10,9 +10,9 @@ axum = ["dep:axum", "revolt-database/axum-impl"]
 default = ["rocket", "axum"]
 
 [dependencies]
-revolt-database = { version = "0.9.2", path = "../database"}
-revolt-result = { version = "0.9.2", path = "../result" }
-revolt-config = { version = "0.9.2", path = "../config" }
+revolt-database = { version = "0.9.3", path = "../database"}
+revolt-result = { version = "0.9.3", path = "../result" }
+revolt-config = { version = "0.9.3", path = "../config" }
 
 rocket = { version = "0.5.1", optional = true }
 revolt_rocket_okapi = { version = "0.10.0", optional = true }

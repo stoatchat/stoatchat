@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.3](https://github.com/stoatchat/stoatchat/compare/v0.9.2...v0.9.3) (2026-01-10)
+
+
+### Bug Fixes
+
+* pipeline fixes ([#487](https://github.com/stoatchat/stoatchat/issues/487)) ([aeeafeb](https://github.com/stoatchat/stoatchat/commit/aeeafebefc36a43a656cf797c9251ca50292733c))
+
 ## [0.9.2](https://github.com/stoatchat/stoatchat/compare/v0.9.1...v0.9.2) (2026-01-10)
 
 

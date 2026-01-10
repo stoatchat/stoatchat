@@ -1,6 +1,6 @@
 [package]
 name = "revolt-parser"
-version = "0.9.2"
+version = "0.9.3"
 edition = "2021"
 license = "MIT"
 authors = ["Zomatree <me@zomatree.live>", "Paul Makles <me@insrt.uk>"]
