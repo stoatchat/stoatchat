@@ -17,7 +17,10 @@ jobs:
     name: Rust project
     runs-on: arc-runner-set
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential
 
       # Using our own runners for now:
       # - name: Free up disk space
@@ -25,12 +28,13 @@ jobs:
       #     sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
 
       - name: Install latest stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
         with:
+          toolchain: stable
           components: rustfmt, clippy
       
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@a58ae9526b2c3acee9ad8e1926b950b7863305d4 # 2.65.16
         with:
           tool: cargo-nextest@0.9.119
 
@@ -63,13 +67,13 @@ jobs:
 
       - name: Wait for API to go up
         if: github.event_name != 'pull_request' && github.ref_name == 'main'
-        uses: nev7n/wait_for_response@v1
+        uses: nev7n/wait_for_response@7fef3c1a6e8939d0b09062f14fec50d3c5d15fa1 # v1.0.1
         with:
           url: "http://localhost:14702/"
 
       - name: Checkout API repository
         if: github.event_name != 'pull_request' && github.ref_name == 'main'
-        uses: actions/checkout@v3
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           repository: stoatchat/javascript-client-api
           path: api
@@ -81,10 +85,10 @@ jobs:
 
       - name: Commit changes
         if: github.event_name != 'pull_request' && github.ref_name == 'main'
-        uses: EndBug/add-and-commit@v4
+        uses: EndBug/add-and-commit@a94899bca583c204427a224a7af87c02f9b325d5 # v9.1.4
         with:
           cwd: "api"
           add: "*.json"
-          author_name: Revolt CI
-          author_email: revolt-ci@users.noreply.github.com
+          author_name: Stoat CI
+          author_email: stoat-ci@users.noreply.github.com
           message: "chore: generate OpenAPI specification"
