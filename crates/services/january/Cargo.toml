@@ -3,6 +3,7 @@ name = "revolt-january"
 version = "0.9.1"
 edition = "2021"
 license = "AGPL-3.0-or-later"
+publish = false
 
 [dependencies]
 # Utility
