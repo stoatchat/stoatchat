@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.4](https://github.com/stoatchat/stoatchat/compare/v0.9.3...v0.9.4) (2026-01-10)
+
+
+### Bug Fixes
+
+* checkout repo. before bumping lock ([#490](https://github.com/stoatchat/stoatchat/issues/490)) ([b2da2a8](https://github.com/stoatchat/stoatchat/commit/b2da2a858787853be43136fd526a0bd72baf78ef))
+* persist credentials for git repo ([#492](https://github.com/stoatchat/stoatchat/issues/492)) ([c674a9f](https://github.com/stoatchat/stoatchat/commit/c674a9fd4e0abbd51569870e4b38074d4a1de03c))
+
 ## [0.9.3](https://github.com/stoatchat/stoatchat/compare/v0.9.2...v0.9.3) (2026-01-10)
 
 

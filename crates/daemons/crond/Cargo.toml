@@ -1,6 +1,6 @@
 [package]
 name = "revolt-crond"
-version = "0.9.3"
+version = "0.9.4"
 license = "AGPL-3.0-or-later"
 authors = ["Paul Makles <me@insrt.uk>"]
 edition = "2021"
@@ -17,7 +17,7 @@ log = "0.4"
 tokio = { version = "1" }
 
 # Core
-revolt-database = { version = "0.9.3", path = "../../core/database" }
-revolt-result = { version = "0.9.3", path = "../../core/result" }
-revolt-config = { version = "0.9.3", path = "../../core/config" }
-revolt-files = { version = "0.9.3", path = "../../core/files" }
+revolt-database = { version = "0.9.4", path = "../../core/database" }
+revolt-result = { version = "0.9.4", path = "../../core/result" }
+revolt-config = { version = "0.9.4", path = "../../core/config" }
+revolt-files = { version = "0.9.4", path = "../../core/files" }
