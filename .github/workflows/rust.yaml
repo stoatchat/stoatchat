@@ -5,8 +5,8 @@ on:
     branches: [main]
   pull_request:
 
-concurrency: 
-  group: ${{ github.head_ref }}
+concurrency:
+  group: ${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 env:
