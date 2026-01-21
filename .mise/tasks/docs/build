@@ -4,4 +4,4 @@
 #MISE dir="{{config_root}}/docs"
 set -e
 
-pnpm start
+pnpm build
