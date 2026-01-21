@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Install dependencies for docs site"
+#MISE dir="{{config_root}}/docs"
+set -e
+
+pnpm i --frozen-lockfile
