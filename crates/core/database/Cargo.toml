@@ -23,7 +23,7 @@ rocket-impl = [
     "revolt_rocket_okapi",
     "authifier/rocket_impl",
 ]
-axum-impl = ["axum"]
+axum-impl = ["axum", "revolt-result/axum"]
 redis-is-patched = ["revolt-presence/redis-is-patched"]
 voice = ["livekit-api", "livekit-protocol", "livekit-runtime"]
 
