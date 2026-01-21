@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Test project"
+set -e
+
+cargo nextest run

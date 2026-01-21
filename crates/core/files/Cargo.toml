@@ -5,6 +5,7 @@ edition = "2021"
 license = "AGPL-3.0-or-later"
 authors = ["Paul Makles <me@insrt.uk>"]
 description = "Revolt Backend: S3 and encryption subroutines"
+repository = "https://github.com/stoatchat/stoatchat"
 
 [dependencies]
 tracing = "0.1"

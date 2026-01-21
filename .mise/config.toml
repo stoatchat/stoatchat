@@ -1,0 +1,17 @@
+[tools]
+node = "25.4.0"
+pnpm = "10.28.1"
+
+gh = "2.25.0"
+
+rust = "1.92.0"
+"cargo:cargo-nextest" = "0.9.122"
+
+[settings]
+experimental = true
+idiomatic_version_file_enable_tools = ["rust"]
+
+[tasks.start]
+description = "Run all services"
+depends = ["docker:start", "build"]
+run = [{ task = "service:*" }]

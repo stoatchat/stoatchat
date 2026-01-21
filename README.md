@@ -43,13 +43,13 @@ Before contributing, make yourself familiar with [our contribution guidelines](h
 
 Before getting started, you'll want to install:
 
-- Rust toolchain (rustup recommended)
+- mise
 - Docker
 - Git
 - mold (optional, faster compilation)
 
 > A **default.nix** is available for Nix users!
-> Just run `nix-shell` and continue.
+> Run `nix-shell` to activate mise.
 
 As a heads-up, the development environment uses the following ports:
 
@@ -72,7 +72,7 @@ Now you can clone and build the project:
 ```bash
 git clone https://github.com/revoltchat/backend revolt-backend
 cd revolt-backend
-cargo build
+mise build
 ```
 
 A default configuration `Revolt.toml` is present in this project that is suited for development.

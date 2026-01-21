@@ -2,15 +2,20 @@
 name = "revolt-ratelimits"
 version = "0.9.4"
 edition = "2024"
+repository = "https://github.com/stoatchat/stoatchat"
 
 [features]
-rocket = ["dep:rocket", "dep:revolt_rocket_okapi", "revolt-database/rocket-impl"]
+rocket = [
+    "dep:rocket",
+    "dep:revolt_rocket_okapi",
+    "revolt-database/rocket-impl",
+]
 axum = ["dep:axum", "revolt-database/axum-impl"]
 
 default = ["rocket", "axum"]
 
 [dependencies]
-revolt-database = { version = "0.9.4", path = "../database"}
+revolt-database = { version = "0.9.4", path = "../database" }
 revolt-result = { version = "0.9.4", path = "../result" }
 revolt-config = { version = "0.9.4", path = "../config" }
 

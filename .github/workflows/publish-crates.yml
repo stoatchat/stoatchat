@@ -15,7 +15,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Publish crates
-        uses: katyo/publish-crates@02cc2f1ad653fb25c7d1ff9eb590a8a50d06186b # v2
+      - name: Setup Mise
+        uses: immich-app/devtools/actions/use-mise@cd24790a7f5f6439ac32cc94f5523cb2de8bfa8c # use-mise-action-v1.1.0
         with:
-          registry-token: ${{ secrets.CRATES_IO_PUBLISH_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish
+        run: mise publish --workspace

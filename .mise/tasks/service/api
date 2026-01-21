@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Run API server"
+set -e
+
+cargo run --bin revolt-delta

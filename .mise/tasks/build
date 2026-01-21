@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Build project"
+set -e
+
+cargo build "$@"

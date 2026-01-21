@@ -5,6 +5,7 @@ edition = "2021"
 license = "MIT"
 authors = ["Zomatree <me@zomatree.live>", "Paul Makles <me@insrt.uk>"]
 description = "Revolt Backend: Message Parser"
+repository = "https://github.com/stoatchat/stoatchat"
 
 [dependencies]
 logos = { version = "0.15" }

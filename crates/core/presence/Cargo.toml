@@ -5,6 +5,7 @@ edition = "2021"
 license = "AGPL-3.0-or-later"
 authors = ["Paul Makles <me@insrt.uk>"]
 description = "Revolt Backend: User Presence"
+repository = "https://github.com/stoatchat/stoatchat"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
