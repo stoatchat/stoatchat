@@ -1,4 +1,7 @@
-use revolt_database::{util::{permissions::DatabasePermissionQuery, reference::Reference}, Channel, Database, FieldsMessage, PartialMessage, SystemMessage, User, AMQP};
+use revolt_database::{
+    util::{permissions::DatabasePermissionQuery, reference::Reference},
+    Channel, Database, FieldsMessage, PartialMessage, SystemMessage, User, AMQP,
+};
 use revolt_models::v0::MessageAuthor;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};

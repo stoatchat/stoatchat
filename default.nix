@@ -30,6 +30,7 @@ in pkgs.mkShell {
   ];
 
   shellHook = ''
+    export TMPDIR=/tmp
     export NIX_LD="${pkgs.stdenv.cc.libc}/lib/ld-linux-x86-64.so.2"
     export NIX_LD_LIBRARY_PATH="${nix-ld-libs}/lib"
     export LD_LIBRARY_PATH="${nix-ld-libs}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
