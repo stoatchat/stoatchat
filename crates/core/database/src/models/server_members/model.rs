@@ -72,6 +72,7 @@ auto_derived!(
         CanReceive,
         CanPublish,
         JoinedAt,
+        VoiceChannel,
     }
 
     /// Member removal intention
@@ -224,13 +225,14 @@ impl Member {
 
     pub fn remove_field(&mut self, field: &FieldsMember) {
         match field {
-            FieldsMember::JoinedAt => (),
+            FieldsMember::JoinedAt => {},
             FieldsMember::Avatar => self.avatar = None,
             FieldsMember::Nickname => self.nickname = None,
             FieldsMember::Roles => self.roles.clear(),
             FieldsMember::Timeout => self.timeout = None,
             FieldsMember::CanReceive => self.can_receive = true,
             FieldsMember::CanPublish => self.can_publish = true,
+            FieldsMember::VoiceChannel => {},
         }
     }
 

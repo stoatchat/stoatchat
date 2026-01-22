@@ -98,13 +98,21 @@ pub async fn edit(
         permissions.throw_if_lacking_channel_permission(ChannelPermission::DeafenMembers)?;
     }
 
-    let new_voice_channel = if let Some(new_channel) = &data.voice_channel {
+    if data.voice_channel.is_some() && data.remove.contains(&FieldsMember::VoiceChannel) {
+        return Err(create_error!(InvalidOperation))
+    }
+
+    if data.voice_channel.is_some() || data.remove.contains(&FieldsMember::VoiceChannel) {
         if !voice_client.is_enabled() {
             return Err(create_error!(LiveKitUnavailable));
         };
 
-        permissions.throw_if_lacking_channel_permission(ChannelPermission::MoveMembers)?;
+        if member.id.user != user.id {
+            permissions.throw_if_lacking_channel_permission(ChannelPermission::MoveMembers)?;
+        }
+    }
 
+    let new_voice_channel = if let Some(new_channel) = &data.voice_channel {
         // ensure the channel we are moving them to is in the server and is a voice channel
 
         let channel = Reference::from_unchecked(new_channel)
@@ -115,6 +123,9 @@ pub async fn edit(
         if channel.server().is_none_or(|v| v != member.id.server) {
             Err(create_error!(UnknownChannel))?
         }
+
+        let channel_permissions = calculate_channel_permissions(&mut query.clone().channel(&channel)).await;
+        channel_permissions.throw_if_lacking_channel_permission(ChannelPermission::Connect)?;
 
         if get_user_voice_channel_in_server(&target_user.id, &server.id)
             .await?
@@ -189,10 +200,8 @@ pub async fn edit(
         partial.avatar = Some(File::use_user_avatar(db, &avatar, &user.id, &user.id).await?);
     }
 
-    let remove_contains_voice = remove.contains(FieldsMember::CanPublish) || remove.contains(FieldsMember::CanReceive);
-
     member
-        .update(db, partial, remove.into_iter().map(Into::into).collect())
+        .update(db, partial, remove.clone().into_iter().map(Into::into).collect())
         .await?;
 
     if let Some(new_voice_channel) = new_voice_channel {
@@ -234,7 +243,7 @@ pub async fn edit(
             .private(target_user.id.clone())
             .await;
         };
-    } else if can_publish.is_some() || can_receive.is_some() || remove_contains_voice {
+    } else if can_publish.is_some() || can_receive.is_some() || remove.contains(FieldsMember::CanPublish) || remove.contains(FieldsMember::CanReceive) {
         if let Some(channel) = get_user_voice_channel_in_server(&target_user.id, &server.id).await?
         {
             let node = get_channel_node(&channel).await?.unwrap();
@@ -252,6 +261,15 @@ pub async fn edit(
             .await?;
         };
     };
+
+    if remove.contains(&FieldsMember::VoiceChannel) {
+        if let Some(channel) = get_user_voice_channel_in_server(&target_user.id, &server.id).await?
+        {
+            let node = get_channel_node(&channel).await?.unwrap();
+
+            voice_client.remove_user(&node, &user.id, &channel).await?;
+        };
+    }
 
     Ok(Json(member.into()))
 }
