@@ -6784,6 +6784,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio 1.47.1",
+ "tower-http 0.5.2",
  "tracing",
  "utoipa",
  "utoipa-scalar",

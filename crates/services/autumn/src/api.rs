@@ -34,6 +34,12 @@ pub async fn router() -> Router<AppState> {
     let cors = CorsLayer::new()
         .allow_methods([Method::POST])
         .allow_headers(AllowHeaders::mirror_request())
+        .expose_headers(vec![
+            "X-RateLimit-Limit".try_into().unwrap(),
+            "X-RateLimit-Bucket".try_into().unwrap(),
+            "X-RateLimit-Remaining".try_into().unwrap(),
+            "X-RateLimit-Reset-After".try_into().unwrap(),
+        ])
         .allow_origin(Any);
 
     Router::new()
