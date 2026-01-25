@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.10.0](https://github.com/stoatchat/stoatchat/compare/v0.9.4...v0.10.0) (2026-01-25)
+
+
+### Features
+
+* allow kicking members from voice channels ([#495](https://github.com/stoatchat/stoatchat/issues/495)) ([0dc5442](https://github.com/stoatchat/stoatchat/commit/0dc544249825a49c793309edee5ec1838458a6da))
+* repository architecture for files crate w. added tests ([#498](https://github.com/stoatchat/stoatchat/issues/498)) ([01ded20](https://github.com/stoatchat/stoatchat/commit/01ded209c62208fc906d6aab9b08c04e860e10ef))
+
+
+### Bug Fixes
+
+* expose ratelimit headers via cors ([#496](https://github.com/stoatchat/stoatchat/issues/496)) ([a1a2125](https://github.com/stoatchat/stoatchat/commit/a1a21252d0ad58937e41f16e5fb86f96bebd2a51))
+
 ## [0.9.4](https://github.com/stoatchat/stoatchat/compare/v0.9.3...v0.9.4) (2026-01-10)
 
 
