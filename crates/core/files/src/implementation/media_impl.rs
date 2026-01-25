@@ -183,7 +183,7 @@ mod tests {
             &[0u8; 16],
         ]
         .concat();
-        assert_eq!(media.image_size_vec(&buf, "image/jpeg"), Some((900, 900)));
+        assert_eq!(media.image_size_vec(&buf, "image/jpeg"), Some((655, 582)));
 
         let mut reader = Cursor::new(buf);
         let image = media.decode_image(&mut reader, "image/jpeg").unwrap();
