@@ -1,3 +1,5 @@
+name: stoat-backend
+
 services:
   # Redis
   redis:
@@ -69,9 +71,29 @@ services:
       MAILDEV_INCOMING_USER: smtp
       MAILDEV_INCOMING_PASS: smtp
 
+  # LiveKit
   livekit:
     image: ghcr.io/stoatchat/livekit-server:v1.9.9
     command: --config /etc/livekit.yml
     network_mode: "host"
     volumes:
       - ./livekit.yml:/etc/livekit.yml
+
+  # VM
+  victoria-metrics:
+    image: victoriametrics/victoria-metrics:latest
+    ports:
+      - 8428:8428
+
+  # VL
+  victoria-logs:
+    image: docker.io/victoriametrics/victoria-logs:v1.43.1
+    ports:
+      - 9428:9428
+    command: -storageDataPath=victoria-logs-data
+
+  # VT
+  victoria-traces:
+    image: docker.io/victoriametrics/victoria-traces:latest
+    ports:
+      - 10428:10428

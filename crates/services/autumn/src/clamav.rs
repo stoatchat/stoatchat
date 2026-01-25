@@ -3,7 +3,6 @@ use std::time::Duration;
 use revolt_config::{config, report_internal_error};
 use revolt_result::Result;
 
-/// Initialise ClamAV
 pub async fn init() {
     let config = config().await;
 
@@ -32,7 +31,6 @@ pub async fn init() {
     }
 }
 
-/// Scan for malware
 pub async fn is_malware(buf: &[u8]) -> Result<bool> {
     let config = config().await;
     if config.files.clamd_host.is_empty() {

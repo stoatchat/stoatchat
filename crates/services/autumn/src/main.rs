@@ -6,6 +6,7 @@ use axum_macros::FromRef;
 use revolt_database::{Database, DatabaseInfo};
 use revolt_ratelimits::axum as ratelimiter;
 use tokio::net::TcpListener;
+use tower_http::trace::TraceLayer;
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
     Modify, OpenApi,
@@ -27,13 +28,32 @@ struct AppState {
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
-    // Configure logging and environment
-    revolt_config::configure!(files);
+    let logger_provider = init_logs();
 
-    // Wait for ClamAV
+    let otel_layer = OpenTelemetryTracingBridge::new(&logger_provider);
+
+    let filter_otel = EnvFilter::new("info")
+        .add_directive("hyper=off".parse().unwrap())
+        .add_directive("tonic=off".parse().unwrap())
+        .add_directive("h2=off".parse().unwrap())
+        .add_directive("reqwest=off".parse().unwrap());
+
+    let otel_layer = otel_layer.with_filter(filter_otel);
+
+    let filter_fmt = EnvFilter::new("info");
+
+    let fmt_layer = tracing_subscriber::fmt::layer()
+        .with_thread_names(true)
+        .with_filter(filter_fmt);
+
+    tracing_subscriber::registry()
+        .with(otel_layer)
+        .with(fmt_layer)
+        .init();
+
+    revolt_config::configure!(files);
     clamav::init().await;
 
-    // Configure API schema
     #[derive(OpenApi)]
     #[openapi(
         modifiers(&SecurityAddon),
@@ -76,7 +96,6 @@ async fn main() -> Result<(), std::io::Error> {
         }
     }
 
-    // Connect to the database
     let db = DatabaseInfo::Auto.connect().await.unwrap();
     let ratelimits = ratelimiter::RatelimitStorage::new(ratelimits::AutumnRatelimits);
 
@@ -85,7 +104,6 @@ async fn main() -> Result<(), std::io::Error> {
         ratelimit_storage: ratelimits,
     };
 
-    // Configure Axum and router
     let app = Router::new()
         .merge(Scalar::with_url("/scalar", ApiDoc::openapi()))
         .nest("/", api::router().await)
@@ -94,10 +112,56 @@ async fn main() -> Result<(), std::io::Error> {
             state.clone(),
             ratelimiter::ratelimit_middleware,
         ))
+        .layer(TraceLayer::new_for_http())
         .with_state(state);
 
-    // Configure TCP listener and bind
     let address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, 14704));
     let listener = TcpListener::bind(&address).await?;
-    axum::serve(listener, app.into_make_service()).await
+    axum::serve(listener, app.into_make_service()).await?;
+
+    if let Err(e) = logger_provider.shutdown() {
+        panic!("logger provider failed to shut down");
+    }
+
+    Ok(())
+}
+
+use opentelemetry::trace::{TraceContextExt, Tracer};
+use opentelemetry::KeyValue;
+use opentelemetry::{global, InstrumentationScope};
+use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
+use opentelemetry_otlp::{LogExporter, MetricExporter, Protocol, SpanExporter, WithExportConfig};
+use opentelemetry_sdk::logs::SdkLoggerProvider;
+use opentelemetry_sdk::metrics::SdkMeterProvider;
+use opentelemetry_sdk::trace::SdkTracerProvider;
+use opentelemetry_sdk::Resource;
+use std::error::Error;
+use std::sync::OnceLock;
+use tracing::info;
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::EnvFilter;
+
+fn get_resource() -> Resource {
+    static RESOURCE: OnceLock<Resource> = OnceLock::new();
+    RESOURCE
+        .get_or_init(|| {
+            Resource::builder()
+                .with_service_name("basic-otlp-example-grpc")
+                .build()
+        })
+        .clone()
+}
+
+fn init_logs() -> SdkLoggerProvider {
+    let exporter = LogExporter::builder()
+        .with_http()
+        .with_endpoint("http://localhost:19428/insert/opentelemetry/v1/logs")
+        .with_protocol(Protocol::HttpBinary)
+        .build()
+        .expect("Failed to create log exporter");
+
+    SdkLoggerProvider::builder()
+        .with_resource(get_resource())
+        .with_batch_exporter(exporter)
+        .build()
 }

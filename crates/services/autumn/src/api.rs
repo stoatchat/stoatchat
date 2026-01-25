@@ -27,7 +27,6 @@ use utoipa::ToSchema;
 
 use crate::{exif::strip_metadata, metadata::generate_metadata, mime_type::determine_mime_type, AppState};
 
-/// Build the API router
 pub async fn router() -> Router<AppState> {
     let config = config().await;
 
@@ -58,8 +57,6 @@ pub async fn router() -> Router<AppState> {
 }
 
 lazy_static! {
-    /// Short-lived file cache to allow us to populate different CDN regions without increasing bandwidth to S3 provider
-    /// Uploads will also be stored here to prevent immediately queued downloads from doing the entire round-trip
     static ref S3_CACHE: moka::future::Cache<String, Result<Vec<u8>>> = moka::future::Cache::builder()
         .weigher(|_key, value: &Result<Vec<u8>>| -> u32 {
             std::mem::size_of::<Result<Vec<u8>>>() as u32 + if let Ok(vec) = value {
@@ -76,7 +73,6 @@ lazy_static! {
         .build();
 }
 
-/// Retrieve hash information and file data by given hash
 async fn retrieve_file_by_hash(hash: &FileHash) -> Result<Vec<u8>> {
     if let Some(data) = S3_CACHE.get(&hash.id).await {
         data
@@ -87,17 +83,15 @@ async fn retrieve_file_by_hash(hash: &FileHash) -> Result<Vec<u8>> {
     }
 }
 
-/// Successful root response
 #[derive(Serialize, Debug, ToSchema)]
 pub struct RootResponse {
     autumn: &'static str,
     version: &'static str,
 }
 
-/// Capture crate version from Cargo
 static CRATE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Root response from service
+/// Get information about the service
 #[utoipa::path(
     get,
     path = "/",
@@ -112,7 +106,6 @@ async fn root() -> Json<RootResponse> {
     })
 }
 
-/// Empty handler for OPTIONS routes
 async fn options() {}
 
 /// Available tags to upload to
@@ -176,28 +169,19 @@ async fn upload_file(
     Path(tag): Path<Tag>,
     TypedMultipart(UploadPayload { mut file }): TypedMultipart<UploadPayload>,
 ) -> Result<Json<UploadResponse>> {
-    // Fetch configuration
+    let now = Instant::now();
     let config = config().await;
 
-    // Keep track of processing time
-    let now = Instant::now();
-
-    // Extract the filename, or give it a generic name
     let filename = file.metadata.file_name.unwrap_or("unnamed-file".to_owned());
 
-    // Load file to memory
     let mut buf = Vec::<u8>::new();
     report_internal_error!(file.contents.read_to_end(&mut buf))?;
 
-    // Take note of original file size
     let original_file_size = buf.len();
-
-    // Ensure the file is not empty
     if original_file_size < config.files.limit.min_file_size {
         return Err(create_error!(FileTooSmall));
     }
 
-    // Get user's file upload limits
     let limits = user.limits().await;
     let size_limit = *limits
         .file_upload_size_limit
@@ -208,24 +192,19 @@ async fn upload_file(
         return Err(create_error!(FileTooLarge { max: size_limit }));
     }
 
-    // Generate sha256 hash
     let original_hash = {
         let mut hasher = sha2::Sha256::new();
         hasher.update(&buf);
         hasher.finalize()
     };
 
-    // Generate an ID for this file
     let id = if matches!(tag, Tag::emojis) {
         ulid::Ulid::new().to_string()
     } else {
         nanoid::nanoid!(42)
     };
 
-    // Determine the mime type for the file
     let mime_type = determine_mime_type(&mut file.contents, &buf, &filename);
-
-    // Check blocklist for mime type
     if config
         .files
         .blocked_mime_types
@@ -235,15 +214,11 @@ async fn upload_file(
         return Err(create_error!(FileTypeNotAllowed));
     }
 
-    // Determine metadata for the file
     let metadata = generate_metadata(&file.contents, mime_type);
-
-    // Block non-images for non-attachment uploads
     if !matches!(tag, Tag::attachments) && !matches!(metadata, Metadata::Image { .. }) {
         return Err(create_error!(FileTypeNotAllowed));
     }
 
-    // Find an existing hash and use that if possible
     let file_hash_exists = if let Ok(file_hash) = db
         .fetch_attachment_hash(&format!("{original_hash:02x}"))
         .await
@@ -266,10 +241,8 @@ async fn upload_file(
         false
     };
 
-    // Strip metadata
     let (buf, metadata) = strip_metadata(file.contents, buf, metadata, mime_type).await?;
 
-    // Virus scan files if ClamAV is configured
     if matches!(metadata, Metadata::File)
         && (config.files.scan_mime_types.is_empty()
             || config.files.scan_mime_types.iter().any(|v| v == mime_type))
@@ -278,7 +251,6 @@ async fn upload_file(
         return Err(create_error!(InternalError));
     }
 
-    // Print file information for debug purposes
     let new_file_size = buf.len() + AUTHENTICATION_TAG_SIZE_BYTES;
     let processed_hash = {
         let mut hasher = sha2::Sha256::new();
@@ -290,7 +262,6 @@ async fn upload_file(
 
     tracing::info!("Received file {filename}\nOriginal hash: {original_hash:02x}\nOriginal size: {original_file_size} bytes\nMime type: {mime_type}\nMetadata: {metadata:?}\nProcessed file size: {new_file_size} bytes ({:.2}%).\nProcessed hash: {processed_hash:02x}\nProcessing took {time_to_process:?}", process_ratio * 100.0);
 
-    // Create hash entry in database
     let file_hash = FileHash {
         id: format!("{original_hash:02x}"),
         processed_hash: format!("{processed_hash:02x}"),
@@ -306,21 +277,17 @@ async fn upload_file(
         size: new_file_size as isize,
     };
 
-    // Add attachment hash if it doesn't exist
     if !file_hash_exists {
         db.insert_attachment_hash(&file_hash).await?;
     }
 
-    // Upload the file to S3 and commit nonce to database
     let upload_start = Instant::now();
     let nonce = upload_to_s3(&file_hash.bucket_id, &file_hash.id, &buf).await?;
     db.set_attachment_hash_nonce(&file_hash.id, &nonce).await?;
 
-    // Debug information
     let time_to_upload = Instant::now() - upload_start;
     tracing::info!("Took {time_to_upload:?} to upload {new_file_size} bytes to S3.");
 
-    // Finally, create the file and return its ID
     let tag: &'static str = tag.into();
     db.insert_attachment(&file_hash.into_file(id.clone(), tag.to_owned(), filename, user.id))
         .await?;
@@ -368,12 +335,10 @@ async fn fetch_preview(
     let tag_str: &'static str = tag.clone().into();
     let file = db.fetch_attachment(tag_str, &file_id).await?;
 
-    // Ignore deleted files
     if file.deleted.is_some_and(|v| v) {
         return Err(create_error!(NotFound));
     }
 
-    // Ignore files that haven't been attached
     if file.used_for.is_none() {
         return Err(create_error!(NotFound));
     }
@@ -382,7 +347,7 @@ async fn fetch_preview(
 
     let is_animated = hash.content_type == "image/gif"; // TODO: extract this data from files
 
-    // Only process image files and don't process GIFs if not avatar or icon
+    // Process GIFs if avatar or icon
     if !matches!(hash.metadata, Metadata::Image { .. })
         || (is_animated && !matches!(tag, Tag::avatars | Tag::icons))
     {
@@ -391,10 +356,8 @@ async fn fetch_preview(
         );
     }
 
-    // Original image data
     let data = retrieve_file_by_hash(&hash).await?;
 
-    // Read image and create thumbnail
     let data = create_thumbnail(
         decode_image(&mut Cursor::new(data), &file.content_type)?,
         tag_str,
@@ -436,17 +399,14 @@ async fn fetch_file(
     let tag: &'static str = tag.clone().into();
     let file = db.fetch_attachment(tag, &file_id).await?;
 
-    // Ignore deleted files
     if file.deleted.is_some_and(|v| v) {
         return Err(create_error!(NotFound));
     }
 
-    // Ignore files that haven't been attached
     if file.used_for.is_none() {
         return Err(create_error!(NotFound));
     }
 
-    // Ensure filename is correct
     if file_name != file.filename {
         if file_name == "original" {
             return Ok(

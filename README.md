@@ -109,6 +109,18 @@ If you'd like to change anything, create a `Revolt.overrides.toml` file and spec
 >     ports: !override
 >       - "14072:5672"
 >       - "14672:15672"
+>
+>   victoria-metrics:
+>     ports: !override
+>       - "18428:8428"
+>
+>   victoria-logs:
+>     ports: !override
+>       - "19428:9428"
+>
+>   victoria-traces:
+>     ports: !override
+>       - "14428:10428"
 > ```
 >
 > And corresponding Revolt configuration:

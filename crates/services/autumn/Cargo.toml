@@ -39,10 +39,6 @@ serde = { version = "1.0", features = ["derive"] }
 # Async runtime
 tokio = { version = "1.0", features = ["full"] }
 
-# Logging
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
 # Core crates
 revolt-files = { version = "0.9.4", path = "../../core/files" }
 revolt-config = { version = "0.9.4", path = "../../core/config" }
@@ -53,15 +49,25 @@ revolt-result = { version = "0.9.4", path = "../../core/result", features = [
     "utoipa",
     "axum",
 ] }
-revolt-ratelimits = { version = "0.9.4", path = "../../core/ratelimits", features = ["axum"] }
+revolt-ratelimits = { version = "0.9.4", path = "../../core/ratelimits", features = [
+    "axum",
+] }
 
 # Axum / web server
 tempfile = "3.12.0"
-axum-macros = "0.4.1"
-axum_typed_multipart = "0.12.1"
-axum = { version = "0.7.5", features = ["multipart"] }
-tower-http = { version = "0.5.2", features = ["cors"] }
+axum-macros = { workspace = true }
+axum_typed_multipart = { workspace = true }
+axum = { workspace = true }
+tower-http = { workspace = true }
 
 # OpenAPI & documentation generation
 utoipa-scalar = { version = "0.1.0", features = ["axum"] }
 utoipa = { version = "4.2.3", features = ["axum_extras", "ulid"] }
+
+# OpenTelemetry
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+opentelemetry = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+opentelemetry-appender-tracing = { workspace = true }

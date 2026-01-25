@@ -19,7 +19,6 @@ static SUPPORTED_IMAGE_MIME: [&str; 9] = [
     "image/webp",
 ];
 
-/// Generate metadata from file, using mime type as a hint
 pub fn generate_metadata(f: &NamedTempFile, mime_type: &str) -> Metadata {
     if SUPPORTED_IMAGE_MIME.contains(&mime_type) {
         image_size(f)
@@ -44,7 +43,6 @@ pub fn generate_metadata(f: &NamedTempFile, mime_type: &str) -> Metadata {
     }
 }
 
-/// Subroutine to ensure data isn't corrupted
 pub fn validate_from_metadata(
     reader: Cursor<Vec<u8>>,
     metadata: Metadata,

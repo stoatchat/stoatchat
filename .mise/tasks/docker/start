@@ -2,4 +2,4 @@
 #MISE description="Start Docker containers"
 set -e
 
-docker compose up -d
+docker compose up -d "$@"

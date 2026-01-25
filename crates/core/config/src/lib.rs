@@ -471,7 +471,6 @@ pub async fn setup_logging(release: &'static str, dsn: String) -> Option<sentry:
         std::env::set_var("ROCKET_ADDRESS", "0.0.0.0");
     }
 
-    pretty_env_logger::init();
     log::info!("Starting {release}");
 
     if dsn.is_empty() {

@@ -8,7 +8,6 @@ use revolt_result::{create_error, Result};
 use tempfile::NamedTempFile;
 use tokio::process::Command;
 
-/// Strip EXIF data from given file and produce new file and metadata
 pub async fn strip_metadata(
     file: NamedTempFile,
     buf: Vec<u8>,
@@ -37,20 +36,16 @@ pub async fn strip_metadata(
             // }
             // Apply orientation manually & strip all other EXIF data
             "image/jpeg" | "image/png" | "image/avif" | "image/tiff" => {
-                // Create a reader
                 let mut cursor = Cursor::new(buf);
 
-                // Decode the image
                 let image = report_internal_error!(report_internal_error!(ImageReader::new(
                     &mut cursor
                 )
                 .with_guessed_format())?
                 .decode());
 
-                // Reset read position
                 cursor.set_position(0);
 
-                // Extract orientation data
                 let exif_reader = Reader::new();
                 let rotation = match exif_reader.read_from_container(&mut cursor) {
                     Ok(exif) => match exif.get_field(exif::Tag::Orientation, exif::In::PRIMARY) {
@@ -60,12 +55,10 @@ pub async fn strip_metadata(
                     _ => 0,
                 };
 
-                // Create a buffer to write to
                 let mut bytes: Vec<u8> = Vec::new();
                 let mut writer = Cursor::new(&mut bytes);
 
-                // Apply the EXIF rotation
-                // See https://jdhao.github.io/2019/07/31/image_rotation_exif_info/
+                // https://jdhao.github.io/2019/07/31/image_rotation_exif_info/
                 report_internal_error!(match &rotation {
                     2 => image?.fliph(),
                     3 => image?.rotate180(),
@@ -87,7 +80,6 @@ pub async fn strip_metadata(
                     },
                 ))?;
 
-                // Calculate dimensions after rotation.
                 let (width, height) = match &rotation {
                     2 | 4 | 5 | 7 => (*height, *width),
                     _ => (*width, *height),
@@ -95,16 +87,13 @@ pub async fn strip_metadata(
 
                 Ok((bytes, Metadata::Image { width, height }))
             }
-            // JXLs store EXIF data but we don't have the ability to write them
+            // TODO: JXLs store EXIF data but we don't have the ability to write them
             "image/jxl" => Ok((buf, metadata)),
-            // All other images that cannot store EXIF data
+            // assume all other images that cannot store EXIF data
             _ => Ok((buf, metadata)),
         },
-        // Use ffmpeg to copy video stream and probe new metadata
         Metadata::Video { .. } => match mime {
-            // Strip EXIF data by copying video stream
             "video/mp4" | "video/webm" | "video/quicktime" => {
-                // Pick the correct file format for ffmpeg
                 let ext = match mime {
                     "video/mp4" => "mp4",
                     "video/webm" => "webm",
@@ -112,30 +101,22 @@ pub async fn strip_metadata(
                     _ => unreachable!(),
                 };
 
-                // Temporary output file
                 let mut out_file = report_internal_error!(NamedTempFile::new())?;
 
-                // Process the file with ffmpeg
                 report_internal_error!(
                     Command::new("ffmpeg")
                         .args([
-                            // Overwrite the temporary file
                             "-y",
-                            // Read original uploaded file
                             "-i",
                             file.path().to_str().ok_or(create_error!(InternalError))?,
-                            // Strip any metadata
-                            "-map_metadata",
+                            "-map_metadata", // strip metadata
                             "-1",
-                            // Copy video / audio data to new file
-                            "-c:v",
+                            "-c:v", // just copy the streams
                             "copy",
                             "-c:a",
                             "copy",
-                            // Select correct file format
                             "-f",
                             ext,
-                            // Save to new temporary file
                             out_file
                                 .path()
                                 .to_str()
@@ -145,19 +126,17 @@ pub async fn strip_metadata(
                         .await
                 )?;
 
-                // Probe the file again
                 let metadata = crate::metadata::generate_metadata(&out_file, mime);
 
-                // Read the file from disk
                 let mut buf = Vec::<u8>::new();
                 report_internal_error!(out_file.read_to_end(&mut buf))?;
 
                 Ok((buf, metadata))
             }
-            // Assume all other video formats cannot store EXIF data
+            // assume all other video formats cannot store EXIF data
             _ => Ok((buf, metadata)),
         },
-        // all other file types don't store EXIF data
+        // assume all other file types don't store EXIF data
         _ => Ok((buf, metadata)),
     }
 }
