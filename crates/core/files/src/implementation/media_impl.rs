@@ -132,6 +132,17 @@ impl MediaRepository for MediaImpl {
         let [w, h] = self.config.preview.get(tag).unwrap();
 
         let image = image.thumbnail(image.width().min(*w as u32), image.height().min(*h as u32));
+        let image = match image {
+            DynamicImage::ImageRgb8(_) => image,
+            DynamicImage::ImageRgba8(_) => image,
+            _ => {
+                if image.has_alpha() {
+                    image.to_rgba8().into()
+                } else {
+                    image.to_rgb8().into()
+                }
+            }
+        };
 
         let encoder = webp::Encoder::from_image(&image).expect("Could not create encoder.");
         if self.config.webp_quality != 100.0 {
@@ -214,6 +225,17 @@ mod tests {
         let mut reader = Cursor::new(buf);
         let image = media.decode_image(&mut reader, "image/png").unwrap();
         media.create_thumbnail(image, "emojis");
+    }
+
+    #[tokio::test]
+    async fn asset_test_floating_point_png() {
+        let media = MediaImpl::from_config().await;
+        let buf = include_bytes!("../../tests/assets/test-float.png");
+        assert_eq!(media.image_size_vec(buf, "image/png"), Some((300, 300)));
+
+        let mut reader = Cursor::new(buf);
+        let image = media.decode_image(&mut reader, "image/png").unwrap();
+        media.create_thumbnail(image, "avatars");
     }
 
     #[tokio::test]
