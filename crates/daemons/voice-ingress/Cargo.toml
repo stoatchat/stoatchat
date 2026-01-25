@@ -1,6 +1,6 @@
 [package]
 name = "revolt-voice-ingress"
-version = "0.10.0"
+version = "0.10.1"
 license = "AGPL-3.0-or-later"
 edition = "2021"
 publish = false

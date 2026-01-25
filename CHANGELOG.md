@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/stoatchat/stoatchat/compare/v0.10.0...v0.10.1) (2026-01-25)
+
+
+### Bug Fixes
+
+* use Rust 1.92.0 for Docker build ([#503](https://github.com/stoatchat/stoatchat/issues/503)) ([98da8a2](https://github.com/stoatchat/stoatchat/commit/98da8a28a0aa2fee4e8eee1d86bd7c49e3187477))
+
 ## [0.10.0](https://github.com/stoatchat/stoatchat/compare/v0.9.4...v0.10.0) (2026-01-25)
 
 
