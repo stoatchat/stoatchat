@@ -1,6 +1,6 @@
 [package]
 name = "revolt-presence"
-version = "0.10.1"
+version = "0.10.2"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 authors = ["Paul Makles <me@insrt.uk>"]
@@ -17,7 +17,7 @@ redis-is-patched = []
 async-std = { version = "1.8.0", features = ["attributes"] }
 
 # Config for loading Redis URI
-revolt-config = { version = "0.10.1", path = "../config" }
+revolt-config = { version = "0.10.2", path = "../config" }
 
 [dependencies]
 # Utility

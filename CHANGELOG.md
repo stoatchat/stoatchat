@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.2](https://github.com/stoatchat/stoatchat/compare/v0.10.1...v0.10.2) (2026-01-25)
+
+
+### Bug Fixes
+
+* thumbnailification requires rgb8/rgba8 ([#505](https://github.com/stoatchat/stoatchat/issues/505)) ([413aa04](https://github.com/stoatchat/stoatchat/commit/413aa04dcaf8bff3935ed1e5f31432e11a03ce6f))
+
 ## [0.10.1](https://github.com/stoatchat/stoatchat/compare/v0.10.0...v0.10.1) (2026-01-25)
 
 

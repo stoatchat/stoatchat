@@ -1,6 +1,6 @@
 [package]
 name = "revolt-bonfire"
-version = "0.10.1"
+version = "0.10.2"
 license = "AGPL-3.0-or-later"
 edition = "2021"
 publish = false

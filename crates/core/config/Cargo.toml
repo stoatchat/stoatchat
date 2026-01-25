@@ -1,6 +1,6 @@
 [package]
 name = "revolt-config"
-version = "0.10.1"
+version = "0.10.2"
 edition = "2021"
 license = "MIT"
 authors = ["Paul Makles <me@insrt.uk>"]
@@ -38,4 +38,4 @@ sentry = { version = "0.31.5", optional = true }
 sentry-anyhow = { version = "0.38.1", optional = true }
 
 # Core
-revolt-result = { version = "0.10.1", path = "../result", optional = true }
+revolt-result = { version = "0.10.2", path = "../result", optional = true }

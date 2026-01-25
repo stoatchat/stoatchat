@@ -1,6 +1,6 @@
 [package]
 name = "revolt-result"
-version = "0.10.1"
+version = "0.10.2"
 edition = "2021"
 license = "MIT"
 authors = ["Paul Makles <me@insrt.uk>"]

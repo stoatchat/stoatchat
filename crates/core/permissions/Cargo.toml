@@ -1,6 +1,6 @@
 [package]
 name = "revolt-permissions"
-version = "0.10.1"
+version = "0.10.2"
 edition = "2021"
 license = "MIT"
 authors = ["Paul Makles <me@insrt.uk>"]
@@ -22,7 +22,7 @@ async-std = { version = "1.8.0", features = ["attributes"] }
 
 [dependencies]
 # Core
-revolt-result = { version = "0.10.1", path = "../result" }
+revolt-result = { version = "0.10.2", path = "../result" }
 
 # Utility
 auto_ops = "0.3.0"
