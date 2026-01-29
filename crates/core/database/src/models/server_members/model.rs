@@ -261,7 +261,7 @@ impl Member {
 
     /// Remove member from server
     pub async fn remove(
-        self,
+        &self,
         db: &Database,
         server: &Server,
         intention: RemovalIntention,
@@ -288,9 +288,9 @@ impl Member {
                 })
             {
                 match intention {
-                    RemovalIntention::Leave => SystemMessage::UserLeft { id: self.id.user },
-                    RemovalIntention::Kick => SystemMessage::UserKicked { id: self.id.user },
-                    RemovalIntention::Ban => SystemMessage::UserBanned { id: self.id.user },
+                    RemovalIntention::Leave => SystemMessage::UserLeft { id: self.id.user.clone() },
+                    RemovalIntention::Kick => SystemMessage::UserKicked { id: self.id.user.clone() },
+                    RemovalIntention::Ban => SystemMessage::UserBanned { id: self.id.user.clone() },
                 }
                 .into_message(id.to_string())
                 // TODO: support notifications here in the future?

@@ -1,11 +1,12 @@
 use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, User,
+    AuditLogEntryAction, Database, User, util::{permissions::DatabasePermissionQuery, reference::Reference}
 };
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 use revolt_result::Result;
 use rocket::State;
 use rocket_empty::EmptyResponse;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Unban user
 ///
@@ -15,6 +16,7 @@ use rocket_empty::EmptyResponse;
 pub async fn unban(
     db: &State<Database>,
     user: User,
+    reason: AuditLogReason,
     server: Reference<'_>,
     target: Reference<'_>,
 ) -> Result<EmptyResponse> {
@@ -25,5 +27,11 @@ pub async fn unban(
         .throw_if_lacking_channel_permission(ChannelPermission::BanMembers)?;
 
     let ban = target.as_ban(db, &server.id).await?;
-    db.delete_ban(&ban.id).await.map(|_| EmptyResponse)
+    db.delete_ban(&ban.id).await?;
+
+    AuditLogEntryAction::BanDelete { user: target.id.to_string() }
+        .insert(db, server.id, reason.0, user.id)
+        .await;
+
+    Ok(EmptyResponse)
 }

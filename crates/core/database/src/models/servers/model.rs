@@ -371,7 +371,7 @@ impl Role {
     }
 
     /// Delete a role
-    pub async fn delete(self, db: &Database, server_id: &str) -> Result<()> {
+    pub async fn delete(&self, db: &Database, server_id: &str) -> Result<()> {
         EventV1::ServerRoleDelete {
             id: server_id.to_string(),
             role_id: self.id.clone(),
