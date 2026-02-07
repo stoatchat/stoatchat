@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.3](https://github.com/stoatchat/stoatchat/compare/v0.10.2...v0.10.3) (2026-02-07)
+
+
+### Bug Fixes
+
+* update `Revolt` -&gt; `Stoat` in email titles/desc. ([#508](https://github.com/stoatchat/stoatchat/issues/508)) ([84483ce](https://github.com/stoatchat/stoatchat/commit/84483cee7af3e5dfa16f7fe13e334c4d9f5abd60))
+
 ## [0.10.2](https://github.com/stoatchat/stoatchat/compare/v0.10.1...v0.10.2) (2026-01-25)
 
 
