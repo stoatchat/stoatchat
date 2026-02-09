@@ -1,6 +1,6 @@
 <div align="center">
 <h1>
-  Revolt Backend
+  Stoat Backend
   
   [![Stars](https://img.shields.io/github/stars/revoltchat/backend?style=flat-square&logoColor=white)](https://github.com/revoltchat/backend/stargazers)
   [![Forks](https://img.shields.io/github/forks/revoltchat/backend?style=flat-square&logoColor=white)](https://github.com/revoltchat/backend/network/members)
