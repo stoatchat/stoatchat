@@ -475,9 +475,9 @@ dependencies = [
 
 [[package]]
 name = "authifier"
-version = "1.0.15"
+version = "1.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1a03b810b342b4c584cdc1cfc40d1ec763b1d653ef4086f7494740f35d9e1f0"
+checksum = "1d6163caecbb985d91406c2c6dc7710c46b38e6461d93d5e843b2f0eac43910c"
 dependencies = [
  "async-std",
  "async-trait",
@@ -6798,7 +6798,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-autumn"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "axum",
  "axum-macros",
@@ -6836,7 +6836,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-bonfire"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "async-channel 2.5.0",
  "async-std",
@@ -6867,7 +6867,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-coalesced"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "indexmap 2.13.0",
  "lru 0.16.3",
@@ -6876,7 +6876,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-config"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "async-std",
  "cached",
@@ -6893,7 +6893,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-crond"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "log",
  "revolt-config",
@@ -6905,7 +6905,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-database"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "amqprs",
  "async-lock 2.8.0",
@@ -6955,7 +6955,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-delta"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "amqprs",
  "async-channel 1.9.0",
@@ -7005,7 +7005,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-files"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -7033,7 +7033,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-gifbox"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "axum",
  "axum-extra",
@@ -7056,7 +7056,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-january"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "async-recursion",
  "axum",
@@ -7084,7 +7084,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-models"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "indexmap 1.9.3",
  "iso8601-timestamp",
@@ -7103,14 +7103,14 @@ dependencies = [
 
 [[package]]
 name = "revolt-parser"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "logos",
 ]
 
 [[package]]
 name = "revolt-permissions"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "async-std",
  "async-trait",
@@ -7125,7 +7125,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-presence"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "async-std",
  "log",
@@ -7137,7 +7137,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-pushd"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "amqprs",
  "anyhow",
@@ -7165,7 +7165,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-ratelimits"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "async-trait",
  "authifier",
@@ -7182,7 +7182,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-result"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "axum",
  "log",
@@ -7198,7 +7198,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-voice-ingress"
-version = "0.10.3"
+version = "0.11.0"
 dependencies = [
  "amqprs",
  "async-std",
@@ -7411,9 +7411,9 @@ dependencies = [
 
 [[package]]
 name = "rocket_authifier"
-version = "1.0.15"
+version = "1.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1f98a5be96ac4144ee1adc809c1594e8212032b8a08d9bc4cef70735dfd976e"
+checksum = "4a4e9660d198ea0165dc2694e7620d8fe199e923b39bec4d12b7159da5a4a6cd"
 dependencies = [
  "authifier",
  "iso8601-timestamp",
