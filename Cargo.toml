@@ -14,9 +14,37 @@ redis23 = { package = "redis", version = "0.23.3", git = "https://github.com/rev
 #authifier = { package = "authifier", version = "1.0.10", path = "../authifier/crates/authifier" }
 #rocket_authifier = { package = "rocket_authifier", version = "1.0.10", path = "../authifier/crates/rocket_authifier" }
 
-# I'm 99% sure this is overloading the GitHub worker
-# hence builds have been failing since, let's just
-# disable it for now. In the future, we could use this
-# if we were rolling our own CI (that is now).
 [profile.release]
 lto = true
+
+[workspace.dependencies]
+# Async
+async-trait = "0.1.89"
+tokio = { version = "1.49.0", features = ["macros", "rt"] }
+
+# Error Handling
+anyhow = "1.0.100"
+thiserror = "2.0.18"
+
+# Other Utilities
+uuid = { version = "1.19.0", features = ["v4"] }
+
+# Axum (HTTP server)
+axum-macros = "0.4.1"
+axum_typed_multipart = "0.12.1"
+axum = { version = "0.7.5", features = ["multipart"] }
+tower-http = { version = "0.5.2", features = ["cors", "trace"] }
+
+# Image Processing
+jxl-oxide = { version = "0.12.5", features = ["image"] }
+image = "0.25.9"
+
+# OpenTelemetry
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.22", features = [
+    "env-filter",
+] } # consider https://crates.io/crates/better-tracing
+opentelemetry = { version = "0.31.0", features = ["logs"] }
+opentelemetry_sdk = { version = "0.31.0", features = ["logs"] }
+opentelemetry-otlp = { version = "0.31.0", features = ["logs"] }
+opentelemetry-appender-tracing = { version = "0.31.1" }

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Run file server"
+set -e
+
+cargo run --bin revolt-autumn

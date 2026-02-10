@@ -1,13 +1,20 @@
 [package]
 name = "revolt-files"
-version = "0.9.4"
+version = "0.10.3"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 authors = ["Paul Makles <me@insrt.uk>"]
 description = "Revolt Backend: S3 and encryption subroutines"
+repository = "https://github.com/stoatchat/stoatchat"
 
 [dependencies]
-tracing = "0.1"
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+tracing = { workspace = true }
+
+tokio = { workspace = true }
+async-trait = { workspace = true }
 
 ffprobe = "0.4.0"
 imagesize = "0.13.0"
@@ -20,14 +27,14 @@ typenum = "1.17.0"
 aws-config = "1.5.5"
 aws-sdk-s3 = { version = "1.46.0", features = ["behavior-version-latest"] }
 
-revolt-config = { version = "0.9.4", path = "../config", features = [
+revolt-config = { version = "0.10.3", path = "../config", features = [
     "report-macros",
 ] }
-revolt-result = { version = "0.9.4", path = "../result" }
+revolt-result = { version = "0.10.3", path = "../result" }
 
 # image processing
-jxl-oxide = "0.8.1"
-image = { version = "0.25.2" }
+jxl-oxide = { workspace = true }
+image = { workspace = true }
 
 # svg rendering
 usvg = "0.44.0"
@@ -36,3 +43,6 @@ tiny-skia = "0.11.4"
 
 # encoding
 webp = "0.3.0"
+
+[dev-dependencies]
+uuid = { workspace = true }

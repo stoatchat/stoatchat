@@ -4,6 +4,6 @@ Please navigate to: {{url}}
 
 This email is intended for {{email}}
 
-This email has no association with Revolt or Revolt Platforms Ltd.
+This email has no association with Stoat or Revolt Platforms Ltd.
 Learn more about third party instances here:
 https://developers.revolt.chat/faq.html

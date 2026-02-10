@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 use cached::proc_macro::cached;
 use config::{Config, File, FileFormat};
@@ -94,10 +94,19 @@ static CONFIG_BUILDER: Lazy<RwLock<Config>> = Lazy::new(|| {
             }
         }
 
-        for path in CONFIG_SEARCH_PATHS {
-            if std::path::Path::new(path).exists() {
-                builder = builder.add_source(File::new(path, FileFormat::Toml));
+        let cwd = std::env::current_dir().unwrap();
+        let mut cwd: Option<&Path> = Some(&cwd);
+
+        while let Some(path) = cwd {
+            for config_path in CONFIG_SEARCH_PATHS {
+                let config_path = path.join(config_path);
+                if config_path.exists() {
+                    builder = builder
+                        .add_source(File::new(config_path.to_str().unwrap(), FileFormat::Toml));
+                }
             }
+
+            cwd = path.parent();
         }
 
         builder.build().unwrap()

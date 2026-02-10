@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Test project"
+set -e
+
+: "${TEST_DB:=REFERENCE}"
+export TEST_DB
+
+cargo nextest run

@@ -70,6 +70,15 @@ pub async fn web() -> Rocket<Build> {
         .iter()
         .map(|s| FromStr::from_str(s).unwrap())
         .collect(),
+        expose_headers: [
+            "X-Ratelimit-Limit",
+            "X-Ratelimit-Bucket",
+            "X-Ratelimit-Remaining",
+            "X-Ratelimit-Reset-After",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect(),
         ..Default::default()
     }
     .to_cors()

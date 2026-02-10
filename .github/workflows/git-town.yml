@@ -1,0 +1,19 @@
+name: Git Town
+
+on:
+  pull_request:
+
+jobs:
+  git-town:
+    name: Display the branch stack
+    runs-on: ubuntu-slim
+
+    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: stoatchat/action-git-town@4bc5c942e4603bffa0806b51d5fe5f0bc5deb0ac

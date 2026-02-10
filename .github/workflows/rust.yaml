@@ -26,43 +26,33 @@ jobs:
       #   run: |
       #     sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
 
-      - name: Install latest stable
-        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+      - name: Setup Mise
+        uses: immich-app/devtools/actions/use-mise@cd24790a7f5f6439ac32cc94f5523cb2de8bfa8c # use-mise-action-v1.1.0
         with:
-          toolchain: stable
-          components: rustfmt, clippy
-      
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@a58ae9526b2c3acee9ad8e1926b950b7863305d4 # 2.65.16
-        with:
-          tool: cargo-nextest@0.9.119
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run cargo build
-        run: cargo build
-
-      - name: Run services in background
-        run: |
-          docker compose -f compose.yml up -d
-
-      - name: Run cargo test
+      - run: mise build
+      - run: mise docker:start
+    
+      - name: Reference Test
         env:
           TEST_DB: REFERENCE
         run: |
-          cargo nextest run
+          mise test
 
-      - name: Run cargo test (with MongoDB)
+      - name: MongoDB Test
         env:
           TEST_DB: MONGODB
           MONGODB: mongodb://localhost
         run: |
-          cargo nextest run
+          mise test
 
       - name: Start API in background
         if: github.event_name != 'pull_request' && github.ref_name == 'main'
         env:
           TEST_DB: REFERENCE
         run: |
-          cargo build --bin revolt-delta && (cargo run --bin revolt-delta &)
+          mise build --bin revolt-delta && (mise service:api &)
 
       - name: Wait for API to go up
         if: github.event_name != 'pull_request' && github.ref_name == 'main'

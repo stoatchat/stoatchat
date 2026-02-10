@@ -95,6 +95,7 @@ auto_derived!(
         CanReceive,
         CanPublish,
         JoinedAt,
+        VoiceChannel,
     }
 
     /// Member removal intention

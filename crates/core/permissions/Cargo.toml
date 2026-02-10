@@ -1,10 +1,11 @@
 [package]
 name = "revolt-permissions"
-version = "0.9.4"
+version = "0.10.3"
 edition = "2021"
 license = "MIT"
 authors = ["Paul Makles <me@insrt.uk>"]
 description = "Revolt Backend: Permission Logic"
+repository = "https://github.com/stoatchat/stoatchat"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -21,7 +22,7 @@ async-std = { version = "1.8.0", features = ["attributes"] }
 
 [dependencies]
 # Core
-revolt-result = { version = "0.9.4", path = "../result" }
+revolt-result = { version = "0.10.3", path = "../result" }
 
 # Utility
 auto_ops = "0.3.0"

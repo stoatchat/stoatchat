@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Run push daemon"
+set -e
+
+cargo run --bin revolt-pushd

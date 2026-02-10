@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Run GIF proxy server"
+set -e
+
+cargo run --bin revolt-gifbox

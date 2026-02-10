@@ -1,10 +1,11 @@
 [package]
 name = "revolt-database"
-version = "0.9.4"
+version = "0.10.3"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 authors = ["Paul Makles <me@insrt.uk>"]
 description = "Revolt Backend: Database Implementation"
+repository = "https://github.com/stoatchat/stoatchat"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -22,7 +23,7 @@ rocket-impl = [
     "revolt_rocket_okapi",
     "authifier/rocket_impl",
 ]
-axum-impl = ["axum"]
+axum-impl = ["axum", "revolt-result/axum"]
 redis-is-patched = ["revolt-presence/redis-is-patched"]
 voice = ["livekit-api", "livekit-protocol", "livekit-runtime"]
 
@@ -31,19 +32,19 @@ default = ["mongodb", "async-std-runtime", "tasks"]
 
 [dependencies]
 # Core
-revolt-config = { version = "0.9.4", path = "../config", features = [
+revolt-config = { version = "0.10.3", path = "../config", features = [
     "report-macros",
 ] }
-revolt-result = { version = "0.9.4", path = "../result" }
-revolt-models = { version = "0.9.4", path = "../models", features = [
+revolt-result = { version = "0.10.3", path = "../result" }
+revolt-models = { version = "0.10.3", path = "../models", features = [
     "validator",
 ] }
-revolt-presence = { version = "0.9.4", path = "../presence" }
-revolt-permissions = { version = "0.9.4", path = "../permissions", features = [
+revolt-presence = { version = "0.10.3", path = "../presence" }
+revolt-permissions = { version = "0.10.3", path = "../permissions", features = [
     "serde",
     "bson",
 ] }
-revolt-parser = { version = "0.9.4", path = "../parser" }
+revolt-parser = { version = "0.10.3", path = "../parser" }
 
 # Utility
 log = "0.4"

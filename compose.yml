@@ -12,6 +12,10 @@ services:
       - "27017:27017"
     volumes:
       - ./.data/db:/data/db
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   # MinIO
   minio:

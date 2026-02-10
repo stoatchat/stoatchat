@@ -1,5 +1,5 @@
 # Build Stage
-FROM --platform="${BUILDPLATFORM}" rust:1.86.0-slim-bookworm
+FROM --platform="${BUILDPLATFORM}" rust:1.92.0-slim-bookworm
 USER 0:0
 WORKDIR /home/rust/src
 

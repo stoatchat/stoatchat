@@ -1,10 +1,11 @@
 [package]
 name = "revolt-result"
-version = "0.9.4"
+version = "0.10.3"
 edition = "2021"
 license = "MIT"
 authors = ["Paul Makles <me@insrt.uk>"]
 description = "Revolt Backend: Result and Error types"
+repository = "https://github.com/stoatchat/stoatchat"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
