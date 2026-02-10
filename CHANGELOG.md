@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/stoatchat/stoatchat/compare/v0.10.3...v0.11.0) (2026-02-10)
+
+
+### Features
+
+* appeal to the almighty Spamhaus ([#524](https://github.com/stoatchat/stoatchat/issues/524)) ([5132270](https://github.com/stoatchat/stoatchat/commit/5132270f2edd6df25ce414daa42ed1b2aa6fa7a9))
+
 ## [0.10.3](https://github.com/stoatchat/stoatchat/compare/v0.10.2...v0.10.3) (2026-02-07)
 
 
