@@ -10,6 +10,7 @@ use authifier::config::SMTPSettings;
 use authifier::config::Shield;
 use authifier::config::Template;
 use authifier::config::Templates;
+use authifier::config::EmailExpiryConfig;
 use authifier::Authifier;
 use rand::Rng;
 use revolt_config::config;
