@@ -9,7 +9,7 @@ publish = false
 revolt-result = { version = "0.9.4", path = "../../core/result" }
 revolt-config = { version = "0.9.4", path = "../../core/config", features = [
     "report-macros",
-    "anyhow"
+    "anyhow",
 ] }
 revolt-database = { version = "0.9.4", path = "../../core/database" }
 revolt-models = { version = "0.9.4", path = "../../core/models", features = [
@@ -30,7 +30,7 @@ tokio = "1.39.2"
 async-trait = "0.1.81"
 ulid = "1.0.0"
 
-authifier = "1.0.15"
+authifier = "1.0.16"
 
 log = "0.4.11"
 pretty_env_logger = "0.4.0"

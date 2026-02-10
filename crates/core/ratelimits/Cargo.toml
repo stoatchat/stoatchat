@@ -4,13 +4,17 @@ version = "0.9.4"
 edition = "2024"
 
 [features]
-rocket = ["dep:rocket", "dep:revolt_rocket_okapi", "revolt-database/rocket-impl"]
+rocket = [
+    "dep:rocket",
+    "dep:revolt_rocket_okapi",
+    "revolt-database/rocket-impl",
+]
 axum = ["dep:axum", "revolt-database/axum-impl"]
 
 default = ["rocket", "axum"]
 
 [dependencies]
-revolt-database = { version = "0.9.4", path = "../database"}
+revolt-database = { version = "0.9.4", path = "../database" }
 revolt-result = { version = "0.9.4", path = "../result" }
 revolt-config = { version = "0.9.4", path = "../config" }
 
@@ -20,7 +24,7 @@ revolt_rocket_okapi = { version = "0.10.0", optional = true }
 axum = { version = "0.7.5", optional = true, features = ["macros"] }
 
 serde = { version = "1", features = ["derive"] }
-authifier = { version = "1.0.15" }
+authifier = { version = "1.0.16" }
 dashmap = "5.2.0"
 async-trait = "0.1.81"
 log = "0.4"
