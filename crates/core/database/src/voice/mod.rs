@@ -22,23 +22,25 @@ async fn get_connection() -> Result<Conn> {
 pub async fn raise_if_in_voice(user: &User, channel_id: &str) -> Result<()> {
     let mut conn = get_connection().await?;
 
-    if user.bot.is_some()
-    // bots can be in as many voice channels as it wants so we just check if its already connected to the one its trying to connect to
-        && conn.sismember(format!("vc:{}", &user.id), channel_id)
+    if user.bot.is_some() {
+        // bots can be in as many voice channels as it wants so we just check if its already connected to the one its trying to connect to
+        if conn
+            .sismember(format!("vc:{}", &user.id), channel_id)
             .await
             .to_internal_error()?
-    {
-        Err(create_error!(AlreadyConnected))
+        {
+            return Err(create_error!(AlreadyConnected));
+        };
     } else if conn
         .scard::<_, u32>(format!("vc:{}", &user.id)) // check if the current vc set is empty
         .await
         .to_internal_error()?
         > 0
     {
-        Err(create_error!(AlreadyConnected))
-    } else {
-        Ok(())
-    }
+        return Err(create_error!(AlreadyConnected));
+    };
+
+    Ok(())
 }
 
 pub async fn set_channel_node(channel: &str, node: &str) -> Result<()> {
