@@ -47,6 +47,9 @@ Before getting started, you'll want to install:
 - Docker
 - Git
 - mold (optional, faster compilation)
+- qemu (emulation of arm64 binary for livekit)
+
+Add 127.0.0.1 local.revolt.chat to your hosts file, even though the project is renamed to stoatchat.
 
 > A **default.nix** is available for Nix users!
 > Run `nix-shell` to activate mise.
@@ -54,13 +57,14 @@ Before getting started, you'll want to install:
 As a heads-up, the development environment uses the following ports:
 
 | Service                   |      Port      |
-| ------------------------- | :------------: |
+|---------------------------|:--------------:|
 | MongoDB                   |     27017      |
 | Redis                     |      6379      |
 | MinIO                     |     14009      |
 | Maildev                   | 14025<br>14080 |
-| Revolt Web App            |     14701      |
+| Revolt Web App            |      5173      |
 | RabbitMQ                  | 5672<br>15672  |
+| Livekit                   |      7880      |
 | `crates/delta`            |     14702      |
 | `crates/bonfire`          |     14703      |
 | `crates/services/autumn`  |     14704      |
@@ -70,14 +74,14 @@ As a heads-up, the development environment uses the following ports:
 Now you can clone and build the project:
 
 ```bash
-git clone https://github.com/revoltchat/backend revolt-backend
-cd revolt-backend
+git clone https://github.com/stoatchat/stoatchat stoatchat
+cd stoatchat
 mise build
 ```
 
 A default configuration `Revolt.toml` is present in this project that is suited for development.
 
-If you'd like to change anything, create a `Revolt.overrides.toml` file and specify relevant variables.
+If you'd like to change anything, create a `Revolt.overrides.toml` file in the projects root directory and specify relevant variables.
 
 > [!TIP]
 > Use Sentry to catch unexpected service errors:
@@ -89,6 +93,22 @@ If you'd like to change anything, create a `Revolt.overrides.toml` file and spec
 > events = "https://abc@your.sentry/1"
 > files = "https://abc@your.sentry/1"
 > proxy = "https://abc@your.sentry/1"
+> ```
+
+> [!TIP]
+> Use Livekit Dev environment for voice chat:
+>
+> ```toml
+> # Revolt.overrides.toml
+> [hosts.livekit]
+> worldwide = "ws://local.revolt.chat:7880"
+> 
+> [hosts.livekit.nodes.worldwide]
+> url = "http://local.revolt.chat:7880"
+> lat = 0.0
+> lon = 0.0
+> key = "worldwide"
+> secret = "ZjCofRlfm6GGtjlifmNpCDkcQbEIIVC0"
 > ```
 
 > [!TIP]
@@ -127,14 +147,13 @@ If you'd like to change anything, create a `Revolt.overrides.toml` file and spec
 Then continue:
 
 ```bash
+# Activate the default livekit.yml
+cp livekit.example.yml livekit.yml
 # start other necessary services
 docker compose up -d
 
-# run everything together
-./scripts/start.sh
-# .. or individually
-# run the API server
-cargo run --bin revolt-delta
+# run each of those in separate terminals / screen sessions / tmux panes
+# if you have mold use mold -run cargo run --bin <crate> instead:
 # run the events server
 cargo run --bin revolt-bonfire
 # run the file server
@@ -145,28 +164,45 @@ cargo run --bin revolt-january
 cargo run --bin revolt-gifbox
 # run the push daemon (not usually needed in regular development)
 cargo run --bin revolt-pushd
-
-# hint:
-# mold -run <cargo build, cargo run, etc...>
-# mold -run ./scripts/start.sh
+# run the API server
+cargo run --bin revolt-delta
 ```
 
-You can start a web client by doing the following:
+Build the most recent version of the web client:
 
 ```bash
-# if you do not have yarn yet and have a modern Node.js:
-corepack enable
+git clone --recursive https://github.com/stoatchat/for-web client
+cd client
 
-# clone the web client and run it:
-git clone --recursive https://github.com/revoltchat/revite
-cd revite
-yarn
-yarn build:deps
-echo "VITE_API_URL=http://local.revolt.chat:14702" > .env.local
-yarn dev --port 14701
+# update submodules if you pull new changes
+# git submodule init && git submodule update
+
+# install all packages
+mise install:frozen
+
+# build deps:
+mise build:deps
+
+# or build a specific dep (e.g. stoat.js updates):
+# pnpm --filter stoat.js run build
+
+# customise the .env
+cp packages/client/.env.example packages/client/.env
 ```
 
-Then go to http://local.revolt.chat:14701 to create an account/login.
+Add the following to your packages/client/vite.config.ts right before the closing }); :
+```ts
+  server: {
+    allowedHosts: ["local.revolt.chat"]
+  }
+```
+
+```bash
+# run dev server
+mise dev
+```
+
+Then go to http://local.revolt.chat:5173 to create an account/login.
 
 When signing up, go to http://localhost:14080 to find confirmation/password reset emails.
 

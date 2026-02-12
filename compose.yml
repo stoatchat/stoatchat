@@ -71,6 +71,7 @@ services:
 
   livekit:
     image: ghcr.io/stoatchat/livekit-server:v1.9.9
+    platform: linux/arm64
     command: --config /etc/livekit.yml
     network_mode: "host"
     volumes:
