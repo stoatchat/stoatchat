@@ -45,8 +45,9 @@ jobs:
         if: ${{ steps.rp.outputs.prs_created == 'true' || steps.rp.outputs.prs_updated == 'true' }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RP_PR_OUTPUT_JSON: ${{ steps.rp.outputs.prs }}
         run: |
-          PR_NUMBER=$(echo '${{ steps.rp.outputs.prs }}' | jq -r '.[0].number')
+          PR_NUMBER=$(echo "$RP_PR_OUTPUT_JSON" | jq -r '.[0].number')
           gh pr checkout "$PR_NUMBER"
           
           cargo update -w
