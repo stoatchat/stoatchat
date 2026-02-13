@@ -103,7 +103,7 @@ If you'd like to change anything, create a `Revolt.overrides.toml` file in the p
 > [hosts.livekit]
 > worldwide = "ws://local.revolt.chat:7880"
 > 
-> [hosts.livekit.nodes.worldwide]
+> [api.livekit.nodes.worldwide]
 > url = "http://local.revolt.chat:7880"
 > lat = 0.0
 > lon = 0.0
