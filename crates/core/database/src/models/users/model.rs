@@ -653,14 +653,14 @@ impl User {
         self.apply_options(partial.clone());
         db.update_user(&self.id, &partial, remove.clone()).await?;
 
-        EventV1::UserUpdate {
-            id: self.id.clone(),
-            data: partial.into(),
-            clear: remove.into_iter().map(|v| v.into()).collect(),
-            event_id: Some(Ulid::new().to_string()),
-        }
-        .p_user(self.id.clone(), db)
-        .await;
+        // EventV1::UserUpdate {
+        //     id: self.id.clone(),
+        //     data: partial.into(),
+        //     clear: remove.into_iter().map(|v| v.into()).collect(),
+        //     event_id: Some(Ulid::new().to_string()),
+        // }
+        // .p_user(self.id.clone(), db)
+        // .await;
 
         Ok(())
     }
