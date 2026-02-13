@@ -49,7 +49,7 @@ Before getting started, you'll want to install:
 - mold (optional, faster compilation)
 - qemu (emulation of arm64 binary for livekit)
 
-Add 127.0.0.1 local.revolt.chat to your hosts file, even though the project is renamed to stoatchat.
+Add 127.0.0.1 local.stoat.chat to your hosts file, even though the project is renamed to stoatchat.
 
 > A **default.nix** is available for Nix users!
 > Run `nix-shell` to activate mise.
@@ -101,10 +101,10 @@ If you'd like to change anything, create a `Revolt.overrides.toml` file in the p
 > ```toml
 > # Revolt.overrides.toml
 > [hosts.livekit]
-> worldwide = "ws://local.revolt.chat:7880"
+> worldwide = "ws://local.stoat.chat:7880"
 > 
 > [api.livekit.nodes.worldwide]
-> url = "http://local.revolt.chat:7880"
+> url = "http://local.stoat.chat:7880"
 > lat = 0.0
 > lon = 0.0
 > key = "worldwide"
@@ -193,7 +193,7 @@ cp packages/client/.env.example packages/client/.env
 Add the following to your packages/client/vite.config.ts right before the closing }); :
 ```ts
   server: {
-    allowedHosts: ["local.revolt.chat"]
+    allowedHosts: ["local.stoat.chat"]
   }
 ```
 
@@ -202,7 +202,7 @@ Add the following to your packages/client/vite.config.ts right before the closin
 mise dev
 ```
 
-Then go to http://local.revolt.chat:5173 to create an account/login.
+Then go to http://local.stoat.chat:5173 to create an account/login.
 
 When signing up, go to http://localhost:14080 to find confirmation/password reset emails.
 
