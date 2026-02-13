@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.2](https://github.com/stoatchat/stoatchat/compare/v0.11.1...v0.11.2) (2026-02-13)
+
+
+### Bug Fixes
+
+* cut events traffic while we engineer a new events architecture ([#559](https://github.com/stoatchat/stoatchat/issues/559)) ([a11986b](https://github.com/stoatchat/stoatchat/commit/a11986ba1ad16b672ff1080913a684567d88adbb))
+
 ## [0.11.1](https://github.com/stoatchat/stoatchat/compare/v0.11.0...v0.11.1) (2026-02-13)
 
 
