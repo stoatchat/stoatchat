@@ -47,7 +47,6 @@ Before getting started, you'll want to install:
 - Docker
 - Git
 - mold (optional, faster compilation)
-- qemu (emulation of arm64 binary for livekit)
 
 Add 127.0.0.1 local.stoat.chat to your hosts file, even though the project is renamed to stoatchat.
 
