@@ -406,7 +406,11 @@ impl From<crate::Metadata> for Metadata {
         match value {
             crate::Metadata::File => Metadata::File,
             crate::Metadata::Text => Metadata::Text,
-            crate::Metadata::Image { width, height, animated } => Metadata::Image {
+            crate::Metadata::Image {
+                width,
+                height,
+                animated,
+            } => Metadata::Image {
                 width: width as usize,
                 height: height as usize,
                 animated: animated as bool,
@@ -425,7 +429,11 @@ impl From<Metadata> for crate::Metadata {
         match value {
             Metadata::File => crate::Metadata::File,
             Metadata::Text => crate::Metadata::Text,
-            Metadata::Image { width, height, animated } => crate::Metadata::Image {
+            Metadata::Image {
+                width,
+                height,
+                animated,
+            } => crate::Metadata::Image {
                 width: width as isize,
                 height: height as isize,
                 animated,

@@ -46,7 +46,7 @@ auto_derived!(
             width: isize,
             height: isize,
             #[serde(default)]
-            animated: bool
+            animated: bool,
         },
         /// File is a video with specific dimensions
         Video { width: isize, height: isize },

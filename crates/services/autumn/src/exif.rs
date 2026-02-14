@@ -16,7 +16,11 @@ pub async fn strip_metadata(
     mime: &str,
 ) -> Result<(Vec<u8>, Metadata)> {
     match &metadata {
-        Metadata::Image { width, height, animated } => match mime {
+        Metadata::Image {
+            width,
+            height,
+            animated,
+        } => match mime {
             // // little_exif does not appear to parse JPEGs correctly? had 2/2 files fail
             // "image/jpeg" | "image/png" => {
             //     // use little_exif to strip metadata except for orientation and colour profile
@@ -93,7 +97,14 @@ pub async fn strip_metadata(
                     _ => (*width, *height),
                 };
 
-                Ok((bytes, Metadata::Image { width, height, animated: *animated }))
+                Ok((
+                    bytes,
+                    Metadata::Image {
+                        width,
+                        height,
+                        animated: *animated,
+                    },
+                ))
             }
             // JXLs store EXIF data but we don't have the ability to write them
             "image/jxl" => Ok((buf, metadata)),

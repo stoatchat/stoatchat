@@ -43,25 +43,22 @@ impl MediaRepository for MediaImpl {
                 let reader = std::io::BufReader::new(file);
                 let decoder = image::codecs::gif::GifDecoder::new(reader).ok()?;
                 Some(decoder.into_frames().take(2).count() > 1)
-            },
+            }
             "image/png" => {
                 let file = std::fs::File::open(f.path()).ok()?;
                 let reader = std::io::BufReader::new(file);
                 let decoder = image::codecs::png::PngDecoder::new(reader).ok()?;
                 decoder.is_apng().ok()
-            },
+            }
             "image/webp" => {
                 let file = std::fs::File::open(f.path()).ok()?;
                 let reader = std::io::BufReader::new(file);
                 let decoder = image::codecs::webp::WebPDecoder::new(reader).ok()?;
                 Some(decoder.has_animation())
-            },
-            _ => {
-                Some(false)
             }
+            _ => Some(false),
         }
     }
-
 
     fn image_size_vec(&self, v: &[u8], mime: &str) -> Option<(usize, usize)> {
         match mime {
@@ -199,9 +196,9 @@ impl MediaRepository for MediaImpl {
 
 #[cfg(test)]
 mod tests {
+    use crate::{MediaImpl, MediaRepository};
     use std::io::{Cursor, Write};
     use tempfile::NamedTempFile;
-    use crate::{MediaImpl, MediaRepository};
 
     #[tokio::test]
     async fn asset_test_jpeg() {
@@ -218,7 +215,8 @@ mod tests {
     async fn asset_test_jpeg_is_not_animated() {
         let media = MediaImpl::from_config().await;
         let mut f = NamedTempFile::new().unwrap();
-        f.write_all(include_bytes!("../../tests/assets/test.jpeg")).unwrap();
+        f.write_all(include_bytes!("../../tests/assets/test.jpeg"))
+            .unwrap();
         assert_eq!(media.is_animated(&f, "image/jpeg"), Some(false));
     }
 
@@ -252,7 +250,8 @@ mod tests {
     async fn asset_test_png_is_not_animated() {
         let media = MediaImpl::from_config().await;
         let mut f = NamedTempFile::new().unwrap();
-        f.write_all(include_bytes!("../../tests/assets/test.png")).unwrap();
+        f.write_all(include_bytes!("../../tests/assets/test.png"))
+            .unwrap();
         assert_eq!(media.is_animated(&f, "image/png"), Some(false));
     }
 
@@ -307,7 +306,8 @@ mod tests {
     async fn asset_test_animated_png_is_animated() {
         let media = MediaImpl::from_config().await;
         let mut f = NamedTempFile::new().unwrap();
-        f.write_all(include_bytes!("../../tests/assets/anim-icos.apng")).unwrap();
+        f.write_all(include_bytes!("../../tests/assets/anim-icos.apng"))
+            .unwrap();
         assert_eq!(media.is_animated(&f, "image/png"), Some(true));
     }
 
@@ -348,7 +348,8 @@ mod tests {
     async fn asset_test_webp_is_not_animated() {
         let media = MediaImpl::from_config().await;
         let mut f = NamedTempFile::new().unwrap();
-        f.write_all(include_bytes!("../../tests/assets/dice.webp")).unwrap();
+        f.write_all(include_bytes!("../../tests/assets/dice.webp"))
+            .unwrap();
         assert_eq!(media.is_animated(&f, "image/webp"), Some(false));
     }
 
@@ -367,7 +368,8 @@ mod tests {
     async fn asset_test_animated_webp_is_animated() {
         let media = MediaImpl::from_config().await;
         let mut f = NamedTempFile::new().unwrap();
-        f.write_all(include_bytes!("../../tests/assets/anim-icos.webp")).unwrap();
+        f.write_all(include_bytes!("../../tests/assets/anim-icos.webp"))
+            .unwrap();
         assert_eq!(media.is_animated(&f, "image/webp"), Some(true));
     }
 
@@ -386,7 +388,8 @@ mod tests {
     async fn asset_test_animated_gif_is_animated() {
         let media = MediaImpl::from_config().await;
         let mut f = NamedTempFile::new().unwrap();
-        f.write_all(include_bytes!("../../tests/assets/anim-icos.gif")).unwrap();
+        f.write_all(include_bytes!("../../tests/assets/anim-icos.gif"))
+            .unwrap();
         assert_eq!(media.is_animated(&f, "image/gif"), Some(true));
     }
 }
