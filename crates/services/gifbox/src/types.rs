@@ -77,7 +77,7 @@ impl From<types::MediaResponse> for MediaResult {
                 .into_iter()
                 .map(|(k, v)| (k, v.into()))
                 .collect(),
-            url: value.itemurl,
+            url: value.url,
         }
     }
 }

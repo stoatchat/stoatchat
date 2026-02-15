@@ -102,7 +102,7 @@ impl Tenor {
                     Some(("key", &self.key)),
                     Some(("q", query)),
                     Some(("client_key", "Gifbox")),
-                    Some(("media_filter", "webm,tinywebm")),
+                    Some(("media_filter", "gif,webm,tinywebm")),
                     Some(("locale", locale)),
                     Some(("contentfilter", "high")),
                     Some(("limit", &limit.to_string())),
@@ -179,7 +179,7 @@ impl Tenor {
                 &[
                     Some(("key", &self.key)),
                     Some(("client_key", "Gifbox")),
-                    Some(("media_filter", "webm,tinywebm")),
+                    Some(("media_filter", "gif,webm,tinywebm")),
                     Some(("locale", locale)),
                     Some(("contentfilter", "high")),
                     Some(("limit", &limit.to_string())),
