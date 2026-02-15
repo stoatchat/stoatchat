@@ -21,6 +21,17 @@ pub struct Feature {
     pub url: String,
 }
 
+/// # Gifbox Service Configuration
+#[derive(Serialize, JsonSchema, Debug)]
+pub struct GifboxFeature {
+    /// Whether the service is enabled
+    pub enabled: bool,
+    /// URL pointing to the service
+    pub url: String,
+    /// Attribution text for the GIF search placeholder
+    pub attribution: String,
+}
+
 /// # Information about a livekit node
 #[derive(Serialize, JsonSchema, Debug)]
 pub struct VoiceNode {
@@ -54,6 +65,8 @@ pub struct RevoltFeatures {
     pub january: Feature,
     /// Voice server configuration
     pub livekit: VoiceFeature,
+	/// Gifbox server Configuration
+	pub gifbox: GifboxFeature,
 }
 
 /// # Build Information
@@ -112,6 +125,11 @@ pub async fn root() -> Result<Json<RevoltConfig>> {
             january: Feature {
                 enabled: !config.hosts.january.is_empty(),
                 url: config.hosts.january.clone(),
+            },
+			gifbox: GifboxFeature {
+                enabled: !config.hosts.gifbox.is_empty(),
+                url: config.hosts.gifbox.clone(),
+                attribution: config.gifbox_attribution.clone(),
             },
             livekit: VoiceFeature {
                 enabled: !config.hosts.livekit.is_empty(),

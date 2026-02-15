@@ -1,6 +1,8 @@
 # ⚠️ This configuration is intended for development environment.
 # If you'd like to override anything, create a Revolt.overrides.toml
 
+gifbox_attribution = ""
+
 [database]
 # MongoDB connection URL
 # Defaults to the container name specified in self-hosted

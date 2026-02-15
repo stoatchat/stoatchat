@@ -418,6 +418,7 @@ pub struct Settings {
     pub files: Files,
     pub features: Features,
     pub sentry: Sentry,
+    pub gifbox_attribution: String,
     pub production: bool,
 }
 

@@ -1,5 +1,7 @@
 production = false
 
+gifbox_attribution = ""
+
 [database]
 # MongoDB connection URL
 # Defaults to the container name specified in self-hosted
