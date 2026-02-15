@@ -11,21 +11,21 @@ use rocket::{serde::json::Json, State};
 ///
 /// Retrieve a member.
 #[openapi(tag = "Server Members")]
-#[get("/<target>/members/<member>?<roles>")]
+#[get("/<server_id>/members/<member_id>?<roles>")]
 pub async fn fetch(
     db: &State<Database>,
     user: User,
-    target: Reference<'_>,
-    member: Reference<'_>,
+    server_id: Reference<'_>,
+    member_id: Reference<'_>,
     roles: Option<bool>,
 ) -> Result<Json<v0::MemberResponse>> {
-    let server = target.as_server(db).await?;
+    let server = server_id.as_server(db).await?;
     let mut query = DatabasePermissionQuery::new(db, &user).server(&server);
     if !query.are_we_a_member().await {
         return Err(create_error!(NotFound));
     }
 
-    let member = member.as_member(db, &server.id).await?;
+    let member = member_id.as_member(db, &server.id).await?;
     if let Some(true) = roles {
         Ok(Json(v0::MemberResponse::MemberWithRoles {
             roles: server
