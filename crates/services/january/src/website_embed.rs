@@ -205,7 +205,7 @@ pub async fn populate_special(original_url: String, metadata: &mut WebsiteMetada
 
         static ref RE_STREAMABLE: Regex = Regex::new("^(?:https?://)?(?:www\\.)?streamable\\.com/([\\w\\d-]+)").unwrap();
 
-        static ref RE_GIF: Regex = Regex::new("^(?:https?://)?(www\\.)?(gifbox\\.me/view|yiffbox\\.me/view|tenor\\.com/view|giphy\\.com/gifs|gfycat\\.com|redgifs\\.com/watch)/[\\w\\d-]+").unwrap();
+        static ref RE_GIF: Regex = Regex::new("^(?:https?://)?(www\\.)?(gifbox\\.me/view|yiffbox\\.me/view|tenor\\.com/view|giphy\\.com/gifs|klipy\\.com/gifs|gfycat\\.com|redgifs\\.com/watch)/[\\w\\d-]+").unwrap();
     }
 
     let url = metadata
