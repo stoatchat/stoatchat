@@ -238,6 +238,23 @@ impl Request {
                         .map(Embed::Website)
                         .unwrap_or_default()
                 }
+                (mime::IMAGE, _) if url.contains("static.klipy.com/") => {
+                    match Request::fetch_image_metadata(&url, Some(request)).await {
+                        Ok(Some(img)) => Embed::Website(revolt_models::v0::WebsiteMetadata {
+                            url: Some(url.clone()),
+                            original_url: Some(url.clone()),
+                            special: Some(revolt_models::v0::Special::GIF),
+                            title: None,
+                            description: None,
+                            image: Some(img),
+                            video: None,
+                            site_name: None,
+                            icon_url: None,
+                            colour: None,
+                        }),
+                        _ => Embed::None,
+                    }
+                }
                 (mime::IMAGE, _) => Request::fetch_image_metadata(&url, Some(request))
                     .await
                     .map(|res| res.map(Embed::Image).unwrap_or_default())
