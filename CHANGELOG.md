@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.4](https://github.com/stoatchat/stoatchat/compare/v0.11.3...v0.11.4) (2026-02-16)
+
+
+### Bug Fixes
+
+* add separate config option for redis events replica url ([#590](https://github.com/stoatchat/stoatchat/issues/590)) ([a75e4ea](https://github.com/stoatchat/stoatchat/commit/a75e4eabfc4b34aba7620c82ba77558a32d9e10a))
+
 ## [0.11.3](https://github.com/stoatchat/stoatchat/compare/v0.11.2...v0.11.3) (2026-02-13)
 
 
