@@ -84,6 +84,7 @@ revolt-presence = { path = "../core/presence" }
 revolt-result = { path = "../core/result", features = ["rocket", "okapi"] }
 revolt-permissions = { path = "../core/permissions", features = ["schemas"] }
 revolt-ratelimits = { path = "../core/ratelimits", features = ["rocket"] }
+revolt-discord = { path = "../core/discord" }
 
 # voice
 livekit-api = "0.4.4"

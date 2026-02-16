@@ -3,8 +3,8 @@ use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 
 use crate::{
-    events::client::EventV1, util::permissions::DatabasePermissionQuery, Channel,
-    Database, File, Server, SystemMessage, User,
+    events::client::EventV1, util::permissions::DatabasePermissionQuery, Channel, Database, File,
+    Server, SystemMessage, User,
 };
 
 fn default_true() -> bool {
@@ -332,6 +332,7 @@ mod tests {
                     name: "Server".to_string(),
                     description: None,
                     nsfw: None,
+                    discord_template_id: None,
                 },
                 &owner,
                 false,

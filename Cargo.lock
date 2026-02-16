@@ -6983,6 +6983,7 @@ dependencies = [
  "reqwest 0.11.27",
  "revolt-config",
  "revolt-database",
+ "revolt-discord",
  "revolt-models",
  "revolt-permissions",
  "revolt-presence",
@@ -7001,6 +7002,19 @@ dependencies = [
  "url",
  "validator 0.16.1",
  "vergen",
+]
+
+[[package]]
+name = "revolt-discord"
+version = "0.11.3"
+dependencies = [
+ "reqwest 0.12.23",
+ "revolt-database",
+ "revolt-models",
+ "revolt-permissions",
+ "revolt-result",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -167,6 +167,9 @@ auto_derived!(
         /// Whether this server is age-restricted
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
         pub nsfw: Option<bool>,
+        /// Discord guild template to import from
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+        pub discord_template_id: Option<String>,
     }
 
     /// Information about new role to create

@@ -29,7 +29,17 @@ pub async fn create_server(
 
     user.can_acquire_server(db).await?;
 
-    let (server, channels) = Server::create(db, data, &user, true).await?;
+    let (server, channels) = if let Some(discord_template_id) = data.discord_template_id.clone() {
+        let (mut server, _) = Server::create(db, data, &user, false).await?;
+
+        let template = revolt_discord::template::fetch_template(&discord_template_id).await?;
+        let channels = revolt_discord::template::import_template(db, &mut server, template).await?;
+
+        (server, channels)
+    } else {
+        Server::create(db, data, &user, true).await?
+    };
+
     let (_, channels) = Member::create(db, &server, &user, Some(channels)).await?;
 
     Ok(Json(v0::CreateServerLegacyResponse {
