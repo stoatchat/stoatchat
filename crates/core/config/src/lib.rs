@@ -117,6 +117,7 @@ static CONFIG_BUILDER: Lazy<RwLock<Config>> = Lazy::new(|| {
 pub struct Database {
     pub mongodb: String,
     pub redis: String,
+    pub redis_pubsub: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
