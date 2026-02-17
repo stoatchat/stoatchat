@@ -169,7 +169,9 @@ impl State {
             }) {
                 if let Ok(Some(voice_state)) = get_channel_voice_state(channel).await {
                     if let Some(server) = channel.server() {
-                        let set = voice_state_server_members.entry(server.to_string()).or_default();
+                        let set = voice_state_server_members
+                            .entry(server.to_string())
+                            .or_default();
 
                         for participant in &voice_state.participants {
                             user_ids.insert(participant.id.clone());
@@ -396,28 +398,29 @@ impl State {
     }
 
     /// Push presence change to the user and all associated server topics
-    pub async fn broadcast_presence_change(&self, target: bool) {
-        if if let Some(status) = &self.cache.users.get(&self.cache.user_id).unwrap().status {
-            status.presence != Some(Presence::Invisible)
-        } else {
-            true
-        } {
-            let event = EventV1::UserUpdate {
-                id: self.cache.user_id.clone(),
-                data: v0::PartialUser {
-                    online: Some(target),
-                    ..Default::default()
-                },
-                clear: vec![],
-                event_id: Some(ulid::Ulid::new().to_string()),
-            };
+    pub async fn broadcast_presence_change(&self, _target: bool) {
+        // disabled events
+        // if if let Some(status) = &self.cache.users.get(&self.cache.user_id).unwrap().status {
+        //     status.presence != Some(Presence::Invisible)
+        // } else {
+        //     true
+        // } {
+        //     let event = EventV1::UserUpdate {
+        //         id: self.cache.user_id.clone(),
+        //         data: v0::PartialUser {
+        //             online: Some(target),
+        //             ..Default::default()
+        //         },
+        //         clear: vec![],
+        //         event_id: Some(ulid::Ulid::new().to_string()),
+        //     };
 
-            for server in self.cache.servers.keys() {
-                event.clone().p(server.clone()).await;
-            }
+        //     for server in self.cache.servers.keys() {
+        //         event.clone().p(server.clone()).await;
+        //     }
 
-            event.p(self.cache.user_id.clone()).await;
-        }
+        //     event.p(self.cache.user_id.clone()).await;
+        // }
     }
 
     /// Handle an incoming event for protocol version 1
