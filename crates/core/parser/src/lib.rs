@@ -69,7 +69,7 @@ impl<'a, I: Iterator<Item = MessageToken<'a>>> Iterator for MessageParserIterato
     }
 }
 
-pub fn parse_message_iter(text: &str) -> impl Iterator<Item = MessageToken> + '_ {
+pub fn parse_message_iter(text: &str) -> impl Iterator<Item = MessageToken<'_>> + '_ {
     MessageParserIterator {
         inner: MessageToken::lexer(text).flatten(),
         temp: VecDeque::new()
