@@ -91,6 +91,34 @@ pub fn image_size_vec(v: &[u8], mime: &str) -> Option<(usize, usize)> {
     media.image_size_vec(v, mime)
 }
 
+/// Check whether an image file contains animation data
+pub fn is_animated(f: &NamedTempFile, mime: &str) -> Option<bool> {
+    let media = MediaImpl::new(Files {
+        blocked_mime_types: Default::default(),
+        clamd_host: Default::default(),
+        encryption_key: Default::default(),
+        limit: FilesLimit {
+            max_mega_pixels: 0,
+            max_pixel_side: 0,
+            min_file_size: 0,
+            min_resolution: [0, 0],
+        },
+        preview: Default::default(),
+        s3: FilesS3 {
+            access_key_id: Default::default(),
+            default_bucket: Default::default(),
+            endpoint: Default::default(),
+            path_style_buckets: Default::default(),
+            region: Default::default(),
+            secret_access_key: Default::default(),
+        },
+        scan_mime_types: Default::default(),
+        webp_quality: Default::default(),
+    });
+
+    media.is_animated(f, mime)
+}
+
 /// Determine size of video at temp file
 pub fn video_size(f: &NamedTempFile) -> Option<(i64, i64)> {
     let media = MediaImpl::new(Files {
