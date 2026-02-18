@@ -244,7 +244,7 @@ voice_quality = 16000
 # Whether the user can use video streams in voice calls
 video = true
 
-# Mamimum resolution (width, height) of video streams in voice calls
+# Maximum resolution (width, height) of video streams in voice calls
 video_resolution = [1080, 720]
 
 # Minimum and maximum aspect ratio of video streams in voice calls
@@ -283,8 +283,8 @@ voice_quality = 16000
 # Whether the user can use video streams in voice calls
 video = true
 
-# Mamimum resolution (width, height) of video streams in voice calls
-video_resolution = [1080, 720]
+# Maximum resolution (width, height) of video streams in voice calls
+video_resolution = [1280, 720]
 
 # Minimum and maximum aspect ratio of video streams in voice calls
 video_aspect_ratio = [0.3, 2.5]

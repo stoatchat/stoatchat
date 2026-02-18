@@ -398,7 +398,8 @@ impl State {
     }
 
     /// Push presence change to the user and all associated server topics
-    pub async fn broadcast_presence_change(&self, target: bool) {
+    pub async fn broadcast_presence_change(&self, _target: bool) {
+        // disabled events
         // if if let Some(status) = &self.cache.users.get(&self.cache.user_id).unwrap().status {
         //     status.presence != Some(Presence::Invisible)
         // } else {

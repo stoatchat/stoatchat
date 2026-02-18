@@ -463,8 +463,31 @@ async fn worker(
                 };
 
                 match payload {
-                    ClientMessage::BeginTyping { .. } => {}
-                    ClientMessage::EndTyping { .. } => {}
+                    // disabled events
+                    // ClientMessage::BeginTyping { channel } => {
+                    //     if !subscribed.read().await.contains(&channel) {
+                    //         continue;
+                    //     }
+
+                    //     EventV1::ChannelStartTyping {
+                    //         id: channel.clone(),
+                    //         user: user_id.clone(),
+                    //     }
+                    //     .p(channel.clone())
+                    //     .await;
+                    // }
+                    // ClientMessage::EndTyping { channel } => {
+                    //     if !subscribed.read().await.contains(&channel) {
+                    //         continue;
+                    //     }
+
+                    //     EventV1::ChannelStopTyping {
+                    //         id: channel.clone(),
+                    //         user: user_id.clone(),
+                    //     }
+                    //     .p(channel.clone())
+                    //     .await;
+                    // }
                     ClientMessage::Subscribe { server_id } => {
                         let mut servers = active_servers.lock().await;
                         let has_item = servers.contains_key(&server_id);
