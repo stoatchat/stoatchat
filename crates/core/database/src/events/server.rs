@@ -9,5 +9,7 @@ pub enum ClientMessage {
     BeginTyping { channel: String },
     EndTyping { channel: String },
     Subscribe { server_id: String },
+    BeginEditing { channel: String, message: String },
+    StopEditing { channel: String, message: String },
     Ping { data: Ping, responded: Option<()> },
 }

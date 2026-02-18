@@ -250,6 +250,20 @@ pub enum EventV1 {
     /// User stopped typing in a channel
     ChannelStopTyping { id: String, user: String },
 
+    /// User started editing a message
+    MessageStartEditing {
+        id: String,
+        channel: String,
+        user: String,
+    },
+
+    /// User stopped editing a message
+    MessageStopEditing {
+        id: String,
+        channel: String,
+        user: String,
+    },
+
     /// User acknowledged message in channel
     ChannelAck {
         id: String,
