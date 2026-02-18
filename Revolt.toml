@@ -15,7 +15,7 @@ host = "127.0.0.1"
 [hosts]
 # Web locations of various services
 # Defaults assume all services are reverse-proxied
-# See https://github.com/revoltchat/self-hosted/blob/master/Caddyfile
+# See https://github.com/stoatchat/self-hosted/blob/main/Caddyfile
 #
 # Remember to change these to https/wss where appropriate in production!
 app = "http://local.revolt.chat:14701"

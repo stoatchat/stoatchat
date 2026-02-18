@@ -10,7 +10,7 @@ The Plugin API is very powerful. **Tread carefully.**
 **Zero guarantees or sandboxes are provided.** Your code is run as-is.
 :::
 
-This document details the very experimental plugin API available in [Revite](https://github.com/revoltchat/revite).
+This document details the very experimental plugin API available in [Revite](https://github.com/stoatchat/for-legacy-web).
 
 This is more or less a proof of concept but can be used to achieve some simple client modifications.
 
