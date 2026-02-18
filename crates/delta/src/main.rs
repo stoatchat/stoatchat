@@ -9,7 +9,6 @@ pub mod routes;
 pub mod util;
 
 use revolt_config::config;
-use revolt_database::events::client::EventV1;
 use revolt_database::AMQP;
 use revolt_ratelimits::rocket as ratelimiter;
 use rocket::{Build, Rocket};
@@ -22,8 +21,6 @@ use amqprs::{
     channel::ExchangeDeclareArguments,
     connection::{Connection, OpenConnectionArguments},
 };
-use async_std::channel::unbounded;
-use authifier::AuthifierEvent;
 use rocket::data::ToByteUnit;
 use revolt_database::voice::VoiceClient;
 
@@ -38,28 +35,6 @@ pub async fn web() -> Rocket<Build> {
     let db = revolt_database::DatabaseInfo::Auto.connect().await.unwrap();
     log::info!("database_here {db:?}");
     db.migrate_database().await.unwrap();
-
-    // Setup Authifier event channel
-    let (_, receiver) = unbounded();
-
-    // Setup Authifier
-    let authifier = db.clone().to_authifier().await;
-
-    // Launch a listener for Authifier events
-    async_std::task::spawn(async move {
-        while let Ok(event) = receiver.recv().await {
-            match &event {
-                AuthifierEvent::CreateSession { .. } | AuthifierEvent::CreateAccount { .. } => {
-                    EventV1::Auth(event).global().await
-                }
-                AuthifierEvent::DeleteSession { user_id, .. }
-                | AuthifierEvent::DeleteAllSessions { user_id, .. } => {
-                    let id = user_id.to_string();
-                    EventV1::Auth(event).private(id).await
-                }
-            }
-        }
-    });
 
     // Configure CORS
     let cors = CorsOptions {
@@ -154,7 +129,6 @@ pub async fn web() -> Rocket<Build> {
         .mount("/", ratelimiter::routes())
         .mount("/swagger/", swagger)
         .mount("/0.8/swagger/", swagger_0_8)
-        .manage(authifier)
         .manage(db)
         .manage(amqp)
         .manage(cors.clone())

@@ -1,8 +1,7 @@
 use std::{collections::HashSet, str::FromStr, time::Duration};
 
-use crate::{events::client::EventV1, Database, File, RatelimitEvent, AMQP};
+use crate::{AMQP, Database, File, RatelimitEvent, events::client::EventV1, util::email::{email_templates, send_email}};
 
-use authifier::config::{EmailVerificationConfig, Template};
 use futures::future::join_all;
 use iso8601_timestamp::Timestamp;
 use once_cell::sync::Lazy;
@@ -705,22 +704,15 @@ impl User {
         duration_days: Option<usize>,
         reason: Option<Vec<String>>,
     ) -> Result<()> {
-        let authifier = db.clone().to_authifier().await;
-        let mut account = authifier
-            .database
-            .find_account(&self.id)
-            .await
-            .map_err(|_| create_error!(InternalError))?;
+        let mut account = db.fetch_account(&self.id).await?;
 
         account
-            .disable(&authifier)
-            .await
-            .map_err(|_| create_error!(InternalError))?;
+            .disable(db)
+            .await?;
 
         account
-            .delete_all_sessions(&authifier, None)
-            .await
-            .map_err(|_| create_error!(InternalError))?;
+            .delete_all_sessions(db, None)
+            .await?;
 
         self.update(
             db,
@@ -736,18 +728,15 @@ impl User {
         .await?;
 
         if let Some(reason) = reason {
-            if let EmailVerificationConfig::Enabled { smtp, .. } =
-                authifier.config.email_verification
-            {
-                smtp.send_email(
+            let config = config().await;
+
+            if !config.api.smtp.host.is_empty() {
+                let templates = email_templates().await;
+
+                send_email(
+                    &config.api.smtp,
                     account.email.clone(),
-                    // maybe move this to common area?
-                    &Template {
-                        title: "Account Suspension".to_string(),
-                        html: Some(include_str!("../../../templates/suspension.html").to_owned()),
-                        text: include_str!("../../../templates/suspension.txt").to_owned(),
-                        url: Default::default(),
-                    },
+                    &templates.suspension,
                     json!({
                         "email": account.email,
                         "list": reason.join(", "),

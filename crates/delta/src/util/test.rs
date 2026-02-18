@@ -1,7 +1,3 @@
-use authifier::{
-    models::{Account, EmailVerification, Session},
-    Authifier,
-};
 use futures::StreamExt;
 use rand::Rng;
 use redis_kiss::redis::aio::PubSub;
@@ -9,6 +5,7 @@ use revolt_database::{
     events::client::EventV1, Channel, Database, Member, Message, PartialRole, Server, User, AMQP,
 };
 use revolt_database::{util::idempotency::IdempotencyKey, Role};
+use revolt_database::{Account, EmailVerification, Session};
 use revolt_models::v0;
 use revolt_permissions::OverrideField;
 use rocket::http::Header;
@@ -16,7 +13,6 @@ use rocket::local::asynchronous::{Client, LocalRequest, LocalResponse};
 
 pub struct TestHarness {
     pub client: Client,
-    authifier: Authifier,
     pub db: Database,
     pub amqp: AMQP,
     sub: PubSub,
@@ -43,12 +39,6 @@ impl TestHarness {
             .expect("`Database`")
             .clone();
 
-        let authifier = client
-            .rocket()
-            .state::<Authifier>()
-            .expect("`Authifier`")
-            .clone();
-
         let connection = amqprs::connection::Connection::open(
             &amqprs::connection::OpenConnectionArguments::new(
                 &config.rabbit.host,
@@ -65,7 +55,6 @@ impl TestHarness {
 
         TestHarness {
             client,
-            authifier,
             db,
             amqp,
             sub,
@@ -106,14 +95,10 @@ impl TestHarness {
             verification: EmailVerification::Verified,
         };
 
-        self.authifier
-            .database
-            .save_account(&account)
-            .await
-            .expect("`Account`");
+        self.db.save_account(&account).await.expect("`Account`");
 
         let session = account
-            .create_session(&self.authifier, String::new())
+            .create_session(&self.db, String::new())
             .await
             .expect("`Session`");
 

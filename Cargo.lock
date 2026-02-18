@@ -474,41 +474,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "authifier"
-version = "1.0.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d6163caecbb985d91406c2c6dc7710c46b38e6461d93d5e843b2f0eac43910c"
-dependencies = [
- "async-std",
- "async-trait",
- "base32",
- "bson",
- "chrono",
- "futures",
- "handlebars",
- "iso8601-timestamp",
- "lazy_static",
- "lettre",
- "log",
- "mongodb",
- "nanoid",
- "rand 0.8.5",
- "regex",
- "reqwest 0.11.27",
- "revolt_okapi",
- "revolt_rocket_okapi",
- "rocket",
- "rust-argon2",
- "schemars 0.8.22",
- "serde",
- "serde_json",
- "sha1",
- "totp-lite",
- "ulid 0.5.0",
- "validator 0.15.0",
-]
-
-[[package]]
 name = "auto_ops"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3767,17 +3732,6 @@ checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
 name = "idna"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "418a0a6fab821475f634efe3ccc45c013f742efe03d853e8d3355d5cb850ecf8"
-dependencies = [
- "matches",
- "unicode-bidi",
- "unicode-normalization",
-]
-
-[[package]]
-name = "idna"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e14ddfc70884202db2244c223200c204c2bda1bc6e0998d11b5e024d657209e6"
@@ -4943,12 +4897,6 @@ checksum = "d1525a2a28c7f4fa0fc98bb91ae755d1e2d1505079e05539e35bc876b5d65ae9"
 dependencies = [
  "regex-automata",
 ]
-
-[[package]]
-name = "matches"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2532096657941c2fea9c289d370a250971c689d4f143798ff67113ec042024a5"
 
 [[package]]
 name = "matchit"
@@ -6765,7 +6713,7 @@ dependencies = [
  "tokio 1.49.0",
  "tokio-native-tls",
  "tower",
- "tower-http 0.6.6",
+ "tower-http 0.6.8",
  "tower-service",
  "url",
  "wasm-bindgen",
@@ -6841,7 +6789,6 @@ dependencies = [
  "async-channel 2.5.0",
  "async-std",
  "async-tungstenite",
- "authifier",
  "bincode",
  "fred",
  "futures",
@@ -6912,16 +6859,18 @@ dependencies = [
  "async-recursion",
  "async-std",
  "async-trait",
- "authifier",
  "axum",
+ "base32",
  "base64 0.21.7",
  "bson",
  "deadqueue",
  "decancer",
  "futures",
+ "handlebars",
  "indexmap 1.9.3",
  "isahc",
  "iso8601-timestamp",
+ "lettre",
  "linkify 0.8.1",
  "livekit-api",
  "livekit-protocol",
@@ -6934,6 +6883,7 @@ dependencies = [
  "rand 0.8.5",
  "redis-kiss",
  "regex",
+ "reqwest 0.11.27",
  "revolt-config",
  "revolt-models",
  "revolt-parser",
@@ -6944,13 +6894,16 @@ dependencies = [
  "revolt_optional_struct",
  "revolt_rocket_okapi",
  "rocket",
+ "rust-argon2",
  "schemars 0.8.22",
  "serde",
  "serde_json",
+ "sha1",
+ "totp-lite",
  "ulid 1.2.1",
  "unicode-segmentation",
  "url-escape",
- "validator 0.16.1",
+ "validator",
 ]
 
 [[package]]
@@ -6960,7 +6913,6 @@ dependencies = [
  "amqprs",
  "async-channel 1.9.0",
  "async-std",
- "authifier",
  "bitfield",
  "chrono",
  "dashmap",
@@ -6990,7 +6942,6 @@ dependencies = [
  "revolt-result",
  "revolt_rocket_okapi",
  "rocket",
- "rocket_authifier",
  "rocket_cors",
  "rocket_empty",
  "rocket_prometheus",
@@ -6999,7 +6950,7 @@ dependencies = [
  "serde_json",
  "ulid 0.4.1",
  "url",
- "validator 0.16.1",
+ "validator",
  "vergen",
 ]
 
@@ -7097,8 +7048,9 @@ dependencies = [
  "rocket",
  "schemars 0.8.22",
  "serde",
+ "serde_json",
  "utoipa",
- "validator 0.16.1",
+ "validator",
 ]
 
 [[package]]
@@ -7142,7 +7094,6 @@ dependencies = [
  "amqprs",
  "anyhow",
  "async-trait",
- "authifier",
  "base64 0.22.1",
  "fcm_v1",
  "isahc",
@@ -7168,7 +7119,6 @@ name = "revolt-ratelimits"
 version = "0.11.4"
 dependencies = [
  "async-trait",
- "authifier",
  "axum",
  "dashmap",
  "log",
@@ -7407,22 +7357,6 @@ dependencies = [
  "ubyte",
  "version_check",
  "yansi",
-]
-
-[[package]]
-name = "rocket_authifier"
-version = "1.0.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a4e9660d198ea0165dc2694e7620d8fe199e923b39bec4d12b7159da5a4a6cd"
-dependencies = [
- "authifier",
- "iso8601-timestamp",
- "revolt_okapi",
- "revolt_rocket_okapi",
- "rocket",
- "rocket_empty",
- "schemars 0.8.22",
- "serde",
 ]
 
 [[package]]
@@ -7673,7 +7607,7 @@ dependencies = [
  "openssl-probe",
  "rustls-pki-types",
  "schannel",
- "security-framework 3.4.0",
+ "security-framework 3.5.1",
 ]
 
 [[package]]
@@ -7922,9 +7856,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework"
-version = "3.4.0"
+version = "3.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60b369d18893388b345804dc0007963c99b7d665ae71d275812d828c6f089640"
+checksum = "b3297343eaf830f66ede390ea39da1d462b6b0c1b000f420d0a83f898bbbe6ef"
 dependencies = [
  "bitflags 2.9.4",
  "core-foundation 0.10.1",
@@ -9151,9 +9085,9 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.6.6"
+version = "0.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adc82fd73de2a9722ac5da747f12383d2bfdb93591ee6c58486e0097890f05f2"
+checksum = "d4e6559d53cc268e5031cd8429d05415bc4cb4aefc4aa5d6cc35fbf5b924a1f8"
 dependencies = [
  "bitflags 2.9.4",
  "bytes 1.10.1",
@@ -9345,7 +9279,6 @@ checksum = "220b18413e1fe5e85a5580b22f44241f82404a66c792c9f3c9eda74c52d9a22e"
 dependencies = [
  "chrono",
  "rand 0.8.5",
- "serde",
 ]
 
 [[package]]
@@ -9622,21 +9555,6 @@ dependencies = [
  "aligned-vec",
  "num-traits",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "validator"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f07b0a1390e01c0fc35ebb26b28ced33c9a3808f7f9fbe94d3cc01e233bfeed5"
-dependencies = [
- "idna 0.2.3",
- "lazy_static",
- "regex",
- "serde",
- "serde_derive",
- "serde_json",
- "url",
 ]
 
 [[package]]

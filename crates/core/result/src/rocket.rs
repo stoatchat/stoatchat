@@ -96,6 +96,32 @@ impl<'r> Responder<'r, 'static> for Error {
             ErrorType::ImageProcessingFailed => Status::InternalServerError,
             ErrorType::NoEmbedData => Status::BadRequest,
             ErrorType::VosoUnavailable => Status::BadRequest,
+
+            ErrorType::RenderFail => Status::InternalServerError,
+            ErrorType::MissingHeaders => Status::BadRequest,
+            ErrorType::CaptchaFailed => Status::BadRequest,
+            ErrorType::BlockedByShield => Status::BadRequest,
+            ErrorType::UnverifiedAccount => Status::Forbidden,
+            ErrorType::EmailFailed => Status::InternalServerError,
+            ErrorType::InvalidToken => Status::Unauthorized,
+            ErrorType::MissingInvite => Status::BadRequest,
+            ErrorType::InvalidInvite => Status::BadRequest,
+            ErrorType::CompromisedPassword => Status::BadRequest,
+            ErrorType::ShortPassword => Status::BadRequest,
+            ErrorType::Blacklisted => {
+                // Fail blacklisted email addresses.
+                const RESP: &str = "{\"type\":\"DisallowedContactSupport\", \"email\":\"support@revolt.chat\", \"note\":\"If you see this messages right here, you're probably doing something you shouldn't be.\"}";
+
+                return Response::build()
+                    .status(Status::Unauthorized)
+                    .sized_body(RESP.len(), std::io::Cursor::new(RESP))
+                    .ok();
+            }
+            ErrorType::LockedOut => Status::Forbidden,
+            ErrorType::TotpAlreadyEnabled => Status::BadRequest,
+            ErrorType::DisallowedMFAMethod => Status::BadRequest,
+            ErrorType::OperationFailed => Status::InternalServerError,
+            ErrorType::IncorrectData { .. } => Status::BadRequest,
         };
 
         // Serialize the error data structure into JSON.

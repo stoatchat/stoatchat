@@ -1,7 +1,6 @@
 use std::{collections::HashSet, net::SocketAddr, sync::Arc};
 
 use async_tungstenite::WebSocketStream;
-use authifier::AuthifierEvent;
 use fred::{
     error::RedisErrorKind,
     interfaces::{ClientLike, EventInterface, PubsubInterface},
@@ -341,22 +340,20 @@ async fn listener(
                     break 'out;
                 };
 
-                if let EventV1::Auth(auth) = &event {
-                    if let AuthifierEvent::DeleteSession { session_id, .. } = auth {
-                        if &state.session_id == session_id {
+                if let EventV1::DeleteSession { session_id, .. } = &event {
+                    if &state.session_id == session_id {
+                        event = EventV1::Logout;
+                    }
+                } else if let EventV1::DeleteAllSessions {
+                    exclude_session_id, ..
+                } = &event
+                {
+                    if let Some(excluded) = exclude_session_id {
+                        if &state.session_id != excluded {
                             event = EventV1::Logout;
                         }
-                    } else if let AuthifierEvent::DeleteAllSessions {
-                        exclude_session_id, ..
-                    } = auth
-                    {
-                        if let Some(excluded) = exclude_session_id {
-                            if &state.session_id != excluded {
-                                event = EventV1::Logout;
-                            }
-                        } else {
-                            event = EventV1::Logout;
-                        }
+                    } else {
+                        event = EventV1::Logout;
                     }
                 } else {
                     let should_send = state.handle_incoming_event_v1(db, &mut event).await;

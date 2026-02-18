@@ -8,14 +8,11 @@ use std::time::Instant;
 const WORKER_COUNT: usize = 5;
 
 pub mod ack;
-pub mod authifier_relay;
 pub mod last_message_id;
 pub mod process_embeds;
 
 /// Spawn background workers
 pub fn start_workers(db: Database, amqp: AMQP) {
-    task::spawn(authifier_relay::worker());
-
     for _ in 0..WORKER_COUNT {
         task::spawn(ack::worker(db.clone(), amqp.clone()));
         task::spawn(last_message_id::worker(db.clone()));

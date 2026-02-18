@@ -21,7 +21,6 @@ use revolt_models::v0::{MessageFlags, PushNotification};
 pub struct MassMessageConsumer {
     #[allow(dead_code)]
     db: Database,
-    authifier_db: authifier::Database,
     conn: Option<Connection>,
     channel: Option<Channel>,
 }
@@ -53,10 +52,9 @@ impl Channeled for MassMessageConsumer {
 }
 
 impl MassMessageConsumer {
-    pub fn new(db: Database, authifier_db: authifier::Database) -> MassMessageConsumer {
+    pub fn new(db: Database) -> MassMessageConsumer {
         MassMessageConsumer {
             db,
-            authifier_db,
             conn: None,
             channel: None,
         }
@@ -68,8 +66,8 @@ impl MassMessageConsumer {
         users: &[String],
     ) -> Result<()> {
         if let Ok(sessions) = self
-            .authifier_db
-            .find_sessions_with_subscription(users)
+            .db
+            .fetch_sessions_with_subscription(users)
             .await
         {
             let config = revolt_config::config().await;

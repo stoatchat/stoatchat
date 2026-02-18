@@ -10,8 +10,7 @@ use revolt_config::config;
 
 use revolt_rocket_okapi::r#gen::OpenApiGenerator;
 use revolt_rocket_okapi::request::{OpenApiFromRequest, RequestHeaderInput};
-
-use authifier::models::Session;
+use revolt_database::Session;
 
 use crate::ratelimiter::RequestKind;
 use crate::ratelimiter::{RatelimitInformation, Ratelimiter};
