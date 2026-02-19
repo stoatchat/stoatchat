@@ -2,12 +2,12 @@
 <h1>
   Stoat Backend
   
-  [![Stars](https://img.shields.io/github/stars/revoltchat/backend?style=flat-square&logoColor=white)](https://github.com/stoatchat/stoatchat/stargazers)
-  [![Forks](https://img.shields.io/github/forks/revoltchat/backend?style=flat-square&logoColor=white)](https://github.com/stoatchat/stoatchat/network/members)
-  [![Pull Requests](https://img.shields.io/github/issues-pr/revoltchat/backend?style=flat-square&logoColor=white)](https://github.com/stoatchat/stoatchat/pulls)
-  [![Issues](https://img.shields.io/github/issues/revoltchat/backend?style=flat-square&logoColor=white)](https://github.com/stoatchat/backend/issues)
-  [![Contributors](https://img.shields.io/github/contributors/revoltchat/backend?style=flat-square&logoColor=white)](https://github.com/stoatchat/backend/graphs/contributors)
-  [![License](https://img.shields.io/github/license/revoltchat/backend?style=flat-square&logoColor=white)](https://github.com/stoat/backend/blob/main/LICENSE)
+  [![Stars](https://img.shields.io/github/stars/stoatchat/stoatchat?style=flat-square&logoColor=white)](https://github.com/stoatchat/stoatchat/stargazers)
+  [![Forks](https://img.shields.io/github/forks/stoatchat/stoatchat?style=flat-square&logoColor=white)](https://github.com/stoatchat/stoatchat/network/members)
+  [![Pull Requests](https://img.shields.io/github/issues-pr/stoatchat/stoatchat?style=flat-square&logoColor=white)](https://github.com/stoatchat/stoatchat/pulls)
+  [![Issues](https://img.shields.io/github/issues/stoatchat/stoatchat?style=flat-square&logoColor=white)](https://github.com/stoatchat/stoatchat/issues)
+  [![Contributors](https://img.shields.io/github/contributors/stoatchat/stoatchat?style=flat-square&logoColor=white)](https://github.com/stoatchat/stoatchat/graphs/contributors)
+  [![License](https://img.shields.io/github/license/stoatchat/stoatchat?style=flat-square&logoColor=white)](https://github.com/stoatchat/stoatchat/blob/main/LICENSE)
 </h1>
 The services and libraries that power the Revolt service.<br/>
 <br/>
@@ -39,7 +39,7 @@ Rust 1.86.0 or higher.
 
 ## Development Guide
 
-Before contributing, make yourself familiar with [our contribution guidelines](https://developers.stoat.chat/contrib.html) and the [technical documentation for this project](https://stoatchat.github.io/backend/).
+Before contributing, make yourself familiar with [our contribution guidelines](https://developers.stoat.chat/contrib.html) and the [technical documentation for this project](https://stoatchat.github.io/stoatchat/).
 
 Before getting started, you'll want to install:
 
@@ -70,7 +70,7 @@ As a heads-up, the development environment uses the following ports:
 Now you can clone and build the project:
 
 ```bash
-git clone https://github.com/stoatchat/backend stoat-backend
+git clone https://github.com/stoatchat/stoatchat stoat-backend
 cd stoat-backend
 mise build
 ```
@@ -198,7 +198,7 @@ Tag and push a new release by running:
 just release
 ```
 
-If you have bumped the crate versions, proceed to [GitHub releases](https://github.com/stoatchat/backend/releases/new) to create a changelog.
+If you have bumped the crate versions, proceed to [GitHub releases](https://github.com/stoatchat/stoatchat/releases/new) to create a changelog.
 
 ## Testing
 
@@ -217,6 +217,6 @@ TEST_DB=MONGODB cargo nextest run
 
 ## License
 
-The Stoat backend is generally licensed under the [GNU Affero General Public License v3.0](https://github.com/revoltchat/backend/blob/master/LICENSE).
+The Stoat backend is generally licensed under the [GNU Affero General Public License v3.0](https://github.com/stoatchat/stoatchat/blob/master/LICENSE).
 
 **Individual crates may supply their own licenses!**
