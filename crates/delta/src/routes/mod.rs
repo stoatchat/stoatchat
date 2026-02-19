@@ -205,18 +205,18 @@ fn custom_openapi_spec() -> OpenApi {
     OpenApi {
         openapi: OpenApi::default_version(),
         info: Info {
-            title: "Revolt API".to_owned(),
+            title: "Stoat API".to_owned(),
             description: Some("Open source user-first chat platform.".to_owned()),
-            terms_of_service: Some("https://revolt.chat/terms".to_owned()),
+            terms_of_service: Some("https://stoat.chat/legal/terms".to_owned()),
             contact: Some(Contact {
-                name: Some("Revolt Support".to_owned()),
-                url: Some("https://revolt.chat".to_owned()),
-                email: Some("contact@revolt.chat".to_owned()),
+                name: Some("Stoat Support".to_owned()),
+                url: Some("https://stoat.chat/".to_owned()),
+                email: Some("contact@stoat.chat".to_owned()),
                 ..Default::default()
             }),
             license: Some(License {
                 name: "AGPLv3".to_owned(),
-                url: Some("https://github.com/revoltchat/delta/blob/master/LICENSE".to_owned()),
+                url: Some("https://github.com/stoatchat/stoatchat/blob/main/LICENSE".to_owned()),
                 ..Default::default()
             }),
             version: env!("CARGO_PKG_VERSION").to_string(),
@@ -224,7 +224,7 @@ fn custom_openapi_spec() -> OpenApi {
         },
         servers: vec![
             Server {
-                url: "https://api.revolt.chat".to_owned(),
+                url: "https://api.stoat.chat".to_owned(),
                 description: Some("Revolt Production".to_owned()),
                 ..Default::default()
             },
