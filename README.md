@@ -9,7 +9,7 @@
   [![Contributors](https://img.shields.io/github/contributors/stoatchat/stoatchat?style=flat-square&logoColor=white)](https://github.com/stoatchat/stoatchat/graphs/contributors)
   [![License](https://img.shields.io/github/license/stoatchat/stoatchat?style=flat-square&logoColor=white)](https://github.com/stoatchat/stoatchat/blob/main/LICENSE)
 </h1>
-The services and libraries that power the Revolt service.<br/>
+The services and libraries that power the Stoat service.<br/>
 <br/>
 
 | Crate              | Path                                               | Description                         |                                                                                                                                                                                                                                                                                                           |
