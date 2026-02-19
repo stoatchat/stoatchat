@@ -59,7 +59,7 @@ As a heads-up, the development environment uses the following ports:
 | Redis                     |      6379      |
 | MinIO                     |     14009      |
 | Maildev                   | 14025<br>14080 |
-| Revolt Web App            |     14701      |
+| Stoat Web App             |     14701      |
 | RabbitMQ                  | 5672<br>15672  |
 | `crates/delta`            |     14702      |
 | `crates/bonfire`          |     14703      |
@@ -70,8 +70,8 @@ As a heads-up, the development environment uses the following ports:
 Now you can clone and build the project:
 
 ```bash
-git clone https://github.com/revoltchat/backend revolt-backend
-cd revolt-backend
+git clone https://github.com/stoatchat/backend stoat-backend
+cd stoat-backend
 mise build
 ```
 
@@ -158,15 +158,15 @@ You can start a web client by doing the following:
 corepack enable
 
 # clone the web client and run it:
-git clone --recursive https://github.com/revoltchat/revite
+git clone --recursive https://github.com/stoatchat/revite
 cd revite
 yarn
 yarn build:deps
-echo "VITE_API_URL=http://local.revolt.chat:14702" > .env.local
+echo "VITE_API_URL=http://local.stoat.chat:14702" > .env.local
 yarn dev --port 14701
 ```
 
-Then go to http://local.revolt.chat:14701 to create an account/login.
+Then go to http://local.stoat.chat:14701 to create an account/login.
 
 When signing up, go to http://localhost:14080 to find confirmation/password reset emails.
 
@@ -217,6 +217,6 @@ TEST_DB=MONGODB cargo nextest run
 
 ## License
 
-The Revolt backend is generally licensed under the [GNU Affero General Public License v3.0](https://github.com/revoltchat/backend/blob/master/LICENSE).
+The Stoat backend is generally licensed under the [GNU Affero General Public License v3.0](https://github.com/revoltchat/backend/blob/master/LICENSE).
 
 **Individual crates may supply their own licenses!**
