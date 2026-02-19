@@ -158,8 +158,8 @@ You can start a web client by doing the following:
 corepack enable
 
 # clone the web client and run it:
-git clone --recursive https://github.com/stoatchat/revite
-cd revite
+git clone --recursive https://github.com/stoatchat/for-web
+cd for-web
 yarn
 yarn build:deps
 echo "VITE_API_URL=http://local.stoat.chat:14702" > .env.local
