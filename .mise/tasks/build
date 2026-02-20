@@ -2,4 +2,4 @@
 #MISE description="Build project"
 set -e
 
-cargo build "$@"
+${BUILDER} build "$@"
