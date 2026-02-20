@@ -115,8 +115,8 @@ fn custom_openapi_spec() -> OpenApi {
     extensions.insert(
         "x-logo".to_owned(),
         json!({
-            "url": "https://revolt.chat/header.png",
-            "altText": "Revolt Header"
+            "url": "https://stoat.chat/header.png",
+            "altText": "Stoat Header"
         }),
     );
 
@@ -124,7 +124,7 @@ fn custom_openapi_spec() -> OpenApi {
         "x-tagGroups".to_owned(),
         json!([
           {
-            "name": "Revolt",
+            "name": "Stoat",
             "tags": [
               "Core"
             ]
@@ -205,18 +205,18 @@ fn custom_openapi_spec() -> OpenApi {
     OpenApi {
         openapi: OpenApi::default_version(),
         info: Info {
-            title: "Revolt API".to_owned(),
+            title: "Stoat API".to_owned(),
             description: Some("Open source user-first chat platform.".to_owned()),
-            terms_of_service: Some("https://revolt.chat/terms".to_owned()),
+            terms_of_service: Some("https://stoat.chat/legal/terms".to_owned()),
             contact: Some(Contact {
-                name: Some("Revolt Support".to_owned()),
-                url: Some("https://revolt.chat".to_owned()),
-                email: Some("contact@revolt.chat".to_owned()),
+                name: Some("Stoat Support".to_owned()),
+                url: Some("https://stoat.chat/".to_owned()),
+                email: Some("contact@stoat.chat".to_owned()),
                 ..Default::default()
             }),
             license: Some(License {
                 name: "AGPLv3".to_owned(),
-                url: Some("https://github.com/revoltchat/delta/blob/master/LICENSE".to_owned()),
+                url: Some("https://github.com/stoatchat/stoatchat/blob/main/LICENSE".to_owned()),
                 ..Default::default()
             }),
             version: env!("CARGO_PKG_VERSION").to_string(),
@@ -224,29 +224,29 @@ fn custom_openapi_spec() -> OpenApi {
         },
         servers: vec![
             Server {
-                url: "https://api.revolt.chat".to_owned(),
-                description: Some("Revolt Production".to_owned()),
+                url: "https://api.stoat.chat".to_owned(),
+                description: Some("Stoat Production".to_owned()),
                 ..Default::default()
             },
             Server {
-                url: "https://revolt.chat/api".to_owned(),
-                description: Some("Revolt Staging".to_owned()),
+                url: "https://stoat.chat/api".to_owned(),
+                description: Some("Stoat Staging".to_owned()),
                 ..Default::default()
             },
             Server {
-                url: "http://local.revolt.chat:14702".to_owned(),
-                description: Some("Local Revolt Environment".to_owned()),
+                url: "http://local.stoat.chat:14702".to_owned(),
+                description: Some("Local Stoat Environment".to_owned()),
                 ..Default::default()
             },
             Server {
-                url: "http://local.revolt.chat:14702/0.8".to_owned(),
-                description: Some("Local Revolt Environment (v0.8)".to_owned()),
+                url: "http://local.stoat.chat:14702/0.8".to_owned(),
+                description: Some("Local Stoat Environment (v0.8)".to_owned()),
                 ..Default::default()
             },
         ],
         external_docs: Some(ExternalDocs {
-            url: "https://developers.revolt.chat".to_owned(),
-            description: Some("Revolt Developer Documentation".to_owned()),
+            url: "https://developers.stoat.chat".to_owned(),
+            description: Some("Stoat Developer Documentation".to_owned()),
             ..Default::default()
         }),
         extensions,
@@ -254,19 +254,19 @@ fn custom_openapi_spec() -> OpenApi {
             Tag {
                 name: "Core".to_owned(),
                 description: Some(
-                    "Use in your applications to determine information about the Revolt node"
+                    "Use in your applications to determine information about the Stoat node"
                         .to_owned(),
                 ),
                 ..Default::default()
             },
             Tag {
                 name: "User Information".to_owned(),
-                description: Some("Query and fetch users on Revolt".to_owned()),
+                description: Some("Query and fetch users on Stoat".to_owned()),
                 ..Default::default()
             },
             Tag {
                 name: "Direct Messaging".to_owned(),
-                description: Some("Direct message other users on Revolt".to_owned()),
+                description: Some("Direct message other users on Stoat".to_owned()),
                 ..Default::default()
             },
             Tag {
@@ -283,7 +283,7 @@ fn custom_openapi_spec() -> OpenApi {
             },
             Tag {
                 name: "Channel Information".to_owned(),
-                description: Some("Query and fetch channels on Revolt".to_owned()),
+                description: Some("Query and fetch channels on Stoat".to_owned()),
                 ..Default::default()
             },
             Tag {
@@ -313,7 +313,7 @@ fn custom_openapi_spec() -> OpenApi {
             },
             Tag {
                 name: "Server Information".to_owned(),
-                description: Some("Query and fetch servers on Revolt".to_owned()),
+                description: Some("Query and fetch servers on Stoat".to_owned()),
                 ..Default::default()
             },
             Tag {
@@ -349,7 +349,7 @@ fn custom_openapi_spec() -> OpenApi {
             Tag {
                 name: "Onboarding".to_owned(),
                 description: Some(
-                    "After signing up to Revolt, users must pick a unique username".to_owned(),
+                    "After signing up to Stoat, users must pick a unique username".to_owned(),
                 ),
                 ..Default::default()
             },
@@ -361,7 +361,7 @@ fn custom_openapi_spec() -> OpenApi {
             Tag {
                 name: "Web Push".to_owned(),
                 description: Some(
-                    "Subscribe to and receive Revolt push notifications while offline".to_owned(),
+                    "Subscribe to and receive Stoat push notifications while offline".to_owned(),
                 ),
                 ..Default::default()
             },
