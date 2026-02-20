@@ -431,7 +431,7 @@ impl Channel {
     }
 
     /// Gets this channel's voice information
-    pub fn voice(&self) -> Option<Cow<VoiceInformation>> {
+    pub fn voice(&self) -> Option<Cow<'_, VoiceInformation>> {
         match self {
             Self::DirectMessage { .. } | Self::Group { .. } => {
                 Some(Cow::Owned(VoiceInformation::default()))

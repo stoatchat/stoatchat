@@ -5,7 +5,7 @@ use revolt_database::{
     events::client::{EventV1, ReadyPayloadFields},
     util::permissions::DatabasePermissionQuery,
     voice::get_channel_voice_state,
-    Channel, Database, Member, MemberCompositeKey, Presence, RelationshipStatus,
+    Channel, Database, Member, MemberCompositeKey, RelationshipStatus,
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
