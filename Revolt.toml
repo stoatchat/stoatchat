@@ -18,11 +18,11 @@ host = "127.0.0.1"
 # See https://github.com/revoltchat/self-hosted/blob/master/Caddyfile
 #
 # Remember to change these to https/wss where appropriate in production!
-app = "http://local.revolt.chat:14701"
-api = "http://local.revolt.chat:14702"
+app = "http://localhost:5173/"
+api = "http://localhost:14702"
 events = "ws://local.revolt.chat:14703"
-autumn = "http://local.revolt.chat:14704"
-january = "http://local.revolt.chat:14705"
+autumn = "http://localhost:14704"
+january = "http://localhost:14705"
 voso_legacy = ""
 voso_legacy_ws = ""
 

@@ -14,11 +14,11 @@ redis = "redis://redis/"
 # See https://github.com/revoltchat/self-hosted/blob/master/Caddyfile
 #
 # Remember to change these to https/wss where appropriate in production!
-app = "http://local.revolt.chat"
-api = "http://local.revolt.chat/api"
+app = "http://localhost"
+api = "http://localhost/api"
 events = "ws://local.revolt.chat/ws"
-autumn = "http://local.revolt.chat/autumn"
-january = "http://local.revolt.chat/january"
+autumn = "http://localhost/autumn"
+january = "http://localhost/january"
 voso_legacy = ""
 voso_legacy_ws = ""
 

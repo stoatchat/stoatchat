@@ -5,12 +5,13 @@ use revolt_database::{
     events::client::{EventV1, ReadyPayloadFields},
     util::permissions::DatabasePermissionQuery,
     voice::get_channel_voice_state,
-    Channel, Database, Member, MemberCompositeKey, Presence, RelationshipStatus,
+    Channel, Database, Member, MemberCompositeKey, RelationshipStatus,
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_presence::filter_online;
 use revolt_result::Result;
+use ulid::Ulid;
 
 use super::state::{Cache, State};
 
@@ -19,21 +20,22 @@ impl Cache {
     /// Check whether the current user can view a channel
     pub async fn can_view_channel(&self, db: &Database, channel: &Channel) -> bool {
         #[allow(deprecated)]
-        match &channel {
+        match channel {
             Channel::TextChannel { server, .. } => {
+                let user = self
+                    .users
+                    .get(&self.user_id)
+                    .expect("self user missing in cache");
                 let member = self.members.get(server);
-                let server = self.servers.get(server);
-                let mut query =
-                    DatabasePermissionQuery::new(db, self.users.get(&self.user_id).unwrap())
-                        .channel(channel);
-                // let mut perms = perms(self.users.get(&self.user_id).unwrap()).channel(channel);
+                let server_obj = self.servers.get(server);
 
-                if let Some(member) = member {
-                    query = query.member(member);
+                let mut query = DatabasePermissionQuery::new(db, user).channel(channel);
+
+                if let Some(m) = member {
+                    query = query.member(m);
                 }
-
-                if let Some(server) = server {
-                    query = query.server(server);
+                if let Some(s) = server_obj {
+                    query = query.server(s);
                 }
 
                 calculate_channel_permissions(&mut query)
@@ -44,412 +46,347 @@ impl Cache {
         }
     }
 
-    /// Filter a given vector of channels to only include the ones we can access
+    /// Filter channels to only those the user can access
     pub async fn filter_accessible_channels(
         &self,
         db: &Database,
         channels: Vec<Channel>,
     ) -> Vec<Channel> {
-        let mut viewable_channels = vec![];
+        let mut viewable = Vec::with_capacity(channels.len());
         for channel in channels {
             if self.can_view_channel(db, &channel).await {
-                viewable_channels.push(channel);
+                viewable.push(channel);
             }
         }
-
-        viewable_channels
+        viewable
     }
 
-    /// Check whether we can subscribe to another user
+    /// Check if we can subscribe to another user's events
     pub fn can_subscribe_to_user(&self, user_id: &str) -> bool {
-        if let Some(user) = self.users.get(&self.user_id) {
-            match user.relationship_with(user_id) {
-                RelationshipStatus::Friend
+        let Some(self_user) = self.users.get(&self.user_id) else {
+            return false;
+        };
+
+        if matches!(
+            self_user.relationship_with(user_id),
+            RelationshipStatus::Friend
                 | RelationshipStatus::Incoming
                 | RelationshipStatus::Outgoing
-                | RelationshipStatus::User => true,
-                _ => {
-                    let user_id = &user_id.to_string();
-                    for channel in self.channels.values() {
-                        match channel {
-                            Channel::DirectMessage { recipients, .. }
-                            | Channel::Group { recipients, .. } => {
-                                if recipients.contains(user_id) {
-                                    return true;
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-
-                    false
-                }
-            }
-        } else {
-            false
+                | RelationshipStatus::User
+        ) {
+            return true;
         }
+
+        for channel in self.channels.values() {
+            let recipients = match channel {
+                Channel::DirectMessage { recipients, .. } | Channel::Group { recipients, .. } => recipients,
+                _ => continue,
+            };
+
+            if recipients.iter().any(|r| r.as_str() == user_id) {
+                return true;
+            }
+        }
+
+        false
     }
 }
 
 /// State Manager
 impl State {
-    /// Generate a Ready packet for the current user
+    /// Generate Ready payload (initial sync)
     pub async fn generate_ready_payload(
         &mut self,
         db: &Database,
         fields: &ReadyPayloadFields,
     ) -> Result<EventV1> {
-        let user = self.clone_user();
-        self.cache.is_bot = user.bot.is_some();
+        let self_user = self.clone_user();
+        self.cache.is_bot = self_user.bot.is_some();
 
-        // Fetch pending policy changes.
-        let policy_changes = if user.bot.is_some() || !fields.policy_changes {
+        let policy_changes = if self_user.bot.is_some() || !fields.policy_changes {
             None
         } else {
             Some(
                 db.fetch_policy_changes()
                     .await?
                     .into_iter()
-                    .filter(|policy| policy.created_time > user.last_acknowledged_policy_change)
+                    .filter(|p| p.created_time > self_user.last_acknowledged_policy_change)
                     .map(Into::into)
                     .collect(),
             )
         };
 
-        // Find all relationships to the user.
-        let mut user_ids: HashSet<String> = user
+        let mut known_user_ids: HashSet<String> = self_user
             .relations
             .as_ref()
-            .map(|arr| arr.iter().map(|x| x.id.to_string()).collect())
+            .map(|rels| rels.iter().map(|r| r.id.clone()).collect())
             .unwrap_or_default();
 
-        // Fetch all memberships with their corresponding servers.
-        let mut members: Vec<Member> = db.fetch_all_memberships(&user.id).await?;
+        let mut members: Vec<Member> = db.fetch_all_memberships(&self_user.id).await?;
 
-        let server_ids: Vec<String> = members.iter().map(|x| x.id.server.clone()).collect();
+        let server_ids: Vec<String> = members.iter().map(|m| m.id.server.clone()).collect();
         let servers = db.fetch_servers(&server_ids).await?;
-        self.cache.servers = servers.iter().cloned().map(|x| (x.id.clone(), x)).collect();
 
-        // Collect channel ids from servers.
-        let mut channel_ids = vec![];
+        self.cache.servers = servers.iter().map(|s| (s.id.clone(), s.clone())).collect();
+
+        let mut channel_ids = Vec::new();
         for server in &servers {
-            channel_ids.append(&mut server.channels.clone());
+            channel_ids.extend_from_slice(&server.channels);
         }
 
-        // Fetch DMs and server channels.
-        let mut channels = db.find_direct_messages(&user.id).await?;
-        channels.append(&mut db.fetch_channels(&channel_ids).await?);
+        let mut channels = db.find_direct_messages(&self_user.id).await?;
+        channels.extend(db.fetch_channels(&channel_ids).await?);
 
-        // Filter server channels by permission.
         let channels = self.cache.filter_accessible_channels(db, channels).await;
 
-        // Append known user IDs from DMs.
-        for channel in &channels {
-            match channel {
-                Channel::DirectMessage { recipients, .. } | Channel::Group { recipients, .. } => {
-                    user_ids.extend(&mut recipients.clone().into_iter());
-                }
-                _ => {}
+        for ch in &channels {
+            if let Channel::DirectMessage { recipients, .. } | Channel::Group { recipients, .. } = ch {
+                known_user_ids.extend(recipients.iter().cloned());
             }
         }
 
         let voice_states = if fields.voice_states {
-            let mut voice_state_server_members: HashMap<String, HashSet<String>> = HashMap::new();
+            let mut server_to_members: HashMap<String, HashSet<String>> = HashMap::new();
+            let mut states = Vec::new();
 
-            // fetch voice states for all the channels we can see
-            let mut voice_states = Vec::new();
+            for ch in channels.iter().filter(|c| matches!(
+                c,
+                Channel::DirectMessage { .. } | Channel::Group { .. } | Channel::TextChannel { voice: Some(_), .. }
+            )) {
+                let Ok(Some(vs)) = get_channel_voice_state(ch).await else { continue; };
 
-            for channel in channels.iter().filter(|c| {
-                matches!(
-                    c,
-                    Channel::DirectMessage { .. }
-                        | Channel::Group { .. }
-                        | Channel::TextChannel { voice: Some(_), .. }
-                )
-            }) {
-                if let Ok(Some(voice_state)) = get_channel_voice_state(channel).await {
-                    if let Some(server) = channel.server() {
-                        let set = voice_state_server_members
-                            .entry(server.to_string())
-                            .or_default();
-
-                        for participant in &voice_state.participants {
-                            user_ids.insert(participant.id.clone());
-                            set.insert(participant.id.clone());
-                        }
-                    } else {
-                        for participant in &voice_state.participants {
-                            user_ids.insert(participant.id.clone());
-                        }
+                if let Some(srv_id) = ch.server() {
+                    let entry = server_to_members.entry(srv_id.to_string()).or_default();
+                    for p in &vs.participants {
+                        known_user_ids.insert(p.id.clone());
+                        entry.insert(p.id.clone());
                     }
-
-                    voice_states.push(voice_state);
+                } else {
+                    for p in &vs.participants {
+                        known_user_ids.insert(p.id.clone());
+                    }
                 }
+                states.push(vs);
             }
 
-            // Fetch all the members for for the participants who are in a server
-            for (server, user_ids) in voice_state_server_members {
-                let user_ids = user_ids.into_iter().collect::<Vec<_>>();
-                let voice_members = db.fetch_members(&server, &user_ids).await?;
-
-                members.extend(voice_members);
+            for (server_id, member_set) in server_to_members {
+                let member_list: Vec<String> = member_set.into_iter().collect();
+                let extra_members = db.fetch_members(&server_id, &member_list).await?;
+                members.extend(extra_members);
             }
 
-            Some(voice_states)
+            Some(states)
         } else {
             None
         };
 
-        // Fetch presence data for known users.
-        let online_ids = filter_online(&user_ids.iter().cloned().collect::<Vec<String>>()).await;
+        let online_ids = filter_online(&known_user_ids.iter().cloned().collect::<Vec<_>>()).await;
 
-        // Fetch user data.
-        let users = db
-            .fetch_users(
-                &user_ids
-                    .into_iter()
-                    .filter(|x| x != &user.id)
-                    .collect::<Vec<String>>(),
-            )
-            .await?;
-
-        self.cache.members = members
+        // Cache users as v0::User with optimized lookup
+        let mut user_ids_to_fetch: Vec<String> = known_user_ids
             .iter()
+            .filter(|&uid| uid != &self_user.id)
             .cloned()
-            .map(|x| (x.id.server.clone(), x))
             .collect();
+        
+        // Remove already cached users to avoid unnecessary DB queries
+        user_ids_to_fetch.retain(|uid| !self.cache.users.contains_key(uid));
+        
+        let other_users = if !user_ids_to_fetch.is_empty() {
+            db.fetch_users(&user_ids_to_fetch).await?
+        } else {
+            Vec::new()
+        };
 
-        // Fetch customisations.
+        // Update cache with newly fetched users
+        for user in &other_users {
+            self.cache.users.insert(user.id.clone(), user.clone());
+        }
+        self.cache.users.insert(self_user.id.clone(), self_user.clone());
+
+        self.cache.members = members.iter().map(|m| (m.id.server.clone(), m.clone())).collect();
+
         let emojis = if fields.emojis {
+            let parent_ids = servers.iter().map(|s| s.id.clone()).collect::<Vec<_>>();
             Some(
-                db.fetch_emoji_by_parent_ids(
-                    &servers
-                        .iter()
-                        .map(|x| x.id.to_string())
-                        .collect::<Vec<String>>(),
-                )
-                .await?
-                .into_iter()
-                .map(|emoji| emoji.into())
-                .collect(),
-            )
-        } else {
-            None
-        };
-
-        // Fetch user settings
-        let user_settings = if !fields.user_settings.is_empty() {
-            Some(
-                db.fetch_user_settings(&user.id, &fields.user_settings)
-                    .await?,
-            )
-        } else {
-            None
-        };
-
-        // Fetch channel unreads
-        let channel_unreads = if fields.channel_unreads {
-            Some(
-                db.fetch_unreads(&user.id)
+                db.fetch_emoji_by_parent_ids(&parent_ids)
                     .await?
                     .into_iter()
-                    .map(|unread| unread.into())
+                    .map(Into::into)
                     .collect(),
             )
         } else {
             None
         };
 
-        // Copy data into local state cache.
-        self.cache.users = users.iter().cloned().map(|x| (x.id.clone(), x)).collect();
-        self.cache
-            .users
-            .insert(self.cache.user_id.clone(), user.clone());
+        let user_settings = if !fields.user_settings.is_empty() {
+            Some(db.fetch_user_settings(&self_user.id, &fields.user_settings).await?)
+        } else {
+            None
+        };
+
+        let channel_unreads = if fields.channel_unreads {
+            Some(
+                db.fetch_unreads(&self_user.id)
+                    .await?
+                    .into_iter()
+                    .map(Into::into)
+                    .collect(),
+            )
+        } else {
+            None
+        };
+
         self.cache.channels = channels
             .iter()
-            .cloned()
-            .map(|x| (x.id().to_string(), x))
+            .map(|ch| (ch.id().to_string(), ch.clone()))
             .collect();
 
-        // Make all users appear from our perspective.
-        let mut users: Vec<v0::User> = join_all(users.into_iter().map(|other_user| async {
-            let is_online = online_ids.contains(&other_user.id);
-            other_user.into_known(&user, is_online).await
+        // Convert to client-visible form, including cached users
+        let mut all_users: Vec<revolt_database::User> = other_users;
+        
+        // Add cached users that are in known_user_ids but not in other_users
+        for uid in &known_user_ids {
+            if uid != &self_user.id && !all_users.iter().any(|u| &u.id == uid) {
+                if let Some(cached_user) = self.cache.users.get(uid) {
+                    all_users.push(cached_user.clone());
+                }
+            }
+        }
+        
+        let mut visible_users: Vec<v0::User> = join_all(all_users.into_iter().map(|u| async {
+            let is_online = online_ids.contains(&u.id);
+            u.into_known(&self_user, is_online).await
         }))
         .await;
 
-        // Make sure we see our own user correctly.
-        users.push(user.into_self(true).await);
+        visible_users.push(self_user.into_self(true).await);
 
-        // Set subscription state internally.
         self.reset_state().await;
         self.insert_subscription(self.private_topic.clone()).await;
 
-        for user in &users {
-            self.insert_subscription(user.id.clone()).await;
+        for u in &visible_users {
+            self.insert_subscription(u.id.clone()).await;
         }
-
-        for server in &servers {
-            self.insert_subscription(server.id.clone()).await;
-
+        for srv in &servers {
+            self.insert_subscription(srv.id.clone()).await;
             if self.cache.is_bot {
-                self.insert_subscription(format!("{}u", server.id)).await;
+                self.insert_subscription(format!("{}u", srv.id)).await;
             }
         }
-
-        for channel in &channels {
-            self.insert_subscription(channel.id().to_string()).await;
+        for ch in &channels {
+            self.insert_subscription(ch.id().to_string()).await;
         }
 
         Ok(EventV1::Ready {
-            users: if fields.users { Some(users) } else { None },
-            servers: if fields.servers {
-                Some(servers.into_iter().map(Into::into).collect())
-            } else {
-                None
-            },
-            channels: if fields.channels {
-                Some(channels.into_iter().map(Into::into).collect())
-            } else {
-                None
-            },
-            members: if fields.members {
-                Some(members.into_iter().map(Into::into).collect())
-            } else {
-                None
-            },
+            users: fields.users.then_some(visible_users),
+            servers: fields.servers.then_some(servers.into_iter().map(Into::into).collect()),
+            channels: fields.channels.then_some(channels.into_iter().map(Into::into).collect()),
+            members: fields.members.then_some(members.into_iter().map(Into::into).collect()),
             voice_states,
-
             emojis,
             user_settings,
             channel_unreads,
-
             policy_changes,
         })
     }
 
-    /// Re-determine the currently accessible server channels
-    pub async fn recalculate_server(&mut self, db: &Database, id: &str, event: &mut EventV1) {
-        if let Some(server) = self.cache.servers.get(id) {
-            let mut channel_ids = HashSet::new();
-            let mut added_channels = vec![];
-            let mut removed_channels = vec![];
+    pub async fn recalculate_server(&mut self, db: &Database, server_id: &str, event: &mut EventV1) {
+        let Some(server) = self.cache.servers.get(server_id) else { return; };
 
-            let id = &id.to_string();
-            for (channel_id, channel) in &self.cache.channels {
-                if channel.server() == Some(id) {
-                    channel_ids.insert(channel_id.clone());
+        let mut cached_channel_ids = HashSet::new();
+        let mut to_add = Vec::new();
+        let mut to_remove = Vec::new();
 
-                    if self.cache.can_view_channel(db, channel).await {
-                        added_channels.push(channel_id.clone());
-                    } else {
-                        removed_channels.push(channel_id.clone());
-                    }
+        let server_id_str = server_id.to_string();
+        for (ch_id, ch) in &self.cache.channels {
+            if ch.server() == Some(&server_id_str) {
+                cached_channel_ids.insert(ch_id.clone());
+
+                if self.cache.can_view_channel(db, ch).await {
+                    to_add.push(ch_id.clone());
+                } else {
+                    to_remove.push(ch_id.clone());
                 }
             }
+        }
 
-            let known_ids = server.channels.iter().cloned().collect::<HashSet<String>>();
+        let known_channel_ids = server.channels.iter().cloned().collect::<HashSet<_>>();
 
-            let mut bulk_events = vec![];
+        let mut bulk = Vec::new();
 
-            for id in added_channels {
-                self.insert_subscription(id).await;
-            }
+        for id in to_add {
+            self.insert_subscription(id).await;
+        }
 
-            for id in removed_channels {
-                self.remove_subscription(&id).await;
-                self.cache.channels.remove(&id);
+        for id in to_remove {
+            self.remove_subscription(&id).await;
+            self.cache.channels.remove(&id);
+            bulk.push(EventV1::ChannelDelete { id });
+        }
 
-                bulk_events.push(EventV1::ChannelDelete { id });
-            }
+        let missing = known_channel_ids
+            .difference(&cached_channel_ids)
+            .cloned()
+            .collect::<Vec<_>>();
 
-            // * NOTE: currently all channels should be cached
-            // * provided that a server was loaded from payload
-            let unknowns = known_ids
-                .difference(&channel_ids)
-                .cloned()
-                .collect::<Vec<String>>();
-
-            if !unknowns.is_empty() {
-                if let Ok(channels) = db.fetch_channels(&unknowns).await {
-                    let viewable_channels =
-                        self.cache.filter_accessible_channels(db, channels).await;
-
-                    for channel in viewable_channels {
-                        self.cache
-                            .channels
-                            .insert(channel.id().to_string(), channel.clone());
-
-                        self.insert_subscription(channel.id().to_string()).await;
-                        bulk_events.push(EventV1::ChannelCreate(channel.into()));
-                    }
+        if !missing.is_empty() {
+            if let Ok(fetched) = db.fetch_channels(&missing).await {
+                let viewable = self.cache.filter_accessible_channels(db, fetched).await;
+                for ch in viewable {
+                    let ch_id = ch.id().to_string();
+                    self.cache.channels.insert(ch_id.clone(), ch.clone());
+                    self.insert_subscription(ch_id).await;
+                    bulk.push(EventV1::ChannelCreate(ch.into()));
                 }
             }
+        }
 
-            if !bulk_events.is_empty() {
-                let mut new_event = EventV1::Bulk { v: bulk_events };
-                std::mem::swap(&mut new_event, event);
-
-                if let EventV1::Bulk { v } = event {
-                    v.push(new_event);
-                }
+        if !bulk.is_empty() {
+            let mut new_bulk = EventV1::Bulk { v: bulk };
+            std::mem::swap(&mut new_bulk, event);
+            if let EventV1::Bulk { v } = event {
+                v.push(new_bulk);
             }
         }
     }
 
-    /// Push presence change to the user and all associated server topics
-    pub async fn broadcast_presence_change(&self, _target: bool) {
-        // disabled events
-        // if if let Some(status) = &self.cache.users.get(&self.cache.user_id).unwrap().status {
-        //     status.presence != Some(Presence::Invisible)
-        // } else {
-        //     true
-        // } {
-        //     let event = EventV1::UserUpdate {
-        //         id: self.cache.user_id.clone(),
-        //         data: v0::PartialUser {
-        //             online: Some(target),
-        //             ..Default::default()
-        //         },
-        //         clear: vec![],
-        //         event_id: Some(ulid::Ulid::new().to_string()),
-        //     };
+    pub async fn broadcast_presence_change(&self, target: bool) {
+        // Check if user is not invisible before broadcasting presence change
+        if let Some(user) = self.cache.users.get(&self.cache.user_id) {
+            if let Some(status) = &user.status {
+                if status.presence == Some(revolt_database::Presence::Invisible) {
+                    return; // Don't broadcast if user is invisible
+                }
+            }
+            
+            // Create UserUpdate event for presence change
+            let event = EventV1::UserUpdate {
+                id: self.cache.user_id.clone(),
+                data: revolt_models::v0::PartialUser {
+                    online: Some(target),
+                    ..Default::default()
+                },
+                clear: vec![],
+                event_id: Some(Ulid::new().to_string()),
+            };
 
-        //     for server in self.cache.servers.keys() {
-        //         event.clone().p(server.clone()).await;
-        //     }
+            // Broadcast to all servers the user is a member of
+            for server_id in self.cache.servers.keys() {
+                let event_clone = event.clone();
+                event_clone.p(server_id.clone()).await;
+            }
 
-        //     event.p(self.cache.user_id.clone()).await;
-        // }
+            // Also broadcast to user's own session
+            event.p(self.cache.user_id.clone()).await;
+        }
     }
 
-    /// Handle an incoming event for protocol version 1
+    /// Handle incoming v1 event – critical for live updates (avatars, etc.)
     pub async fn handle_incoming_event_v1(&mut self, db: &Database, event: &mut EventV1) -> bool {
-        /* Superseded by private topics.
-          if match event {
-            EventV1::UserRelationship { id, .. }
-            | EventV1::UserSettingsUpdate { id, .. }
-            | EventV1::ChannelAck { id, .. } => id != &self.cache.user_id,
-            EventV1::ServerCreate { server, .. } => server.owner != self.cache.user_id,
-            EventV1::ChannelCreate(channel) => match channel {
-                Channel::SavedMessages { user, .. } => user != &self.cache.user_id,
-                Channel::DirectMessage { recipients, .. } | Channel::Group { recipients, .. } => {
-                    !recipients.contains(&self.cache.user_id)
-                }
-                _ => false,
-            },
-            _ => false,
-        } {
-            return false;
-        }*/
-
-        // An event may trigger recalculation of an entire server's permission.
-        // Keep track of whether we need to do anything.
-        let mut queue_server = None;
-
-        // It may also need to sub or unsub a single value.
-        let mut queue_add = None;
-        let mut queue_remove = None;
+        let mut recalc_server = None;
+        let mut queue_sub_add = None;
+        let mut queue_sub_remove = None;
 
         match event {
             EventV1::ChannelCreate(channel) => {
@@ -457,37 +394,34 @@ impl State {
                 self.insert_subscription(id.clone()).await;
                 self.cache.channels.insert(id, channel.clone().into());
             }
-            EventV1::ChannelUpdate {
-                id, data, clear, ..
-            } => {
-                let could_view: bool = if let Some(channel) = self.cache.channels.get(id) {
-                    self.cache.can_view_channel(db, channel).await
+            EventV1::ChannelUpdate { id, data, clear, .. } => {
+                let could_view = if let Some(c) = self.cache.channels.get(id) {
+                    self.cache.can_view_channel(db, c).await
                 } else {
                     false
                 };
 
-                if let Some(channel) = self.cache.channels.get_mut(id) {
+                if let Some(ch) = self.cache.channels.get_mut(id) {
                     for field in clear {
-                        channel.remove_field(&field.clone().into());
+                        ch.remove_field(&field.clone().into());
                     }
-
-                    channel.apply_options(data.clone().into());
+                    ch.apply_options(data.clone().into());
                 }
 
                 if !self.cache.channels.contains_key(id) {
-                    if let Ok(channel) = db.fetch_channel(id).await {
-                        self.cache.channels.insert(id.clone(), channel);
+                    if let Ok(ch) = db.fetch_channel(id).await {
+                        self.cache.channels.insert(id.clone(), ch);
                     }
                 }
 
-                if let Some(channel) = self.cache.channels.get(id) {
-                    let can_view = self.cache.can_view_channel(db, channel).await;
-                    if could_view != can_view {
-                        if can_view {
-                            queue_add = Some(id.clone());
-                            *event = EventV1::ChannelCreate(channel.clone().into());
+                if let Some(ch) = self.cache.channels.get(id) {
+                    let now_viewable = self.cache.can_view_channel(db, ch).await;
+                    if could_view != now_viewable {
+                        if now_viewable {
+                            queue_sub_add = Some(id.clone());
+                            *event = EventV1::ChannelCreate(ch.clone().into());
                         } else {
-                            queue_remove = Some(id.clone());
+                            queue_sub_remove = Some(id.clone());
                             *event = EventV1::ChannelDelete { id: id.clone() };
                         }
                     }
@@ -507,16 +441,8 @@ impl State {
                     self.remove_subscription(user).await;
                 }
             }
-
-            EventV1::ServerCreate {
-                id,
-                server,
-                channels,
-                emojis: _,
-                voice_states: _,
-            } => {
+            EventV1::ServerCreate { id, server, channels, .. } => {
                 self.insert_subscription(id.clone()).await;
-
                 if self.cache.is_bot {
                     self.insert_subscription(format!("{}u", id)).await;
                 }
@@ -531,40 +457,30 @@ impl State {
                 };
                 self.cache.members.insert(id.clone(), member);
 
-                for channel in channels {
-                    self.cache
-                        .channels
-                        .insert(channel.id().to_string(), channel.clone().into());
+                for ch in channels {
+                    self.cache.channels.insert(ch.id().to_string(), ch.clone().into());
                 }
 
-                queue_server = Some(id.clone());
+                recalc_server = Some(id.clone());
             }
-            EventV1::ServerUpdate {
-                id, data, clear, ..
-            } => {
-                if let Some(server) = self.cache.servers.get_mut(id) {
+            EventV1::ServerUpdate { id, data, clear, .. } => {
+                if let Some(srv) = self.cache.servers.get_mut(id) {
                     for field in clear {
-                        server.remove_field(&field.clone().into());
+                        srv.remove_field(&field.clone().into());
                     }
-
-                    server.apply_options(data.clone().into());
+                    srv.apply_options(data.clone().into());
                 }
-
                 if data.default_permissions.is_some() {
-                    queue_server = Some(id.clone());
+                    recalc_server = Some(id.clone());
                 }
-            }
-            EventV1::ServerMemberJoin { .. } => {
-                // We will always receive ServerCreate when joining a new server.
             }
             EventV1::ServerMemberLeave { id, user, .. } => {
                 if user == &self.cache.user_id {
                     self.remove_subscription(id).await;
-
-                    if let Some(server) = self.cache.servers.remove(id) {
-                        for channel in &server.channels {
-                            self.remove_subscription(channel).await;
-                            self.cache.channels.remove(channel);
+                    if let Some(srv) = self.cache.servers.remove(id) {
+                        for ch_id in &srv.channels {
+                            self.remove_subscription(ch_id).await;
+                            self.cache.channels.remove(ch_id);
                         }
                     }
                     self.cache.members.remove(id);
@@ -572,74 +488,180 @@ impl State {
             }
             EventV1::ServerDelete { id } => {
                 self.remove_subscription(id).await;
-
-                if let Some(server) = self.cache.servers.remove(id) {
-                    for channel in &server.channels {
-                        self.remove_subscription(channel).await;
-                        self.cache.channels.remove(channel);
+                if let Some(srv) = self.cache.servers.remove(id) {
+                    for ch_id in &srv.channels {
+                        self.remove_subscription(ch_id).await;
+                        self.cache.channels.remove(ch_id);
                     }
                 }
                 self.cache.members.remove(id);
             }
             EventV1::ServerMemberUpdate { id, data, clear } => {
                 if id.user == self.cache.user_id {
-                    if let Some(member) = self.cache.members.get_mut(&id.server) {
-                        for field in &clear.clone() {
-                            member.remove_field(&field.clone().into());
+                    let clear_clone = clear.clone();
+                    if let Some(mem) = self.cache.members.get_mut(&id.server) {
+                        for field in clear {
+                            mem.remove_field(&field.clone().into());
                         }
-
-                        member.apply_options(data.clone().into());
+                        mem.apply_options(data.clone().into());
                     }
-
-                    if data.roles.is_some() || clear.contains(&v0::FieldsMember::Roles) {
-                        queue_server = Some(id.server.clone());
+                    if data.roles.is_some() || clear_clone.contains(&v0::FieldsMember::Roles) {
+                        recalc_server = Some(id.server.clone());
                     }
                 }
             }
-            EventV1::ServerRoleUpdate {
-                id,
-                role_id,
-                data,
-                clear,
-                ..
-            } => {
-                if let Some(server) = self.cache.servers.get_mut(id) {
-                    if let Some(role) = server.roles.get_mut(role_id) {
-                        for field in &clear.clone() {
+            EventV1::ServerRoleUpdate { id, role_id, data, clear, .. } => {
+                if let Some(srv) = self.cache.servers.get_mut(id) {
+                    if let Some(role) = srv.roles.get_mut(role_id) {
+                        for field in clear {
                             role.remove_field(&field.clone().into());
                         }
-
                         role.apply_options(data.clone().into());
                     }
                 }
-
                 if data.rank.is_some() || data.permissions.is_some() {
-                    if let Some(member) = self.cache.members.get(id) {
-                        if member.roles.contains(role_id) {
-                            queue_server = Some(id.clone());
+                    if let Some(mem) = self.cache.members.get(id) {
+                        if mem.roles.contains(role_id) {
+                            recalc_server = Some(id.clone());
                         }
                     }
                 }
             }
             EventV1::ServerRoleDelete { id, role_id } => {
-                if let Some(server) = self.cache.servers.get_mut(id) {
-                    server.roles.remove(role_id);
+                if let Some(srv) = self.cache.servers.get_mut(id) {
+                    srv.roles.remove(role_id);
                 }
-
-                if let Some(member) = self.cache.members.get(id) {
-                    if member.roles.contains(role_id) {
-                        queue_server = Some(id.clone());
+                if let Some(mem) = self.cache.members.get(id) {
+                    if mem.roles.contains(role_id) {
+                        recalc_server = Some(id.clone());
                     }
                 }
             }
-
-            EventV1::UserUpdate { event_id, .. } => {
-                if let Some(id) = event_id {
-                    if self.cache.seen_events.contains(id) {
+            EventV1::UserUpdate { id, data, clear, event_id } => {
+                if let Some(eid) = event_id {
+                    if self.cache.seen_events.contains(eid) {
                         return false;
                     }
+                    self.cache.seen_events.put(eid.clone(), ());
+                }
 
-                    self.cache.seen_events.put(id.to_string(), ());
+                // Early return for non-avatar updates to reduce processing overhead
+                let has_avatar_update = data.avatar.is_some() || clear.contains(&revolt_models::v0::FieldsUser::Avatar);
+                let has_essential_update = data.display_name.is_some() 
+                    || data.status.is_some()
+                    || clear.iter().any(|f| matches!(f, revolt_models::v0::FieldsUser::DisplayName | revolt_models::v0::FieldsUser::StatusText | revolt_models::v0::FieldsUser::StatusPresence));
+
+                if !has_avatar_update && !has_essential_update {
+                    *event_id = None;
+                    return true; // Skip processing for non-essential updates
+                }
+
+                // Update existing cached user with avatar and other field changes
+                if let Some(cached_user) = self.cache.users.get_mut(id) {
+                    // Apply avatar updates
+                    if let Some(avatar) = &data.avatar {
+                        cached_user.avatar = Some(avatar.clone().into());
+                    }
+                    
+                    // Apply display name updates
+                    if let Some(display_name) = &data.display_name {
+                        cached_user.display_name = Some(display_name.clone());
+                    }
+                    
+                    // Apply status updates (convert from v0::UserStatus to database::UserStatus)
+                    if let Some(status) = &data.status {
+                        if cached_user.status.is_none() {
+                            cached_user.status = Some(revolt_database::UserStatus::default());
+                        }
+                        
+                        if let Some(ref mut cached_status) = cached_user.status {
+                            if let Some(ref text) = status.text {
+                                cached_status.text = Some(text.clone());
+                            }
+                            
+                            if let Some(ref presence) = status.presence {
+                                cached_status.presence = Some(match presence {
+                                    revolt_models::v0::Presence::Online => revolt_database::Presence::Online,
+                                    revolt_models::v0::Presence::Idle => revolt_database::Presence::Idle,
+                                    revolt_models::v0::Presence::Focus => revolt_database::Presence::Focus,
+                                    revolt_models::v0::Presence::Busy => revolt_database::Presence::Busy,
+                                    revolt_models::v0::Presence::Invisible => revolt_database::Presence::Invisible,
+                                });
+                            }
+                        }
+                    }
+                    
+                    // Handle field removals
+                    for field in clear {
+                        match field {
+                            revolt_models::v0::FieldsUser::Avatar => {
+                                cached_user.avatar = None;
+                            }
+                            revolt_models::v0::FieldsUser::StatusText => {
+                                if let Some(ref mut status) = cached_user.status {
+                                    status.text = None;
+                                }
+                            }
+                            revolt_models::v0::FieldsUser::StatusPresence => {
+                                if let Some(ref mut status) = cached_user.status {
+                                    status.presence = None;
+                                }
+                            }
+                            revolt_models::v0::FieldsUser::DisplayName => {
+                                cached_user.display_name = None;
+                            }
+                            revolt_models::v0::FieldsUser::ProfileContent => {
+                                if let Some(ref mut profile) = cached_user.profile {
+                                    profile.content = None;
+                                }
+                            }
+                            revolt_models::v0::FieldsUser::ProfileBackground => {
+                                if let Some(ref mut profile) = cached_user.profile {
+                                    profile.background = None;
+                                }
+                            }
+                            revolt_models::v0::FieldsUser::Internal => {
+                                // Skip internal fields
+                            }
+                        }
+                    }
+                }
+                // Fetch from DB if missing from cache and this is an essential update
+                else if has_essential_update {
+                    if let Ok(mut db_user) = db.fetch_user(id).await {
+                        // Apply the updates to the freshly fetched user
+                        if let Some(avatar) = &data.avatar {
+                            db_user.avatar = Some(avatar.clone().into());
+                        }
+                        
+                        if let Some(display_name) = &data.display_name {
+                            db_user.display_name = Some(display_name.clone());
+                        }
+                        
+                        if let Some(status) = &data.status {
+                            if db_user.status.is_none() {
+                                db_user.status = Some(revolt_database::UserStatus::default());
+                            }
+                            
+                            if let Some(ref mut db_status) = db_user.status {
+                                if let Some(ref text) = status.text {
+                                    db_status.text = Some(text.clone());
+                                }
+                                
+                                if let Some(ref presence) = status.presence {
+                                    db_status.presence = Some(match presence {
+                                        revolt_models::v0::Presence::Online => revolt_database::Presence::Online,
+                                        revolt_models::v0::Presence::Idle => revolt_database::Presence::Idle,
+                                        revolt_models::v0::Presence::Focus => revolt_database::Presence::Focus,
+                                        revolt_models::v0::Presence::Busy => revolt_database::Presence::Busy,
+                                        revolt_models::v0::Presence::Invisible => revolt_database::Presence::Invisible,
+                                    });
+                                }
+                            }
+                        }
+
+                        self.cache.users.insert(id.clone(), db_user);
+                    }
                 }
 
                 *event_id = None;
@@ -653,35 +675,24 @@ impl State {
                     self.remove_subscription(id).await;
                 }
             }
-
             EventV1::Message(message) => {
-                // Since Message events are fanned out to many clients,
-                // we must reconstruct the relationship value at this end.
                 if let Some(user) = &mut message.user {
-                    user.relationship = self
-                        .cache
-                        .users
-                        .get(&self.cache.user_id)
-                        .expect("missing self?")
-                        .relationship_with(&message.author)
-                        .into();
+                    if let Some(self_user) = self.cache.users.get(&self.cache.user_id) {
+                        user.relationship = self_user.relationship_with(&message.author).into();
+                    }
                 }
             }
-
             _ => {}
         }
 
-        // Calculate server permissions if requested.
-        if let Some(server_id) = queue_server {
-            self.recalculate_server(db, &server_id, event).await;
+        if let Some(sid) = recalc_server {
+            self.recalculate_server(db, &sid, event).await;
         }
 
-        // Sub / unsub accordingly.
-        if let Some(id) = queue_add {
+        if let Some(id) = queue_sub_add {
             self.insert_subscription(id).await;
         }
-
-        if let Some(id) = queue_remove {
+        if let Some(id) = queue_sub_remove {
             self.remove_subscription(&id).await;
         }
 

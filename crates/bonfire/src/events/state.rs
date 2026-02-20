@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use async_std::sync::{Mutex, RwLock};
@@ -44,6 +44,9 @@ pub struct Cache {
     pub servers: HashMap<String, Server>,
 
     pub seen_events: LruCache<String, ()>,
+    
+    // Performance optimization: track recently accessed users
+    pub recently_accessed_users: LruCache<String, Instant>,
 }
 
 impl Default for Cache {
@@ -58,6 +61,7 @@ impl Default for Cache {
             servers: Default::default(),
 
             seen_events: LruCache::new(20),
+            recently_accessed_users: LruCache::new(100),
         }
     }
 }

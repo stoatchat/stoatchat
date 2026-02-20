@@ -71,8 +71,8 @@ lazy_static! {
         // TODO config
         // .max_capacity(1024 * 1024 * 1024) // Cache up to 1GiB in memory
         // .max_capacity(512 * 1024 * 1024) // Cache up to 512MiB in memory
-        .max_capacity(2 * 1024 * 1024 * 1024) // Cache up to 2GiB in memory
-        .time_to_live(Duration::from_secs(5 * 60)) // For up to 5 minutes
+        .max_capacity(4 * 1024 * 1024 * 1024) // Cache up to 4GiB in memory
+        .time_to_live(Duration::from_secs(10 * 60)) // For up to 10 minutes
         .build();
 }
 
@@ -329,7 +329,7 @@ async fn upload_file(
 }
 
 /// Header value used for cache control
-pub static CACHE_CONTROL: &str = "public, max-age=604800, must-revalidate";
+pub static CACHE_CONTROL: &str = "public, max-age=2592000, must-revalidate";
 
 /// Fetch preview of file
 ///

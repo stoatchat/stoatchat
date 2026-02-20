@@ -162,11 +162,11 @@ git clone --recursive https://github.com/revoltchat/revite
 cd revite
 yarn
 yarn build:deps
-echo "VITE_API_URL=http://local.revolt.chat:14702" > .env.local
+echo "VITE_API_URL=http://localhost:14702" > .env.local
 yarn dev --port 14701
 ```
 
-Then go to http://local.revolt.chat:14701 to create an account/login.
+Then go to http://localhost:5173/ to create an account/login.
 
 When signing up, go to http://localhost:14080 to find confirmation/password reset emails.
 
