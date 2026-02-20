@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.6](https://github.com/stoatchat/stoatchat/compare/v0.11.5...v0.11.6) (2026-02-20)
+
+
+### Bug Fixes
+
+* default video resolution is a non-existent size ([#601](https://github.com/stoatchat/stoatchat/issues/601)) ([0698e11](https://github.com/stoatchat/stoatchat/commit/0698e115e8d003d615e468c4fb9654e6bbc9107f)), closes [#588](https://github.com/stoatchat/stoatchat/issues/588)
+
 ## [0.11.5](https://github.com/stoatchat/stoatchat/compare/v0.11.4...v0.11.5) (2026-02-17)
 
 
