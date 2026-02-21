@@ -70,8 +70,10 @@ services:
       MAILDEV_INCOMING_PASS: smtp
 
   livekit:
-    image: ghcr.io/stoatchat/livekit-server:v1.9.9
+    image: ghcr.io/stoatchat/livekit-server:v1.9.6
     command: --config /etc/livekit.yml
     network_mode: "host"
+    depends_on:
+      - redis
     volumes:
       - ./livekit.yml:/etc/livekit.yml

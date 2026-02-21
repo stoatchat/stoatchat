@@ -18,18 +18,18 @@ host = "127.0.0.1"
 # See https://github.com/revoltchat/self-hosted/blob/master/Caddyfile
 #
 # Remember to change these to https/wss where appropriate in production!
-app = "http://local.revolt.chat:14701"
-api = "http://local.revolt.chat:14702"
-events = "ws://local.revolt.chat:14703"
-autumn = "http://local.revolt.chat:14704"
-january = "http://local.revolt.chat:14705"
+app = "http://local.stoat.chat:5173"
+api = "http://local.stoat.chat:14702"
+events = "ws://local.stoat.chat:14703"
+autumn = "http://local.stoat.chat:14704"
+january = "http://local.stoat.chat:14705"
 voso_legacy = ""
 voso_legacy_ws = ""
 
 # Public urls for livekit nodes
 # each entry here should have a corresponding entry under `api.livekit.nodes`
 [hosts.livekit]
-worldwide = "ws://local.revolt.chat:14706"
+worldwide = "ws://local.stoat.chat:14706"
 
 [api]
 
