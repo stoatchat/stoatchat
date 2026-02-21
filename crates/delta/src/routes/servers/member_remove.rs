@@ -1,12 +1,14 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     voice::{get_user_voice_channel_in_server, remove_user_from_voice_channel, VoiceClient},
-    Database, RemovalIntention, User,
+    AuditLogEntryAction, Database, RemovalIntention, User,
 };
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::State;
 use rocket_empty::EmptyResponse;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Kick Member
 ///
@@ -17,6 +19,7 @@ pub async fn kick(
     db: &State<Database>,
     voice_client: &State<VoiceClient>,
     user: User,
+    reason: AuditLogReason,
     target: Reference<'_>,
     member: Reference<'_>,
 ) -> Result<EmptyResponse> {
@@ -45,6 +48,12 @@ pub async fn kick(
     member
         .remove(db, &server, RemovalIntention::Kick, false)
         .await?;
+
+    AuditLogEntryAction::MemberKick {
+        user: member.id.user.clone(),
+    }
+    .insert(db, server.id.clone(), reason.0, user.id)
+    .await;
 
     if let Some(channel_id) = get_user_voice_channel_in_server(&target.id, &server.id).await? {
         remove_user_from_voice_channel(db, voice_client, &channel_id, &target.id).await?;

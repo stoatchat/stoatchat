@@ -101,14 +101,6 @@ pub async fn web() -> Rocket<Build> {
     )
     .into();
 
-    let swagger_0_8 = revolt_rocket_okapi::swagger_ui::make_swagger_ui(
-        &revolt_rocket_okapi::swagger_ui::SwaggerUIConfig {
-            url: "/0.8/openapi.json".to_owned(),
-            ..Default::default()
-        },
-    )
-    .into();
-
     // Voice handler
     let voice_client = VoiceClient::new(config.api.livekit.nodes.clone());
     // Configure Rabbit

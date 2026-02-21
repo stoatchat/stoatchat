@@ -1,13 +1,15 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     voice::{sync_voice_permissions, VoiceClient},
-    Database, PartialRole, User
+    AuditLogEntryAction, Database, FieldsRole, PartialRole, User,
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 use validator::Validate;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Edit Role
 ///
@@ -18,6 +20,7 @@ pub async fn edit(
     db: &State<Database>,
     voice_client: &State<VoiceClient>,
     user: User,
+    reason: AuditLogReason,
     target: Reference<'_>,
     role_id: String,
     data: Json<v0::DataEditRole>,
@@ -58,19 +61,31 @@ pub async fn edit(
             ..Default::default()
         };
 
-        role.update(
-            db,
-            &server.id,
-            partial,
-            remove.into_iter().map(Into::into).collect(),
-        )
-        .await?;
+        let remove = remove
+            .into_iter()
+            .map(Into::into)
+            .collect::<Vec<FieldsRole>>();
+
+        let before = role.generate_diff(&partial, &remove);
+
+        role.update(db, &server.id, partial.clone(), remove.clone())
+            .await?;
+
+        AuditLogEntryAction::RoleEdit {
+            role: role_id.clone(),
+            remove,
+            before,
+            after: partial,
+        }
+        .insert(db, server.id.clone(), reason.0, user.id)
+        .await;
 
         for channel_id in &server.channels {
             let channel = Reference::from_unchecked(channel_id).as_channel(db).await?;
 
-            sync_voice_permissions(db, voice_client, &channel, Some(&server), Some(&role_id)).await?;
-        };
+            sync_voice_permissions(db, voice_client, &channel, Some(&server), Some(&role_id))
+                .await?;
+        }
 
         Ok(Json(role.into()))
     } else {

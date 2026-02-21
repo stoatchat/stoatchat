@@ -74,6 +74,9 @@ max_concurrent_connections = 50
 # How long to ring devices for when calling in dms/groups, in seconds
 call_ring_duration = 30
 
+[api.audit_logs]
+expires_after = 2592000  # 30d
+
 [api.livekit.nodes]
 
 [api.users]

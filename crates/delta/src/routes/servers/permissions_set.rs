@@ -1,12 +1,16 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     voice::{sync_voice_permissions, VoiceClient},
-    Database, User,
+    AuditLogEntryAction, Database, PartialRole, User,
 };
 use revolt_models::v0;
-use revolt_permissions::{calculate_server_permissions, ChannelPermission, Override};
+use revolt_permissions::{
+    calculate_server_permissions, ChannelPermission, Override, OverrideField,
+};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Set Role Permission
 ///
@@ -17,6 +21,7 @@ pub async fn set_role_permission(
     db: &State<Database>,
     voice_client: &State<VoiceClient>,
     user: User,
+    reason: AuditLogReason,
     target: Reference<'_>,
     role_id: String,
     data: Json<v0::DataSetServerRolePermission>,
@@ -42,20 +47,37 @@ pub async fn set_role_permission(
     }
 
     // Ensure we have access to grant these permissions forwards
-    let current_value: Override = current_value.into();
+    let current_override: Override = current_value.into();
     permissions
-        .throw_permission_override(current_value, &data.permissions)
+        .throw_permission_override(current_override, &data.permissions)
         .await?;
 
+    let override_field: OverrideField = data.permissions.into();
+
     server
-        .set_role_permission(db, &role_id, data.permissions.into())
+        .set_role_permission(db, &role_id, override_field)
         .await?;
+
+    AuditLogEntryAction::RoleEdit {
+        role: role_id.clone(),
+        remove: Vec::new(),
+        before: PartialRole {
+            permissions: Some(current_value),
+            ..Default::default()
+        },
+        after: PartialRole {
+            permissions: Some(override_field),
+            ..Default::default()
+        },
+    }
+    .insert(db, server.id.clone(), reason.0, user.id)
+    .await;
 
     for channel_id in &server.channels {
         let channel = Reference::from_unchecked(channel_id).as_channel(db).await?;
 
         sync_voice_permissions(db, voice_client, &channel, Some(&server), Some(&role_id)).await?;
-    };
+    }
 
     Ok(Json(server.into()))
 }

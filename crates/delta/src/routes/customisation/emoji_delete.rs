@@ -1,12 +1,14 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, EmojiParent, User,
+    AuditLogEntryAction, Database, EmojiParent, User,
 };
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 use revolt_result::Result;
 
 use rocket::State;
 use rocket_empty::EmptyResponse;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Delete Emoji
 ///
@@ -16,6 +18,7 @@ use rocket_empty::EmptyResponse;
 pub async fn delete_emoji(
     db: &State<Database>,
     user: User,
+    reason: AuditLogReason,
     emoji_id: Reference<'_>,
 ) -> Result<EmptyResponse> {
     // Fetch the emoji
@@ -39,5 +42,16 @@ pub async fn delete_emoji(
     }
 
     // Delete the emoji
-    emoji.delete(db).await.map(|_| EmptyResponse)
+    emoji.delete(db).await?;
+
+    if let EmojiParent::Server { id: server_id } = emoji.parent {
+        AuditLogEntryAction::EmojiDelete {
+            emoji: emoji.id,
+            name: emoji.name,
+        }
+        .insert(db, server_id, reason.0, user.id)
+        .await;
+    };
+
+    Ok(EmptyResponse)
 }

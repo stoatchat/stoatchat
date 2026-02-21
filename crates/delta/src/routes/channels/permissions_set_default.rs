@@ -1,10 +1,14 @@
 use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference}, voice::{sync_voice_permissions, VoiceClient}, Channel, Database, PartialChannel, User
+    util::{permissions::DatabasePermissionQuery, reference::Reference},
+    voice::{sync_voice_permissions, VoiceClient},
+    AuditLogEntryAction, Channel, Database, PartialChannel, User,
 };
 use revolt_models::v0::{self, DataDefaultChannelPermissions};
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Set Default Permission
 ///
@@ -17,6 +21,7 @@ pub async fn set_default_channel_permissions(
     db: &State<Database>,
     voice_client: &State<VoiceClient>,
     user: User,
+    reason: AuditLogReason,
     target: Reference<'_>,
     data: Json<v0::DataDefaultChannelPermissions>,
 ) -> Result<Json<v0::Channel>> {
@@ -46,6 +51,8 @@ pub async fn set_default_channel_permissions(
             }
         }
         Channel::TextChannel {
+            id,
+            server,
             default_permissions,
             ..
         } => {
@@ -54,16 +61,26 @@ pub async fn set_default_channel_permissions(
                     .throw_permission_override(default_permissions.map(|x| x.into()), &field)
                     .await?;
 
-                channel
-                    .update(
-                        db,
-                        PartialChannel {
-                            default_permissions: Some(field.into()),
-                            ..Default::default()
-                        },
-                        vec![],
-                    )
-                    .await?;
+                let partial = PartialChannel {
+                    default_permissions: Some(field.into()),
+                    ..Default::default()
+                };
+
+                let id = id.clone();
+                let server = server.clone();
+
+                let before = channel.generate_diff(&partial, &[]);
+
+                channel.update(db, partial.clone(), vec![]).await?;
+
+                AuditLogEntryAction::ChannelEdit {
+                    channel: id,
+                    remove: Vec::new(),
+                    before,
+                    after: partial,
+                }
+                .insert(db, server, reason.0, user.id)
+                .await;
             } else {
                 return Err(create_error!(InvalidOperation));
             }
@@ -73,7 +90,7 @@ pub async fn set_default_channel_permissions(
 
     let server = match channel.server() {
         Some(server_id) => Some(Reference::from_unchecked(server_id).as_server(db).await?),
-        None => None
+        None => None,
     };
 
     sync_voice_permissions(db, voice_client, &channel, server.as_ref(), None).await?;

@@ -236,6 +236,24 @@ impl Member {
         }
     }
 
+    pub fn generate_diff(&self, partial: &PartialMember, remove: &[FieldsMember]) -> PartialMember {
+        let mut before = PartialMember::default();
+
+        generate_diff!(
+            self, before, partial, remove,
+            (
+                (FieldsMember::Nickname) nickname,
+                (FieldsMember::Avatar) avatar,
+                (FieldsMember::Timeout) timeout,
+                ((default) FieldsMember::Roles) roles,
+                ((default) FieldsMember::CanPublish) can_publish,
+                ((default) FieldsMember::CanReceive) can_receive,
+            )
+        );
+
+        before
+    }
+
     /// Get this user's current ranking
     pub fn get_ranking(&self, server: &Server) -> i64 {
         let mut value = i64::MAX;
@@ -261,7 +279,7 @@ impl Member {
 
     /// Remove member from server
     pub async fn remove(
-        self,
+        &self,
         db: &Database,
         server: &Server,
         intention: RemovalIntention,
@@ -288,9 +306,9 @@ impl Member {
                 })
             {
                 match intention {
-                    RemovalIntention::Leave => SystemMessage::UserLeft { id: self.id.user },
-                    RemovalIntention::Kick => SystemMessage::UserKicked { id: self.id.user },
-                    RemovalIntention::Ban => SystemMessage::UserBanned { id: self.id.user },
+                    RemovalIntention::Leave => SystemMessage::UserLeft { id: self.id.user.clone() },
+                    RemovalIntention::Kick => SystemMessage::UserKicked { id: self.id.user.clone() },
+                    RemovalIntention::Ban => SystemMessage::UserBanned { id: self.id.user.clone() },
                 }
                 .into_message(id.to_string())
                 // TODO: support notifications here in the future?
