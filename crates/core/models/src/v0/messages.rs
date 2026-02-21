@@ -344,6 +344,9 @@ auto_derived!(
         /// Embeds to include in the message
         #[cfg_attr(feature = "validator", validate(length(min = 0, max = 10)))]
         pub embeds: Option<Vec<SendableEmbed>>,
+        /// Remove attachments by their IDs
+        #[cfg_attr(feature = "validator", validate(length(min = 0, max = 10)))]
+        pub remove_attachments: Option<Vec<String>>,
     }
 
     /// Options for bulk deleting messages
@@ -376,6 +379,8 @@ auto_derived!(
         /// Message will mention all users who are online and can see the channel.
         /// This cannot be true if MentionsEveryone is true
         MentionsOnline = 3,
+        /// Message embeds are suppressed
+        SuppressEmbeds = 4,
     }
 
     /// Optional fields on message

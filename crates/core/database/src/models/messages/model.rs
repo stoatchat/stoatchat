@@ -882,6 +882,15 @@ impl Message {
         channel: String,
         append: AppendMessage,
     ) -> Result<()> {
+        // Check if message has SuppressEmbeds flag set
+        if let Ok(message) = db.fetch_message(&id).await {
+            let flags = message.flags.unwrap_or(0);
+            if flags & MessageFlags::SuppressEmbeds as u32 != 0 {
+                // Skip appending embeds if suppressed
+                return Ok(());
+            }
+        }
+
         db.append_message(&id, &append).await?;
 
         EventV1::MessageAppend {
