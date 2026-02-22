@@ -107,7 +107,7 @@ impl MessageConsumer {
                             config.pushd.vapid.queue.as_str(),
                         )
                         .finish();
-                        sendable.extras.insert("p265dh".to_string(), sub.p256dh);
+                        sendable.extras.insert("p256dh".to_string(), sub.p256dh.clone());
                         sendable
                             .extras
                             .insert("endpoint".to_string(), sub.endpoint.clone());
