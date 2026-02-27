@@ -54,8 +54,64 @@ pub struct RevoltFeatures {
     pub january: Feature,
     /// Voice server configuration
     pub livekit: VoiceFeature,
+    /// Limits
+    pub limits: LimitsConfig,
 }
 
+/// # Limits For Users
+#[derive(Serialize, JsonSchema, Debug)]
+pub struct LimitsConfig {
+    /// Global Limits
+    pub global: GlobalLimits,
+    /// New User Limits
+    pub new_user: UserLimits,
+    /// Default User Limits
+    pub default: UserLimits,
+}
+
+/// # Global limits
+#[derive(Serialize, JsonSchema, Debug)]
+pub struct GlobalLimits {
+    /// max group size
+    group_size: i64,
+    /// max message embeds
+    message_embeds: i64,
+    /// max replies
+    message_replies: i64,
+    /// max reactions per message
+    message_reactions: i64,
+    /// max server emoji
+    server_emoji: i64,
+    /// max server roles
+    server_roles: i64,
+    /// max server channels
+    server_channels: i64,
+}
+
+/// # User Limits
+#[derive(Serialize, JsonSchema, Debug)]
+pub struct UserLimits {
+    /// Max Outgoing Friend Requests
+    pub outgoing_friend_requests: i64,
+    /// Max Owned Bots
+    pub bots: i64,
+    /// Max message content length
+    pub message_length: i64,
+    /// max message attachments
+    pub message_attachments: i64,
+    /// max servers
+    pub servers: i64,
+    /// max audio quality
+    pub voice_quality: i64,
+    /// video streaming enabled
+    pub video: bool,
+    /// max video resolution (vertical, horizontal)
+    pub video_resolution: [i64; 2],
+    /// min/max aspect ratios
+    pub video_aspect_ratio: [f64; 2],
+}
+
+/// # File Upload Size Limits
 /// # Build Information
 #[derive(Serialize, JsonSchema, Debug)]
 pub struct BuildInformation {
@@ -134,6 +190,39 @@ pub async fn root() -> Result<Json<RevoltConfig>> {
                     })
                     .collect(),
             },
+            limits: LimitsConfig {
+                global: GlobalLimits {
+                    group_size: config.features.limits.global.group_size as i64,
+                    message_embeds: config.features.limits.global.message_embeds as i64,
+                    message_replies: config.features.limits.global.message_replies as i64,
+                    message_reactions: config.features.limits.global.message_reactions as i64,
+                    server_emoji: config.features.limits.global.server_emoji as i64,
+                    server_roles: config.features.limits.global.server_roles as i64,
+                    server_channels: config.features.limits.global.server_channels as i64,
+                },
+                new_user: UserLimits {
+                    outgoing_friend_requests: config.features.limits.new_user.outgoing_friend_requests as i64,
+                    bots: config.features.limits.new_user.bots as i64,
+                    message_length: config.features.limits.new_user.message_length as i64,
+                    message_attachments: config.features.limits.new_user.message_attachments as i64,
+                    servers: config.features.limits.new_user.servers as i64,
+                    voice_quality: config.features.limits.new_user.voice_quality as i64,
+                    video: config.features.limits.new_user.video,
+                    video_resolution: [config.features.limits.new_user.video_resolution[0] as i64, config.features.limits.new_user.video_resolution[1] as i64],
+                    video_aspect_ratio: [config.features.limits.new_user.video_aspect_ratio[0] as f64, config.features.limits.new_user.video_aspect_ratio[1] as f64],
+                },
+                default: UserLimits {
+                    outgoing_friend_requests: config.features.limits.default.outgoing_friend_requests as i64,
+                    bots: config.features.limits.default.bots as i64,
+                    message_length: config.features.limits.default.message_length as i64,
+                    message_attachments: config.features.limits.default.message_attachments as i64,
+                    servers: config.features.limits.default.servers as i64,
+                    voice_quality: config.features.limits.default.voice_quality as i64,
+                    video: config.features.limits.default.video,
+                    video_resolution: [config.features.limits.default.video_resolution[0] as i64, config.features.limits.default.video_resolution[1] as i64],
+                    video_aspect_ratio: [config.features.limits.default.video_aspect_ratio[0] as f64, config.features.limits.default.video_aspect_ratio[1] as f64],
+                },
+            }
         },
         ws: config.hosts.events,
         app: config.hosts.app,
