@@ -39,7 +39,7 @@ Rust 1.86.0 or higher.
 
 ## Development Guide
 
-Before contributing, make yourself familiar with [our contribution guidelines](https://developers.stoat.chat/developing/contrib/) and the [technical documentation for this project](https://stoatchat.github.io/stoatchat/).
+Before contributing, make yourself familiar with [our contribution guidelines](https://developers.stoat.chat/developing/contrib/) and the [technical documentation for this project](https://developers.stoat.chat/).
 
 Before getting started, you'll want to install:
 
@@ -212,6 +212,6 @@ TEST_DB=MONGODB cargo nextest run
 
 ## License
 
-The Stoat backend is generally licensed under the [GNU Affero General Public License v3.0](https://github.com/stoatchat/stoatchat/blob/master/LICENSE).
+The Stoat backend is generally licensed under the [GNU Affero General Public License v3.0](https://github.com/stoatchat/stoatchat/blob/main/LICENSE).
 
 **Individual crates may supply their own licenses!**
