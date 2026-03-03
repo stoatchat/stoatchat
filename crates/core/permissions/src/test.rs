@@ -159,15 +159,15 @@ async fn blocked_relationship_parity_permissions() {
         }
 
         async fn do_we_have_publish_overwrites(&mut self) -> bool {
-            unreachable!()
+            true
         }
 
         async fn do_we_have_receive_overwrites(&mut self) -> bool {
-            unreachable!()
+            true
         }
 
         async fn get_channel_type(&mut self) -> ChannelType {
-            unreachable!()
+            ChannelType::DirectMessage
         }
 
         async fn get_default_channel_permissions(&mut self) -> Override {
@@ -183,11 +183,11 @@ async fn blocked_relationship_parity_permissions() {
         }
 
         async fn are_we_part_of_the_channel(&mut self) -> bool {
-            unreachable!()
+            true
         }
 
         async fn set_recipient_as_user(&mut self) {
-            unreachable!()
+            // no-op
         }
 
         async fn set_server_from_channel(&mut self) {
@@ -195,22 +195,25 @@ async fn blocked_relationship_parity_permissions() {
         }
     }
 
-    let mut blocked_query = BlockedRelationshipScenario {
-        blocked_other: false,
-    };
-    let blocked_perms = calculate_user_permissions(&mut blocked_query).await;
-    let blocked_value: u64 = blocked_perms.into();
+    async fn permission_values(blocked_other: bool) -> (u64, u64) {
+        let mut query = BlockedRelationshipScenario { blocked_other };
+        let user_value: u64 = calculate_user_permissions(&mut query).await.into();
+        let dm_value: u64 = calculate_channel_permissions(&mut query).await.into();
+
+        (user_value, dm_value)
+    }
+
+    let (blocked_value, blocked_dm_value) = permission_values(false).await;
     assert_eq!(blocked_value, UserPermission::Access as u64);
+    assert_eq!(blocked_dm_value, *DEFAULT_PERMISSION_VIEW_ONLY);
 
-    let mut blocked_other_query = BlockedRelationshipScenario {
-        blocked_other: true,
-    };
-    let blocked_other_perms = calculate_user_permissions(&mut blocked_other_query).await;
-    let blocked_other_value: u64 = blocked_other_perms.into();
+    let (blocked_other_value, blocked_other_dm_value) = permission_values(true).await;
     assert_eq!(blocked_other_value, UserPermission::Access as u64);
+    assert_eq!(blocked_other_dm_value, *DEFAULT_PERMISSION_VIEW_ONLY);
 
-    // Directional blocked variants must resolve to identical user permissions.
+    // Directional blocked variants must resolve to identical user and DM permissions.
     assert_eq!(blocked_value, blocked_other_value);
+    assert_eq!(blocked_dm_value, blocked_other_dm_value);
 }
 
 #[async_std::test]

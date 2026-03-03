@@ -1543,4 +1543,40 @@ mod tests {
         assert_eq!(user.relationship, RelationshipStatus::Blocked);
         assert!(user.status.is_none());
     }
+
+    #[async_std::test]
+    async fn into_hides_profile_state_for_internal_blocked() {
+        let db = crate::DatabaseInfo::Reference
+            .connect()
+            .await
+            .expect("reference database should initialize");
+
+        let target_id = "01ARZ3NDEKTSV4RRFFQ69G5FB2".to_string();
+        let perspective_id = "01ARZ3NDEKTSV4RRFFQ69G5FB3".to_string();
+
+        let target = crate::User {
+            id: target_id.clone(),
+            username: "target".to_string(),
+            discriminator: "0001".to_string(),
+            status: Some(crate::UserStatus {
+                text: Some("should be hidden".to_string()),
+                presence: Some(crate::Presence::Online),
+            }),
+            ..Default::default()
+        };
+
+        let perspective = crate::User {
+            id: perspective_id,
+            relations: Some(vec![crate::Relationship {
+                id: target_id,
+                status: crate::RelationshipStatus::Blocked,
+            }]),
+            ..Default::default()
+        };
+
+        let user = target.into(&db, Some(&perspective)).await;
+
+        assert_eq!(user.relationship, RelationshipStatus::Blocked);
+        assert!(user.status.is_none());
+    }
 }
