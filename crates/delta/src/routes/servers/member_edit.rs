@@ -15,9 +15,7 @@ use revolt_database::{
 };
 use revolt_models::v0::{self, FieldsMember};
 
-use revolt_permissions::{
-    calculate_channel_permissions, calculate_server_permissions, ChannelPermission,
-};
+use revolt_permissions::{calculate_channel_permissions, calculate_server_permissions, ChannelPermission, UserPermission};
 use revolt_result::{create_error, Result};
 use rocket::{form::validate::Contains, serde::json::Json, State};
 use validator::Validate;
@@ -68,7 +66,7 @@ pub async fn edit(
         if user.id == member.id.user {
             permissions.throw_if_lacking_channel_permission(ChannelPermission::ChangeAvatar)?;
         } else {
-            return Err(create_error!(InvalidOperation));
+            permissions.throw_if_lacking_channel_permission(ChannelPermission::RemoveAvatars)?;
         }
     }
 
