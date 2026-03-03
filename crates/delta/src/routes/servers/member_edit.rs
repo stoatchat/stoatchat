@@ -66,7 +66,11 @@ pub async fn edit(
         if user.id == member.id.user {
             permissions.throw_if_lacking_channel_permission(ChannelPermission::ChangeAvatar)?;
         } else {
-            permissions.throw_if_lacking_channel_permission(ChannelPermission::RemoveAvatars)?;
+            if data.remove.contains(&v0::FieldsMember::Avatar) {
+                permissions.throw_if_lacking_channel_permission(ChannelPermission::RemoveAvatars)?;
+            } else {
+                return Err(create_error!(InvalidOperation))
+            }
         }
     }
 
