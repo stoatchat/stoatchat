@@ -131,7 +131,7 @@ Then continue:
 docker compose up -d
 
 # run everything together
-./scripts/start.sh
+mise start
 # .. or individually
 # run the API server
 cargo run --bin revolt-delta
