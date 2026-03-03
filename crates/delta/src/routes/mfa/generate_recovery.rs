@@ -25,56 +25,42 @@ pub async fn generate_recovery(
     Ok(Json(account.mfa.recovery_codes))
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::test::*;
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_database::MFATicket;
+    use rocket::http::{ContentType, Header, Status};
+    #[async_std::test]
+    async fn success() {
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
 
-//     #[async_std::test]
-//     async fn success() {
-//         use rocket::http::Header;
+        let ticket1 = MFATicket::new(account.id.to_string(), true);
+        ticket1.save(&harness.db).await.unwrap();
 
-//         let (authifier, session, account, _) =
-//             for_test_authenticated("generate_recovery::success").await;
-//         let ticket1 = MFATicket::new(account.id.to_string(), true);
-//         ticket1.save(&authifier).await.unwrap();
+        let ticket2 = MFATicket::new(account.id, true);
+        ticket2.save(&harness.db).await.unwrap();
 
-//         let ticket2 = MFATicket::new(account.id, true);
-//         ticket2.save(&authifier).await.unwrap();
+        let res = harness.client
+            .patch("/auth/mfa/recovery")
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .header(Header::new("X-MFA-Ticket", ticket1.token))
+            .header(ContentType::JSON)
+            .dispatch()
+            .await;
 
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![
-//                 crate::routes::mfa::generate_recovery::generate_recovery,
-//                 crate::routes::mfa::fetch_recovery::fetch_recovery
-//             ],
-//         )
-//         .await;
+        assert_eq!(res.status(), Status::Ok);
+        assert!(res.into_json::<Vec<String>>().await.is_some());
 
-//         let res = client
-//             .patch("/recovery")
-//             .header(Header::new("X-Session-Token", session.token.clone()))
-//             .header(Header::new("X-MFA-Ticket", ticket1.token))
-//             .header(ContentType::JSON)
-//             .dispatch()
-//             .await;
+        let res = harness.client
+            .post("/auth/mfa/recovery")
+            .header(Header::new("X-Session-Token", session.token))
+            .header(Header::new("X-MFA-Ticket", ticket2.token))
+            .header(ContentType::JSON)
+            .dispatch()
+            .await;
 
-//         assert_eq!(res.status(), Status::Ok);
-//         assert!(serde_json::from_str::<Vec<String>>(&res.into_string().await.unwrap()).is_ok());
-
-//         let res = client
-//             .post("/recovery")
-//             .header(Header::new("X-Session-Token", session.token))
-//             .header(Header::new("X-MFA-Ticket", ticket2.token))
-//             .header(ContentType::JSON)
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Ok);
-//         assert_eq!(
-//             serde_json::from_str::<Vec<String>>(&res.into_string().await.unwrap())
-//                 .unwrap()
-//                 .len(),
-//             10
-//         );
-//     }
-// }
+        assert_eq!(res.status(), Status::Ok);
+        assert_eq!(res.into_json::<Vec<String>>().await.unwrap().len(), 10);
+    }
+}

@@ -34,36 +34,34 @@ pub async fn edit(
     Ok(Json(session.into()))
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::{routes::session::fetch_all::SessionInfo, test::*};
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use rocket::http::{ContentType, Status};
+    use revolt_models::v0;
 
-//     #[async_std::test]
-//     async fn success() {
-//         use rocket::http::Header;
+    #[async_std::test]
+    async fn success() {
+        use rocket::http::Header;
 
-//         let (authifier, session, _, _) = for_test_authenticated("edit::success").await;
-//         let client =
-//             bootstrap_rocket_with_auth(authifier, routes![crate::routes::session::edit::edit])
-//                 .await;
+        let harness = TestHarness::new().await;
+        let (_, session, _) = harness.new_user().await;
 
-//         let res = client
-//             .patch(format!("/{}", session.id))
-//             .header(ContentType::JSON)
-//             .header(Header::new("X-Session-Token", session.token))
-//             .body(
-//                 json!({
-//                     "friendly_name": "test name"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
+        let res = harness.client
+            .patch(format!("/auth/session/{}", session.id))
+            .header(ContentType::JSON)
+            .header(Header::new("X-Session-Token", session.token))
+            .body(
+                json!({
+                    "friendly_name": "test name"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
 
-//         assert_eq!(res.status(), Status::Ok);
+        assert_eq!(res.status(), Status::Ok);
 
-//         let result = res.into_string().await.unwrap();
-//         let session = serde_json::from_str::<SessionInfo>(&result).unwrap();
-//         assert_eq!(session.name, "test name");
-//     }
-// }
+        assert_eq!(res.into_json::<v0::SessionInfo>().await.unwrap().name, "test name");
+    }
+}

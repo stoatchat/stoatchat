@@ -28,79 +28,62 @@ pub async fn revoke_all(
         .map(|_| EmptyResponse)
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::test::*;
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use rocket::http::{Header, Status};
 
-//     #[async_std::test]
-//     async fn success() {
-//         use rocket::http::Header;
+    #[async_std::test]
+    async fn success() {
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
 
-//         let (authifier, session, account, _) = for_test_authenticated("revoke_all::success").await;
+        for i in 1..=3 {
+            account
+                .create_session(&harness.db, format!("session{}", i))
+                .await
+                .unwrap();
+        }
 
-//         for i in 1..=3 {
-//             account
-//                 .create_session(&authifier, format!("session{}", i))
-//                 .await
-//                 .unwrap();
-//         }
+        let res = harness.client
+            .delete("/auth/session/all?revoke_self=true")
+            .header(Header::new("X-Session-Token", session.token))
+            .dispatch()
+            .await;
 
-//         let client = bootstrap_rocket_with_auth(
-//             authifier.clone(),
-//             routes![crate::routes::session::revoke_all::revoke_all],
-//         )
-//         .await;
+        assert_eq!(res.status(), Status::NoContent);
+        assert!(harness.db
+            .fetch_sessions(&session.user_id)
+            .await
+            .unwrap()
+            .is_empty());
+    }
 
-//         let res = client
-//             .delete("/all?revoke_self=true")
-//             .header(Header::new("X-Session-Token", session.token))
-//             .dispatch()
-//             .await;
+    #[async_std::test]
+    async fn success_not_including_self() {
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
 
-//         assert_eq!(res.status(), Status::NoContent);
-//         assert!(authifier
-//             .database
-//             .find_sessions(&session.user_id)
-//             .await
-//             .unwrap()
-//             .is_empty());
-//     }
+        for i in 1..=3 {
+            account
+                .create_session(&harness.db, format!("session{}", i))
+                .await
+                .unwrap();
+        }
 
-//     #[async_std::test]
-//     async fn success_not_including_self() {
-//         use rocket::http::Header;
+        let res = harness.client
+            .delete("/auth/session/all?revoke_self=false")
+            .header(Header::new("X-Session-Token", session.token))
+            .dispatch()
+            .await;
 
-//         let (authifier, session, account, _) =
-//             for_test_authenticated("revoke_all::success_not_including_self").await;
+        assert_eq!(res.status(), Status::NoContent);
+        let sessions = harness.db
+                .fetch_sessions(&session.user_id)
+                .await
+                .unwrap();
 
-//         for i in 1..=3 {
-//             account
-//                 .create_session(&authifier, format!("session{}", i))
-//                 .await
-//                 .unwrap();
-//         }
-
-//         let client = bootstrap_rocket_with_auth(
-//             authifier.clone(),
-//             routes![crate::routes::session::revoke_all::revoke_all],
-//         )
-//         .await;
-
-//         let res = client
-//             .delete("/all?revoke_self=false")
-//             .header(Header::new("X-Session-Token", session.token))
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::NoContent);
-//         assert_eq!(
-//             authifier
-//                 .database
-//                 .find_sessions(&session.user_id)
-//                 .await
-//                 .unwrap()
-//                 .len(),
-//             1
-//         );
-//     }
-// }
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].id, session.id);
+    }
+}

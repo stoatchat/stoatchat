@@ -62,16 +62,45 @@ pub struct Templates {
     pub deletion: Template,
     /// Template for suspention
     pub suspension: Template,
-    /// Template for welcome email
-    ///
-    /// Unlike the other two, this one isn't required for email verification to function.
-    pub welcome: Option<Template>,
 }
 
 pub async fn email_templates() -> Templates {
     let config = config().await;
 
-    if config.production {
+    if std::env::var("TEST_DB").is_ok() {
+        Templates {
+            verify: Template {
+                title: "verify".into(),
+                text: "[[{{url}}]]".into(),
+                url: "".into(),
+                html: None,
+            },
+            reset: Template {
+                title: "reset".into(),
+                text: "[[{{url}}]]".into(),
+                url: "".into(),
+                html: None,
+            },
+            reset_existing: Template {
+                title: "reset_existing".into(),
+                text: "[[{{url}}]]".into(),
+                url: "".into(),
+                html: None,
+            },
+            deletion: Template {
+                title: "deletion".into(),
+                text: "[[{{url}}]]".into(),
+                url: "".into(),
+                html: None,
+            },
+            suspension: Template {
+                title: "suspension".into(),
+                text: "[[dummy]]".into(),
+                url: "".into(),
+                html: None,
+            },
+        }
+    } else if config.production {
         Templates {
             verify: Template {
                 title: "Verify your Stoat account.".into(),
@@ -103,7 +132,6 @@ pub async fn email_templates() -> Templates {
                 text: include_str!("../../templates/suspension.txt").to_owned(),
                 url: Default::default(),
             },
-            welcome: None,
         }
     } else {
         Templates {
@@ -137,7 +165,6 @@ pub async fn email_templates() -> Templates {
                 url: Default::default(),
                 html: None,
             },
-            welcome: None,
         }
     }
 }
@@ -226,7 +253,9 @@ pub fn send_email(
 pub fn validate_email(email: &str) -> Result<()> {
     // Make sure this is an actual email
     if !validator::validate_email(email) {
-        return Err(create_error!(IncorrectData { with: "email".to_string() }));
+        return Err(create_error!(IncorrectData {
+            with: "email".to_string()
+        }));
     }
 
     // Check if the email is blacklisted

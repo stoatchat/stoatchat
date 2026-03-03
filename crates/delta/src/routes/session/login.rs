@@ -159,467 +159,428 @@ pub async fn login(
     )))
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use iso8601_timestamp::Timestamp;
-
-//     use crate::test::*;
-
-//     use super::ResponseLogin;
-
-//     #[async_std::test]
-//     async fn success() {
-//         let (authifier, receiver) = for_test("login::success").await;
-
-//         Account::new(
-//             &authifier,
-//             "example@validemail.com".into(),
-//             "password_insecure".into(),
-//             false,
-//         )
-//         .await
-//         .unwrap();
-
-//         receiver.try_recv().expect("an event");
-
-//         let client =
-//             bootstrap_rocket_with_auth(authifier, routes![crate::routes::session::login::login])
-//                 .await;
-
-//         let res = client
-//             .post("/login")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "email": "EXAMPLE@validemail.com",
-//                     "password": "password_insecure"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Ok);
-//         assert!(serde_json::from_str::<Session>(&res.into_string().await.unwrap()).is_ok());
-
-//         let event = receiver.try_recv().expect("an event");
-//         if !matches!(event, AuthifierEvent::CreateSession { .. }) {
-//             panic!("Received incorrect event type. {:?}", event);
-//         }
-//     }
-
-//     #[async_std::test]
-//     async fn success_totp_mfa() {
-//         let (authifier, _, mut account, _) =
-//             for_test_authenticated("create_ticket::success_totp_mfa").await;
-
-//         let totp = Totp::Enabled {
-//             secret: "secret".to_string(),
-//         };
-
-//         account.mfa.totp_token = totp.clone();
-//         account.save(&authifier).await.unwrap();
-
-//         let client =
-//             bootstrap_rocket_with_auth(authifier, routes![crate::routes::session::login::login])
-//                 .await;
-
-//         let res = client
-//             .post("/login")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "email": "email@revolt.chat",
-//                     "password": "password_insecure"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Ok);
-//         let response = serde_json::from_str::<crate::routes::session::login::ResponseLogin>(
-//             &res.into_string().await.unwrap(),
-//         )
-//         .expect("`ResponseLogin`");
-
-//         if let ResponseLogin::MFA {
-//             ticket,
-//             allowed_methods,
-//         } = response
-//         {
-//             assert!(allowed_methods.contains(&MFAMethod::Totp));
-
-//             let res = client
-//                 .post("/login")
-//                 .header(ContentType::JSON)
-//                 .body(
-//                     json!({
-//                         "mfa_ticket": ticket,
-//                         "mfa_response": {
-//                             "totp_code": totp.generate_code().expect("totp code")
-//                         }
-//                     })
-//                     .to_string(),
-//                 )
-//                 .dispatch()
-//                 .await;
-
-//             assert_eq!(res.status(), Status::Ok);
-//             assert!(serde_json::from_str::<Session>(&res.into_string().await.unwrap()).is_ok());
-//         } else {
-//             panic!("expected `ResponseLogin::MFA`")
-//         }
-//     }
-
-//     #[async_std::test]
-//     async fn success_totp_stored_mfa() {
-//         let (authifier, _, mut account, _) =
-//             for_test_authenticated("create_ticket::success_totp_stored_mfa").await;
-
-//         let totp = Totp::Enabled {
-//             secret: "secret".to_string(),
-//         };
-
-//         account.mfa.totp_token = totp.clone();
-//         account.save(&authifier).await.unwrap();
-
-//         let mut ticket = MFATicket::new(account.id.to_string(), true);
-//         ticket.last_totp_code = Some("token from earlier".into());
-//         ticket.save(&authifier).await.unwrap();
-
-//         let client =
-//             bootstrap_rocket_with_auth(authifier, routes![crate::routes::session::login::login])
-//                 .await;
-
-//         let res = client
-//             .post("/login")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "mfa_ticket": ticket.token,
-//                     "mfa_response": {
-//                         "totp_code": "token from earlier"
-//                     }
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Ok);
-//         assert!(serde_json::from_str::<Session>(&res.into_string().await.unwrap()).is_ok());
-//     }
-
-//     #[async_std::test]
-//     async fn fail_totp_invalid_mfa() {
-//         let (authifier, _, mut account, _) =
-//             for_test_authenticated("create_ticket::fail_totp_invalid_mfa").await;
-
-//         let totp = Totp::Enabled {
-//             secret: "secret".to_string(),
-//         };
-
-//         account.mfa.totp_token = totp.clone();
-//         account.save(&authifier).await.unwrap();
-
-//         let client =
-//             bootstrap_rocket_with_auth(authifier, routes![crate::routes::session::login::login])
-//                 .await;
-
-//         let res = client
-//             .post("/login")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "email": "email@revolt.chat",
-//                     "password": "password_insecure"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Ok);
-//         let response = serde_json::from_str::<crate::routes::session::login::ResponseLogin>(
-//             &res.into_string().await.unwrap(),
-//         )
-//         .expect("`ResponseLogin`");
-
-//         if let ResponseLogin::MFA {
-//             ticket,
-//             allowed_methods,
-//         } = response
-//         {
-//             assert!(allowed_methods.contains(&MFAMethod::Totp));
-
-//             let res = client
-//                 .post("/login")
-//                 .header(ContentType::JSON)
-//                 .body(
-//                     json!({
-//                         "mfa_ticket": ticket,
-//                         "mfa_response": {
-//                             "totp_code": "some random data"
-//                         }
-//                     })
-//                     .to_string(),
-//                 )
-//                 .dispatch()
-//                 .await;
-
-//             assert_eq!(res.status(), Status::Unauthorized);
-//             assert_eq!(
-//                 res.into_string().await,
-//                 Some("{\"type\":\"InvalidToken\"}".into())
-//             );
-//         } else {
-//             panic!("expected `ResponseLogin::MFA`")
-//         }
-//     }
-
-//     #[async_std::test]
-//     async fn fail_invalid_user() {
-//         let (client, _) = bootstrap_rocket(
-//             "create_account",
-//             "fail_invalid_user",
-//             routes![crate::routes::session::login::login],
-//         )
-//         .await;
-
-//         let res = client
-//             .post("/login")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "email": "example@validemail.com",
-//                     "password": "password_insecure"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Unauthorized);
-//         assert_eq!(
-//             res.into_string().await,
-//             Some("{\"type\":\"InvalidCredentials\"}".into())
-//         );
-//     }
-
-//     #[async_std::test]
-//     async fn fail_disabled_account() {
-//         let (authifier, _) = for_test("login::fail_disabled_account").await;
-
-//         let mut account = Account::new(
-//             &authifier,
-//             "example@validemail.com".into(),
-//             "password_insecure".into(),
-//             false,
-//         )
-//         .await
-//         .unwrap();
-
-//         account.disabled = true;
-//         account.save(&authifier).await.unwrap();
-
-//         let client =
-//             bootstrap_rocket_with_auth(authifier, routes![crate::routes::session::login::login])
-//                 .await;
-
-//         let res = client
-//             .post("/login")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "email": "example@validemail.com",
-//                     "password": "password_insecure"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Ok);
-//         let response = serde_json::from_str::<crate::routes::session::login::ResponseLogin>(
-//             &res.into_string().await.unwrap(),
-//         )
-//         .expect("`ResponseLogin`");
-
-//         assert!(matches!(
-//             response,
-//             crate::routes::session::login::ResponseLogin::Disabled { .. }
-//         ));
-//     }
-
-//     #[async_std::test]
-//     async fn fail_unverified_account() {
-//         let (authifier, _) = for_test("login::fail_unverified_account").await;
-
-//         let mut account = Account::new(
-//             &authifier,
-//             "example@validemail.com".into(),
-//             "password_insecure".into(),
-//             false,
-//         )
-//         .await
-//         .unwrap();
-
-//         account.verification = EmailVerification::Pending {
-//             token: "".to_string(),
-//             expiry: Timestamp::now_utc(),
-//         };
-
-//         account.save(&authifier).await.unwrap();
-
-//         let client =
-//             bootstrap_rocket_with_auth(authifier, routes![crate::routes::session::login::login])
-//                 .await;
-
-//         let res = client
-//             .post("/login")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "email": "example@validemail.com",
-//                     "password": "password_insecure"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Forbidden);
-//         assert_eq!(
-//             res.into_string().await,
-//             Some("{\"type\":\"UnverifiedAccount\"}".into())
-//         );
-//     }
-
-//     #[async_std::test]
-//     async fn fail_locked_account() {
-//         let (authifier, _) = for_test("login::fail_locked_account").await;
-
-//         let mut account = Account::new(
-//             &authifier,
-//             "example@validemail.com".into(),
-//             "password_insecure".into(),
-//             false,
-//         )
-//         .await
-//         .unwrap();
-
-//         account.save(&authifier).await.unwrap();
-
-//         let client = bootstrap_rocket_with_auth(
-//             authifier.clone(),
-//             routes![crate::routes::session::login::login],
-//         )
-//         .await;
-
-//         // Attempt 1
-//         let res = client
-//             .post("/login")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "email": "example@validemail.com",
-//                     "password": "wrong_password"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Unauthorized);
-//         assert_eq!(
-//             res.into_string().await,
-//             Some("{\"type\":\"InvalidCredentials\"}".into())
-//         );
-
-//         // Attempt 2
-//         let res = client
-//             .post("/login")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "email": "example@validemail.com",
-//                     "password": "wrong_password"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Unauthorized);
-//         assert_eq!(
-//             res.into_string().await,
-//             Some("{\"type\":\"InvalidCredentials\"}".into())
-//         );
-
-//         // Attempt 3
-//         let res = client
-//             .post("/login")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "email": "example@validemail.com",
-//                     "password": "wrong_password"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Unauthorized);
-//         assert_eq!(
-//             res.into_string().await,
-//             Some("{\"type\":\"InvalidCredentials\"}".into())
-//         );
-
-//         // Attempt 4: Locked Out
-//         let res = client
-//             .post("/login")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "email": "example@validemail.com",
-//                     "password": "password_insecure"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Forbidden);
-//         assert_eq!(
-//             res.into_string().await,
-//             Some("{\"type\":\"LockedOut\"}".into())
-//         );
-
-//         // Pretend it expired
-//         account.lockout = Some(Lockout {
-//             attempts: 9001,
-//             expiry: Some(Timestamp::now_utc()),
-//         });
-
-//         account.save(&authifier).await.unwrap();
-
-//         // Once it expires, we can log in.
-//         let res = client
-//             .post("/login")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "email": "example@validemail.com",
-//                     "password": "password_insecure"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Ok);
-//         assert!(serde_json::from_str::<Session>(&res.into_string().await.unwrap()).is_ok());
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use iso8601_timestamp::Timestamp;
+    use revolt_database::{Account, EmailVerification, Lockout, MFATicket, Totp, events::client::EventV1};
+    use crate::{rocket, util::test::TestHarness};
+    use rocket::http::{ContentType, Status};
+    use revolt_models::v0;
+    use revolt_result::{Error, ErrorType};
+
+    #[async_std::test]
+    async fn success() {
+        let mut harness = TestHarness::new().await;
+
+        Account::new(
+            &harness.db,
+            "example@validemail.com".into(),
+            "password_insecure".into(),
+            false,
+        )
+        .await
+        .unwrap();
+
+        harness.wait_for_event("global", |_| true).await;
+
+        let res = harness.client
+            .post("/auth/session/login")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "EXAMPLE@validemail.com",
+                    "password": "password_insecure"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Ok);
+        assert!(res.into_json::<v0::Session>().await.is_some());
+
+        let event = harness.wait_for_event("global", |_| true).await;
+        if !matches!(event, EventV1::CreateSession { .. }) {
+            panic!("Received incorrect event type. {:?}", event);
+        }
+    }
+
+    #[async_std::test]
+    async fn success_totp_mfa() {
+        let harness = TestHarness::new().await;
+        let (mut account, _, _) = harness.new_user().await;
+
+        let totp = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+
+        account.mfa.totp_token = totp.clone();
+        account.save(&harness.db).await.unwrap();
+
+        let res = harness.client
+            .post("/auth/session/login")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": &account.email,
+                    "password": "password_insecure"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Ok);
+        let response = serde_json::from_str::<v0::ResponseLogin>(
+            &res.into_string().await.unwrap(),
+        )
+        .expect("`ResponseLogin`");
+
+        if let v0::ResponseLogin::MFA {
+            ticket,
+            allowed_methods,
+        } = response
+        {
+            assert!(allowed_methods.contains(&v0::MFAMethod::Totp));
+
+            let res = harness.client
+                .post("/auth/session/login")
+                .header(ContentType::JSON)
+                .body(
+                    json!({
+                        "mfa_ticket": ticket,
+                        "mfa_response": {
+                            "totp_code": totp.generate_code().expect("totp code")
+                        }
+                    })
+                    .to_string(),
+                )
+                .dispatch()
+                .await;
+
+            assert_eq!(res.status(), Status::Ok);
+            assert!(serde_json::from_str::<v0::Session>(&res.into_string().await.unwrap()).is_ok());
+        } else {
+            panic!("expected `ResponseLogin::MFA`")
+        }
+    }
+
+    #[async_std::test]
+    async fn success_totp_stored_mfa() {
+        let harness = TestHarness::new().await;
+        let (mut account, _, _) = harness.new_user().await;
+
+        let totp = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+
+        account.mfa.totp_token = totp.clone();
+        account.save(&harness.db).await.unwrap();
+
+        let mut ticket = MFATicket::new(account.id.to_string(), true);
+        ticket.last_totp_code = Some("token from earlier".into());
+        ticket.save(&harness.db).await.unwrap();
+
+        let res = harness.client
+            .post("/auth/session/login")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "mfa_ticket": ticket.token,
+                    "mfa_response": {
+                        "totp_code": "token from earlier"
+                    }
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Ok);
+        assert!(serde_json::from_str::<v0::Session>(&res.into_string().await.unwrap()).is_ok());
+    }
+
+    #[async_std::test]
+    async fn fail_totp_invalid_mfa() {
+        let harness = TestHarness::new().await;
+        println!("{:?}", harness.db);
+        let (mut account, _, _) = harness.new_user().await;
+
+        let totp = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+
+        account.mfa.totp_token = totp.clone();
+        account.save(&harness.db).await.unwrap();
+
+        let res = harness.client
+            .post("/auth/session/login")
+            .json(
+                &json!({
+                    "email": account.email.clone(),
+                    "password": "password_insecure"
+                })
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Ok);
+        let response = serde_json::from_str::<v0::ResponseLogin>(
+            &res.into_string().await.unwrap(),
+        )
+        .expect("`ResponseLogin`");
+
+        if let v0::ResponseLogin::MFA {
+            ticket,
+            allowed_methods,
+        } = response
+        {
+            assert!(allowed_methods.contains(&v0::MFAMethod::Totp));
+
+            let res = harness.client
+                .post("/auth/session/login")
+                .json(
+                    &json!({
+                        "mfa_ticket": ticket,
+                        "mfa_response": {
+                            "totp_code": "some random data"
+                        }
+                    })
+                )
+                .dispatch()
+                .await;
+
+            assert_eq!(res.status(), Status::Unauthorized);
+        assert!(matches!(
+            res.into_json::<Error>().await.unwrap().error_type,
+            ErrorType::InvalidToken,
+        ));
+        } else {
+            panic!("expected `ResponseLogin::MFA`")
+        }
+    }
+
+    #[async_std::test]
+    async fn fail_invalid_user() {
+        let harness = TestHarness::new().await;
+
+        let res = harness.client
+            .post("/auth/session/login")
+            .json(
+                &json!({
+                    "email": "example@validemail.com",
+                    "password": "password_insecure"
+                })
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Unauthorized);
+        assert!(matches!(
+            res.into_json::<Error>().await.unwrap().error_type,
+            ErrorType::InvalidCredentials,
+        ));
+    }
+
+    #[async_std::test]
+    async fn fail_disabled_account() {
+        let harness = TestHarness::new().await;
+
+        let mut account = Account::new(
+            &harness.db,
+            "example@validemail.com".into(),
+            "password_insecure".into(),
+            false,
+        )
+        .await
+        .unwrap();
+
+        account.disabled = true;
+        account.save(&harness.db).await.unwrap();
+
+        let res = harness.client
+            .post("/auth/session/login")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "example@validemail.com",
+                    "password": "password_insecure"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Ok);
+        let response = serde_json::from_str::<v0::ResponseLogin>(
+            &res.into_string().await.unwrap(),
+        )
+        .expect("`ResponseLogin`");
+
+        assert!(matches!(
+            response,
+            v0::ResponseLogin::Disabled { .. }
+        ));
+    }
+
+    #[async_std::test]
+    async fn fail_unverified_account() {
+        let harness = TestHarness::new().await;
+
+        let mut account = Account::new(
+            &harness.db,
+            "example@validemail.com".into(),
+            "password_insecure".into(),
+            false,
+        )
+        .await
+        .unwrap();
+
+        account.verification = EmailVerification::Pending {
+            token: "".to_string(),
+            expiry: Timestamp::now_utc(),
+        };
+
+        account.save(&harness.db).await.unwrap();
+
+        let res = harness.client
+            .post("/auth/session/login")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "example@validemail.com",
+                    "password": "password_insecure"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Forbidden);
+        assert!(matches!(
+            res.into_json::<Error>().await.unwrap().error_type,
+            ErrorType::UnverifiedAccount,
+        ));
+    }
+
+    #[async_std::test]
+    async fn fail_locked_account() {
+        let harness = TestHarness::new().await;
+
+        let mut account = Account::new(
+            &harness.db,
+            "example@validemail.com".into(),
+            "password_insecure".into(),
+            false,
+        )
+        .await
+        .unwrap();
+
+        account.save(&harness.db).await.unwrap();
+
+
+        // Attempt 1
+        let res = harness.client
+            .post("/auth/session/login")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "example@validemail.com",
+                    "password": "wrong_password"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Unauthorized);
+        assert!(matches!(
+            res.into_json::<Error>().await.unwrap().error_type,
+            ErrorType::InvalidCredentials,
+        ));
+
+        // Attempt 2
+        let res = harness.client
+            .post("/auth/session/login")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "example@validemail.com",
+                    "password": "wrong_password"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Unauthorized);
+        assert!(matches!(
+            res.into_json::<Error>().await.unwrap().error_type,
+            ErrorType::InvalidCredentials,
+        ));
+
+        // Attempt 3
+        let res = harness.client
+            .post("/auth/session/login")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "example@validemail.com",
+                    "password": "wrong_password"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Unauthorized);
+        assert!(matches!(
+            res.into_json::<Error>().await.unwrap().error_type,
+            ErrorType::InvalidCredentials,
+        ));
+
+        // Attempt 4: Locked Out
+        let res = harness.client
+            .post("/auth/session/login")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "example@validemail.com",
+                    "password": "password_insecure"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Forbidden);
+        assert!(matches!(
+            res.into_json::<Error>().await.unwrap().error_type,
+            ErrorType::LockedOut,
+        ));
+        // Pretend it expired
+        account.lockout = Some(Lockout {
+            attempts: 9001,
+            expiry: Some(Timestamp::now_utc()),
+        });
+
+        account.save(&harness.db).await.unwrap();
+
+        // Once it expires, we can log in.
+        let res = harness.client
+            .post("/auth/session/login")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "example@validemail.com",
+                    "password": "password_insecure"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Ok);
+        assert!(serde_json::from_str::<v0::Session>(&res.into_string().await.unwrap()).is_ok());
+    }
+}

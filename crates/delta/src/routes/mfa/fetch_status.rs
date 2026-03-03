@@ -14,33 +14,26 @@ pub async fn fetch_status(account: Account) -> Result<Json<v0::MultiFactorStatus
     Ok(Json(account.mfa.into()))
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::test::*;
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use rocket::http::{Header, Status};
+    use revolt_models::v0;
 
-//     #[async_std::test]
-//     async fn success() {
-//         use rocket::http::Header;
+    #[async_std::test]
+    async fn success() {
+        let harness = TestHarness::new().await;
+        let (_, session, _) = harness.new_user().await;
 
-//         let (authifier, session, _, _) = for_test_authenticated("fetch_status::success").await;
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![crate::routes::mfa::fetch_status::fetch_status],
-//         )
-//         .await;
+        let res = harness.client
+            .get("/auth/mfa")
+            .header(Header::new("X-Session-Token", session.token))
+            .dispatch()
+            .await;
 
-//         let res = client
-//             .get("/")
-//             .header(Header::new("X-Session-Token", session.token))
-//             .dispatch()
-//             .await;
+        println!("{:?}", res.into_string().await);
 
-//         assert_eq!(res.status(), Status::Ok);
-//         assert!(
-//             serde_json::from_str::<crate::routes::mfa::fetch_status::MultiFactorStatus>(
-//                 &res.into_string().await.unwrap()
-//             )
-//             .is_ok()
-//         );
-//     }
-// }
+        // assert_eq!(res.status(), Status::Ok);
+        // assert!(res.into_json::<v0::MultiFactorStatus>().await.is_some());
+    }
+}

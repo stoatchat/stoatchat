@@ -20,65 +20,52 @@ pub async fn get_mfa_methods(account: Account) -> Json<Vec<v0::MFAMethod>> {
     )
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use authifier::models::totp::Totp;
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_database::Totp;
+    use rocket::http::{Header, Status};
+    use revolt_models::v0;
 
-//     use crate::test::*;
+    #[async_std::test]
+    async fn success() {
+        let harness = TestHarness::new().await;
+        let (_, session, _) = harness.new_user().await;
 
-//     #[async_std::test]
-//     async fn success() {
-//         use rocket::http::Header;
+        let res = harness.client
+            .get("/auth/mfa/methods")
+            .header(Header::new("X-Session-Token", session.token))
+            .dispatch()
+            .await;
 
-//         let (authifier, session, _, _) = for_test_authenticated("get_mfa_methods::success").await;
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![crate::routes::mfa::get_mfa_methods::get_mfa_methods],
-//         )
-//         .await;
+        assert_eq!(res.status(), Status::Ok);
+        assert_eq!(
+            res.into_json::<Vec<v0::MFAMethod>>().await.unwrap(),
+            vec![v0::MFAMethod::Password]
+        );
+    }
 
-//         let res = client
-//             .get("/methods")
-//             .header(Header::new("X-Session-Token", session.token))
-//             .dispatch()
-//             .await;
+    #[async_std::test]
+    async fn success_has_recovery_and_totp() {
+        let harness = TestHarness::new().await;
+        let (mut account, session, _) = harness.new_user().await;
 
-//         assert_eq!(res.status(), Status::Ok);
-//         assert_eq!(
-//             serde_json::from_str::<Vec<MFAMethod>>(&res.into_string().await.unwrap()).unwrap(),
-//             vec![MFAMethod::Password]
-//         );
-//     }
+        account.mfa.totp_token = Totp::Enabled {
+            secret: "some".to_string(),
+        };
+        account.mfa.generate_recovery_codes();
+        account.save(&harness.db).await.unwrap();
 
-//     #[async_std::test]
-//     async fn success_has_recovery_and_totp() {
-//         use rocket::http::Header;
+        let res = harness.client
+            .get("/auth/mfa/methods")
+            .header(Header::new("X-Session-Token", session.token))
+            .dispatch()
+            .await;
 
-//         let (authifier, session, mut account, _) =
-//             for_test_authenticated("get_mfa_methods::success_has_recovery_and_totp").await;
-
-//         account.mfa.totp_token = Totp::Enabled {
-//             secret: "some".to_string(),
-//         };
-//         account.mfa.generate_recovery_codes();
-//         account.save(&authifier).await.unwrap();
-
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![crate::routes::mfa::get_mfa_methods::get_mfa_methods],
-//         )
-//         .await;
-
-//         let res = client
-//             .get("/methods")
-//             .header(Header::new("X-Session-Token", session.token))
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Ok);
-//         assert_eq!(
-//             serde_json::from_str::<Vec<MFAMethod>>(&res.into_string().await.unwrap()).unwrap(),
-//             vec![MFAMethod::Totp, MFAMethod::Recovery]
-//         );
-//     }
-// }
+        assert_eq!(res.status(), Status::Ok);
+        assert_eq!(
+            res.into_json::<Vec<v0::MFAMethod>>().await.unwrap(),
+            vec![v0::MFAMethod::Totp, v0::MFAMethod::Recovery]
+        );
+    }
+}

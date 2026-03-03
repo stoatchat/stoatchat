@@ -14,81 +14,66 @@ pub async fn logout(db: &State<Database>, session: Session) -> Result<EmptyRespo
     session.delete(db).await.map(|_| EmptyResponse)
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::test::*;
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_database::events::client::EventV1;
+    use revolt_result::ErrorType;
+    use rocket::http::{Header, Status};
 
-//     #[async_std::test]
-//     async fn success() {
-//         use rocket::http::Header;
+    #[async_std::test]
+    async fn success() {
+        let mut harness = TestHarness::new().await;
+        let (_, session, _) = harness.new_user().await;
 
-//         let (authifier, session, _, receiver) = for_test_authenticated("logout::success").await;
-//         let client = bootstrap_rocket_with_auth(
-//             authifier.clone(),
-//             routes![crate::routes::session::logout::logout],
-//         )
-//         .await;
+        let res = harness.client
+            .post("/auth/session/logout")
+            .header(Header::new("X-Session-Token", session.token))
+            .dispatch()
+            .await;
 
-//         let res = client
-//             .post("/logout")
-//             .header(Header::new("X-Session-Token", session.token))
-//             .dispatch()
-//             .await;
+        assert_eq!(res.status(), Status::NoContent);
+        drop(res);
+        assert!(matches!(
+            harness.db
+                .fetch_session(&session.id)
+                .await
+                .unwrap_err().error_type,
+            ErrorType::UnknownUser
+        ));
 
-//         assert_eq!(res.status(), Status::NoContent);
-//         assert_eq!(
-//             authifier
-//                 .database
-//                 .find_session(&session.id)
-//                 .await
-//                 .unwrap_err(),
-//             Error::UnknownUser
-//         );
+        let event = harness.wait_for_event(&format!("{}!", &session.user_id), |evt| matches!(evt, EventV1::DeleteSession { .. })).await;
+        if let EventV1::DeleteSession {
+            user_id,
+            session_id,
+        } = event
+        {
+            assert_eq!(user_id, session.user_id);
+            assert_eq!(session_id, session.id);
+        } else {
+            panic!("Received incorrect event type. {:?}", event);
+        }
+    }
 
-//         let event = receiver.try_recv().expect("an event");
-//         if let AuthifierEvent::DeleteSession {
-//             user_id,
-//             session_id,
-//         } = event
-//         {
-//             assert_eq!(user_id, session.user_id);
-//             assert_eq!(session_id, session.id);
-//         } else {
-//             panic!("Received incorrect event type. {:?}", event);
-//         }
-//     }
+    #[async_std::test]
+    async fn fail_invalid_session() {
+        let harness = TestHarness::new().await;
 
-//     #[async_std::test]
-//     async fn fail_invalid_session() {
-//         use rocket::http::Header;
+        let res = harness.client
+            .post("/auth/session/logout")
+            .header(Header::new("X-Session-Token", "invalid"))
+            .dispatch()
+            .await;
 
-//         let (client, _) = bootstrap_rocket(
-//             "logout",
-//             "fail_invalid_session",
-//             routes![crate::routes::session::logout::logout],
-//         )
-//         .await;
+        assert_eq!(res.status(), Status::Unauthorized);
+    }
 
-//         let res = client
-//             .post("/logout")
-//             .header(Header::new("X-Session-Token", "invalid"))
-//             .dispatch()
-//             .await;
+    #[async_std::test]
+    async fn fail_no_session() {
+        let harness = TestHarness::new().await;
 
-//         assert_eq!(res.status(), Status::Unauthorized);
-//     }
+        let res = harness.client.post("/auth/session/logout").dispatch().await;
 
-//     #[async_std::test]
-//     async fn fail_no_session() {
-//         let (client, _) = bootstrap_rocket(
-//             "logout",
-//             "fail_no_session",
-//             routes![crate::routes::session::logout::logout],
-//         )
-//         .await;
-
-//         let res = client.post("/logout").dispatch().await;
-
-//         assert_eq!(res.status(), Status::Unauthorized);
-//     }
-// }
+        assert_eq!(res.status(), Status::Unauthorized);
+    }
+}

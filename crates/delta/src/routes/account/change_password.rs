@@ -33,51 +33,46 @@ pub async fn change_password(
     account.save(db).await.map(|_| EmptyResponse)
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::test::*;
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use rocket::http::{ContentType, Header, Status};
 
-//     #[async_std::test]
-//     async fn success() {
-//         use rocket::http::Header;
+    #[async_std::test]
+    async fn success() {
+        let harness = TestHarness::new().await;
+        let (_, session, _) = harness.new_user().await;
 
-//         let (authifier, session, _, _) = for_test_authenticated("change_password::success").await;
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![crate::routes::account::change_password::change_password],
-//         )
-//         .await;
+        let res = harness.client
+            .patch("/auth/account/change/password")
+            .header(ContentType::JSON)
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .body(
+                json!({
+                    "password": "new password",
+                    "current_password": "password_insecure"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
 
-//         let res = client
-//             .patch("/change/password")
-//             .header(ContentType::JSON)
-//             .header(Header::new("X-Session-Token", session.token.clone()))
-//             .body(
-//                 json!({
-//                     "password": "new password",
-//                     "current_password": "password_insecure"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
+        assert_eq!(res.status(), Status::NoContent);
 
-//         assert_eq!(res.status(), Status::NoContent);
+        let res = harness.client
+            .patch("/auth/account/change/password")
+            .header(ContentType::JSON)
+            .header(Header::new("X-Session-Token", session.token))
+            .body(
+                json!({
+                    "password": "sussy password",
+                    "current_password": "new password"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
 
-//         let res = client
-//             .patch("/change/password")
-//             .header(ContentType::JSON)
-//             .header(Header::new("X-Session-Token", session.token))
-//             .body(
-//                 json!({
-//                     "password": "sussy password",
-//                     "current_password": "new password"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::NoContent);
-//     }
-// }
+        assert_eq!(res.status(), Status::NoContent);
+    }
+}

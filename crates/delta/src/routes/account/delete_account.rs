@@ -20,56 +20,45 @@ pub async fn delete_account(
         .map(|_| EmptyResponse)
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::test::*;
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_database::MFATicket;
+    use rocket::http::{ContentType, Header, Status};
 
-//     #[async_std::test]
-//     async fn success() {
-//         use rocket::http::Header;
+    #[async_std::test]
+    async fn success() {
+        let harness = TestHarness::new().await;
+        let (mut account, session, _) = harness.new_user().await;
 
-//         let (authifier, session, mut account, _) =
-//             for_test_authenticated_with_config("delete_account::success", test_smtp_config().await)
-//                 .await;
+        account.email = "delete_account@smtp.test".to_string();
+        account.save(&harness.db).await.unwrap();
 
-//         account.email = "delete_account@smtp.test".to_string();
-//         account.save(&authifier).await.unwrap();
+        let ticket = MFATicket::new(account.id.to_string(), true);
+        ticket.save(&harness.db).await.unwrap();
 
-//         let ticket = MFATicket::new(account.id.to_string(), true);
-//         ticket.save(&authifier).await.unwrap();
+        let res = harness.client
+            .post("/auth/account/delete")
+            .header(Header::new("X-Session-Token", session.token))
+            .header(Header::new("X-MFA-Ticket", ticket.token))
+            .dispatch()
+            .await;
 
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![
-//                 crate::routes::account::delete_account::delete_account,
-//                 crate::routes::account::confirm_deletion::confirm_deletion
-//             ],
-//         )
-//         .await;
+        assert_eq!(res.status(), Status::NoContent);
 
-//         let res = client
-//             .post("/delete")
-//             .header(Header::new("X-Session-Token", session.token))
-//             .header(Header::new("X-MFA-Ticket", ticket.token))
-//             .header(ContentType::JSON)
-//             .dispatch()
-//             .await;
+        let (_, code) = harness.assert_email("delete_account@smtp.test").await;
+        let res = harness.client
+            .put("/auth/account/delete")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "token": code
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
 
-//         assert_eq!(res.status(), Status::NoContent);
-
-//         let mail = assert_email_sendria("delete_account@smtp.test".into()).await;
-//         let res = client
-//             .put("/delete")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "token": mail.code.expect("`code`")
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::NoContent);
-//     }
-// }
+        assert_eq!(res.status(), Status::NoContent);
+    }
+}
