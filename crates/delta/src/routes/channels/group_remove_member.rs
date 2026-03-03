@@ -13,20 +13,20 @@ use rocket_empty::EmptyResponse;
 ///
 /// Removes a user from the group.
 #[openapi(tag = "Groups")]
-#[delete("/<target>/recipients/<member>")]
+#[delete("/<group_id>/recipients/<member_id>")]
 pub async fn remove_member(
     db: &State<Database>,
     voice_client: &State<VoiceClient>,
     amqp: &State<AMQP>,
     user: User,
-    target: Reference<'_>,
-    member: Reference<'_>,
+    group_id: Reference<'_>,
+    member_id: Reference<'_>,
 ) -> Result<EmptyResponse> {
     if user.bot.is_some() {
         return Err(create_error!(IsBot));
     }
 
-    let channel = target.as_channel(db).await?;
+    let channel = group_id.as_channel(db).await?;
 
     if let Channel::Group {
         owner, recipients, ..
@@ -38,7 +38,7 @@ pub async fn remove_member(
             }));
         }
 
-        let member = member.as_user(db).await?;
+        let member = member_id.as_user(db).await?;
         if user.id == member.id {
             return Err(create_error!(CannotRemoveYourself));
         }
@@ -54,8 +54,8 @@ pub async fn remove_member(
         return Err(create_error!(InvalidOperation));
     };
 
-    if is_in_voice_channel(&member.id, channel.id()).await? {
-        remove_user_from_voice_channel(db, voice_client, channel.id(), &member.id).await?;
+    if is_in_voice_channel(&member_id.id, channel.id()).await? {
+        remove_user_from_voice_channel(db, voice_client, channel.id(), &member_id.id).await?;
     };
 
     Ok(EmptyResponse)

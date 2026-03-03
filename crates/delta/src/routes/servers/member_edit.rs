@@ -26,13 +26,13 @@ use validator::Validate;
 ///
 /// Edit a member by their id.
 #[openapi(tag = "Server Members")]
-#[patch("/<server>/members/<member>", data = "<data>")]
+#[patch("/<server_id>/members/<member_id>", data = "<data>")]
 pub async fn edit(
     db: &State<Database>,
     voice_client: &State<VoiceClient>,
     user: User,
-    server: Reference<'_>,
-    member: Reference<'_>,
+    server_id: Reference<'_>,
+    member_id: Reference<'_>,
     data: Json<v0::DataMemberEdit>,
 ) -> Result<Json<v0::Member>> {
     let data = data.into_inner();
@@ -43,9 +43,9 @@ pub async fn edit(
     })?;
 
     // Fetch server and member
-    let mut server = server.as_server(db).await?;
-    let target_user = member.as_user(db).await?;
-    let mut member = member.as_member(db, &server.id).await?;
+    let mut server = server_id.as_server(db).await?;
+    let target_user = member_id.as_user(db).await?;
+    let mut member = member_id.as_member(db, &server.id).await?;
 
     // Fetch our currrent permissions
     let mut query = DatabasePermissionQuery::new(db, &user).server(&server);

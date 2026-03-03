@@ -11,11 +11,11 @@ use rocket::{serde::json::Json, State};
 ///
 /// Create an emoji by its Autumn upload id.
 #[openapi(tag = "Emojis")]
-#[put("/emoji/<id>", data = "<data>")]
+#[put("/emoji/<emoji_id>", data = "<data>")]
 pub async fn create_emoji(
     db: &State<Database>,
     user: User,
-    id: String,
+    emoji_id: String,
     data: Json<v0::DataCreateEmoji>,
 ) -> Result<Json<v0::Emoji>> {
     let config = config().await;
@@ -50,11 +50,11 @@ pub async fn create_emoji(
     };
 
     // Find the relevant attachment
-    let attachment = File::use_emoji(db, &id, &id, &user.id).await?;
+    let attachment = File::use_emoji(db, &emoji_id, &emoji_id, &user.id).await?;
 
     // Create the emoji object
     let emoji = Emoji {
-        id,
+        id: emoji_id,
         parent: data.parent.into(),
         creator_id: user.id,
         name: data.name,
