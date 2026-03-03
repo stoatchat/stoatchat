@@ -68,7 +68,12 @@ pub async fn edit(
         if user.id == member.id.user {
             permissions.throw_if_lacking_channel_permission(ChannelPermission::ChangeAvatar)?;
         } else {
-            return Err(create_error!(InvalidOperation));
+            let target_user = target.as_user(db).await?;
+            if target_user.bot.is_some() {
+                permissions.throw_if_lacking_channel_permission(ChannelPermission::ChangeAvatar)?;
+            } else {
+                return Err(create_error!(InvalidOperation));
+            }
         }
     }
 
