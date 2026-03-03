@@ -133,7 +133,10 @@ auto_derived!(
         #[serde(rename = "message_unpinned")]
         MessageUnpinned { id: String, by: String },
         #[serde(rename = "call_started")]
-        CallStarted { by: String, finished_at: Option<Timestamp> },
+        CallStarted {
+            by: String,
+            finished_at: Option<Timestamp>,
+        },
     }
 
     /// Name and / or avatar override information
@@ -201,6 +204,9 @@ auto_derived!(
         pub image: Option<String>,
         /// Message content or system message information
         pub body: String,
+        /// The raw body, if the body has been rendered
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub raw_body: Option<String>,
         /// Unique tag, usually the channel ID
         pub tag: String,
         /// Timestamp at which this notification was created
@@ -508,6 +514,7 @@ impl PushNotification {
             icon,
             image,
             body,
+            raw_body: None,
             tag: channel.id().to_string(),
             timestamp,
             url: format!("{}/channel/{}/{}", config.hosts.app, channel.id(), msg.id),

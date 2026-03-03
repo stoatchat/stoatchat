@@ -3,7 +3,7 @@ use std::{
     hash::RandomState,
 };
 
-use crate::consumers::inbound::internal::*;
+use crate::{consumers::inbound::internal::*, utils};
 use amqprs::{
     channel::{BasicPublishArguments, Channel},
     connection::Connection,
@@ -129,7 +129,14 @@ impl MassMessageConsumer {
     ) -> Result<()> {
         let config = revolt_config::config().await;
         let content = String::from_utf8(content)?;
-        let payload: MassMessageSentPayload = serde_json::from_str(content.as_str())?;
+        let mut payload: MassMessageSentPayload = serde_json::from_str(content.as_str())?;
+
+        for push in payload.notifications.iter_mut() {
+            if let Ok(body) = utils::render_notification_content(push, &self.db).await {
+                push.raw_body = Some(push.body.clone());
+                push.body = body;
+            }
+        }
 
         debug!("Received mass message event");
 
