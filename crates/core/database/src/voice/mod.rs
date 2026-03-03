@@ -589,9 +589,10 @@ pub async fn remove_user_from_voice_channel(db: &Database, voice_client: &VoiceC
 
 pub async fn delete_voice_channel(voice_client: &VoiceClient, channel_id: &str, server_id: Option<&str>) -> Result<()> {
     if let Some(users) = get_voice_channel_members(channel_id).await? {
-        let node = get_channel_node(channel_id).await?.unwrap();
-
-        voice_client.delete_room(&node, channel_id).await?;
+        let node = get_channel_node(channel_id).await?;
+        if node.is_some() {
+            voice_client.delete_room(&node.unwrap(), channel_id).await?;
+        }
 
         delete_channel_voice_state(channel_id, server_id, &users).await?;
     };
