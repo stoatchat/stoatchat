@@ -60,9 +60,9 @@ pub async fn delete(
         }
         Channel::TextChannel { .. } => {
             permissions.throw_if_lacking_channel_permission(ChannelPermission::ManageChannel)?;
-            channel.delete(db).await?;
 
             delete_voice_channel(voice_client, channel.id(), channel.server()).await?;
+            channel.delete(db).await?;
         }
     };
 
