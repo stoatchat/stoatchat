@@ -65,14 +65,14 @@ impl Emoji {
     }
 
     /// Delete an emoji
-    pub async fn delete(self, db: &Database) -> Result<()> {
+    pub async fn delete(&self, db: &Database) -> Result<()> {
         EventV1::EmojiDelete {
             id: self.id.to_string(),
         }
         .p(self.parent().to_string())
         .await;
 
-        db.detach_emoji(&self).await
+        db.detach_emoji(self).await
     }
 
     /// Check whether we can use a given emoji

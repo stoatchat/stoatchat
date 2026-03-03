@@ -634,6 +634,116 @@ impl Channel {
         }
     }
 
+    pub fn generate_diff(
+        &self,
+        partial: &PartialChannel,
+        remove: &[FieldsChannel],
+    ) -> PartialChannel {
+        let mut before = PartialChannel::default();
+
+        match self {
+            Channel::SavedMessages { .. } => {}
+            Channel::DirectMessage {
+                active,
+                last_message_id,
+                ..
+            } => {
+                if partial.active.is_some() {
+                    before.active = Some(*active);
+                };
+
+                if partial.last_message_id.is_some() {
+                    before.last_message_id = last_message_id.clone()
+                };
+            }
+            Channel::Group {
+                name,
+                owner,
+                description,
+                icon,
+                last_message_id,
+                permissions,
+                nsfw,
+                ..
+            } => {
+                if partial.name.is_some() {
+                    before.name = Some(name.clone());
+                };
+
+                if partial.owner.is_some() {
+                    before.owner = Some(owner.clone());
+                };
+
+                if partial.description.is_some() || remove.contains(&FieldsChannel::Description) {
+                    before.description = description.clone();
+                };
+
+                if partial.icon.is_some() || remove.contains(&FieldsChannel::Icon) {
+                    before.icon = icon.clone();
+                };
+
+                if partial.last_message_id.is_some() {
+                    before.last_message_id = last_message_id.clone()
+                };
+
+                if partial.permissions.is_some() {
+                    before.permissions = *permissions;
+                };
+
+                if partial.nsfw.is_some() {
+                    before.nsfw = Some(*nsfw);
+                };
+            }
+            Channel::TextChannel {
+                name,
+                description,
+                icon,
+                last_message_id,
+                default_permissions,
+                role_permissions,
+                nsfw,
+                voice,
+                ..
+            } => {
+                if partial.name.is_some() {
+                    before.name = Some(name.clone());
+                };
+
+                if partial.description.is_some() || remove.contains(&FieldsChannel::Description) {
+                    before.description = description.clone();
+                };
+
+                if partial.icon.is_some() || remove.contains(&FieldsChannel::Icon) {
+                    before.icon = icon.clone();
+                };
+
+                if partial.last_message_id.is_some() {
+                    before.last_message_id = last_message_id.clone()
+                };
+
+                if partial.default_permissions.is_some()
+                    || remove.contains(&FieldsChannel::DefaultPermissions)
+                {
+                    before.default_permissions = *default_permissions;
+                };
+
+                if partial.role_permissions.is_some() {
+                    before.role_permissions = Some(role_permissions.clone());
+                };
+
+                if partial.nsfw.is_some() {
+                    before.nsfw = Some(*nsfw);
+                };
+
+                if partial.voice.is_some() || remove.contains(&FieldsChannel::Voice) {
+                    before.voice = voice.clone();
+                };
+            }
+        }
+
+        before
+    }
+
     /// Acknowledge a message
     pub async fn ack(&self, user: &str, message: &str) -> Result<()> {
         EventV1::ChannelAck {

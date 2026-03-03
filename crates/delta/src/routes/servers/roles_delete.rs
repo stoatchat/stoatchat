@@ -1,12 +1,14 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     voice::{sync_voice_permissions, VoiceClient},
-    Database, User,
+    AuditLogEntryAction, Database, User,
 };
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::State;
 use rocket_empty::EmptyResponse;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Delete Role
 ///
@@ -16,6 +18,7 @@ use rocket_empty::EmptyResponse;
 pub async fn delete(
     db: &State<Database>,
     user: User,
+    reason: AuditLogReason,
     target: Reference<'_>,
     role_id: String,
     voice_client: &State<VoiceClient>,
@@ -38,6 +41,13 @@ pub async fn delete(
     }
 
     role.delete(db, &server.id).await?;
+
+    AuditLogEntryAction::RoleDelete {
+        role: role_id.clone(),
+        name: role.name,
+    }
+    .insert(db, server.id.clone(), reason.0, user.id)
+    .await;
 
     for channel_id in &server.channels {
         let channel = Reference::from_unchecked(channel_id).as_channel(db).await?;

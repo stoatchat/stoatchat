@@ -1,13 +1,16 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     voice::{delete_voice_channel, VoiceClient},
-    Channel, Database, File, PartialChannel, SystemMessage, User, AMQP,
+    AuditLogEntryAction, Channel, Database, FieldsChannel, File, PartialChannel, SystemMessage,
+    User, AMQP,
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 use validator::Validate;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Edit Channel
 ///
@@ -19,6 +22,7 @@ pub async fn edit(
     voice_client: &State<VoiceClient>,
     amqp: &State<AMQP>,
     user: User,
+    reason: AuditLogReason,
     target: Reference<'_>,
     data: Json<v0::DataEditChannel>,
 ) -> Result<Json<v0::Channel>> {
@@ -89,6 +93,8 @@ pub async fn edit(
         .await
         .ok();
     }
+
+    let before_channel = channel.clone();
 
     match &mut channel {
         Channel::Group {
@@ -251,17 +257,34 @@ pub async fn edit(
         _ => return Err(create_error!(InvalidOperation)),
     };
 
-    channel
-        .update(
-            db,
-            partial,
-            data.remove.into_iter().map(|f| f.into()).collect(),
-        )
-        .await?;
+    let remove = data
+        .remove
+        .into_iter()
+        .map(|f| f.into())
+        .collect::<Vec<FieldsChannel>>();
+
+    let before = if before_channel.server().is_some() {
+        Some(before_channel.generate_diff(&partial, &remove))
+    } else {
+        None
+    };
+
+    channel.update(db, partial.clone(), remove.clone()).await?;
 
     if channel.voice().is_none() {
         delete_voice_channel(voice_client, channel.id(), channel.server()).await?;
     }
+
+    if let Some(before) = before {
+        AuditLogEntryAction::ChannelEdit {
+            channel: channel.id().to_string(),
+            remove,
+            before,
+            after: partial,
+        }
+        .insert(db, channel.server().unwrap().to_string(), reason.0, user.id)
+        .await;
+    };
 
     Ok(Json(channel.into()))
 }

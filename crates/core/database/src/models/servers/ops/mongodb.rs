@@ -247,6 +247,13 @@ impl MongoDb {
         })
         .await?;
 
+        self.col::<Document>("audit_logs")
+            .delete_many(doc! {
+                "server": &server_id
+            })
+            .await
+            .map_err(|_| create_database_error!("delete_many", "audit_logs"))?;
+
         Ok(())
     }
 }
