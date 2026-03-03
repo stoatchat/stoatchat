@@ -18,6 +18,7 @@ revolt-models = { version = "0.11.5", path = "../../core/models", features = [
 revolt-presence = { version = "0.11.5", path = "../../core/presence", features = [
     "redis-is-patched",
 ] }
+revolt-parser = { version = "0.11.5", path = "../../core/parser" }
 
 anyhow = { version = "1.0.98" }
 
@@ -26,6 +27,7 @@ fcm_v1 = "0.3.0"
 web-push = "0.10.0"
 isahc = { optional = true, version = "1.7", features = ["json"] }
 revolt_a2 = { version = "0.10", default-features = false, features = ["ring"] }
+redis-kiss = "0.1.4"
 tokio = "1.39.2"
 async-trait = "0.1.81"
 ulid = "1.0.0"
@@ -34,6 +36,8 @@ authifier = "1.0.16"
 
 log = "0.4.11"
 pretty_env_logger = "0.4.0"
+
+regex = "1.12.3"
 
 #serialization
 serde_json = "1"

@@ -88,6 +88,11 @@ production = true
 # Increasing this will resolve mentions faster, but will consume more memory while resolving.
 mass_mention_chunk_size = 200
 
+# How long pushd will cache resolved names for rendered message notifications.
+# Increasing this will result in lower database usage, but may result in a situation where a user/channel/role name changes 
+# and the notifications still resolve to the old name.
+render_cache_time = 60
+
 # none of these should need changing
 exchange = "revolt.notifications"
 message_queue = "notifications.origin.message"

@@ -388,6 +388,7 @@ impl Message {
             mut role_mentions,
             mut mentions_everyone,
             mut mentions_online,
+            ..
         } = message_mentions;
 
         if allow_mass_mentions && server_id.is_some() && !role_mentions.is_empty() {
@@ -497,7 +498,7 @@ impl Message {
                     user_mentions.retain(|m| recipients_hash.contains(m));
                     role_mentions.clear();
                 }
-                Channel::TextChannel { ref server, .. }=> {
+                Channel::TextChannel { ref server, .. } => {
                     let mentions_vec = Vec::from_iter(user_mentions.iter().cloned());
 
                     let valid_members = db.fetch_members(server.as_str(), &mentions_vec[..]).await;
