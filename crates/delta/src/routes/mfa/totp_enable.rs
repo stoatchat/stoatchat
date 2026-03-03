@@ -24,96 +24,79 @@ pub async fn totp_enable(
     account.save(db).await.map(|_| EmptyResponse)
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use authifier::models::totp::Totp;
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_database::{MFATicket, Totp};
+    use rocket::http::{ContentType, Header, Status};
+    use revolt_models::v0;
 
-//     use crate::{routes::session::login::ResponseLogin, test::*};
+    #[async_std::test]
+    async fn success() {
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
 
-//     #[async_std::test]
-//     async fn success() {
-//         use rocket::http::Header;
+        let ticket = MFATicket::new(account.id.to_string(), true);
+        ticket.save(&harness.db).await.unwrap();
 
-//         let (authifier, session, account, _) = for_test_authenticated("totp_enable::success").await;
-//         let ticket = MFATicket::new(account.id.to_string(), true);
-//         ticket.save(&authifier).await.unwrap();
+        let res = harness.client
+            .post("/auth/mfa/totp")
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .header(Header::new("X-MFA-Ticket", ticket.token))
+            .dispatch()
+            .await;
 
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![
-//                 crate::routes::mfa::totp_generate_secret::totp_generate_secret,
-//                 crate::routes::mfa::totp_enable::totp_enable,
-//                 crate::routes::session::login::login
-//             ],
-//         )
-//         .await;
+        assert_eq!(res.status(), Status::Ok);
 
-//         let res = client
-//             .post("/totp")
-//             .header(Header::new("X-Session-Token", session.token.clone()))
-//             .header(Header::new("X-MFA-Ticket", ticket.token))
-//             .dispatch()
-//             .await;
+        let secret = res.into_json::<v0::ResponseTotpSecret>().await.unwrap().secret;
 
-//         assert_eq!(res.status(), Status::Ok);
+        let code = Totp::Enabled { secret }.generate_code().unwrap();
 
-//         #[allow(dead_code)]
-//         #[derive(Deserialize)]
-//         pub struct Response {
-//             secret: String,
-//         }
+        let res = harness.client
+            .put("/auth/mfa/totp")
+            .header(Header::new("X-Session-Token", session.token))
+            .header(ContentType::JSON)
+            .body(json!({ "totp_code": code }).to_string())
+            .dispatch()
+            .await;
 
-//         let Response { secret } =
-//             serde_json::from_str::<Response>(&res.into_string().await.unwrap()).unwrap();
+        assert_eq!(res.status(), Status::NoContent);
 
-//         let code = Totp::Enabled { secret }.generate_code().unwrap();
+        let res = harness.client
+            .post("/auth/session/login")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": account.email.clone(),
+                    "password": "password_insecure"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
 
-//         let res = client
-//             .put("/totp")
-//             .header(Header::new("X-Session-Token", session.token))
-//             .header(ContentType::JSON)
-//             .body(json!({ "totp_code": code }).to_string())
-//             .dispatch()
-//             .await;
+        assert_eq!(res.status(), Status::Ok);
+        let response = res.into_json::<v0::ResponseLogin>().await.unwrap();
 
-//         assert_eq!(res.status(), Status::NoContent);
+        if let v0::ResponseLogin::MFA { ticket, .. } = response {
+            let res = harness.client
+                .post("/auth/session/login")
+                .header(ContentType::JSON)
+                .body(
+                    json!({
+                        "mfa_ticket": ticket,
+                        "mfa_response": {
+                            "totp_code": code
+                        }
+                    })
+                    .to_string(),
+                )
+                .dispatch()
+                .await;
 
-//         let res = client
-//             .post("/login")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "email": "email@revolt.chat",
-//                     "password": "password_insecure"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Ok);
-//         let response =
-//             serde_json::from_str::<ResponseLogin>(&res.into_string().await.unwrap()).unwrap();
-
-//         if let ResponseLogin::MFA { ticket, .. } = response {
-//             let res = client
-//                 .post("/login")
-//                 .header(ContentType::JSON)
-//                 .body(
-//                     json!({
-//                         "mfa_ticket": ticket,
-//                         "mfa_response": {
-//                             "totp_code": code
-//                         }
-//                     })
-//                     .to_string(),
-//                 )
-//                 .dispatch()
-//                 .await;
-
-//             assert_eq!(res.status(), Status::Ok);
-//         } else {
-//             unreachable!("Did not receive MFA challenge!");
-//         }
-//     }
-// }
+            assert_eq!(res.status(), Status::Ok);
+        } else {
+            unreachable!("Did not receive MFA challenge!");
+        }
+    }
+}

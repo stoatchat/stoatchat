@@ -40,144 +40,118 @@ pub async fn create_ticket(
     Ok(Json(ticket.into()))
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::test::*;
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_database::Totp;
+    use rocket::http::{Header, Status};
+    use revolt_models::v0;
+    use revolt_result::{Error, ErrorType};
 
-//     #[async_std::test]
-//     async fn success() {
-//         use rocket::http::Header;
+    #[async_std::test]
+    async fn success() {
+        let harness = TestHarness::new().await;
+        let (_, session, _) = harness.new_user().await;
 
-//         let (authifier, session, _, _) = for_test_authenticated("create_ticket::success").await;
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![crate::routes::mfa::create_ticket::create_ticket,],
-//         )
-//         .await;
+        let res = harness.client
+            .put("/auth/mfa/ticket")
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .body(
+                json!({
+                    "password": "password_insecure"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
 
-//         let res = client
-//             .put("/ticket")
-//             .header(Header::new("X-Session-Token", session.token.clone()))
-//             .body(
-//                 json!({
-//                     "password": "password_insecure"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
+        assert_eq!(res.status(), Status::Ok);
+        assert!(res.into_json::<v0::MFATicket>().await.unwrap().validated);
+    }
 
-//         assert_eq!(res.status(), Status::Ok);
-//         serde_json::from_str::<MFATicket>(&res.into_string().await.unwrap()).unwrap();
-//     }
+    #[async_std::test]
+    async fn success_totp() {
+        let harness = TestHarness::new().await;
+        let (mut account, session, _) = harness.new_user().await;
 
-//     #[async_std::test]
-//     async fn success_totp() {
-//         use rocket::http::Header;
+        account.mfa.totp_token = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+        account.save(&harness.db).await.unwrap();
 
-//         let (authifier, session, mut account, _) =
-//             for_test_authenticated("create_ticket::success_totp").await;
+        let res = harness.client
+            .put("/auth/mfa/ticket")
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .body(
+                json!({
+                    "totp_code": Totp::Enabled {
+                        secret: "secret".to_string(),
+                    }.generate_code().unwrap()
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
 
-//         account.mfa.totp_token = Totp::Enabled {
-//             secret: "secret".to_string(),
-//         };
-//         account.save(&authifier).await.unwrap();
+        assert_eq!(res.status(), Status::Ok);
+        assert!(res.into_json::<v0::MFATicket>().await.is_some());
+    }
 
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![crate::routes::mfa::create_ticket::create_ticket,],
-//         )
-//         .await;
+    #[async_std::test]
+    async fn failure_totp() {
+        let harness = TestHarness::new().await;
+        let (mut account, session, _) = harness.new_user().await;
 
-//         let res = client
-//             .put("/ticket")
-//             .header(Header::new("X-Session-Token", session.token.clone()))
-//             .body(
-//                 json!({
-//                     "totp_code": Totp::Enabled {
-//                         secret: "secret".to_string(),
-//                     }.generate_code().unwrap()
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
+        account.mfa.totp_token = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+        account.save(&harness.db).await.unwrap();
 
-//         assert_eq!(res.status(), Status::Ok);
-//         serde_json::from_str::<MFATicket>(&res.into_string().await.unwrap()).unwrap();
-//     }
+        let res = harness.client
+            .put("/auth/mfa/ticket")
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .body(
+                json!({
+                    "totp_code": "000000"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
 
-//     #[async_std::test]
-//     async fn failure_totp() {
-//         use rocket::http::Header;
+        assert_eq!(res.status(), Status::Unauthorized);
+        assert!(matches!(
+            res.into_json::<Error>().await.unwrap().error_type,
+            ErrorType::InvalidToken,
+        ));
+    }
 
-//         let (authifier, session, mut account, _) =
-//             for_test_authenticated("create_ticket::failure_totp").await;
+    #[async_std::test]
+    async fn failure_no_totp() {
+        let harness = TestHarness::new().await;
+        let (mut account, session, _) = harness.new_user().await;
 
-//         account.mfa.totp_token = Totp::Enabled {
-//             secret: "secret".to_string(),
-//         };
-//         account.save(&authifier).await.unwrap();
+        account.mfa.totp_token = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+        account.save(&harness.db).await.unwrap();
 
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![crate::routes::mfa::create_ticket::create_ticket,],
-//         )
-//         .await;
+        let res = harness.client
+            .put("/auth/mfa/ticket")
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .body(
+                json!({
+                    "password": "this is the wrong mfa method"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
 
-//         let res = client
-//             .put("/ticket")
-//             .header(Header::new("X-Session-Token", session.token.clone()))
-//             .body(
-//                 json!({
-//                     "totp_code": "000000"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Unauthorized);
-//         assert_eq!(
-//             res.into_string().await,
-//             Some("{\"type\":\"InvalidToken\"}".into())
-//         );
-//     }
-
-//     #[async_std::test]
-//     async fn failure_no_totp() {
-//         use rocket::http::Header;
-
-//         let (authifier, session, mut account, _) =
-//             for_test_authenticated("create_ticket::failure_no_totp").await;
-
-//         account.mfa.totp_token = Totp::Enabled {
-//             secret: "secret".to_string(),
-//         };
-//         account.save(&authifier).await.unwrap();
-
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![crate::routes::mfa::create_ticket::create_ticket,],
-//         )
-//         .await;
-
-//         let res = client
-//             .put("/ticket")
-//             .header(Header::new("X-Session-Token", session.token.clone()))
-//             .body(
-//                 json!({
-//                     "password": "this is the wrong mfa method"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::BadRequest);
-//         assert_eq!(
-//             res.into_string().await,
-//             Some("{\"type\":\"DisallowedMFAMethod\"}".into())
-//         );
-//     }
-// }
+        assert_eq!(res.status(), Status::BadRequest);
+        assert!(matches!(
+            res.into_json::<Error>().await.unwrap().error_type,
+            ErrorType::DisallowedMFAMethod,
+        ));
+    }
+}

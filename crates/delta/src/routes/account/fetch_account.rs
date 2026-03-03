@@ -14,33 +14,27 @@ pub async fn fetch_account(account: Account) -> Result<Json<v0::AccountInfo>> {
     Ok(Json(account.into()))
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::test::*;
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_models::v0;
+    use rocket::http::{Header, Status};
 
-//     #[async_std::test]
-//     async fn success() {
-//         use rocket::http::Header;
+    #[async_std::test]
+    async fn success() {
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
 
-//         let (authifier, session, _, _) = for_test_authenticated("fetch_account::success").await;
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![crate::routes::account::fetch_account::fetch_account],
-//         )
-//         .await;
+        let res = harness.client
+            .get("/auth/account")
+            .header(Header::new("X-Session-Token", session.token))
+            .dispatch()
+            .await;
 
-//         let res = client
-//             .get("/")
-//             .header(Header::new("X-Session-Token", session.token))
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Ok);
-//         assert!(
-//             serde_json::from_str::<crate::routes::account::fetch_account::AccountInfo>(
-//                 &res.into_string().await.unwrap()
-//             )
-//             .is_ok()
-//         );
-//     }
-// }
+        assert_eq!(res.status(), Status::Ok);
+        assert_eq!(
+            &res.into_json::<v0::AccountInfo>().await.unwrap().id,
+            &account.id
+        );
+    }
+}

@@ -27,39 +27,33 @@ pub async fn totp_generate_secret(
     Ok(Json(v0::ResponseTotpSecret { secret }))
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::routes::mfa::totp_generate_secret::ResponseTotpSecret;
-//     use crate::test::*;
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_database::{MFATicket, Totp};
+    use rocket::http::{Header, Status};
+    use revolt_models::v0;
 
-//     #[async_std::test]
-//     async fn success() {
-//         use rocket::http::Header;
+    #[async_std::test]
+    async fn success() {
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
 
-//         let (authifier, session, account, _) =
-//             for_test_authenticated("totp_generate_secret::success").await;
-//         let ticket = MFATicket::new(account.id.to_string(), true);
-//         ticket.save(&authifier).await.unwrap();
+        let ticket = MFATicket::new(account.id.to_string(), true);
+        ticket.save(&harness.db).await.unwrap();
 
-//         let client = bootstrap_rocket_with_auth(
-//             authifier.clone(),
-//             routes![crate::routes::mfa::totp_generate_secret::totp_generate_secret],
-//         )
-//         .await;
+        let res = harness.client
+            .post("/auth/mfa/totp")
+            .header(Header::new("X-Session-Token", session.token))
+            .header(Header::new("X-MFA-Ticket", ticket.token))
+            .dispatch()
+            .await;
 
-//         let res = client
-//             .post("/totp")
-//             .header(Header::new("X-Session-Token", session.token))
-//             .header(Header::new("X-MFA-Ticket", ticket.token))
-//             .dispatch()
-//             .await;
+        assert_eq!(res.status(), Status::Ok);
 
-//         assert_eq!(res.status(), Status::Ok);
+        let secret = res.into_json::<v0::ResponseTotpSecret>().await.unwrap().secret;
 
-//         let ResponseTotpSecret { secret } =
-//             serde_json::from_str::<ResponseTotpSecret>(&res.into_string().await.unwrap()).unwrap();
-
-//         let account = authifier.database.find_account(&account.id).await.unwrap();
-//         assert_eq!(account.mfa.totp_token, Totp::Pending { secret });
-//     }
-// }
+        let account = harness.db.fetch_account(&account.id).await.unwrap();
+        assert_eq!(account.mfa.totp_token, Totp::Pending { secret });
+    }
+}

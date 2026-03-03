@@ -28,6 +28,7 @@ pub async fn password_reset(
     assert_safe(&data.password)
         .await?;
 
+    println!("password {}", data.password);
     // Update the account
     account.password = hash_password(data.password)?;
     account.password_reset = None;
@@ -44,116 +45,97 @@ pub async fn password_reset(
     Ok(EmptyResponse)
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use chrono::Duration;
-//     use iso8601_timestamp::Timestamp;
+#[cfg(test)]
+mod tests {
+    use iso8601_timestamp::{Timestamp, Duration};
+    use revolt_database::PasswordReset;
+    use revolt_models::v0;
+    use revolt_result::{ErrorType, Error};
+    use crate::{rocket, util::test::TestHarness};
+    use rocket::http::{ContentType, Status};
 
-//     use crate::test::*;
+    // #[async_std::test]
+    // async fn success() {
+    //     let harness = TestHarness::new().await;
+    //     let (mut account, session, _) = harness.new_user().await;
 
-//     #[async_std::test]
-//     async fn success() {
-//         let (authifier, session, mut account, _) =
-//             for_test_authenticated("password_reset::success").await;
+    //     account.password_reset = Some(PasswordReset {
+    //         token: "token".into(),
+    //         expiry: Timestamp::now_utc() + Duration::seconds(100),
+    //     });
 
-//         account.password_reset = Some(PasswordReset {
-//             token: "token".into(),
-//             expiry: Timestamp::from_unix_timestamp_ms(
-//                 chrono::Utc::now()
-//                     .checked_add_signed(Duration::seconds(100))
-//                     .expect("failed to checked_add_signed")
-//                     .timestamp_millis(),
-//             ),
-//         });
+    //     account.save(&harness.db).await.unwrap();
 
-//         account.save(&authifier).await.unwrap();
+    //     let res = harness.client
+    //         .patch("/auth/account/reset_password")
+    //         .header(ContentType::JSON)
+    //         .body(
+    //             json!({
+    //                 "token": "token",
+    //                 "password": "valid-password",
+    //                 "remove_sessions": true
+    //             })
+    //             .to_string(),
+    //         )
+    //         .dispatch()
+    //         .await;
 
-//         let client = bootstrap_rocket_with_auth(
-//             authifier.clone(),
-//             routes![
-//                 crate::routes::account::password_reset::password_reset,
-//                 crate::routes::session::login::login
-//             ],
-//         )
-//         .await;
+    //     assert_eq!(res.status(), Status::NoContent);
 
-//         let res = client
-//             .patch("/reset_password")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "token": "token",
-//                     "password": "valid password",
-//                     "remove_sessions": true
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
+    //     // Make sure it was used and can't be used again
+    //     assert!(harness.db
+    //         .fetch_account_with_password_reset("token")
+    //         .await
+    //         .is_err());
 
-//         assert_eq!(res.status(), Status::NoContent);
+    //     let res = harness.client
+    //         .post("/auth/session/login")
+    //         .header(ContentType::JSON)
+    //         .body(
+    //             json!({
+    //                 "email": account.email.clone(),
+    //                 "password": "valid-password"
+    //             })
+    //             .to_string(),
+    //         )
+    //         .dispatch()
+    //         .await;
 
-//         // Make sure it was used and can't be used again
-//         assert!(authifier
-//             .database
-//             .find_account_with_password_reset("token")
-//             .await
-//             .is_err());
+    //     assert_eq!(res.status(), Status::Ok);
+    //     assert!(res.into_json::<v0::Session>().await.is_some());
 
-//         let res = client
-//             .post("/login")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "email": "email@revolt.chat",
-//                     "password": "valid password"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
+    //     // Ensure sessions were deleted
+    //     assert!(matches!(
+    //         harness
+    //             .db
+    //             .fetch_session(&session.id)
+    //             .await
+    //             .unwrap_err().error_type,
+    //         ErrorType::UnknownUser
+    //     ));
+    // }
 
-//         assert_eq!(res.status(), Status::Ok);
-//         assert!(serde_json::from_str::<Session>(&res.into_string().await.unwrap()).is_ok());
+    #[async_std::test]
+    async fn fail_invalid_token() {
+        let harness = TestHarness::new().await;
 
-//         // Ensure sessions were deleted
-//         assert_eq!(
-//             authifier
-//                 .database
-//                 .find_session(&session.id)
-//                 .await
-//                 .unwrap_err(),
-//             Error::UnknownUser
-//         );
-//     }
+        let res = harness.client
+            .patch("/auth/account/reset_password")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "token": "invalid",
+                    "password": "valid password"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
 
-//     #[async_std::test]
-//     async fn fail_invalid_token() {
-//         let (authifier, _) = for_test("password_reset::fail_invalid_token").await;
-
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![crate::routes::account::password_reset::password_reset],
-//         )
-//         .await;
-
-//         let res = client
-//             .patch("/reset_password")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "token": "invalid",
-//                     "password": "valid password"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Unauthorized);
-//         assert_eq!(
-//             res.into_string().await,
-//             Some("{\"type\":\"InvalidToken\"}".into())
-//         );
-//     }
-// }
+        assert_eq!(res.status(), Status::Unauthorized);
+        assert!(matches!(
+            res.into_json::<Error>().await.unwrap().error_type,
+            ErrorType::InvalidToken
+        ));
+    }
+}

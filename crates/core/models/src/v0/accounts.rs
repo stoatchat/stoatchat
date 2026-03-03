@@ -1,5 +1,3 @@
-use crate::v0::MFATicket;
-
 auto_derived!(
     /// # Change Email Data
     pub struct DataChangeEmail {

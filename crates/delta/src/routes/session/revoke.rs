@@ -24,35 +24,31 @@ pub async fn revoke(
     session.delete(db).await.map(|_| EmptyResponse)
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::test::*;
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_result::ErrorType;
+    use rocket::http::{ContentType, Header, Status};
 
-//     #[async_std::test]
-//     async fn success() {
-//         use rocket::http::Header;
+    #[async_std::test]
+    async fn success() {
+        let harness = TestHarness::new().await;
+        let (_, session, _) = harness.new_user().await;
 
-//         let (authifier, session, _, _) = for_test_authenticated("revoke::success").await;
-//         let client = bootstrap_rocket_with_auth(
-//             authifier.clone(),
-//             routes![crate::routes::session::revoke::revoke],
-//         )
-//         .await;
+        let res = harness.client
+            .delete(format!("/auth/session/{}", session.id))
+            .header(Header::new("X-Session-Token", session.token))
+            .dispatch()
+            .await;
 
-//         let res = client
-//             .delete(format!("/{}", session.id))
-//             .header(Header::new("X-Session-Token", session.token))
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::NoContent);
-//         assert_eq!(
-//             authifier
-//                 .database
-//                 .find_session(&session.id)
-//                 .await
-//                 .unwrap_err(),
-//             Error::UnknownUser
-//         );
-//     }
-// }
+        assert_eq!(res.status(), Status::NoContent);
+        assert!(matches!(
+            harness.db
+                .fetch_session(&session.id)
+                .await
+                .unwrap_err()
+                .error_type,
+            ErrorType::UnknownUser
+        ));
+    }
+}

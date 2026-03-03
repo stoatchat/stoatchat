@@ -39,89 +39,66 @@ pub async fn verify_email(
     Ok(Json(response))
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use chrono::Duration;
-//     use iso8601_timestamp::Timestamp;
+#[cfg(test)]
+mod tests {
+    use iso8601_timestamp::{Timestamp, Duration};
+    use revolt_database::EmailVerification;
+    use crate::{rocket, util::test::TestHarness};
+    use rocket::http::{ContentType, Status};
+    use revolt_models::v0;
+    use revolt_result::{Error, ErrorType};
+    
+    #[async_std::test]
+    async fn success() {
+        let harness = TestHarness::new().await;
+        let (mut account, _, _) = harness.new_user().await;
 
-//     use crate::test::*;
+        account.verification = EmailVerification::Pending {
+            token: "token".into(),
+            expiry: Timestamp::now_utc() + Duration::seconds(100),
+        };
 
-//     use super::ResponseVerify;
+        account.save(&harness.db).await.unwrap();
 
-//     #[async_std::test]
-//     async fn success() {
-//         let (authifier, _, mut account, _) = for_test_authenticated("verify_email::success").await;
+        let res = harness.client.post("/auth/account/verify/token").dispatch().await;
 
-//         account.verification = EmailVerification::Pending {
-//             token: "token".into(),
-//             expiry: Timestamp::from_unix_timestamp_ms(
-//                 chrono::Utc::now()
-//                     .checked_add_signed(Duration::seconds(100))
-//                     .expect("failed to checked_add_signed")
-//                     .timestamp_millis(),
-//             ),
-//         };
+        assert_eq!(res.status(), Status::Ok);
 
-//         account.save(&authifier).await.unwrap();
+        // Make sure it was used and can't be used again
+        assert!(harness.db
+            .fetch_account_with_email_verification("token")
+            .await
+            .is_err());
 
-//         let client = bootstrap_rocket_with_auth(
-//             authifier.clone(),
-//             routes![
-//                 crate::routes::account::verify_email::verify_email,
-//                 crate::routes::session::login::login
-//             ],
-//         )
-//         .await;
+        // Check that we can login using the received MFA ticket
+        let response = res.into_json::<v0::ResponseVerify>().await
+            .expect("`ResponseVerify`");
 
-//         let res = client.post("/verify/token").dispatch().await;
+        if let v0::ResponseVerify::WithTicket { ticket } = response {
+            let res = harness.client
+                .post("/auth/session/login")
+                .header(ContentType::JSON)
+                .body(json!({ "mfa_ticket": ticket.token }).to_string())
+                .dispatch()
+                .await;
 
-//         assert_eq!(res.status(), Status::Ok);
+            assert_eq!(res.status(), Status::Ok);
+            assert!(res.into_json::<v0::Session>().await.is_some());
+        } else {
+            panic!("Expected `ResponseVerify::WithTicket`");
+        }
+    }
 
-//         // Make sure it was used and can't be used again
-//         assert!(authifier
-//             .database
-//             .find_account_with_email_verification("token")
-//             .await
-//             .is_err());
+    #[async_std::test]
+    async fn fail_invalid_token() {
+        let harness = TestHarness::new().await;
 
-//         // Check that we can login using the received MFA ticket
-//         let response =
-//             serde_json::from_str::<crate::routes::account::verify_email::ResponseVerify>(
-//                 &res.into_string().await.unwrap(),
-//             )
-//             .expect("`ResponseVerify`");
+        let res = harness.client.post("/auth/account/verify/token").dispatch().await;
 
-//         if let ResponseVerify::WithTicket { ticket } = response {
-//             let res = client
-//                 .post("/login")
-//                 .header(ContentType::JSON)
-//                 .body(json!({ "mfa_ticket": ticket.token }).to_string())
-//                 .dispatch()
-//                 .await;
-
-//             assert_eq!(res.status(), Status::Ok);
-//             assert!(serde_json::from_str::<Session>(&res.into_string().await.unwrap()).is_ok());
-//         } else {
-//             panic!("Expected `ResponseVerify::WithTicket`");
-//         }
-//     }
-
-//     #[async_std::test]
-//     async fn fail_invalid_token() {
-//         let (authifier, _) = for_test("verify_email::fail_invalid_token").await;
-
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![crate::routes::account::verify_email::verify_email],
-//         )
-//         .await;
-
-//         let res = client.post("/verify/token").dispatch().await;
-
-//         assert_eq!(res.status(), Status::Unauthorized);
-//         assert_eq!(
-//             res.into_string().await,
-//             Some("{\"type\":\"InvalidToken\"}".into())
-//         );
-//     }
-// }
+        assert_eq!(res.status(), Status::Unauthorized);
+        assert!(matches!(
+            res.into_json::<Error>().await.unwrap().error_type,
+            ErrorType::InvalidToken,
+        ));
+    }
+}

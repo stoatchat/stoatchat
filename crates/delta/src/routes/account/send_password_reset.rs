@@ -45,78 +45,70 @@ pub async fn send_password_reset(
     Ok(EmptyResponse)
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::test::*;
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_database::Account;
+    use revolt_models::v0;
+    use rocket::http::{ContentType, Status};
 
-//     #[async_std::test]
-//     async fn success() {
-//         let (authifier, _) =
-//             for_test_with_config("send_password_reset::success", test_smtp_config().await).await;
+    #[async_std::test]
+    async fn success() {
+        let harness = TestHarness::new().await;
 
-//         Account::new(
-//             &authifier,
-//             "password_reset@smtp.test".into(),
-//             "password".into(),
-//             false,
-//         )
-//         .await
-//         .unwrap();
+        Account::new(
+            &harness.db,
+            "password_reset@smtp.test".into(),
+            "password".into(),
+            false,
+        )
+        .await
+        .unwrap();
 
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![
-//                 crate::routes::account::password_reset::password_reset,
-//                 crate::routes::account::send_password_reset::send_password_reset,
-//                 crate::routes::session::login::login
-//             ],
-//         )
-//         .await;
+        let res = harness.client
+            .post("/auth/account/reset_password")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "password_reset@smtp.test",
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
 
-//         let res = client
-//             .post("/reset_password")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "email": "password_reset@smtp.test",
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
+        assert_eq!(res.status(), Status::NoContent);
 
-//         assert_eq!(res.status(), Status::NoContent);
+        let (_, code) = harness.assert_email("password_reset@smtp.test").await;
+        let res = harness.client
+            .patch("/auth/account/reset_password")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "token": code,
+                    "password": "valid password"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
 
-//         let mail = assert_email_sendria("password_reset@smtp.test".into()).await;
-//         let res = client
-//             .patch("/reset_password")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "token": mail.code.expect("`code`"),
-//                     "password": "valid password"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
+        assert_eq!(res.status(), Status::NoContent);
 
-//         assert_eq!(res.status(), Status::NoContent);
+        let res = harness.client
+            .post("/auth/session/login")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": "password_reset@smtp.test",
+                    "password": "valid password"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
 
-//         let res = client
-//             .post("/login")
-//             .header(ContentType::JSON)
-//             .body(
-//                 json!({
-//                     "email": "password_reset@smtp.test",
-//                     "password": "valid password"
-//                 })
-//                 .to_string(),
-//             )
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Ok);
-//         assert!(serde_json::from_str::<Session>(&res.into_string().await.unwrap()).is_ok());
-//     }
-// }
+        assert_eq!(res.status(), Status::Ok);
+        assert!(serde_json::from_str::<v0::Session>(&res.into_string().await.unwrap()).is_ok());
+    }
+}

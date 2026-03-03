@@ -22,40 +22,31 @@ pub async fn fetch_all(
         .map(Json)
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::test::*;
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use rocket::http::{Header, Status};
+    use revolt_models::v0;
 
-//     #[async_std::test]
-//     async fn success() {
-//         use rocket::http::Header;
+    #[async_std::test]
+    async fn success() {
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
 
-//         let (authifier, session, account, _) = for_test_authenticated("fetch_all::success").await;
+        for i in 1..=3 {
+            account
+                .create_session(&harness.db, format!("session{}", i))
+                .await
+                .unwrap();
+        }
 
-//         for i in 1..=3 {
-//             account
-//                 .create_session(&authifier, format!("session{}", i))
-//                 .await
-//                 .unwrap();
-//         }
+        let res = harness.client
+            .get("/auth/session/all")
+            .header(Header::new("X-Session-Token", session.token))
+            .dispatch()
+            .await;
 
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![crate::routes::session::fetch_all::fetch_all],
-//         )
-//         .await;
-
-//         let res = client
-//             .get("/all")
-//             .header(Header::new("X-Session-Token", session.token))
-//             .dispatch()
-//             .await;
-
-//         assert_eq!(res.status(), Status::Ok);
-
-//         let result = res.into_string().await.unwrap();
-//         let sessions: Vec<crate::routes::session::fetch_all::SessionInfo> =
-//             serde_json::from_str(&result).unwrap();
-//         assert_eq!(sessions.len(), 4);
-//     }
-// }
+        assert_eq!(res.status(), Status::Ok);
+        assert_eq!(res.into_json::<Vec<v0::SessionInfo>>().await.unwrap().len(), 4);
+    }
+}

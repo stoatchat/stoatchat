@@ -18,56 +18,50 @@ pub async fn disable_account(
     account.disable(db).await.map(|_| EmptyResponse)
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::test::*;
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_database::{MFATicket, events::client::EventV1};
+    use revolt_result::ErrorType;
+    use rocket::http::{Header, Status};
 
-//     #[async_std::test]
-//     async fn success() {
-//         use rocket::http::Header;
+    #[async_std::test]
+    async fn success() {
+        let mut harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
 
-//         let (authifier, session, account, receiver) =
-//             for_test_authenticated("disable_account::success").await;
-//         let ticket = MFATicket::new(account.id.to_string(), true);
-//         ticket.save(&authifier).await.unwrap();
+        let ticket = MFATicket::new(account.id.to_string(), true);
+        ticket.save(&harness.db).await.unwrap();
 
-//         let client = bootstrap_rocket_with_auth(
-//             authifier.clone(),
-//             routes![crate::routes::account::disable_account::disable_account],
-//         )
-//         .await;
+        let res = harness.client
+            .post("/auth/account/disable")
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .header(Header::new("X-MFA-Ticket", ticket.token))
+            .dispatch()
+            .await;
 
-//         let res = client
-//             .post("/disable")
-//             .header(Header::new("X-Session-Token", session.token))
-//             .header(Header::new("X-MFA-Ticket", ticket.token))
-//             .header(ContentType::JSON)
-//             .dispatch()
-//             .await;
+        assert_eq!(res.status(), Status::NoContent);
+        drop(res);
+        assert!(
+            harness.db
+                .fetch_account(&account.id)
+                .await
+                .unwrap()
+                .disabled
+        );
 
-//         assert_eq!(res.status(), Status::NoContent);
-//         assert!(
-//             authifier
-//                 .database
-//                 .find_account(&account.id)
-//                 .await
-//                 .unwrap()
-//                 .disabled
-//         );
-//         assert_eq!(
-//             authifier
-//                 .database
-//                 .find_session(&session.id)
-//                 .await
-//                 .unwrap_err(),
-//             Error::UnknownUser
-//         );
+        assert!(matches!(
+            harness.db
+                .fetch_session(&session.id)
+                .await
+                .unwrap_err().error_type,
+            ErrorType::UnknownUser
+        ));
 
-//         let event = receiver.try_recv().expect("an event");
-//         if let AuthifierEvent::DeleteAllSessions { user_id, .. } = event {
-//             assert_eq!(user_id, session.user_id);
-//         } else {
-//             panic!("Received incorrect event type. {:?}", event);
-//         }
-//     }
-// }
+        harness.wait_for_event(&format!("{}!", &account.id), |e| if let EventV1::DeleteAllSessions { user_id, .. } = e {
+            user_id == &account.id
+        } else {
+            false
+        }).await;
+    }
+}

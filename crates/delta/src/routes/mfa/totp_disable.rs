@@ -22,32 +22,28 @@ pub async fn totp_disable(
     account.save(db).await.map(|_| EmptyResponse)
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::test::*;
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_database::MFATicket;
+    use rocket::http::{Header, Status};
 
-//     #[async_std::test]
-//     async fn success() {
-//         use rocket::http::Header;
+    #[async_std::test]
+    async fn success() {
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
 
-//         let (authifier, session, account, _) =
-//             for_test_authenticated("totp_disable::success").await;
-//         let ticket = MFATicket::new(account.id, true);
-//         ticket.save(&authifier).await.unwrap();
+        let ticket = MFATicket::new(account.id, true);
+        ticket.save(&harness.db).await.unwrap();
 
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![crate::routes::mfa::totp_disable::totp_disable],
-//         )
-//         .await;
 
-//         let res = client
-//             .delete("/totp")
-//             .header(Header::new("X-Session-Token", session.token.clone()))
-//             .header(Header::new("X-MFA-Ticket", ticket.token))
-//             .dispatch()
-//             .await;
+        let res = harness.client
+            .delete("/auth/mfa/totp")
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .header(Header::new("X-MFA-Ticket", ticket.token))
+            .dispatch()
+            .await;
 
-//         assert_eq!(res.status(), Status::NoContent);
-//     }
-// }
+        assert_eq!(res.status(), Status::NoContent);
+    }
+}

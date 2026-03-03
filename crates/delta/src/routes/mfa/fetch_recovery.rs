@@ -16,38 +16,30 @@ pub async fn fetch_recovery(
     Ok(Json(account.mfa.recovery_codes))
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::test::*;
+#[cfg(test)]
+mod tests {
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_database::MFATicket;
+    use rocket::http::{ContentType, Header, Status};
 
-//     #[async_std::test]
-//     async fn success() {
-//         use rocket::http::Header;
 
-//         let (authifier, session, account, _) =
-//             for_test_authenticated("fetch_recovery::success").await;
-//         let ticket = MFATicket::new(account.id, true);
-//         ticket.save(&authifier).await.unwrap();
+    #[async_std::test]
+    async fn success() {
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
 
-//         let client = bootstrap_rocket_with_auth(
-//             authifier,
-//             routes![crate::routes::mfa::fetch_recovery::fetch_recovery],
-//         )
-//         .await;
+        let ticket = MFATicket::new(account.id, true);
+        ticket.save(&harness.db).await.unwrap();
 
-//         let res = client
-//             .post("/recovery")
-//             .header(Header::new("X-Session-Token", session.token))
-//             .header(Header::new("X-MFA-Ticket", ticket.token))
-//             .header(ContentType::JSON)
-//             .dispatch()
-//             .await;
+        let res = harness.client
+            .post("/auth/mfa/recovery")
+            .header(Header::new("X-Session-Token", session.token))
+            .header(Header::new("X-MFA-Ticket", ticket.token))
+            .header(ContentType::JSON)
+            .dispatch()
+            .await;
 
-//         assert_eq!(res.status(), Status::Ok);
-//         assert!(
-//             serde_json::from_str::<Vec<String>>(&res.into_string().await.unwrap())
-//                 .unwrap()
-//                 .is_empty()
-//         );
-//     }
-// }
+        assert_eq!(res.status(), Status::Ok);
+        assert!(res.into_json::<Vec<String>>().await.unwrap().is_empty());
+    }
+}

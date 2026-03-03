@@ -41,17 +41,17 @@ auto_derived!(
 
     #[derive(Default)]
     pub struct MultiFactorStatus {
-        #[serde(skip_serializing_if = "crate::if_false")]
+        #[serde(skip_serializing_if = "crate::if_false", default)]
         pub email_otp: bool,
-        #[serde(skip_serializing_if = "crate::if_false")]
+        #[serde(skip_serializing_if = "crate::if_false", default)]
         pub trusted_handover: bool,
-        #[serde(skip_serializing_if = "crate::if_false")]
+        #[serde(skip_serializing_if = "crate::if_false", default)]
         pub email_mfa: bool,
-        #[serde(skip_serializing_if = "crate::if_false")]
+        #[serde(skip_serializing_if = "crate::if_false", default)]
         pub totp_mfa: bool,
-        #[serde(skip_serializing_if = "crate::if_false")]
+        #[serde(skip_serializing_if = "crate::if_false", default)]
         pub security_key_mfa: bool,
-        #[serde(skip_serializing_if = "crate::if_false")]
+        #[serde(skip_serializing_if = "crate::if_false", default)]
         pub recovery_active: bool,
     }
 
