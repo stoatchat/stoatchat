@@ -26,7 +26,7 @@ pub async fn ingress(
     auth_header: AuthHeader<'_>,
     body: &str,
 ) -> Result<EmptyResponse> {
-    log::info!("received event: {body}");
+    log::debug!("received event: {body:?}");
 
     let config = revolt_config::config().await;
 
