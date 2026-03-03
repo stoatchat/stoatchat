@@ -1,5 +1,6 @@
 use std::io::Cursor;
 
+use image::{GenericImageView, ImageError, ImageReader};
 use revolt_database::Metadata;
 use revolt_files::{image_size, video_size};
 use tempfile::NamedTempFile;
@@ -26,6 +27,16 @@ pub fn generate_metadata(f: &NamedTempFile, mime_type: &str) -> Metadata {
             .map(|(width, height)| Metadata::Image {
                 width: width as isize,
                 height: height as isize,
+                thumbhash: ImageReader::open(f)
+                    .and_then(|r| r.with_guessed_format())
+                    .map_err(ImageError::from)
+                    .and_then(|r| r.decode())
+                    .map(|img| img.thumbnail(100, 100))
+                    .map(|img| (img.dimensions(), img.to_rgba8().into_raw()))
+                    .map(|((width, height), rgba)| {
+                        thumbhash::rgba_to_thumb_hash(width as usize, height as usize, &rgba)
+                    })
+                    .unwrap_or_default(),
             })
             .unwrap_or_default()
     } else if mime_type.starts_with("video/") {

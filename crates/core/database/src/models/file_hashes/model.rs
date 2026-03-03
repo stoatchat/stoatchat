@@ -45,7 +45,7 @@ auto_derived!(
         Image {
             width: isize,
             height: isize,
-            // animated: bool // TODO: https://docs.rs/image/latest/image/trait.AnimationDecoder.html for APNG support
+            thumbhash: Vec<u8>, // animated: bool // TODO: https://docs.rs/image/latest/image/trait.AnimationDecoder.html for APNG support
         },
         /// File is a video with specific dimensions
         Video { width: isize, height: isize },
