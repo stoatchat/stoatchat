@@ -11,7 +11,7 @@ redis = "redis://redis/"
 [hosts]
 # Web locations of various services
 # Defaults assume all services are reverse-proxied
-# See https://github.com/revoltchat/self-hosted/blob/master/Caddyfile
+# See https://github.com/stoatchat/self-hosted/blob/main/Caddyfile
 #
 # Remember to change these to https/wss where appropriate in production!
 app = "http://local.revolt.chat"
@@ -34,7 +34,7 @@ password = "rabbitpass"
 
 [api.registration]
 # Whether an invite should be required for registration
-# See https://github.com/revoltchat/self-hosted#making-your-instance-invite-only
+# See https://github.com/stoatchat/self-hosted#making-your-instance-invite-only
 invite_only = false
 
 [api.smtp]

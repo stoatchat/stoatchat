@@ -8,16 +8,12 @@ sidebar_position: 1
 
 You can connect to the API on the following URLs:
 
-| URL                           |  Release   | Description                 |
-| ----------------------------- | :--------: | --------------------------- |
-| `https://api.revolt.chat`     | Production | Primary API endpoint        |
-| `https://app.revolt.chat/api` | Production | API endpoint for old client |
-| `https://revolt.chat/api`     |  Staging   | API endpoint for new client |
+| URL                           |  Release   | Description                        |
+| ----------------------------- | :--------: | ---------------------------------- |
+| `https://api.stoat.chat`      | Production | Primary API endpoint               |
 
 You can connect to the events server on the following URLs:
 
-| URL                            |  Release   | Description                    |
-| ------------------------------ | :--------: | ------------------------------ |
-| `wss://ws.revolt.chat`         | Production | Primary events endpoint        |
-| `wss://app.revolt.chat/events` | Production | Events endpoint for old client |
-| `wss://revolt.chat/events`     |  Staging   | Events endpoint for new client |
+| URL                            |  Release   | Description                           |
+| ------------------------------ | :--------: | ------------------------------------- |
+| `wss://events.stoat.chat`      | Production | Primary events endpoint               |
