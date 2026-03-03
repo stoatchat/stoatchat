@@ -9,7 +9,7 @@ use revolt_database::{
     voice::{
         get_channel_node, get_user_voice_channel_in_server, set_channel_node,
         set_user_moved_from_voice, set_user_moved_to_voice, sync_user_voice_permissions,
-        VoiceClient,
+        UserVoiceChannel, VoiceClient,
     },
     Database, File, PartialMember, User,
 };
@@ -52,7 +52,9 @@ pub async fn edit(
     let permissions = calculate_server_permissions(&mut query).await;
 
     // Fetch target permissions
-    let mut target_query = DatabasePermissionQuery::new(db, &target_user).server(&server).member(&member);
+    let mut target_query = DatabasePermissionQuery::new(db, &target_user)
+        .server(&server)
+        .member(&member);
     let target_permissions = calculate_server_permissions(&mut target_query).await;
 
     // Check permissions in server
@@ -83,7 +85,7 @@ pub async fn edit(
             }
 
             if target_permissions.has_channel_permission(ChannelPermission::TimeoutMembers) {
-                return Err(create_error!(IsElevated))
+                return Err(create_error!(IsElevated));
             }
         }
 
@@ -99,7 +101,7 @@ pub async fn edit(
     }
 
     if data.voice_channel.is_some() && data.remove.contains(&FieldsMember::VoiceChannel) {
-        return Err(create_error!(InvalidOperation))
+        return Err(create_error!(InvalidOperation));
     }
 
     if data.voice_channel.is_some() || data.remove.contains(&FieldsMember::VoiceChannel) {
@@ -217,8 +219,19 @@ pub async fn edit(
                 }
             };
 
-            set_user_moved_from_voice(&channel, new_voice_channel.id(), &target_user.id).await?;
-            set_user_moved_to_voice(new_voice_channel.id(), &channel, &target_user.id).await?;
+            let new_user_voice_channel = UserVoiceChannel::from_channel(&new_voice_channel);
+            let old_user_voice_channel = UserVoiceChannel {
+                id: channel.clone(),
+                server_id: new_user_voice_channel.server_id.clone(),
+            };
+
+            set_user_moved_from_voice(&channel, &new_user_voice_channel, &target_user.id).await?;
+            set_user_moved_to_voice(
+                new_voice_channel.id(),
+                &old_user_voice_channel,
+                &target_user.id,
+            )
+            .await?;
 
             let mut query = perms(db, &target_user).channel(&new_voice_channel);
             let permissions = calculate_channel_permissions(&mut query).await;

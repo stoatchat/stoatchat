@@ -1,3 +1,5 @@
+use std::fmt::{Display, Write};
+
 use crate::{
     events::client::EventV1,
     models::{Channel, User},
@@ -6,7 +8,11 @@ use crate::{
 };
 use iso8601_timestamp::{Duration, Timestamp};
 use livekit_protocol::ParticipantPermission;
-use redis_kiss::{get_connection as _get_connection, redis::Pipeline, AsyncCommands, Conn};
+use redis_kiss::{
+    get_connection as _get_connection,
+    redis::{FromRedisValue, Pipeline, RedisError, RedisWrite, ToRedisArgs, Value},
+    AsyncCommands, Conn,
+};
 use revolt_config::FeaturesLimits;
 use revolt_models::v0::{self, PartialUserVoiceState, UserVoiceState};
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission, PermissionValue};
@@ -21,13 +27,13 @@ async fn get_connection() -> Result<Conn> {
         .map_err(|_| create_error!(InternalError))
 }
 
-pub async fn raise_if_in_voice(user: &User, channel_id: &str) -> Result<()> {
+pub async fn raise_if_in_voice(user: &User, channel: &UserVoiceChannel) -> Result<()> {
     let mut conn = get_connection().await?;
 
     if user.bot.is_some() {
         // bots can be in as many voice channels as it wants so we just check if its already connected to the one its trying to connect to
         if conn
-            .sismember(format!("vc:{}", &user.id), channel_id)
+            .sismember(format!("vc:{}", &user.id), channel)
             .await
             .to_internal_error()?
         {
@@ -45,31 +51,31 @@ pub async fn raise_if_in_voice(user: &User, channel_id: &str) -> Result<()> {
     Ok(())
 }
 
-pub async fn set_channel_node(channel: &str, node: &str) -> Result<()> {
+pub async fn set_channel_node(channel_id: &str, node: &str) -> Result<()> {
     get_connection()
         .await?
-        .set(format!("node:{channel}"), node)
+        .set(format!("node:{channel_id}"), node)
         .await
         .to_internal_error()
 }
 
-pub async fn get_channel_node(channel: &str) -> Result<Option<String>> {
+pub async fn get_channel_node(channel_id: &str) -> Result<Option<String>> {
     get_connection()
         .await?
-        .get(format!("node:{channel}"))
+        .get(format!("node:{channel_id}"))
         .await
         .to_internal_error()
 }
 
-pub async fn delete_channel_node(channel: &str) -> Result<()> {
+pub async fn delete_channel_node(channel_id: &str) -> Result<()> {
     get_connection()
         .await?
-        .del(format!("node:{channel}"))
+        .del(format!("node:{channel_id}"))
         .await
         .to_internal_error()
 }
 
-pub async fn get_user_voice_channels(user_id: &str) -> Result<Vec<String>> {
+pub async fn get_user_voice_channels(user_id: &str) -> Result<Vec<UserVoiceChannel>> {
     get_connection()
         .await?
         .smembers(format!("vc:{user_id}"))
@@ -78,14 +84,14 @@ pub async fn get_user_voice_channels(user_id: &str) -> Result<Vec<String>> {
 }
 
 pub async fn set_user_moved_from_voice(
-    old_channel: &str,
-    new_channel: &str,
+    old_channel_id: &str,
+    new_channel: &UserVoiceChannel,
     user_id: &str,
 ) -> Result<()> {
     get_connection()
         .await?
         .set_ex(
-            format!("moved_from:{user_id}:{old_channel}"),
+            format!("moved_from:{user_id}:{old_channel_id}"),
             new_channel,
             10,
         )
@@ -102,18 +108,25 @@ pub async fn get_user_moved_from_voice(channel_id: &str, user_id: &str) -> Resul
 }
 
 pub async fn set_user_moved_to_voice(
-    new_channel: &str,
-    old_channel: &str,
+    new_channel_id: &str,
+    old_channel: &UserVoiceChannel,
     user_id: &str,
 ) -> Result<()> {
     get_connection()
         .await?
-        .set_ex(format!("moved_to:{user_id}:{new_channel}"), old_channel, 10)
+        .set_ex(
+            format!("moved_to:{user_id}:{new_channel_id}"),
+            old_channel,
+            10,
+        )
         .await
         .to_internal_error()
 }
 
-pub async fn get_user_moved_to_voice(channel_id: &str, user_id: &str) -> Result<Option<String>> {
+pub async fn get_user_moved_to_voice(
+    channel_id: &str,
+    user_id: &str,
+) -> Result<Option<UserVoiceChannel>> {
     get_connection()
         .await?
         .get_del(format!("moved_to:{user_id}:{channel_id}"))
@@ -121,10 +134,10 @@ pub async fn get_user_moved_to_voice(channel_id: &str, user_id: &str) -> Result<
         .to_internal_error()
 }
 
-pub async fn is_in_voice_channel(user_id: &str, channel_id: &str) -> Result<bool> {
+pub async fn is_in_voice_channel(user_id: &str, channel: &UserVoiceChannel) -> Result<bool> {
     get_connection()
         .await?
-        .sismember(format!("vc:{user_id}"), channel_id)
+        .sismember(format!("vc:{user_id}"), channel)
         .await
         .to_internal_error()
 }
@@ -158,12 +171,15 @@ pub fn get_allowed_sources(
 }
 
 pub async fn create_voice_state(
-    channel_id: &str,
-    server_id: Option<&str>,
+    channel: &UserVoiceChannel,
     user_id: &str,
     joined_at: Timestamp,
 ) -> Result<UserVoiceState> {
-    let unique_key = format!("{}:{}", &user_id, server_id.unwrap_or(channel_id));
+    let unique_key = format!(
+        "{}:{}",
+        &user_id,
+        channel.server_id.as_ref().unwrap_or(&channel.id)
+    );
 
     let voice_state = UserVoiceState {
         joined_at,
@@ -175,9 +191,9 @@ pub async fn create_voice_state(
     };
 
     Pipeline::new()
-        .sadd(format!("vc_members:{channel_id}"), user_id)
-        .sadd(format!("vc:{user_id}"), channel_id)
-        .set(&unique_key, channel_id)
+        .sadd(format!("vc_members:{}", &channel.id), user_id)
+        .sadd(format!("vc:{user_id}"), channel)
+        .set(&unique_key, &channel.id)
         .set(
             format!("joined_at:{unique_key}"),
             joined_at
@@ -204,16 +220,16 @@ pub async fn create_voice_state(
     Ok(voice_state)
 }
 
-pub async fn delete_voice_state(
-    channel_id: &str,
-    server_id: Option<&str>,
-    user_id: &str,
-) -> Result<()> {
-    let unique_key = format!("{}:{}", &user_id, server_id.unwrap_or(channel_id));
+pub async fn delete_voice_state(channel: &UserVoiceChannel, user_id: &str) -> Result<()> {
+    let unique_key = format!(
+        "{}:{}",
+        &user_id,
+        channel.server_id.as_ref().unwrap_or(&channel.id)
+    );
 
     Pipeline::new()
-        .srem(format!("vc_members:{channel_id}"), user_id)
-        .srem(format!("vc:{user_id}"), channel_id)
+        .srem(format!("vc_members:{}", &channel.id), user_id)
+        .srem(format!("vc:{user_id}"), channel)
         .del(&[
             format!("joined_at:{unique_key}"),
             format!("is_publishing:{unique_key}"),
@@ -228,20 +244,19 @@ pub async fn delete_voice_state(
 }
 
 pub async fn delete_channel_voice_state(
-    channel_id: &str,
-    server_id: Option<&str>,
+    channel: &UserVoiceChannel,
     user_ids: &[String],
 ) -> Result<()> {
-    let parent_id = server_id.unwrap_or(channel_id);
+    let parent_id = channel.server_id.as_ref().unwrap_or(&channel.id);
 
     let mut pipeline = Pipeline::new();
-    pipeline.del(format!("vc_members:{channel_id}"));
-    pipeline.del(format!("node:{channel_id}"));
+    pipeline.del(format!("vc_members:{}", &channel.id));
+    pipeline.del(format!("node:{}", &channel.id));
 
     for user_id in user_ids {
         let unique_key = format!("{user_id}:{parent_id}");
 
-        pipeline.srem(format!("vc:{user_id}"), channel_id).del(&[
+        pipeline.srem(format!("vc:{user_id}"), channel).del(&[
             format!("joined_at:{unique_key}"),
             format!("is_publishing:{unique_key}"),
             format!("is_receiving:{unique_key}"),
@@ -258,8 +273,7 @@ pub async fn delete_channel_voice_state(
 }
 
 pub async fn update_voice_state_tracks(
-    channel_id: &str,
-    server_id: Option<&str>,
+    channel: &UserVoiceChannel,
     user_id: &str,
     added: bool,
     track: i32,
@@ -284,18 +298,21 @@ pub async fn update_voice_state_tracks(
         _ => unreachable!(),
     };
 
-    update_voice_state(channel_id, server_id, user_id, &partial).await?;
+    update_voice_state(channel, user_id, &partial).await?;
 
     Ok(partial)
 }
 
 pub async fn update_voice_state(
-    channel_id: &str,
-    server_id: Option<&str>,
+    channel: &UserVoiceChannel,
     user_id: &str,
     partial: &PartialUserVoiceState,
 ) -> Result<()> {
-    let unique_key = format!("{}:{}", &user_id, server_id.unwrap_or(channel_id));
+    let unique_key = format!(
+        "{}:{}",
+        &user_id,
+        channel.server_id.as_ref().unwrap_or(&channel.id)
+    );
 
     let mut pipeline = Pipeline::new();
 
@@ -321,21 +338,24 @@ pub async fn update_voice_state(
         .to_internal_error()
 }
 
-pub async fn get_voice_channel_members(channel_id: &str) -> Result<Option<Vec<String>>> {
+pub async fn get_voice_channel_members(channel: &UserVoiceChannel) -> Result<Option<Vec<String>>> {
     get_connection()
         .await?
-        .smembers::<_, Option<Vec<String>>>(format!("vc_members:{channel_id}"))
+        .smembers::<_, Option<Vec<String>>>(format!("vc_members:{}", &channel.id))
         .await
         .to_internal_error()
         .map(|opt| opt.and_then(|v| if v.is_empty() { None } else { Some(v) }))
 }
 
 pub async fn get_voice_state(
-    channel_id: &str,
-    server_id: Option<&str>,
+    channel: &UserVoiceChannel,
     user_id: &str,
 ) -> Result<Option<UserVoiceState>> {
-    let unique_key = format!("{}:{}", user_id, server_id.unwrap_or(channel_id));
+    let unique_key = format!(
+        "{}:{}",
+        &user_id,
+        channel.server_id.as_ref().unwrap_or(&channel.id)
+    );
 
     let (joined_at, is_publishing, is_receiving, screensharing, camera) = get_connection()
         .await?
@@ -376,21 +396,21 @@ pub async fn get_voice_state(
     }
 }
 
-pub async fn get_channel_voice_state(channel: &Channel) -> Result<Option<v0::ChannelVoiceState>> {
-    let members = get_voice_channel_members(channel.id()).await?;
-
-    let server = channel.server();
+pub async fn get_channel_voice_state(
+    channel: &UserVoiceChannel,
+) -> Result<Option<v0::ChannelVoiceState>> {
+    let members = get_voice_channel_members(channel).await?;
 
     if let Some(members) = members {
         let mut participants = Vec::with_capacity(members.len());
 
         for user_id in members {
-            if let Some(voice_state) = get_voice_state(channel.id(), server, &user_id).await? {
+            if let Some(voice_state) = get_voice_state(channel, &user_id).await? {
                 participants.push(voice_state);
             } else {
                 log::info!("Voice state not found but member in voice channel members, removing.");
 
-                delete_voice_state(channel.id(), server, &user_id).await?;
+                delete_voice_state(channel, &user_id).await?;
             }
         }
 
@@ -398,7 +418,7 @@ pub async fn get_channel_voice_state(channel: &Channel) -> Result<Option<v0::Cha
         participants.shrink_to_fit();
 
         Ok(Some(v0::ChannelVoiceState {
-            id: channel.id().to_string(),
+            id: channel.id.clone(),
             participants,
         }))
     } else {
@@ -406,12 +426,12 @@ pub async fn get_channel_voice_state(channel: &Channel) -> Result<Option<v0::Cha
     }
 }
 
-pub async fn move_user(user: &str, from: &str, to: &str) -> Result<()> {
+pub async fn move_user(user: &str, from_channel_id: &str, to_channel_id: &str) -> Result<()> {
     get_connection()
         .await?
         .smove(
-            format!("vc-members-{from}"),
-            format!("vc-members-{to}"),
+            format!("vc_members:{from_channel_id}"),
+            format!("vc_members:{to_channel_id}"),
             user,
         )
         .await
@@ -425,11 +445,13 @@ pub async fn sync_voice_permissions(
     server: Option<&Server>,
     role_id: Option<&str>,
 ) -> Result<()> {
+    let user_voice_channel = UserVoiceChannel::from_channel(channel);
+
     let Some(node) = get_channel_node(channel.id()).await? else {
         return Ok(());
     };
 
-    for user_id in get_voice_channel_members(channel.id())
+    for user_id in get_voice_channel_members(&user_voice_channel)
         .await?
         .iter()
         .flatten()
@@ -469,7 +491,9 @@ pub async fn sync_user_voice_permissions(
             .as_ref()
             .is_none_or(|member| member.roles.iter().any(|r| r == role_id))
     }) {
-        let Some(voice_state) = get_voice_state(channel_id, server_id, &user.id).await? else {
+        let user_voice_channel = UserVoiceChannel::from_channel(channel);
+
+        let Some(voice_state) = get_voice_state(&user_voice_channel, &user.id).await? else {
             return Ok(());
         };
 
@@ -500,7 +524,7 @@ pub async fn sync_user_voice_permissions(
         update_event.screensharing = voice_state.screensharing.then_some(can_video);
         update_event.is_publishing = voice_state.is_publishing.then_some(can_speak);
 
-        update_voice_state(channel_id, server_id, &user.id, &update_event).await?;
+        update_voice_state(&user_voice_channel, &user.id, &update_event).await?;
 
         voice_client
             .update_permissions(
@@ -579,46 +603,94 @@ pub async fn get_call_notification_recipients(
 }
 
 pub async fn remove_user_from_voice_channels(
-    db: &Database,
     voice_client: &VoiceClient,
     user_id: &str,
 ) -> Result<()> {
-    for channel_id in get_user_voice_channels(user_id).await? {
-        remove_user_from_voice_channel(db, voice_client, &channel_id, user_id).await?;
+    for channel in get_user_voice_channels(user_id).await? {
+        remove_user_from_voice_channel(voice_client, &channel, user_id).await?;
     }
 
     Ok(())
 }
 
 pub async fn remove_user_from_voice_channel(
-    db: &Database,
     voice_client: &VoiceClient,
-    channel_id: &str,
+    channel: &UserVoiceChannel,
     user_id: &str,
 ) -> Result<()> {
-    if let Some(node) = get_channel_node(channel_id).await? {
-        let _ = voice_client.remove_user(&node, user_id, channel_id).await;
+    if let Some(node) = get_channel_node(&channel.id).await? {
+        let _ = voice_client.remove_user(&node, user_id, &channel.id).await;
     }
 
-    let channel = Reference::from_unchecked(channel_id).as_channel(db).await?;
-
-    delete_voice_state(channel_id, channel.server(), user_id).await?;
+    delete_voice_state(channel, user_id).await?;
 
     Ok(())
 }
 
 pub async fn delete_voice_channel(
     voice_client: &VoiceClient,
-    channel_id: &str,
-    server_id: Option<&str>,
+    channel: &UserVoiceChannel,
 ) -> Result<()> {
-    if let Some(users) = get_voice_channel_members(channel_id).await? {
-        let node = get_channel_node(channel_id).await?.unwrap();
+    if let Some(users) = get_voice_channel_members(channel).await? {
+        let node = get_channel_node(&channel.id).await?.unwrap();
+        voice_client.delete_room(&node, &channel.id).await?;
 
-        voice_client.delete_room(&node, channel_id).await?;
-
-        delete_channel_voice_state(channel_id, server_id, &users).await?;
+        delete_channel_voice_state(channel, &users).await?;
     };
 
     Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoomMetadata {
+    pub server: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UserVoiceChannel {
+    pub id: String,
+    pub server_id: Option<String>,
+}
+
+impl UserVoiceChannel {
+    pub fn from_string(input: String) -> Self {
+        let mut parts = input.splitn(2, '-');
+
+        Self {
+            id: parts.next().unwrap().to_string(),
+            server_id: parts.next().map(ToString::to_string),
+        }
+    }
+
+    pub fn from_channel(channel: &Channel) -> Self {
+        Self {
+            id: channel.id().to_string(),
+            server_id: channel.server().map(ToString::to_string),
+        }
+    }
+}
+
+impl Display for UserVoiceChannel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.id)?;
+
+        if let Some(server_id) = &self.server_id {
+            f.write_char('-')?;
+            f.write_str(server_id)?
+        };
+
+        Ok(())
+    }
+}
+
+impl ToRedisArgs for UserVoiceChannel {
+    fn write_redis_args<W: ?Sized + RedisWrite>(&self, out: &mut W) {
+        out.write_arg_fmt(self);
+    }
+}
+
+impl FromRedisValue for UserVoiceChannel {
+    fn from_redis_value(v: &Value) -> Result<Self, RedisError> {
+        String::from_redis_value(v).map(UserVoiceChannel::from_string)
+    }
 }

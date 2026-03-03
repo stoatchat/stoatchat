@@ -1,6 +1,6 @@
 use revolt_database::{
     util::reference::Reference,
-    voice::{get_voice_state, VoiceClient},
+    voice::{get_voice_state, UserVoiceChannel, VoiceClient},
     Channel, Database, User, AMQP,
 };
 use revolt_result::{create_error, Result, ToRevoltError};
@@ -32,9 +32,15 @@ pub async fn stop_ring(
         return Err(create_error!(NoEffect));
     }
 
-    if get_voice_state(channel.id(), None, &user.id)
-        .await?
-        .is_none()
+    if get_voice_state(
+        &UserVoiceChannel {
+            id: channel.id().to_string(),
+            server_id: None,
+        },
+        &user.id,
+    )
+    .await?
+    .is_none()
     {
         return Err(create_error!(NotConnected));
     }
@@ -46,7 +52,7 @@ pub async fn stop_ring(
         _ => return Err(create_error!(NoEffect)),
     };
 
-    if members.iter().any(|m| &target_user.id == m) {
+    if members.iter().any(|m| target_user.id == m) {
         if let Err(e) = amqp
             .dm_call_updated(
                 &user.id,

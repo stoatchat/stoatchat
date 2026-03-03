@@ -3,7 +3,8 @@ use revolt_database::{
     util::{permissions::perms, reference::Reference},
     voice::{
         delete_voice_state, get_channel_node, get_user_voice_channels, get_voice_channel_members,
-        raise_if_in_voice, set_call_notification_recipients, set_channel_node, VoiceClient,
+        raise_if_in_voice, set_call_notification_recipients, set_channel_node, UserVoiceChannel,
+        VoiceClient,
     },
     Database, User,
 };
@@ -50,7 +51,9 @@ pub async fn call(
     let current_permissions = calculate_channel_permissions(&mut permissions).await;
     current_permissions.throw_if_lacking_channel_permission(ChannelPermission::Connect)?;
 
-    if get_voice_channel_members(channel.id())
+    let user_voice_channel = UserVoiceChannel::from_channel(&channel);
+
+    if get_voice_channel_members(&user_voice_channel)
         .await?
         .zip(voice_info.max_users)
         .is_some_and(|(ms, max_users)| ms.len() >= max_users)
@@ -79,22 +82,18 @@ pub async fn call(
         // Finds and disconnects any existing voice connections by the user,
         // should only ever loop once but just to cover our backs.
 
-        for channel_id in get_user_voice_channels(&user.id).await? {
-            if let Some(node) = get_channel_node(&channel_id).await? {
+        for previous_channel in get_user_voice_channels(&user.id).await? {
+            if let Some(node) = get_channel_node(&previous_channel.id).await? {
                 // if this errors its just a mismatching state - ignore and proceed to still delete our state
-                let _ = voice_client.remove_user(&node, &user.id, &channel_id).await;
+                let _ = voice_client
+                    .remove_user(&node, &user.id, &previous_channel.id)
+                    .await;
             };
 
-            let channel = Reference::from_unchecked(&channel_id)
-                .as_channel(db)
-                .await;
-
-            if channel.is_ok() {
-                delete_voice_state(&channel_id, channel.unwrap().server(), &user.id).await?;
-            }
+            delete_voice_state(&previous_channel, &user.id).await?;
         }
     } else {
-        raise_if_in_voice(&user, channel.id()).await?;
+        raise_if_in_voice(&user, &user_voice_channel).await?;
     }
 
     let token = voice_client

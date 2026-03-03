@@ -4,7 +4,7 @@ use futures::future::join_all;
 use revolt_database::{
     events::client::{EventV1, ReadyPayloadFields},
     util::permissions::DatabasePermissionQuery,
-    voice::get_channel_voice_state,
+    voice::{get_channel_voice_state, UserVoiceChannel},
     Channel, Database, Member, MemberCompositeKey, Presence, RelationshipStatus,
 };
 use revolt_models::v0;
@@ -167,7 +167,9 @@ impl State {
                         | Channel::TextChannel { voice: Some(_), .. }
                 )
             }) {
-                if let Ok(Some(voice_state)) = get_channel_voice_state(channel).await {
+                if let Ok(Some(voice_state)) =
+                    get_channel_voice_state(&UserVoiceChannel::from_channel(channel)).await
+                {
                     if let Some(server) = channel.server() {
                         let set = voice_state_server_members
                             .entry(server.to_string())
