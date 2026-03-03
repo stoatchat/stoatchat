@@ -2,7 +2,7 @@
 
 This page documents various incoming and outgoing events.
 
-**Help Wanted:** we should adopt [AsyncAPI](https://www.asyncapi.com) to properly document the protocol!
+An [AsyncAPI](https://www.asyncapi.com) specification is available at [`asyncapi.yml`](https://github.com/stoatchat/stoatchat/blob/main/docs/asyncapi.yml) for machine-readable protocol documentation.
 
 ## Client to Server
 
@@ -150,11 +150,14 @@ Data for use by client, data structures match the API specification.
     "channels"?: [{..}],
     "members"?: [{..}],
     "emojis"?: [{..}],
+    "voice_states"?: [{..}],
     "user_settings"?: [{..}],
     "channel_unreads"?: [{..}],
     "policy_changes"?: [{..}],
 }
 ```
+
+- `voice_states` is an array of `ChannelVoiceState` objects for all voice channels where the user is a member. See [Voice & Audio](../voice.md#channelvoicestate) for the model definition.
 
 ### Message
 
@@ -358,9 +361,15 @@ Server created, the event object has the same schema as the SERVER object in the
 ```json
 {
     "type": "ServerCreate",
-    [..]
+    "id": "{server_id}",
+    "server": {..},
+    "channels": [{..}],
+    "emojis": [{..}],
+    "voice_states": [{..}]
 }
 ```
+
+- `voice_states` is an array of `ChannelVoiceState` objects for any voice channels in the server that currently have active participants. See [Voice & Audio](../voice.md#channelvoicestate) for the model definition.
 
 ### ServerUpdate
 
@@ -587,3 +596,121 @@ All sessions for this account have been deleted, optionally excluding a given ID
   "exclude_session_id": "{session_id}"
 }
 ```
+
+## Voice Events
+
+Voice events are published to the channel topic matching the voice channel ID. See [Voice & Audio](../voice.md) for the full overview, including how to join a call and the data model definitions.
+
+### VoiceChannelJoin
+
+A user has joined a voice channel.
+
+```json
+{
+  "type": "VoiceChannelJoin",
+  "id": "{channel_id}",
+  "state": {
+    "id": "{user_id}",
+    "joined_at": "{iso8601_timestamp}",
+    "is_receiving": true,
+    "is_publishing": false,
+    "screensharing": false,
+    "camera": false
+  }
+}
+```
+
+- `state` contains a `UserVoiceState` object for the user who joined.
+- Users join with `is_receiving: true` and all publishing flags set to `false`. Flags update as media tracks are published (see `UserVoiceStateUpdate`).
+
+### VoiceChannelLeave
+
+A user has left a voice channel.
+
+```json
+{
+  "type": "VoiceChannelLeave",
+  "id": "{channel_id}",
+  "user": "{user_id}"
+}
+```
+
+### VoiceChannelMove
+
+A user was moved from one voice channel to another by a moderator. This event is sent on the **destination** channel topic.
+
+Clients subscribed to both channels should use this event to:
+- Remove the user from `from` without showing a leave notification.
+- Add the user to `to` with the provided `state`.
+
+```json
+{
+  "type": "VoiceChannelMove",
+  "user": "{user_id}",
+  "from": "{source_channel_id}",
+  "to": "{destination_channel_id}",
+  "state": {
+    "id": "{user_id}",
+    "joined_at": "{iso8601_timestamp}",
+    "is_receiving": true,
+    "is_publishing": false,
+    "screensharing": false,
+    "camera": false
+  }
+}
+```
+
+- `state` contains a fresh `UserVoiceState` for the user in the new channel.
+
+### UserVoiceStateUpdate
+
+A user's voice state has changed (e.g. microphone muted/unmuted, camera toggled, screenshare started/stopped, or a permission change applied by a moderator).
+
+```json
+{
+  "type": "UserVoiceStateUpdate",
+  "id": "{user_id}",
+  "channel_id": "{channel_id}",
+  "data": {
+    "id": "{user_id}",
+    "is_publishing": true
+  }
+}
+```
+
+- `data` contains a `PartialUserVoiceState` — only the fields that changed are present.
+
+Fields that may appear in `data`:
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `string` | Always present. The user's ID. |
+| `is_publishing` | `bool?` | Whether the user is publishing a microphone track. |
+| `is_receiving` | `bool?` | Whether the user is receiving audio. |
+| `camera` | `bool?` | Whether the user's camera is active. |
+| `screensharing` | `bool?` | Whether the user is screen sharing. |
+
+### UserMoveVoiceChannel
+
+**Private event** — only sent to the user being moved.
+
+A moderator has moved you to a different voice channel. You should disconnect from the current LiveKit room and reconnect to the new one using the provided `token` and node.
+
+```json
+{
+  "type": "UserMoveVoiceChannel",
+  "node": "{node_name}",
+  "from": "{source_channel_id}",
+  "to": "{destination_channel_id}",
+  "token": "<livekit-jwt>"
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `node` | `string` | Name of the LiveKit node hosting the destination channel. |
+| `from` | `string` | Channel ID you are being moved from. |
+| `to` | `string` | Channel ID you are being moved to. |
+| `token` | `string` | Short-lived JWT for connecting to the destination room on the LiveKit server. |
+
+After receiving this event, look up the WebSocket URL for `node` using the [`/nodes`](../endpoints.md) endpoint (or use the URL you already have if connecting to the same node), then reconnect via the LiveKit SDK.
