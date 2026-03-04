@@ -199,7 +199,7 @@ pub struct ApiSecurity {
     pub captcha: ApiSecurityCaptcha,
     pub trust_cloudflare: bool,
     pub easypwned: String,
-    pub tenor_key: String,
+    pub giphy_key: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]

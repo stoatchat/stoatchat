@@ -58,8 +58,8 @@ voso_legacy_token = ""
 trust_cloudflare = false
 # easypwned endpoint
 easypwned = ""
-# Tenor API Key
-tenor_key = ""
+# Giphy API Key
+giphy_key = ""
 
 [api.security.captcha]
 # hCaptcha configuration

@@ -1,4 +1,4 @@
-//! Internal Tenor API wrapper
+//! Internal Giphy API wrapper
 
 use std::{sync::Arc, time::Duration};
 
@@ -10,25 +10,25 @@ use tokio::sync::RwLock;
 
 pub mod types;
 
-const TENOR_API_BASE_URL: &str = "https://tenor.googleapis.com/v2";
+const GIPHY_API_BASE_URL: &str = "https://api.giphy.com/v1/gifs";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum TenorError {
+pub enum GiphyError {
     HttpError,
 }
 
 #[derive(Clone)]
-pub struct Tenor {
+pub struct Giphy {
     pub key: Arc<str>,
     pub client: Client,
     pub coalescion: CoalescionService<String>,
-    pub cache: Arc<RwLock<LruCache<String, Arc<types::PaginatedMediaResponse>>>>,
+    pub cache: Arc<RwLock<LruCache<String, Arc<types::SearchResponse>>>>,
 
     pub categories: Arc<RwLock<LruCache<String, Arc<types::CategoriesResponse>>>>,
-    pub featured: Arc<RwLock<LruCache<String, Arc<types::PaginatedMediaResponse>>>>,
+    pub featured: Arc<RwLock<LruCache<String, Arc<types::SearchResponse>>>>,
 }
 
-impl Tenor {
+impl Giphy {
     pub fn new(key: &str) -> Self {
         Self {
             key: Arc::from(key),
@@ -59,24 +59,29 @@ impl Tenor {
         }
     }
 
-    pub async fn request<T: DeserializeOwned>(&self, path: &str, query: &[Option<(&str, &str)>]) -> Result<Arc<T>, TenorError> {
+    pub async fn request<T: DeserializeOwned>(&self, path: &str, query: &[(&str, &str)]) -> Result<Arc<T>, GiphyError> {
         let response = self
             .client
-            .get(format!("{TENOR_API_BASE_URL}{path}"))
+            .get(format!("{GIPHY_API_BASE_URL}{path}"))
             .query(query)
             .send()
             .await
             .inspect_err(|e| {
                 revolt_config::capture_error(e);
             })
-            .map_err(|_| TenorError::HttpError)?;
+            .map_err(|_| GiphyError::HttpError)?;
 
         let text = response.text().await.map_err(|e| {
             revolt_config::capture_error(&e);
-            TenorError::HttpError
+            GiphyError::HttpError
         })?;
 
         Ok(Arc::new(serde_json::from_str(&text).unwrap()))
+    }
+
+    /// Strip country code from locale (e.g. "en_US" -> "en")
+    fn strip_locale(locale: &str) -> &str {
+        locale.split('_').next().unwrap_or(locale)
     }
 
     pub async fn search(
@@ -84,10 +89,9 @@ impl Tenor {
         query: &str,
         locale: &str,
         limit: u32,
-        is_category: bool,
-        position: &str,
-    ) -> Result<Arc<types::PaginatedMediaResponse>, TenorError> {
-        let unique_key = format!("s:{query}:{locale}:{is_category}:{position}");
+        offset: u64,
+    ) -> Result<Arc<types::SearchResponse>, GiphyError> {
+        let unique_key = format!("s:{query}:{locale}:{offset}");
 
         if self.cache.read().await.contains_key(&unique_key) {
             if let Some(response) = self.cache.write().await.get(&unique_key) {
@@ -95,19 +99,20 @@ impl Tenor {
             }
         }
 
+        let limit_str = limit.to_string();
+        let offset_str = offset.to_string();
+        let lang = Self::strip_locale(locale);
+
         let res = self.coalescion.execute(unique_key.clone(), || async move {
-            self.request::<types::PaginatedMediaResponse>(
+            self.request::<types::SearchResponse>(
                 "/search",
                 &[
-                    Some(("key", &self.key)),
-                    Some(("q", query)),
-                    Some(("client_key", "Gifbox")),
-                    Some(("media_filter", "webm,tinywebm")),
-                    Some(("locale", locale)),
-                    Some(("contentfilter", "high")),
-                    Some(("limit", &limit.to_string())),
-                    position.is_empty().then_some(("pos", position)),
-                    is_category.then_some(("component", "categories"))
+                    ("api_key", &self.key),
+                    ("q", query),
+                    ("limit", &limit_str),
+                    ("offset", &offset_str),
+                    ("rating", "g"),
+                    ("lang", lang),
                 ]
             ).await
         })
@@ -123,9 +128,8 @@ impl Tenor {
 
     pub async fn categories(
         &self,
-        locale: &str,
-    ) -> Result<Arc<types::CategoriesResponse>, TenorError> {
-        let unique_key = format!("c-{locale}");
+    ) -> Result<Arc<types::CategoriesResponse>, GiphyError> {
+        let unique_key = "categories".to_string();
 
         if self.categories.read().await.contains_key(&unique_key) {
             if let Some(response) = self.categories.write().await.get(&unique_key) {
@@ -139,10 +143,7 @@ impl Tenor {
                 self.request::<types::CategoriesResponse>(
                     "/categories",
                     &[
-                        Some(("key", &self.key)),
-                        Some(("client_key", "Gifbox")),
-                        Some(("locale", locale)),
-                        Some(("contentfilter", "high")),
+                        ("api_key", &self.key),
                     ]
                 ).await
             })
@@ -159,31 +160,30 @@ impl Tenor {
         (*res).clone()
     }
 
-    pub async fn featured(
+    pub async fn trending(
         &self,
-        locale: &str,
         limit: u32,
-        position: &str,
-    ) -> Result<Arc<types::PaginatedMediaResponse>, TenorError> {
-        let unique_key = format!("f-{locale}-{limit}-{position}");
+        offset: u64,
+    ) -> Result<Arc<types::SearchResponse>, GiphyError> {
+        let unique_key = format!("f-{limit}-{offset}");
 
-        if self.categories.read().await.contains_key(&unique_key) {
+        if self.featured.read().await.contains_key(&unique_key) {
             if let Some(response) = self.featured.write().await.get(&unique_key) {
                 return Ok(response.clone());
             }
         }
 
+        let limit_str = limit.to_string();
+        let offset_str = offset.to_string();
+
         let res = self.coalescion.execute(unique_key.clone(), || async move {
-            self.request::<types::PaginatedMediaResponse>(
-                "/featured",
+            self.request::<types::SearchResponse>(
+                "/trending",
                 &[
-                    Some(("key", &self.key)),
-                    Some(("client_key", "Gifbox")),
-                    Some(("media_filter", "webm,tinywebm")),
-                    Some(("locale", locale)),
-                    Some(("contentfilter", "high")),
-                    Some(("limit", &limit.to_string())),
-                    position.is_empty().then_some(("pos", position)),
+                    ("api_key", &self.key),
+                    ("limit", &limit_str),
+                    ("offset", &offset_str),
+                    ("rating", "g"),
                 ]
             ).await
         })

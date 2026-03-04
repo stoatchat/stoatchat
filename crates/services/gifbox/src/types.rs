@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::tenor::types;
+use crate::giphy::types;
 
 /// Successful root response
 #[derive(Serialize, Debug, ToSchema)]
@@ -22,14 +22,14 @@ pub struct PaginatedMediaResponse {
     pub next: Option<String>,
 }
 
-/// Indivual gif result.
+/// Individual gif result.
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug, PartialEq)]
 pub struct MediaResult {
-    /// Unique Tenor id.
+    /// Unique GIF id.
     pub id: String,
     /// Mapping of each file format and url of the file.
     pub media_formats: HashMap<String, MediaObject>,
-    /// Public Tenor web url for the gif.
+    /// Public web url for the gif.
     pub url: String,
 }
 
@@ -51,51 +51,62 @@ pub struct CategoryResponse {
     pub image: String,
 }
 
-impl From<types::PaginatedMediaResponse> for PaginatedMediaResponse {
-    fn from(value: types::PaginatedMediaResponse) -> Self {
+impl From<types::SearchResponse> for PaginatedMediaResponse {
+    fn from(value: types::SearchResponse) -> Self {
+        let next_offset = value.pagination.offset + value.pagination.count;
+        let has_more = next_offset < value.pagination.total_count;
         Self {
             results: value
-                .results
+                .data
                 .into_iter()
-                .map(|result| result.into())
+                .map(|gif| gif.into())
                 .collect(),
-            next: if value.next.is_empty() {
-                None
+            next: if has_more {
+                Some(next_offset.to_string())
             } else {
-                Some(value.next)
+                None
             },
         }
     }
 }
 
-impl From<types::MediaResponse> for MediaResult {
-    fn from(value: types::MediaResponse) -> Self {
+impl From<types::Gif> for MediaResult {
+    fn from(value: types::Gif) -> Self {
+        let mut media_formats = HashMap::new();
+
+        // Map original mp4 → "webm" key (matches existing frontend expectations)
+        if let Some(mp4) = &value.images.original.mp4 {
+            let width = value.images.original.width.as_deref().and_then(|w| w.parse().ok()).unwrap_or(0);
+            let height = value.images.original.height.as_deref().and_then(|h| h.parse().ok()).unwrap_or(0);
+            media_formats.insert("webm".to_string(), MediaObject {
+                url: mp4.clone(),
+                dimensions: vec![width, height],
+            });
+        }
+
+        // Map fixed_width mp4 → "tinywebm" key (matches existing frontend expectations)
+        if let Some(mp4) = &value.images.fixed_width.mp4 {
+            let width = value.images.fixed_width.width.as_deref().and_then(|w| w.parse().ok()).unwrap_or(0);
+            let height = value.images.fixed_width.height.as_deref().and_then(|h| h.parse().ok()).unwrap_or(0);
+            media_formats.insert("tinywebm".to_string(), MediaObject {
+                url: mp4.clone(),
+                dimensions: vec![width, height],
+            });
+        }
+
         Self {
             id: value.id,
-            media_formats: value
-                .media_formats
-                .into_iter()
-                .map(|(k, v)| (k, v.into()))
-                .collect(),
+            media_formats,
             url: value.url,
         }
     }
 }
 
-impl From<types::MediaObject> for MediaObject {
-    fn from(value: types::MediaObject) -> Self {
+impl From<types::Category> for CategoryResponse {
+    fn from(value: types::Category) -> Self {
         Self {
-            url: value.url,
-            dimensions: value.dims,
-        }
-    }
-}
-
-impl From<types::CategoryResponse> for CategoryResponse {
-    fn from(value: types::CategoryResponse) -> Self {
-        Self {
-            title: value.searchterm,
-            image: value.image,
+            title: value.name,
+            image: value.gif.images.fixed_width.url.unwrap_or_default(),
         }
     }
 }

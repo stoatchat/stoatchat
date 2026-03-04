@@ -7,7 +7,7 @@ use revolt_result::{create_error, Result};
 use serde::Deserialize;
 use utoipa::IntoParams;
 
-use crate::{tenor, types};
+use crate::{giphy, types};
 
 #[derive(Deserialize, IntoParams)]
 pub struct SearchQueryParams {
@@ -19,8 +19,6 @@ pub struct SearchQueryParams {
     pub locale: String,
     /// Amount of results to respond with
     pub limit: Option<u32>,
-    /// Flag for if searching in a gif category
-    pub is_category: Option<bool>,
     /// Value of `next` for getting the next page of results with the current search query
     pub position: Option<String>,
 }
@@ -39,15 +37,21 @@ pub struct SearchQueryParams {
 pub async fn search(
     _user: User,
     Query(params): Query<SearchQueryParams>,
-    State(tenor): State<tenor::Tenor>,
+    State(giphy): State<giphy::Giphy>,
 ) -> Result<Json<types::PaginatedMediaResponse>> {
-    tenor
+    let offset: u64 = params
+        .position
+        .as_deref()
+        .unwrap_or("0")
+        .parse()
+        .unwrap_or(0);
+
+    giphy
         .search(
             &params.query,
             &params.locale,
             params.limit.unwrap_or(50),
-            params.is_category.unwrap_or_default(),
-            params.position.as_deref().unwrap_or_default(),
+            offset,
         )
         .await
         .map_err(|_| create_error!(InternalError))

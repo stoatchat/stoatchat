@@ -12,17 +12,17 @@ use utoipa::{
 };
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 
-use crate::tenor::Tenor;
+use crate::giphy::Giphy;
 
 mod ratelimits;
 mod routes;
-mod tenor;
+mod giphy;
 mod types;
 
 #[derive(Clone, FromRef)]
 struct AppState {
     pub database: Database,
-    pub tenor: Tenor,
+    pub giphy: Giphy,
     pub ratelimit_storage: ratelimiter::RatelimitStorage,
 }
 
@@ -63,7 +63,7 @@ async fn main() -> Result<(), std::io::Error> {
         ),
         tags(
             (name = "Misc", description = "Misc routes for microservice."),
-            (name = "GIFs", description = "All routes for requesting GIFs from tenor.")
+            (name = "GIFs", description = "All routes for requesting GIFs from Giphy.")
         ),
         components(
             schemas(
@@ -83,13 +83,13 @@ async fn main() -> Result<(), std::io::Error> {
         .await
         .expect("Unable to connect to database");
 
-    let tenor = tenor::Tenor::new(&config.api.security.tenor_key);
+    let giphy = giphy::Giphy::new(&config.api.security.giphy_key);
 
     let ratelimit_storage = ratelimiter::RatelimitStorage::new(ratelimits::GifboxRatelimits);
 
     let state = AppState {
         database,
-        tenor,
+        giphy,
         ratelimit_storage,
     };
 

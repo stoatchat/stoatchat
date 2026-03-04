@@ -7,7 +7,7 @@ use revolt_result::{create_error, Result};
 use serde::Deserialize;
 use utoipa::IntoParams;
 
-use crate::{tenor, types};
+use crate::{giphy, types};
 
 #[derive(Deserialize, IntoParams)]
 pub struct TrendingQueryParams {
@@ -34,13 +34,19 @@ pub struct TrendingQueryParams {
 pub async fn trending(
     _user: User,
     Query(params): Query<TrendingQueryParams>,
-    State(tenor): State<tenor::Tenor>,
+    State(giphy): State<giphy::Giphy>,
 ) -> Result<Json<types::PaginatedMediaResponse>> {
-    tenor
-        .featured(
-            &params.locale,
+    let offset: u64 = params
+        .position
+        .as_deref()
+        .unwrap_or("0")
+        .parse()
+        .unwrap_or(0);
+
+    giphy
+        .trending(
             params.limit.unwrap_or(50),
-            params.position.as_deref().unwrap_or_default(),
+            offset,
         )
         .await
         .map_err(|_| create_error!(InternalError))
