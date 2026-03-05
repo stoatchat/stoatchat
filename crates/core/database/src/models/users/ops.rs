@@ -1,5 +1,3 @@
-use authifier::models::Session;
-use iso8601_timestamp::Timestamp;
 use revolt_result::Result;
 
 use crate::{FieldsUser, PartialUser, RelationshipStatus, User};
@@ -18,9 +16,6 @@ pub trait AbstractUsers: Sync + Send {
 
     /// Fetch a user from the database by their username
     async fn fetch_user_by_username(&self, username: &str, discriminator: &str) -> Result<User>;
-
-    /// Fetch a session from the database by token
-    async fn fetch_session_by_token(&self, token: &str) -> Result<Session>;
 
     /// Fetch multiple users by their ids
     async fn fetch_users<'a>(&self, ids: &'a [String]) -> Result<Vec<User>>;
@@ -60,9 +55,4 @@ pub trait AbstractUsers: Sync + Send {
 
     /// Delete a user by their id
     async fn delete_user(&self, id: &str) -> Result<()>;
-
-    /// Remove push subscription for a session by session id (TODO: remove)
-    async fn remove_push_subscription_by_session_id(&self, session_id: &str) -> Result<()>;
-
-    async fn update_session_last_seen(&self, session_id: &str, when: Timestamp) -> Result<()>;
 }

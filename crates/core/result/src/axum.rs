@@ -1,4 +1,8 @@
-use axum::{http::StatusCode, response::IntoResponse, Json};
+use axum::{
+    http::{header, StatusCode},
+    response::IntoResponse,
+    Json,
+};
 
 use crate::{Error, ErrorType};
 
@@ -90,6 +94,29 @@ impl IntoResponse for Error {
             ErrorType::FileTypeNotAllowed => StatusCode::BAD_REQUEST,
             ErrorType::ImageProcessingFailed => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorType::NoEmbedData => StatusCode::BAD_REQUEST,
+            ErrorType::RenderFail => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorType::MissingHeaders => StatusCode::BAD_REQUEST,
+            ErrorType::CaptchaFailed => StatusCode::BAD_REQUEST,
+            ErrorType::BlockedByShield => StatusCode::BAD_REQUEST,
+            ErrorType::UnverifiedAccount => StatusCode::FORBIDDEN,
+            ErrorType::EmailFailed => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorType::InvalidToken => StatusCode::UNAUTHORIZED,
+            ErrorType::MissingInvite => StatusCode::BAD_REQUEST,
+            ErrorType::InvalidInvite => StatusCode::BAD_REQUEST,
+            ErrorType::CompromisedPassword => StatusCode::BAD_REQUEST,
+            ErrorType::ShortPassword => StatusCode::BAD_REQUEST,
+            ErrorType::Blacklisted => {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    [(header::CONTENT_TYPE, "application/json")],
+                    "{\"type\":\"DisallowedContactSupport\", \"email\":\"support@revolt.chat\", \"note\":\"If you see this messages right here, you're probably doing something you shouldn't be.\"}"
+                ).into_response()
+            }
+            ErrorType::LockedOut => StatusCode::FORBIDDEN,
+            ErrorType::TotpAlreadyEnabled => StatusCode::BAD_REQUEST,
+            ErrorType::DisallowedMFAMethod => StatusCode::BAD_REQUEST,
+            ErrorType::OperationFailed => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorType::IncorrectData { .. } => StatusCode::BAD_REQUEST,
         };
 
         (status, Json(&self)).into_response()

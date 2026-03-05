@@ -283,7 +283,7 @@ impl From<crate::PartialChannel> for PartialChannel {
             role_permissions: value.role_permissions,
             default_permissions: value.default_permissions,
             last_message_id: value.last_message_id,
-            voice: value.voice.map(|voice| voice.into())
+            voice: value.voice.map(|voice| voice.into()),
         }
     }
 }
@@ -301,7 +301,7 @@ impl From<PartialChannel> for crate::PartialChannel {
             role_permissions: value.role_permissions,
             default_permissions: value.default_permissions,
             last_message_id: value.last_message_id,
-            voice: value.voice.map(|voice| voice.into())
+            voice: value.voice.map(|voice| voice.into()),
         }
     }
 }
@@ -515,7 +515,9 @@ impl From<crate::SystemMessage> for SystemMessage {
             crate::SystemMessage::UserRemove { id, by } => Self::UserRemove { id, by },
             crate::SystemMessage::MessagePinned { id, by } => Self::MessagePinned { id, by },
             crate::SystemMessage::MessageUnpinned { id, by } => Self::MessageUnpinned { id, by },
-            crate::SystemMessage::CallStarted { by, finished_at } => Self::CallStarted { by, finished_at }
+            crate::SystemMessage::CallStarted { by, finished_at } => {
+                Self::CallStarted { by, finished_at }
+            }
         }
     }
 }
@@ -1382,7 +1384,7 @@ impl From<FieldsMessage> for crate::FieldsMessage {
 impl From<VoiceInformation> for crate::VoiceInformation {
     fn from(value: VoiceInformation) -> Self {
         crate::VoiceInformation {
-            max_users: value.max_users
+            max_users: value.max_users,
         }
     }
 }
@@ -1390,7 +1392,96 @@ impl From<VoiceInformation> for crate::VoiceInformation {
 impl From<crate::VoiceInformation> for VoiceInformation {
     fn from(value: crate::VoiceInformation) -> Self {
         VoiceInformation {
-            max_users: value.max_users
+            max_users: value.max_users,
+        }
+    }
+}
+
+impl From<crate::Account> for AccountInfo {
+    fn from(item: crate::Account) -> Self {
+        AccountInfo {
+            id: item.id,
+            email: item.email,
+        }
+    }
+}
+
+impl From<crate::MFATicket> for MFATicket {
+    fn from(value: crate::MFATicket) -> Self {
+        MFATicket {
+            id: value.id,
+            account_id: value.account_id,
+            token: value.token,
+            validated: value.validated,
+            authorised: value.authorised,
+            last_totp_code: value.last_totp_code,
+        }
+    }
+}
+
+impl From<crate::MultiFactorAuthentication> for MultiFactorStatus {
+    fn from(item: crate::MultiFactorAuthentication) -> Self {
+        MultiFactorStatus {
+            // email_otp: item.enable_email_otp,
+            // trusted_handover: item.enable_trusted_handover,
+            // email_mfa: item.enable_email_mfa,
+            totp_mfa: !item.totp_token.is_disabled(),
+            // security_key_mfa: item.security_key_token.is_some(),
+            recovery_active: !item.recovery_codes.is_empty(),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<crate::MFAMethod> for MFAMethod {
+    fn from(value: crate::MFAMethod) -> Self {
+        match value {
+            crate::MFAMethod::Password => MFAMethod::Password,
+            crate::MFAMethod::Recovery => MFAMethod::Recovery,
+            crate::MFAMethod::Totp => MFAMethod::Totp,
+        }
+    }
+}
+
+impl From<crate::Session> for SessionInfo {
+    fn from(item: crate::Session) -> Self {
+        SessionInfo {
+            id: item.id,
+            name: item.name,
+        }
+    }
+}
+
+impl From<crate::Session> for Session {
+    fn from(value: crate::Session) -> Self {
+        Session {
+            id: value.id,
+            user_id: value.user_id,
+            token: value.token,
+            name: value.name,
+            last_seen: value.last_seen,
+            origin: value.origin,
+            subscription: value.subscription.map(Into::into),
+        }
+    }
+}
+
+impl From<crate::WebPushSubscription> for WebPushSubscription {
+    fn from(value: crate::WebPushSubscription) -> Self {
+        WebPushSubscription {
+            endpoint: value.endpoint,
+            p256dh: value.p256dh,
+            auth: value.auth,
+        }
+    }
+}
+
+impl From<WebPushSubscription> for crate::WebPushSubscription {
+    fn from(value: WebPushSubscription) -> Self {
+        crate::WebPushSubscription {
+            endpoint: value.endpoint,
+            p256dh: value.p256dh,
+            auth: value.auth,
         }
     }
 }

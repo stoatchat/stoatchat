@@ -1,22 +1,23 @@
-use authifier::{
-    models::{Account, EmailVerification, Session},
-    Authifier,
-};
+use std::time::Duration;
+
 use futures::StreamExt;
 use rand::Rng;
 use redis_kiss::redis::aio::PubSub;
+use revolt_database::util::password::hash_password;
 use revolt_database::{
     events::client::EventV1, Channel, Database, Member, Message, PartialRole, Server, User, AMQP,
 };
 use revolt_database::{util::idempotency::IdempotencyKey, Role};
+use revolt_database::{Account, EmailVerification, Session};
 use revolt_models::v0;
 use revolt_permissions::OverrideField;
 use rocket::http::Header;
 use rocket::local::asynchronous::{Client, LocalRequest, LocalResponse};
+use rocket::tokio;
+use serde::{Deserialize, Serialize};
 
 pub struct TestHarness {
     pub client: Client,
-    authifier: Authifier,
     pub db: Database,
     pub amqp: AMQP,
     sub: PubSub,
@@ -43,12 +44,6 @@ impl TestHarness {
             .expect("`Database`")
             .clone();
 
-        let authifier = client
-            .rocket()
-            .state::<Authifier>()
-            .expect("`Authifier`")
-            .clone();
-
         let connection = amqprs::connection::Connection::open(
             &amqprs::connection::OpenConnectionArguments::new(
                 &config.rabbit.host,
@@ -65,7 +60,6 @@ impl TestHarness {
 
         TestHarness {
             client,
-            authifier,
             db,
             amqp,
             sub,
@@ -93,11 +87,12 @@ impl TestHarness {
     }
 
     pub async fn account_from_user(&self, id: String) -> (Account, Session) {
+        let email = format!("{}@revolt.chat", TestHarness::rand_string());
         let account = Account {
             id,
-            email: format!("{}@revolt.chat", TestHarness::rand_string()),
-            password: Default::default(),
-            email_normalised: Default::default(),
+            email: email.clone(),
+            password: hash_password("password_insecure".to_string()).unwrap(),
+            email_normalised: email,
             deletion: None,
             disabled: false,
             lockout: None,
@@ -106,14 +101,10 @@ impl TestHarness {
             verification: EmailVerification::Verified,
         };
 
-        self.authifier
-            .database
-            .save_account(&account)
-            .await
-            .expect("`Account`");
+        self.db.save_account(&account).await.expect("`Account`");
 
         let session = account
-            .create_session(&self.authifier, String::new())
+            .create_session(&self.db, String::new())
             .await
             .expect("`Session`");
 
@@ -251,6 +242,40 @@ impl TestHarness {
         unreachable!()
     }
 
+    pub async fn assert_email(&self, mailbox: &str) -> (Mail, String) {
+        // Wait a moment for maildev to catch the email
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let client = reqwest::Client::new();
+        let results = client
+            .get("http://localhost:14080/email")
+            .send()
+            .await
+            .unwrap()
+            .json::<Vec<Mail>>()
+            .await
+            .unwrap();
+
+        let re = regex::Regex::new(r"\[\[([A-Za-z0-9_-]*)\]\]").unwrap();
+
+        for entry in results.into_iter().rev() {
+            if entry.envelope.to[0].address == mailbox {
+                client
+                    .delete(format!("http://localhost:14080/delete/{}", &entry.id))
+                    .send()
+                    .await
+                    .unwrap();
+
+                let code = re.captures_iter(&entry.text).next().unwrap()[1].to_string();
+
+                return (entry, code);
+            }
+        }
+
+        panic!("Email not found.")
+    }
+
     pub async fn wait_for_message(&mut self, channel_id: &str) -> v0::Message {
         dbg!(&self.event_buffer);
 
@@ -265,4 +290,23 @@ impl TestHarness {
             _ => unreachable!(),
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Mail {
+    pub id: String,
+    pub envelope: MailEnvelope,
+    pub subject: String,
+    pub text: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MailEnvelope {
+    pub from: MailAddress,
+    pub to: Vec<MailAddress>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MailAddress {
+    pub address: String,
 }

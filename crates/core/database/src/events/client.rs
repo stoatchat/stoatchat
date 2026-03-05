@@ -1,4 +1,3 @@
-use authifier::AuthifierEvent;
 use revolt_result::Error;
 use serde::{Deserialize, Serialize};
 
@@ -6,7 +5,7 @@ use revolt_models::v0::{
     AppendMessage, Channel, ChannelUnread, ChannelVoiceState, Emoji, FieldsChannel, FieldsMember, FieldsMessage, FieldsRole, FieldsServer, FieldsUser, FieldsWebhook, Member, MemberCompositeKey, Message, PartialChannel, PartialMember, PartialMessage, PartialRole, PartialServer, PartialUser, PartialUserVoiceState, PartialWebhook, PolicyChange, RemovalIntention, Report, Server, User, UserSettings, UserVoiceState, Webhook
 };
 
-use crate::Database;
+use crate::{Account, Database, Session};
 
 /// Ping Packet
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -271,7 +270,20 @@ pub enum EventV1 {
     WebhookDelete { id: String },
 
     /// Auth events
-    Auth(AuthifierEvent),
+    CreateAccount {
+        account: Account,
+    },
+    CreateSession {
+        session: Session,
+    },
+    DeleteSession {
+        user_id: String,
+        session_id: String,
+    },
+    DeleteAllSessions {
+        user_id: String,
+        exclude_session_id: Option<String>,
+    },
 
     /// Voice events
     VoiceChannelJoin {
