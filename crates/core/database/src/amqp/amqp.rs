@@ -11,6 +11,8 @@ use revolt_presence::filter_online;
 
 use serde_json::to_string;
 
+// TODO: move away from storing Connection and Channel to using thread local singletons - #659
+
 #[derive(Clone)]
 pub struct AMQP {
     #[allow(unused)]

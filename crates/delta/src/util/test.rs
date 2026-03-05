@@ -6,7 +6,9 @@ use futures::StreamExt;
 use rand::Rng;
 use redis_kiss::redis::aio::PubSub;
 use revolt_database::{
-    events::client::EventV1, Channel, Database, Member, Message, PartialRole, Server, User, AMQP,
+    events::client::EventV1,
+    util::rabbit::{get_channel, set_rabbitmq_connection},
+    Channel, Database, Member, Message, PartialRole, Server, User, AMQP,
 };
 use revolt_database::{util::idempotency::IdempotencyKey, Role};
 use revolt_models::v0;
@@ -59,9 +61,15 @@ impl TestHarness {
         )
         .await
         .unwrap();
-        let channel = connection.open_channel(None).await.unwrap();
+
+        set_rabbitmq_connection(connection.clone());
+        let channel = get_channel().await;
 
         let amqp = AMQP::new(connection, channel);
+
+        async_std::task::spawn(async {
+
+        });
 
         TestHarness {
             client,

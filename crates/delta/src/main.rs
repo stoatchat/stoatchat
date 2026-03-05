@@ -9,8 +9,7 @@ pub mod routes;
 pub mod util;
 
 use revolt_config::config;
-use revolt_database::events::client::EventV1;
-use revolt_database::AMQP;
+use revolt_database::{AMQP, util::rabbit::{get_channel, get_channel_with_init, set_rabbitmq_connection}};
 use revolt_ratelimits::rocket as ratelimiter;
 use rocket::{Build, Rocket};
 use rocket_cors::{AllowedOrigins, CorsOptions};
@@ -19,11 +18,9 @@ use std::net::Ipv4Addr;
 use std::str::FromStr;
 
 use amqprs::{
-    channel::ExchangeDeclareArguments,
+    channel::{Channel, ExchangeDeclareArguments},
     connection::{Connection, OpenConnectionArguments},
 };
-use async_std::channel::unbounded;
-use authifier::AuthifierEvent;
 use rocket::data::ToByteUnit;
 use revolt_database::voice::VoiceClient;
 
@@ -39,27 +36,8 @@ pub async fn web() -> Rocket<Build> {
     log::info!("database_here {db:?}");
     db.migrate_database().await.unwrap();
 
-    // Setup Authifier event channel
-    let (_, receiver) = unbounded();
-
     // Setup Authifier
     let authifier = db.clone().to_authifier().await;
-
-    // Launch a listener for Authifier events
-    async_std::task::spawn(async move {
-        while let Ok(event) = receiver.recv().await {
-            match &event {
-                AuthifierEvent::CreateSession { .. } | AuthifierEvent::CreateAccount { .. } => {
-                    EventV1::Auth(event).global().await
-                }
-                AuthifierEvent::DeleteSession { user_id, .. }
-                | AuthifierEvent::DeleteAllSessions { user_id, .. } => {
-                    let id = user_id.to_string();
-                    EventV1::Auth(event).private(id).await
-                }
-            }
-        }
-    });
 
     // Configure CORS
     let cors = CorsOptions {
@@ -121,19 +99,19 @@ pub async fn web() -> Rocket<Build> {
     .await
     .expect("Failed to connect to RabbitMQ");
 
-    let channel = connection
-        .open_channel(None)
-        .await
-        .expect("Failed to open RabbitMQ channel");
+    set_rabbitmq_connection(connection.clone());
+    let channel = get_channel_with_init(|channel: Channel| async {
+        channel
+            .exchange_declare(
+                ExchangeDeclareArguments::new(&config.pushd.exchange, "direct")
+                    .durable(true)
+                    .finish(),
+            )
+            .await
+            .expect("Failed to declare exchange");
 
-    channel
-        .exchange_declare(
-            ExchangeDeclareArguments::new(&config.pushd.exchange, "direct")
-                .durable(true)
-                .finish(),
-        )
-        .await
-        .expect("Failed to declare exchange");
+        channel
+    }).await;
 
     let amqp = AMQP::new(connection, channel);
 
