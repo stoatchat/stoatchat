@@ -232,6 +232,11 @@ pub struct ApiUsers {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct ApiAuditLogs {
+    pub expires_after: u64,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct Api {
     pub registration: ApiRegistration,
     pub smtp: ApiSmtp,
@@ -239,6 +244,7 @@ pub struct Api {
     pub workers: ApiWorkers,
     pub livekit: ApiLiveKit,
     pub users: ApiUsers,
+    pub audit_logs: ApiAuditLogs,
 }
 
 #[derive(Deserialize, Debug, Clone)]

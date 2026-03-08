@@ -77,6 +77,54 @@ macro_rules! auto_derived_partial {
     };
 }
 
+macro_rules! generate_field_diff {
+    (optional, $remove:ident, $fieldsmember:path, $self:ident, $before:ident, $partial:ident, $field:ident) => {
+        if $partial.$field.is_some() || $remove.contains(&$fieldsmember) {
+            $before.$field = $self.$field.clone();
+        };
+    };
+
+    (optional, default, $remove:ident, $fieldsmember:path, $self:ident, $before:ident, $partial:ident, $field:ident) => {
+        if $partial.$field.is_some() || $remove.contains(&$fieldsmember) {
+            $before.$field = Some($self.$field.clone());
+        };
+    };
+
+    ($self:ident, $before:ident, $partial:ident, $field:ident) => {
+        if $partial.$field.is_some() {
+            $before.$field = Some($self.$field.clone());
+        };
+    };
+}
+
+macro_rules! generate_diff {
+    (
+        $self:ident,
+        $before:ident,
+        $partial:ident,
+        $remove:ident,
+        (
+            $(
+                $(
+                    $(@$optional:tt)? (
+                        $($(@$default:tt)? (default))?
+                        $fieldsmember:path
+                    )
+                )?
+                $field: ident
+            ),*
+            $(,)?
+        )
+    ) => {
+        $(
+            generate_field_diff!(
+                $( $($optional)? optional, $($($default)? default,)? $remove, $fieldsmember,)?
+                $self, $before, $partial, $field
+            );
+        )*
+    }
+}
+
 mod drivers;
 pub use drivers::*;
 
@@ -114,7 +162,6 @@ pub use amqp::amqp::AMQP;
 
 #[cfg(feature = "voice")]
 pub mod voice;
-
 
 /// Utility function to check if a boolean value is false
 pub fn if_false(t: &bool) -> bool {

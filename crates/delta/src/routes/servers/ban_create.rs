@@ -1,7 +1,7 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     voice::{get_user_voice_channel_in_server, remove_user_from_voice_channel, VoiceClient},
-    Database, RemovalIntention, ServerBan, User,
+    AuditLogEntryAction, Database, RemovalIntention, ServerBan, User,
 };
 use revolt_models::v0;
 
@@ -9,6 +9,8 @@ use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 use validator::Validate;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Ban User
 ///
@@ -19,6 +21,7 @@ pub async fn ban(
     db: &State<Database>,
     voice_client: &State<VoiceClient>,
     user: User,
+    audit_log_reason: AuditLogReason,
     server: Reference<'_>,
     target: Reference<'_>,
     data: Json<v0::DataBanCreate>,
@@ -63,8 +66,13 @@ pub async fn ban(
         }
     }
 
-    ServerBan::create(db, &server, target.id, data.reason)
-        .await
-        .map(Into::into)
-        .map(Json)
+    let ban = ServerBan::create(db, &server, target.id, data.reason.clone()).await?;
+
+    AuditLogEntryAction::BanCreate {
+        user: target.id.to_string(),
+    }
+    .insert(db, server.id, audit_log_reason.0.or(data.reason), user.id)
+    .await;
+
+    Ok(Json(ban.into()))
 }

@@ -11,9 +11,9 @@ use revolt_database::{
         set_user_moved_from_voice, set_user_moved_to_voice, sync_user_voice_permissions,
         VoiceClient,
     },
-    Database, File, PartialMember, User,
+    AuditLogEntryAction, Database, FieldsMember, File, PartialMember, User,
 };
-use revolt_models::v0::{self, FieldsMember};
+use revolt_models::v0;
 
 use revolt_permissions::{
     calculate_channel_permissions, calculate_server_permissions, ChannelPermission,
@@ -21,6 +21,8 @@ use revolt_permissions::{
 use revolt_result::{create_error, Result};
 use rocket::{form::validate::Contains, serde::json::Json, State};
 use validator::Validate;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Edit Member
 ///
@@ -31,6 +33,7 @@ pub async fn edit(
     db: &State<Database>,
     voice_client: &State<VoiceClient>,
     user: User,
+    reason: AuditLogReason,
     server: Reference<'_>,
     member: Reference<'_>,
     data: Json<v0::DataMemberEdit>,
@@ -52,7 +55,9 @@ pub async fn edit(
     let permissions = calculate_server_permissions(&mut query).await;
 
     // Fetch target permissions
-    let mut target_query = DatabasePermissionQuery::new(db, &target_user).server(&server).member(&member);
+    let mut target_query = DatabasePermissionQuery::new(db, &target_user)
+        .server(&server)
+        .member(&member);
     let target_permissions = calculate_server_permissions(&mut target_query).await;
 
     // Check permissions in server
@@ -83,7 +88,7 @@ pub async fn edit(
             }
 
             if target_permissions.has_channel_permission(ChannelPermission::TimeoutMembers) {
-                return Err(create_error!(IsElevated))
+                return Err(create_error!(IsElevated));
             }
         }
 
@@ -98,11 +103,11 @@ pub async fn edit(
         permissions.throw_if_lacking_channel_permission(ChannelPermission::DeafenMembers)?;
     }
 
-    if data.voice_channel.is_some() && data.remove.contains(&FieldsMember::VoiceChannel) {
-        return Err(create_error!(InvalidOperation))
+    if data.voice_channel.is_some() && data.remove.contains(&v0::FieldsMember::VoiceChannel) {
+        return Err(create_error!(InvalidOperation));
     }
 
-    if data.voice_channel.is_some() || data.remove.contains(&FieldsMember::VoiceChannel) {
+    if data.voice_channel.is_some() || data.remove.contains(&v0::FieldsMember::VoiceChannel) {
         if !voice_client.is_enabled() {
             return Err(create_error!(LiveKitUnavailable));
         };
@@ -200,9 +205,23 @@ pub async fn edit(
         partial.avatar = Some(File::use_user_avatar(db, &avatar, &user.id, &user.id).await?);
     }
 
-    member
-        .update(db, partial, remove.clone().into_iter().map(Into::into).collect())
-        .await?;
+    let remove = remove
+        .into_iter()
+        .map(Into::into)
+        .collect::<Vec<FieldsMember>>();
+
+    let before = member.generate_diff(&partial, &remove);
+
+    member.update(db, partial.clone(), remove.clone()).await?;
+
+    AuditLogEntryAction::MemberEdit {
+        user: member.id.user.clone(),
+        remove: remove.clone(),
+        before,
+        after: partial,
+    }
+    .insert(db, server.id.clone(), reason.0, user.id.clone())
+    .await;
 
     if let Some(new_voice_channel) = new_voice_channel {
         if let Some(channel) = get_user_voice_channel_in_server(&target_user.id, &server.id).await?
