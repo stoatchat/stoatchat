@@ -42,7 +42,7 @@ impl<'a> PayloadLike for MessagePayload<'a> {
     fn get_device_token(&self) -> &'a str {
         self.device_token
     }
-    fn get_options(&self) -> &NotificationOptions {
+    fn get_options(&self) -> &NotificationOptions<'_> {
         &self.options
     }
 }
@@ -68,7 +68,7 @@ impl<'a> PayloadLike for CallStartStopPayload<'a> {
     fn get_device_token(&self) -> &'a str {
         self.device_token
     }
-    fn get_options(&self) -> &NotificationOptions {
+    fn get_options(&self) -> &NotificationOptions<'_> {
         &self.options
     }
 }
