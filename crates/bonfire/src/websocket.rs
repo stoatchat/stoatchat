@@ -218,7 +218,13 @@ async fn listener(
     kill_signal_r: async_channel::Receiver<()>,
     write: &Mutex<WsWriter>,
 ) {
-    let redis_config = RedisConfig::from_url(&REDIS_URI).unwrap();
+    let stoat_config = revolt_config::config().await;
+    let url = stoat_config
+        .database
+        .redis_pubsub
+        .unwrap_or(REDIS_URI.to_string());
+
+    let redis_config = RedisConfig::from_url(&url).unwrap();
     let subscriber = match report_internal_error!(
         fred::types::Builder::from_config(redis_config).build_subscriber_client()
     ) {
@@ -457,8 +463,31 @@ async fn worker(
                 };
 
                 match payload {
-                    ClientMessage::BeginTyping { .. } => {}
-                    ClientMessage::EndTyping { .. } => {}
+                    // disabled events
+                    // ClientMessage::BeginTyping { channel } => {
+                    //     if !subscribed.read().await.contains(&channel) {
+                    //         continue;
+                    //     }
+
+                    //     EventV1::ChannelStartTyping {
+                    //         id: channel.clone(),
+                    //         user: user_id.clone(),
+                    //     }
+                    //     .p(channel.clone())
+                    //     .await;
+                    // }
+                    // ClientMessage::EndTyping { channel } => {
+                    //     if !subscribed.read().await.contains(&channel) {
+                    //         continue;
+                    //     }
+
+                    //     EventV1::ChannelStopTyping {
+                    //         id: channel.clone(),
+                    //         user: user_id.clone(),
+                    //     }
+                    //     .p(channel.clone())
+                    //     .await;
+                    // }
                     ClientMessage::Subscribe { server_id } => {
                         let mut servers = active_servers.lock().await;
                         let has_item = servers.contains_key(&server_id);
