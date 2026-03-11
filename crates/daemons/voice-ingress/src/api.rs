@@ -5,8 +5,9 @@ use revolt_database::{
     iso8601_timestamp::{Duration, Timestamp},
     util::reference::Reference,
     voice::{
-        create_voice_state, delete_channel_node, delete_voice_state, get_user_moved_from_voice,
-        get_user_moved_to_voice, get_voice_channel_members, update_voice_state_tracks, VoiceClient,
+        create_voice_state, delete_channel_voice_state, delete_voice_state,
+        get_user_moved_from_voice, get_user_moved_to_voice, update_voice_state_tracks,
+        RoomMetadata, UserVoiceChannel, VoiceClient,
     },
     Database, AMQP,
 };
@@ -50,27 +51,34 @@ pub async fn ingress(
 
     let channel_id = event.room.as_ref().map(|r| &r.name);
     let user_id = event.participant.as_ref().map(|r| &r.identity);
+    let room_metadata = if let Some(room) = event.room.as_ref() {
+        Some(serde_json::from_str::<RoomMetadata>(&room.metadata).to_internal_error()?)
+    } else {
+        None
+    };
 
     match event.event.as_str() {
         // User joined a channel
         "participant_joined" => {
             let channel_id = channel_id.to_internal_error()?;
             let user_id = user_id.to_internal_error()?;
-
-            let channel = Reference::from_unchecked(channel_id).as_channel(db).await?;
+            let server_id = room_metadata.to_internal_error()?.server;
+            let channel = UserVoiceChannel {
+                id: channel_id.clone(),
+                server_id: server_id.clone(),
+            };
 
             let joined_at = Timestamp::UNIX_EPOCH
                 .checked_add(Duration::seconds(event.created_at))
                 .unwrap();
 
-            let voice_state =
-                create_voice_state(channel_id, channel.server(), user_id, joined_at).await?;
+            let voice_state = create_voice_state(&channel, user_id, joined_at).await?;
 
             // Only publish one event when a user is moved from one channel to another.
             if let Some(moved_from) = get_user_moved_to_voice(channel_id, user_id).await? {
                 EventV1::VoiceChannelMove {
                     user: user_id.to_string(),
-                    from: moved_from,
+                    from: moved_from.id,
                     to: channel_id.to_string(),
                     state: voice_state,
                 }
@@ -135,10 +143,13 @@ pub async fn ingress(
         "participant_left" => {
             let channel_id = channel_id.to_internal_error()?;
             let user_id = user_id.to_internal_error()?;
+            let server_id = room_metadata.to_internal_error()?.server;
+            let channel = UserVoiceChannel {
+                id: channel_id.clone(),
+                server_id: server_id.clone(),
+            };
 
-            let channel = Reference::from_unchecked(channel_id).as_channel(db).await?;
-
-            delete_voice_state(channel_id, channel.server(), user_id).await?;
+            delete_voice_state(&channel, user_id).await?;
 
             // Dont send leave event when a user is moved
             if get_user_moved_from_voice(channel_id, user_id)
@@ -159,8 +170,6 @@ pub async fn ingress(
             // let members = get_voice_channel_members(channel_id).await?;
 
             // if members.is_none_or(|m| m.is_empty()) {
-            //     delete_channel_node(channel_id).await?;
-            //
             //     // The channel is empty so send out an "end" message for ringing
             //     if let Err(e) = amqp
             //         .dm_call_updated(user_id, channel_id, None, true, None)
@@ -204,8 +213,11 @@ pub async fn ingress(
             let channel_id = channel_id.to_internal_error()?;
             let user_id = user_id.to_internal_error()?;
             let track = event.track.as_ref().to_internal_error()?;
-
-            let channel = Reference::from_unchecked(channel_id).as_channel(db).await?;
+            let server_id = room_metadata.to_internal_error()?.server;
+            let channel = UserVoiceChannel {
+                id: channel_id.clone(),
+                server_id: server_id.clone(),
+            };
 
             let user = Reference::from_unchecked(user_id).as_user(db).await?;
 
@@ -245,15 +257,14 @@ pub async fn ingress(
                     log::debug!("Removing user {user_id} from channel {channel_id} {event:?} due to forbidden track.");
 
                     let _ = voice_client.remove_user(node, user_id, channel_id).await;
-                    delete_voice_state(channel_id, channel.server(), user_id).await?;
+                    delete_voice_state(&channel, user_id).await?;
 
                     return Ok(EmptyResponse);
                 };
             };
 
             let partial = update_voice_state_tracks(
-                channel_id,
-                channel.server(),
+                &channel,
                 user_id,
                 event.event == "track_published" || event.event == "track_unmuted", // to avoid duplicating this entire case twice
                 track.source,
@@ -267,6 +278,16 @@ pub async fn ingress(
             }
             .p(channel_id.clone())
             .await;
+        }
+        "room_finished" => {
+            let channel_id = channel_id.to_internal_error()?;
+            let server_id = room_metadata.to_internal_error()?.server;
+            let channel = UserVoiceChannel {
+                id: channel_id.clone(),
+                server_id: server_id.clone(),
+            };
+
+            delete_channel_voice_state(&channel, &[]).await?;
         }
         _ => {}
     };

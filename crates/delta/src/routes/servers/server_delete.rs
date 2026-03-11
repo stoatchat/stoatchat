@@ -2,7 +2,7 @@ use revolt_database::{
     util::reference::Reference,
     voice::{
         delete_voice_channel, get_user_voice_channel_in_server, remove_user_from_voice_channel,
-        VoiceClient,
+        UserVoiceChannel, VoiceClient,
     },
     Database, RemovalIntention, User,
 };
@@ -29,13 +29,28 @@ pub async fn delete(
 
     if server.owner == user.id {
         for channel_id in &server.channels {
-            delete_voice_channel(voice_client, channel_id, Some(&server.id)).await?;
+            delete_voice_channel(
+                voice_client,
+                &UserVoiceChannel {
+                    id: channel_id.clone(),
+                    server_id: Some(server.id.clone()),
+                },
+            )
+            .await?;
         }
 
         server.delete(db).await
     } else {
         if let Some(channel_id) = get_user_voice_channel_in_server(&user.id, &server.id).await? {
-            remove_user_from_voice_channel(db, voice_client, &channel_id, &user.id).await?;
+            remove_user_from_voice_channel(
+                voice_client,
+                &UserVoiceChannel {
+                    id: channel_id,
+                    server_id: Some(server.id.clone()),
+                },
+                &user.id,
+            )
+            .await?;
         };
 
         member
