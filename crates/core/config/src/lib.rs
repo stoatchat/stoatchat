@@ -449,7 +449,7 @@ pub async fn config() -> Settings {
     let mut config = read().await.try_deserialize::<Settings>().unwrap();
 
     // inject REDIS_URI for redis-kiss library
-    if std::env::var("REDIS_URL").is_err() {
+    if std::env::var("REDIS_URI").is_err() {
         std::env::set_var("REDIS_URI", config.database.redis.clone());
     }
 
