@@ -687,8 +687,13 @@ impl Message {
         )
         .await?;
 
+        let is_dm_or_group = matches!(
+            channel,
+            Channel::DirectMessage { .. } | Channel::Group { .. }
+        );
+
         if !self.has_suppressed_notifications()
-            && (self.mentions.is_some() || self.contains_mass_push_mention())
+            && (is_dm_or_group || self.mentions.is_some() || self.contains_mass_push_mention())
         {
             // send Push notifications
             #[cfg(feature = "tasks")]
