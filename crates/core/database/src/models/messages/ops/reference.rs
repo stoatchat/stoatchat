@@ -1,7 +1,9 @@
+use std::collections::HashMap;
 use futures::future::try_join_all;
 use indexmap::IndexSet;
 use revolt_result::Result;
-
+use std::time::SystemTime;
+use ulid::Ulid;
 use crate::{AppendMessage, FieldsMessage, Message, MessageQuery, PartialMessage, ReferenceDb};
 
 use super::AbstractMessages;
@@ -285,5 +287,36 @@ impl AbstractMessages for ReferenceDb {
             .retain(|id, message| message.channel != channel && !ids.contains(id));
 
         Ok(())
+    }
+
+    /// Delete all messages from a specific author in a list of channels from a certain ULID onwards
+    async fn delete_messages_by_author_since(
+        &self,
+        channels: &[String],
+        author: &str,
+        since: SystemTime
+    ) -> Result<HashMap<String, Vec<String>>> {
+        let threshold_ulid = Ulid::from_datetime(since).to_string();
+        let mut deleted_messages: HashMap<String, Vec<String>> = HashMap::new();
+
+        self.messages
+            .lock()
+            .await
+            .retain(|id, message| {
+                let should_delete = message.author == author
+                    && channels.contains(&message.channel)
+                    && id.as_str() >= threshold_ulid.as_str();
+
+                if should_delete {
+                    deleted_messages
+                        .entry(message.channel.clone())
+                        .or_default()
+                        .push(id.clone());
+                }
+
+                !should_delete
+            });
+
+        Ok(deleted_messages)
     }
 }

@@ -1,6 +1,10 @@
+use std::collections::HashMap;
+use futures::StreamExt;
+use std::time::SystemTime;
 use bson::{to_bson, Document};
 use futures::try_join;
 use mongodb::options::FindOptions;
+use ulid::Ulid;
 use revolt_models::v0::MessageSort;
 use revolt_result::Result;
 
@@ -305,6 +309,47 @@ impl AbstractMessages for MongoDb {
             .await
             .map(|_| ())
             .map_err(|_| create_database_error!("delete_many", COL))
+    }
+
+    /// Delete all messages from a specific author in a server from a certain ULID onwards
+    async fn delete_messages_by_author_since(&self, channels: &[String], author: &str, since: SystemTime) -> Result<HashMap<String, Vec<String>>> {
+        let threshold_ulid = Ulid::from_datetime(since).to_string();
+
+        let filter = doc! {
+        "author": author,
+        "channel": { "$in": channels },
+        "_id": { "$gte": &threshold_ulid }
+        };
+
+        let find_options = FindOptions::builder()
+            .projection(doc! { "_id": 1, "channel": 1 })
+            .build();
+
+        let mut cursor = self.col::<Document>(COL)
+            .find(filter.clone())
+            .with_options(find_options)
+            .await
+            .map_err(|_| create_database_error!("find", COL))?;
+
+        let mut deleted_messages: HashMap<String, Vec<String>> = HashMap::new();
+
+        while let Some(result) = cursor.next().await {
+            if let Ok(doc) = result {
+                if let (Ok(id), Ok(channel)) = (doc.get_str("_id"), doc.get_str("channel")) {
+                    deleted_messages
+                        .entry(channel.to_string())
+                        .or_default()
+                        .push(id.to_string());
+                }
+            }
+        }
+
+        self.col::<Document>(COL)
+            .delete_many(filter)
+            .await
+            .map_err(|_| create_database_error!("delete_many", COL))?;
+
+        Ok(deleted_messages)
     }
 }
 

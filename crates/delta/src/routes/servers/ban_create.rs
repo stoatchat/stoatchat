@@ -1,3 +1,4 @@
+use std::time::{SystemTime, Duration};
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     voice::{
@@ -11,7 +12,9 @@ use revolt_models::v0;
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
+use ulid::Ulid;
 use validator::Validate;
+use revolt_database::events::client::EventV1;
 
 /// # Ban User
 ///
@@ -73,7 +76,29 @@ pub async fn ban(
             .await?;
         }
     }
+    // We do this outside the member check so we can sweep hit-and-run spammers who already left.
+    if let Some(seconds) = data.delete_message_seconds {
+        if seconds > 0 {
+            let threshold_time = SystemTime::now() - Duration::from_secs(seconds as u64);
 
+            let deleted_groups = db.delete_messages_by_author_since(
+                &server.channels,
+                target.id,
+                threshold_time
+            ).await?;
+
+            for (channel_id, message_ids) in deleted_groups {
+                if !message_ids.is_empty() {
+                    EventV1::BulkMessageDelete {
+                        channel: channel_id.clone(),
+                        ids: message_ids,
+                    }
+                        .p(channel_id)
+                        .await;
+                }
+            }
+        }
+    }
     ServerBan::create(db, &server, target.id, data.reason)
         .await
         .map(Into::into)
