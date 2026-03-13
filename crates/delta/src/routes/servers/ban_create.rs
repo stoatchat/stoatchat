@@ -1,4 +1,4 @@
-use chrono::{Utc, Duration};
+use std::time::{SystemTime, Duration};
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     voice::{
@@ -78,15 +78,12 @@ pub async fn ban(
     // We do this outside the member check so we can sweep hit-and-run spammers who already left.
     if let Some(seconds) = data.delete_message_seconds {
         if seconds > 0 {
-
-            let threshold_time = Utc::now() - Duration::seconds(seconds);
-
-            let threshold_ulid = Ulid::from_datetime(threshold_time).to_string();
+            let threshold_time = SystemTime::now() - Duration::from_secs(seconds as u64);
 
             db.delete_messages_by_author_since(
                 &server.channels,
                 target.id,
-                &threshold_ulid
+                threshold_time
             ).await?;
         }
     }

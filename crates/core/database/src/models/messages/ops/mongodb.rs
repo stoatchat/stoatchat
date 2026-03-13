@@ -1,6 +1,8 @@
+use std::time::SystemTime;
 use bson::{to_bson, Document};
 use futures::try_join;
 use mongodb::options::FindOptions;
+use ulid::Ulid;
 use revolt_models::v0::MessageSort;
 use revolt_result::Result;
 
@@ -308,13 +310,14 @@ impl AbstractMessages for MongoDb {
     }
 
     /// Delete all messages from a specific author in a server from a certain ULID onwards
-    async fn delete_messages_by_author_since(&self, channels: &[String], author: &str, since_ulid: &str) -> Result<()> {
+    async fn delete_messages_by_author_since(&self, channels: &[String], author: &str, since: SystemTime) -> Result<()> {
+        let threshold_ulid = Ulid::from_datetime(since).to_string();
         self.col::<Document>(COL)
             .delete_many(
                 doc! {
                     "author": author,
                     "channel": { "$in": channels }, // Matches any channel in the slice
-                    "_id": { "$gte": since_ulid }
+                    "_id": { "$gte": threshold_ulid }
                 }
             )
             .await

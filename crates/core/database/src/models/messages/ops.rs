@@ -1,3 +1,4 @@
+use std::time::SystemTime;
 use revolt_result::Result;
 
 use crate::{AppendMessage, FieldsMessage, Message, MessageQuery, PartialMessage};
@@ -46,6 +47,6 @@ pub trait AbstractMessages: Sync + Send {
         &self,
         channels: &[String],
         author: &str,
-        since_ulid: &str
+        since: SystemTime
     ) -> Result<()>;
 }

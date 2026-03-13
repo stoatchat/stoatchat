@@ -1,7 +1,8 @@
 use futures::future::try_join_all;
 use indexmap::IndexSet;
 use revolt_result::Result;
-
+use std::time::SystemTime;
+use ulid::Ulid;
 use crate::{AppendMessage, FieldsMessage, Message, MessageQuery, PartialMessage, ReferenceDb};
 
 use super::AbstractMessages;
@@ -292,15 +293,16 @@ impl AbstractMessages for ReferenceDb {
         &self,
         channels: &[String],
         author: &str,
-        since_ulid: &str
+        since: SystemTime
     ) -> Result<()> {
+        let since_ulid = Ulid::from_datetime(since).to_string();
         self.messages
             .lock()
             .await
             .retain(|id, message| {
                 let should_delete = message.author == author
                     && channels.contains(&message.channel)
-                    && id.as_str() >= since_ulid;
+                    && id.as_str() >= since_ulid.as_str();
                 !should_delete
             });
 
