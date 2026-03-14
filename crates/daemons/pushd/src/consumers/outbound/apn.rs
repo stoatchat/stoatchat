@@ -136,7 +136,7 @@ impl ApnsOutboundConsumer {
 
         let pkcs8 = engine::general_purpose::STANDARD
             .decode(config.pushd.apn.pkcs8.clone())
-            .expect("valid `pcks8`");
+            .expect("valid `pkcs8`");
 
         let client_config = ClientConfig::new(endpoint);
 

@@ -6,7 +6,7 @@ members = [
     "crates/bonfire",
     "crates/core/*",
     "crates/services/*",
-    "crates/daemons/*",
+    "crates/daemons/*", "crates/cmd",
 ]
 
 [patch.crates-io]
