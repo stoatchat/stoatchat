@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.12.0](https://github.com/stoatchat/stoatchat/compare/v0.11.5...v0.12.0) (2026-03-14)
+
+
+### Features
+
+* add bug report template for issue tracking ([#627](https://github.com/stoatchat/stoatchat/issues/627)) ([f777e28](https://github.com/stoatchat/stoatchat/commit/f777e2863c6ca50057c8b5d0a5be14915d287724))
+* expose global and user limits in root API response ([#644](https://github.com/stoatchat/stoatchat/issues/644)) ([0b522eb](https://github.com/stoatchat/stoatchat/commit/0b522ebddc17f2e3f792ff5e2347793e9849fa23))
+
+
+### Bug Fixes
+
+* add masquerade permission to default direct message settings ([#665](https://github.com/stoatchat/stoatchat/issues/665)) ([ab52569](https://github.com/stoatchat/stoatchat/commit/ab525699bd6663333f0e9fed6d2455e482e6a09f))
+* Check for appropriate permission for removing other users avatar ([#657](https://github.com/stoatchat/stoatchat/issues/657)) ([d56135e](https://github.com/stoatchat/stoatchat/commit/d56135e0cbc713884c9378832952f7ad490fa315))
+* default video resolution is a non-existent size ([#601](https://github.com/stoatchat/stoatchat/issues/601)) ([0698e11](https://github.com/stoatchat/stoatchat/commit/0698e115e8d003d615e468c4fb9654e6bbc9107f)), closes [#588](https://github.com/stoatchat/stoatchat/issues/588)
+* Fix typo for p256dh in vapid notification flow ([#622](https://github.com/stoatchat/stoatchat/issues/622)) ([a80ad1c](https://github.com/stoatchat/stoatchat/commit/a80ad1cbe58b8af5e45751e51d94d93c1cea1c9f))
+* no node state set on channel creation ([#653](https://github.com/stoatchat/stoatchat/issues/653)) ([24d0d2b](https://github.com/stoatchat/stoatchat/commit/24d0d2b7266f6f8a692d0a52704acfecf517674c))
+* redis_url vs redis_uri in config ([#666](https://github.com/stoatchat/stoatchat/issues/666)) ([b0b728f](https://github.com/stoatchat/stoatchat/commit/b0b728fb0dbc9ee28360301de1c3ea501bbbff1d))
+* replace some links and Revolt mentions to current Stoat ([#515](https://github.com/stoatchat/stoatchat/issues/515)) ([d629e89](https://github.com/stoatchat/stoatchat/commit/d629e89304be2f0011e189293b278f07d346aa7d))
+* send push notifications for DM and group messages ([#660](https://github.com/stoatchat/stoatchat/issues/660)) ([52c0d2f](https://github.com/stoatchat/stoatchat/commit/52c0d2f266b76d8975bba2d5e75c62bb30149c45))
+* store server id in redis and in room metadata to be able to delete voice state in all scenarios ([#656](https://github.com/stoatchat/stoatchat/issues/656)) ([49c6289](https://github.com/stoatchat/stoatchat/commit/49c628958070e4f0a5edc764d3b48158589219d9))
+
 ## [0.11.5](https://github.com/stoatchat/stoatchat/compare/v0.11.4...v0.11.5) (2026-02-17)
 
 
