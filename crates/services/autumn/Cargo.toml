@@ -17,6 +17,7 @@ jxl-oxide = "0.8.1"
 kamadak-exif = "0.5.4"
 # revolt_little_exif = "0.5.1"
 image = { version = "0.25.2" } # avif encode requires dav1d system library: features = ["avif-native"]
+thumbhash = "0.1.0"
 
 # File processing
 revolt_clamav-client = { version = "0.1.5" }

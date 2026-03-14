@@ -283,7 +283,7 @@ impl From<crate::PartialChannel> for PartialChannel {
             role_permissions: value.role_permissions,
             default_permissions: value.default_permissions,
             last_message_id: value.last_message_id,
-            voice: value.voice.map(|voice| voice.into())
+            voice: value.voice.map(|voice| voice.into()),
         }
     }
 }
@@ -301,7 +301,7 @@ impl From<PartialChannel> for crate::PartialChannel {
             role_permissions: value.role_permissions,
             default_permissions: value.default_permissions,
             last_message_id: value.last_message_id,
-            voice: value.voice.map(|voice| voice.into())
+            voice: value.voice.map(|voice| voice.into()),
         }
     }
 }
@@ -406,9 +406,14 @@ impl From<crate::Metadata> for Metadata {
         match value {
             crate::Metadata::File => Metadata::File,
             crate::Metadata::Text => Metadata::Text,
-            crate::Metadata::Image { width, height } => Metadata::Image {
+            crate::Metadata::Image {
+                width,
+                height,
+                thumbhash,
+            } => Metadata::Image {
                 width: width as usize,
                 height: height as usize,
+                thumbhash,
             },
             crate::Metadata::Video { width, height } => Metadata::Video {
                 width: width as usize,
@@ -424,9 +429,14 @@ impl From<Metadata> for crate::Metadata {
         match value {
             Metadata::File => crate::Metadata::File,
             Metadata::Text => crate::Metadata::Text,
-            Metadata::Image { width, height } => crate::Metadata::Image {
+            Metadata::Image {
+                width,
+                height,
+                thumbhash,
+            } => crate::Metadata::Image {
                 width: width as isize,
                 height: height as isize,
+                thumbhash,
             },
             Metadata::Video { width, height } => crate::Metadata::Video {
                 width: width as isize,
@@ -515,7 +525,9 @@ impl From<crate::SystemMessage> for SystemMessage {
             crate::SystemMessage::UserRemove { id, by } => Self::UserRemove { id, by },
             crate::SystemMessage::MessagePinned { id, by } => Self::MessagePinned { id, by },
             crate::SystemMessage::MessageUnpinned { id, by } => Self::MessageUnpinned { id, by },
-            crate::SystemMessage::CallStarted { by, finished_at } => Self::CallStarted { by, finished_at }
+            crate::SystemMessage::CallStarted { by, finished_at } => {
+                Self::CallStarted { by, finished_at }
+            }
         }
     }
 }
@@ -1382,7 +1394,7 @@ impl From<FieldsMessage> for crate::FieldsMessage {
 impl From<VoiceInformation> for crate::VoiceInformation {
     fn from(value: VoiceInformation) -> Self {
         crate::VoiceInformation {
-            max_users: value.max_users
+            max_users: value.max_users,
         }
     }
 }
@@ -1390,7 +1402,7 @@ impl From<VoiceInformation> for crate::VoiceInformation {
 impl From<crate::VoiceInformation> for VoiceInformation {
     fn from(value: crate::VoiceInformation) -> Self {
         VoiceInformation {
-            max_users: value.max_users
+            max_users: value.max_users,
         }
     }
 }

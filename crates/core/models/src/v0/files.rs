@@ -47,7 +47,11 @@ auto_derived!(
         /// File contains textual data and should be displayed as such
         Text,
         /// File is an image with specific dimensions
-        Image { width: usize, height: usize },
+        Image {
+            width: usize,
+            height: usize,
+            thumbhash: Vec<u8>,
+        },
         /// File is a video with specific dimensions
         Video { width: usize, height: usize },
         /// File is audio
