@@ -10,6 +10,6 @@ Before writing new API features, generally a good idea to:
 When your feature is ready to release, ensure to:
 
 - Update backend documentation (what you're reading now!) if applicable
-- Update the [developers documentation](https://github.com/stoatchat/developer-wiki) if applicable
+- Update the [developers documentation](https://github.com/stoatchat/stoatchat/tree/main/docs) if applicable
 - Update the Feature Matrix (or ask someone that can to do so)
 - Ensure it is properly listed in the backend release changelog
