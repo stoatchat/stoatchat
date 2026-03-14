@@ -1,12 +1,20 @@
+use amqprs::{
+    channel::{BasicPublishArguments},
+    BasicProperties, FieldTable,
+};
 use authifier::AuthifierEvent;
 use revolt_result::Error;
 use serde::{Deserialize, Serialize};
 
 use revolt_models::v0::{
-    AppendMessage, Channel, ChannelUnread, ChannelVoiceState, Emoji, FieldsChannel, FieldsMember, FieldsMessage, FieldsRole, FieldsServer, FieldsUser, FieldsWebhook, Member, MemberCompositeKey, Message, PartialChannel, PartialMember, PartialMessage, PartialRole, PartialServer, PartialUser, PartialUserVoiceState, PartialWebhook, PolicyChange, RemovalIntention, Report, Server, User, UserSettings, UserVoiceState, Webhook
+    AppendMessage, Channel, ChannelUnread, ChannelVoiceState, Emoji, FieldsChannel, FieldsMember,
+    FieldsMessage, FieldsRole, FieldsServer, FieldsUser, FieldsWebhook, Member, MemberCompositeKey,
+    Message, PartialChannel, PartialMember, PartialMessage, PartialRole, PartialServer,
+    PartialUser, PartialUserVoiceState, PartialWebhook, PolicyChange, RemovalIntention, Report,
+    Server, User, UserSettings, UserVoiceState, Webhook,
 };
 
-use crate::Database;
+use crate::{util::rabbit::get_channel, Database};
 
 /// Ping Packet
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -304,14 +312,23 @@ pub enum EventV1 {
 impl EventV1 {
     /// Publish helper wrapper
     pub async fn p(self, channel: String) {
-        #[cfg(not(debug_assertions))]
-        redis_kiss::p(channel, self).await;
-
         #[cfg(debug_assertions)]
         info!("Publishing event to {channel}: {self:?}");
 
-        #[cfg(debug_assertions)]
-        redis_kiss::publish(channel, self).await.unwrap();
+        let rmq = get_channel().await;
+
+        let mut headers = FieldTable::new();
+        headers.insert("c".try_into().unwrap(), channel.clone().into());
+        let mut properties = BasicProperties::default();
+        properties.with_headers(headers);
+
+        rmq.basic_publish(
+            properties,
+            serde_json::to_string(&self).unwrap().into_bytes(),
+            BasicPublishArguments::new("events", "events"),
+        )
+        .await
+        .unwrap();
     }
 
     /// Publish user event
