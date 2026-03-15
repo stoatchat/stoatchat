@@ -15,11 +15,11 @@ use validator::Validate;
 ///
 /// Creates a webhook which 3rd party platforms can use to send messages
 #[openapi(tag = "Webhooks")]
-#[post("/<target>/webhooks", data = "<data>")]
+#[post("/<channel_id>/webhooks", data = "<data>")]
 pub async fn create_webhook(
     db: &State<Database>,
     user: User,
-    target: Reference<'_>,
+    channel_id: Reference<'_>,
     data: Json<v0::CreateWebhookBody>,
 ) -> Result<Json<v0::Webhook>> {
     let data = data.into_inner();
@@ -29,7 +29,7 @@ pub async fn create_webhook(
         })
     })?;
 
-    let channel = target.as_channel(db).await?;
+    let channel = channel_id.as_channel(db).await?;
 
     if !matches!(channel, Channel::TextChannel { .. } | Channel::Group { .. }) {
         return Err(create_error!(InvalidOperation));
