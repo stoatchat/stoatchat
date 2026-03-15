@@ -380,7 +380,7 @@ async fn fetch_preview(
 
     let hash = file.as_hash(&db).await?;
 
-    let is_animated = hash.content_type == "image/gif"; // TODO: extract this data from files
+    let is_animated = matches!(hash.metadata, Metadata::Image { animated: true, .. });
 
     // Only process image files and don't process GIFs if not avatar or icon
     if !matches!(hash.metadata, Metadata::Image { .. })
