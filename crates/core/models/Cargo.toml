@@ -41,6 +41,7 @@ iso8601-timestamp = { version = "0.2.11", features = ["schema", "bson"] }
 # Spec Generation
 schemars = { version = "0.8.8", optional = true, features = ["indexmap1"] }
 utoipa = { version = "4.2.3", optional = true }
+serde_json = "1"
 
 # Validation
 validator = { version = "0.16.0", optional = true, features = ["derive"] }

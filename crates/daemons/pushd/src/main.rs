@@ -30,17 +30,6 @@ async fn main() {
 
     // Setup database
     let db = revolt_database::DatabaseInfo::Auto.connect().await.unwrap();
-    let authifier: authifier::Database;
-
-    if let Some(client) = match &db {
-        revolt_database::Database::Reference(_) => None,
-        revolt_database::Database::MongoDb(mongo) => Some(mongo),
-    } {
-        authifier =
-            authifier::Database::MongoDb(authifier::database::MongoDb(client.database("revolt")));
-    } else {
-        panic!("Mongo is not in use, can't connect via authifier!")
-    }
 
     let mut connections: Vec<(Channel, Connection)> = Vec::new();
 
@@ -62,7 +51,7 @@ async fn main() {
             &config.pushd.generic_queue,
             config.pushd.get_generic_routing_key().as_str(),
             None,
-            GenericConsumer::new(db.clone(), authifier.clone()),
+            GenericConsumer::new(db.clone()),
         )
         .await,
     );
@@ -74,7 +63,7 @@ async fn main() {
             &config.pushd.message_queue,
             config.pushd.get_message_routing_key().as_str(),
             None,
-            MessageConsumer::new(db.clone(), authifier.clone()),
+            MessageConsumer::new(db.clone()),
         )
         .await,
     );
@@ -86,7 +75,7 @@ async fn main() {
             &config.pushd.fr_received_queue,
             config.pushd.get_fr_received_routing_key().as_str(),
             None,
-            FRReceivedConsumer::new(db.clone(), authifier.clone()),
+            FRReceivedConsumer::new(db.clone()),
         )
         .await,
     );
@@ -98,7 +87,7 @@ async fn main() {
             &config.pushd.fr_accepted_queue,
             config.pushd.get_fr_accepted_routing_key().as_str(),
             None,
-            FRAcceptedConsumer::new(db.clone(), authifier.clone()),
+            FRAcceptedConsumer::new(db.clone()),
         )
         .await,
     );
@@ -110,7 +99,7 @@ async fn main() {
             &config.pushd.mass_mention_queue,
             config.pushd.get_mass_mention_routing_key().as_str(),
             None,
-            MassMessageConsumer::new(db.clone(), authifier.clone()),
+            MassMessageConsumer::new(db.clone()),
         )
         .await,
     );
@@ -122,7 +111,7 @@ async fn main() {
             &config.pushd.dm_call_queue,
             config.pushd.get_dm_call_routing_key().as_str(),
             None,
-            DmCallConsumer::new(db.clone(), authifier.clone()),
+            DmCallConsumer::new(db.clone()),
         )
         .await,
     );
@@ -148,7 +137,7 @@ async fn main() {
                 &config.pushd.ack_queue,
                 &config.pushd.ack_queue,
                 Some(table),
-                AckConsumer::new(db.clone(), authifier.clone()),
+                AckConsumer::new(db.clone()),
             )
             .await,
         );

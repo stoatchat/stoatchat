@@ -73,6 +73,21 @@ static CONFIG_BUILDER: Lazy<RwLock<Config>> = Lazy::new(|| {
             FileFormat::Toml,
         ));
 
+        let cwd = std::env::current_dir().unwrap();
+        let mut cwd: Option<&Path> = Some(&cwd);
+
+        while let Some(path) = cwd {
+            for config_path in CONFIG_SEARCH_PATHS {
+                let config_path = path.join(config_path);
+                if config_path.exists() {
+                    builder = builder
+                        .add_source(File::new(config_path.to_str().unwrap(), FileFormat::Toml));
+                }
+            }
+
+            cwd = path.parent();
+        }
+
         if std::env::var("TEST_DB").is_ok() {
             builder = builder.add_source(File::from_str(
                 include_str!("../Revolt.test.toml"),
@@ -92,21 +107,6 @@ static CONFIG_BUILDER: Lazy<RwLock<Config>> = Lazy::new(|| {
                     path = current_path.parent();
                 }
             }
-        }
-
-        let cwd = std::env::current_dir().unwrap();
-        let mut cwd: Option<&Path> = Some(&cwd);
-
-        while let Some(path) = cwd {
-            for config_path in CONFIG_SEARCH_PATHS {
-                let config_path = path.join(config_path);
-                if config_path.exists() {
-                    builder = builder
-                        .add_source(File::new(config_path.to_str().unwrap(), FileFormat::Toml));
-                }
-            }
-
-            cwd = path.parent();
         }
 
         builder.build().unwrap()
@@ -153,6 +153,18 @@ pub struct ApiSmtp {
     pub port: Option<i32>,
     pub use_tls: Option<bool>,
     pub use_starttls: Option<bool>,
+    pub expiry: EmailExpiry,
+}
+
+/// Email expiration config
+#[derive(Deserialize, Debug, Clone)]
+pub struct EmailExpiry {
+    /// How long email verification codes should last for (in seconds)
+    pub expire_verification: i64,
+    /// How long password reset codes should last for (in seconds)
+    pub expire_password_reset: i64,
+    /// How long account deletion codes should last for (in seconds)
+    pub expire_account_deletion: i64,
 }
 
 #[derive(Deserialize, Debug, Clone)]

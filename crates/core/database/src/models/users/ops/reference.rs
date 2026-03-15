@@ -1,5 +1,3 @@
-use authifier::models::Session;
-use iso8601_timestamp::Timestamp;
 use revolt_result::Result;
 
 use crate::{FieldsUser, PartialUser, RelationshipStatus, User};
@@ -40,11 +38,6 @@ impl AbstractUsers for ReferenceDb {
             })
             .cloned()
             .ok_or_else(|| create_error!(NotFound))
-    }
-
-    /// Fetch a session from the database by token
-    async fn fetch_session_by_token(&self, _token: &str) -> Result<Session> {
-        todo!()
     }
 
     /// Fetch multiple users by their ids
@@ -163,14 +156,5 @@ impl AbstractUsers for ReferenceDb {
         } else {
             Err(create_error!(NotFound))
         }
-    }
-
-    /// Remove push subscription for a session by session id (TODO: remove)
-    async fn remove_push_subscription_by_session_id(&self, _session_id: &str) -> Result<()> {
-        todo!()
-    }
-
-    async fn update_session_last_seen(&self, _session_id: &str, _when: Timestamp) -> Result<()> {
-        todo!()
     }
 }
