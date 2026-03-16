@@ -110,7 +110,7 @@ impl<'r> Responder<'r, 'static> for Error {
             ErrorType::ShortPassword => Status::BadRequest,
             ErrorType::Blacklisted => {
                 // Fail blacklisted email addresses.
-                const RESP: &str = "{\"type\":\"DisallowedContactSupport\", \"email\":\"support@revolt.chat\", \"note\":\"If you see this messages right here, you're probably doing something you shouldn't be.\"}";
+                const RESP: &str = "{\"type\":\"DisallowedContactSupport\", \"note\":\"If you see this messages right here, you're probably doing something you shouldn't be.\"}";
 
                 return Response::build()
                     .status(Status::Unauthorized)

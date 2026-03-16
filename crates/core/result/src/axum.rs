@@ -109,7 +109,7 @@ impl IntoResponse for Error {
                 return (
                     StatusCode::UNAUTHORIZED,
                     [(header::CONTENT_TYPE, "application/json")],
-                    "{\"type\":\"DisallowedContactSupport\", \"email\":\"support@revolt.chat\", \"note\":\"If you see this messages right here, you're probably doing something you shouldn't be.\"}"
+                    "{\"type\":\"DisallowedContactSupport\", \"note\":\"If you see this messages right here, you're probably doing something you shouldn't be.\"}"
                 ).into_response()
             }
             ErrorType::LockedOut => StatusCode::FORBIDDEN,
