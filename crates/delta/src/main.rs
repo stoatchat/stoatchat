@@ -161,6 +161,7 @@ pub async fn web() -> Rocket<Build> {
         .manage(authifier)
         .manage(db)
         .manage(amqp)
+        .manage(kafka_client)
         .manage(cors.clone())
         .manage(voice_client)
         .manage(ratelimits)
