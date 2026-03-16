@@ -89,5 +89,9 @@ revolt-ratelimits = { path = "../core/ratelimits", features = ["rocket"] }
 livekit-api = "0.4.4"
 livekit-protocol = "0.4.0"
 
+# kafka
+rdkafka = "0.39.0"
+
 [build-dependencies]
 vergen = "7.5.0"
+

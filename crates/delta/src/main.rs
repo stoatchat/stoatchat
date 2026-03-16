@@ -15,6 +15,7 @@ use revolt_ratelimits::rocket as ratelimiter;
 use rocket::{Build, Rocket};
 use rocket_cors::{AllowedOrigins, CorsOptions};
 use rocket_prometheus::PrometheusMetrics;
+use util::kafka::KafkaClient;
 use std::net::Ipv4Addr;
 use std::str::FromStr;
 
@@ -146,6 +147,9 @@ pub async fn web() -> Rocket<Build> {
 
     // Ratelimits
     let ratelimits = ratelimiter::RatelimitStorage::new(util::ratelimits::DeltaRatelimits);
+
+    // Kafka
+    let kafka_client = KafkaClient::connect("".to_string());
 
     routes::mount(config, rocket)
         .attach(prometheus.clone())
