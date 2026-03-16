@@ -20,9 +20,7 @@ auto_derived!(
         /// When the session was last logged in
         pub last_seen: Timestamp,
 
-        /// What is the session origin?
-        /// This could be used to differentiate sessions that come from staging/test vs prod, etc.
-        /// Authifier will set this to None by default. The application must fill it in.
+        /// Where the session is originating from
         #[serde(skip_serializing_if = "Option::is_none")]
         pub origin: Option<String>,
 
