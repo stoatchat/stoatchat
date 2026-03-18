@@ -112,6 +112,10 @@ auto_derived!(
             /// Voice Information for when this channel is also a voice channel
             #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
             voice: Option<VoiceInformation>,
+
+            /// The channel's slowmode delay in seconds
+            #[serde(skip_serializing_if = "Option::is_none")]
+            slowmode: Option<u64>,
         },
     }
 
@@ -150,6 +154,8 @@ auto_derived!(
         pub last_message_id: Option<String>,
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
         pub voice: Option<VoiceInformation>,
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+        pub slowmode: Option<u64>,
     }
 
     /// Optional fields on channel object
@@ -188,6 +194,10 @@ auto_derived!(
 
         /// Voice Information for voice channels
         pub voice: Option<VoiceInformation>,
+
+        /// The channel's slow mode delay in seconds, up to 6 hours
+        #[cfg_attr(feature = "validator", validate(range(min = 0, max = 21600)))]
+        pub slowmode: Option<u64>,
 
         /// Fields to remove from channel
         #[cfg_attr(feature = "serde", serde(default))]

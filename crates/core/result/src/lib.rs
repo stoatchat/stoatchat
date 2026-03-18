@@ -102,6 +102,9 @@ pub enum ErrorType {
     NotInGroup,
     AlreadyPinned,
     NotPinned,
+    InSlowmode {
+        retry_after: u64,
+    },
 
     // ? Server related errors
     UnknownServer,

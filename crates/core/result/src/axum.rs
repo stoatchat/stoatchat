@@ -36,6 +36,9 @@ impl IntoResponse for Error {
             ErrorType::NotInGroup => StatusCode::NOT_FOUND,
             ErrorType::AlreadyPinned => StatusCode::BAD_REQUEST,
             ErrorType::NotPinned => StatusCode::BAD_REQUEST,
+            ErrorType::InSlowmode {
+                retry_after: _,
+            } => StatusCode::TOO_MANY_REQUESTS,
 
             ErrorType::UnknownServer => StatusCode::NOT_FOUND,
             ErrorType::InvalidRole => StatusCode::NOT_FOUND,

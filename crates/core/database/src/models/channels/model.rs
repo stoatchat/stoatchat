@@ -110,6 +110,10 @@ auto_derived!(
             /// Voice Information for when this channel is also a voice channel
             #[serde(skip_serializing_if = "Option::is_none")]
             voice: Option<VoiceInformation>,
+
+            /// The channel's slowmode delay in seconds
+            #[serde(skip_serializing_if = "Option::is_none")]
+            slowmode: Option<u64>,
         },
     }
 
@@ -146,6 +150,8 @@ auto_derived!(
         pub last_message_id: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub voice: Option<VoiceInformation>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub slowmode: Option<u64>,
     }
 
     /// Optional fields on channel object
@@ -206,6 +212,7 @@ impl Channel {
                 role_permissions: HashMap::new(),
                 nsfw: data.nsfw.unwrap_or(false),
                 voice: data.voice.map(|voice| voice.into()),
+                slowmode: None
             },
             v0::LegacyServerChannelType::Voice => Channel::TextChannel {
                 id: id.clone(),
@@ -218,6 +225,7 @@ impl Channel {
                 role_permissions: HashMap::new(),
                 nsfw: data.nsfw.unwrap_or(false),
                 voice: Some(data.voice.unwrap_or_default().into()),
+                slowmode: None
             },
         };
 

@@ -1,9 +1,10 @@
 use chrono::{Duration, Utc};
+use redis_kiss::{get_connection, AsyncCommands};
 use revolt_database::util::permissions::DatabasePermissionQuery;
 use revolt_database::{
     util::idempotency::IdempotencyKey, util::reference::Reference, Database, User,
 };
-use revolt_database::{Interactions, Message, AMQP};
+use revolt_database::{Channel, Interactions, Message, AMQP};
 use revolt_models::v0;
 use revolt_permissions::PermissionQuery;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
@@ -55,6 +56,29 @@ pub async fn message_send(
     // Check permissions for files
     if data.attachments.as_ref().is_some_and(|v| !v.is_empty()) {
         permissions.throw_if_lacking_channel_permission(ChannelPermission::UploadFiles)?;
+    }
+
+    if !permissions.has_channel_permission(ChannelPermission::ManageMessages) {
+        if let Channel::TextChannel { slowmode: Some(channel_slowmode), id: channel_id, .. } = &channel {
+            if *channel_slowmode > 0 {
+                let slowmode_key = format!("slowmode:{}:{}", user.id, channel_id);
+
+                if let Ok(mut conn) = get_connection().await {
+                    if let Ok(last_time) = conn.get::<_, u64>(&slowmode_key).await {
+                        let now = Utc::now().timestamp() as u64;
+                        if now - last_time < *channel_slowmode {
+                            return Err(create_error!(InSlowmode {
+                                retry_after: (*channel_slowmode - (now - last_time))
+                            }));
+                        }
+                    }
+
+                    let _ = conn.set::<_, _, ()>(&slowmode_key, Utc::now().timestamp()).await;
+                }
+                // If Redis connection fails, just skip the slowmode check
+                // Probably not the ideal way to implement this, but I assume if the redis is dead there would be more issues
+            }
+        }
     }
 
     // Ensure interactions information is correct
@@ -186,6 +210,7 @@ mod test {
             }),
             last_message_id: None,
             voice: None,
+            slowmode: None,
         };
         locked_channel
             .update(&harness.db, partial, vec![])
