@@ -24,6 +24,7 @@ impl IntoResponse for Error {
             ErrorType::UnknownChannel => StatusCode::NOT_FOUND,
             ErrorType::UnknownMessage => StatusCode::NOT_FOUND,
             ErrorType::UnknownAttachment => StatusCode::BAD_REQUEST,
+            ErrorType::CannotDeleteMessage => StatusCode::FORBIDDEN,
             ErrorType::CannotEditMessage => StatusCode::FORBIDDEN,
             ErrorType::CannotJoinCall => StatusCode::BAD_REQUEST,
             ErrorType::TooManyAttachments { .. } => StatusCode::BAD_REQUEST,

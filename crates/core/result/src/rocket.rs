@@ -30,6 +30,7 @@ impl<'r> Responder<'r, 'static> for Error {
             ErrorType::UnknownChannel => Status::NotFound,
             ErrorType::UnknownMessage => Status::NotFound,
             ErrorType::UnknownAttachment => Status::BadRequest,
+            ErrorType::CannotDeleteMessage => Status::Forbidden,
             ErrorType::CannotEditMessage => Status::Forbidden,
             ErrorType::CannotJoinCall => Status::BadRequest,
             ErrorType::TooManyAttachments { .. } => Status::BadRequest,
