@@ -15,6 +15,10 @@ pub async fn search_messages(
     user: User,
     data: Json<v0::DataChannelMessagesSearch>,
 ) -> Result<Json<v0::BulkMessageResponse>> {
+    if user.bot.is_some() {
+        return Err(create_error!(IsBot));
+    }
+
     let data = data.into_inner();
 
     if (data.server.is_some() && data.channel.is_some())
