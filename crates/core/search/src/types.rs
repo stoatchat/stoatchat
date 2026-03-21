@@ -1,16 +1,18 @@
+use std::collections::HashSet;
+
 use iso8601_timestamp::Timestamp;
+use revolt_database::{File, Metadata};
 use revolt_models::v0;
 use serde::{Deserialize, Serialize};
-use revolt_database::{File, Metadata};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Hash)]
 pub enum AuthorType {
     User,
     // Bot,
     Webhook,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum MessageComponent {
     Image,
     Video,
@@ -22,14 +24,14 @@ pub enum MessageComponent {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SearchFilters {
     pub content: Option<String>,
-    pub author: Option<Vec<String>>,
-    pub mentions: Option<Vec<String>>,
-    pub role_mentions: Option<Vec<String>>,
+    pub author: Option<HashSet<String>>,
+    pub mentions: Option<HashSet<String>>,
+    pub role_mentions: Option<HashSet<String>>,
     pub before_date: Option<Timestamp>,
     pub after_date: Option<Timestamp>,
-    pub author_type: Option<Vec<AuthorType>>,
+    pub author_type: Option<HashSet<AuthorType>>,
     pub pinned: Option<bool>,
-    pub components: Option<Vec<MessageComponent>>,
+    pub components: Option<HashSet<MessageComponent>>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -51,7 +53,7 @@ pub struct SearchTerms {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MetadataFile {
     pub file: File,
-    pub metadata: Metadata
+    pub metadata: Metadata,
 }
 
 impl From<v0::AuthorType> for AuthorType {

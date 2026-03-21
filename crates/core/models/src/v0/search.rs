@@ -1,4 +1,5 @@
 use iso8601_timestamp::Timestamp;
+use std::collections::HashSet;
 
 auto_derived!(
     pub struct DataChannelMessagesSearch {
@@ -13,24 +14,24 @@ auto_derived!(
 
     pub struct DataChannelMessagesSearchFilters {
         pub content: Option<String>,
-        pub author: Option<Vec<String>>,
-        pub mentions: Option<Vec<String>>,
-        pub role_mentions: Option<Vec<String>>,
+        pub author: Option<HashSet<String>>,
+        pub mentions: Option<HashSet<String>>,
+        pub role_mentions: Option<HashSet<String>>,
         pub before_date: Option<Timestamp>,
         pub after_date: Option<Timestamp>,
-        pub author_type: Option<Vec<AuthorType>>,
+        pub author_type: Option<HashSet<AuthorType>>,
         pub pinned: Option<bool>,
-        pub components: Option<Vec<MessageComponent>>,
+        pub components: Option<HashSet<MessageComponent>>,
     }
 
-    #[derive(Copy)]
+    #[derive(Copy, Hash)]
     pub enum AuthorType {
         User,
         // Bot,
         Webhook,
     }
 
-    #[derive(Copy)]
+    #[derive(Copy, Hash)]
     pub enum MessageComponent {
         Image,
         Video,
