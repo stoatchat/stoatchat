@@ -1,13 +1,10 @@
 use std::fmt::Display;
 
 use elasticsearch::{
-    CreateParts, DeleteByQueryParts, DeleteParts, Elasticsearch, IndexParts, SearchParts,
-    auth::Credentials,
-    http::{
+    BulkOperation, BulkParts, CreateParts, DeleteByQueryParts, DeleteParts, Elasticsearch, IndexParts, SearchParts, auth::Credentials, http::{
         response::Exception,
         transport::{SingleNodeConnectionPool, TransportBuilder},
-    },
-    indices::{IndicesCreateParts, IndicesDeleteParts},
+    }, indices::{IndicesCreateParts, IndicesDeleteParts}
 };
 use elasticsearch_dsl::{FieldSort, Query, Search, SearchResponse, Sort};
 use revolt_database::{Database, Message};
@@ -260,6 +257,32 @@ impl ElasticsearchClient {
         );
 
         Value::Object(map)
+    }
+
+    pub async fn bulk_index_messages(&self, db: &Database, messages: Vec<Message>) -> Result<(), Error> {
+        let mut ops = Vec::<BulkOperation<Value>>::new();
+
+        for message in messages {
+            let id = message.id.clone();
+            let source = self.create_message_source(db, message);
+
+            ops.push(BulkOperation::create(source).id(id).into());
+        };
+
+        let exception = self
+            .inner
+            .bulk(BulkParts::Index("messages"))
+            .body(ops)
+            .send()
+            .await?
+            .exception()
+            .await?;
+
+        if let Some(exception) = exception {
+            Err(exception.into())
+        } else {
+            Ok(())
+        }
     }
 
     pub async fn index_message(&self, db: &Database, message: Message) -> Result<(), Error> {

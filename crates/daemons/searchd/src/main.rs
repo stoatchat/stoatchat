@@ -7,7 +7,7 @@ use amqprs::{
     consumer::AsyncConsumer,
 };
 use revolt_config::{Settings, config, configure};
-use revolt_database::{AMQP, DatabaseInfo};
+use revolt_database::DatabaseInfo;
 use revolt_search::ElasticsearchClient;
 use tokio::{signal::ctrl_c, spawn};
 
@@ -88,8 +88,7 @@ async fn _main() {
     let mut task = None;
 
     if std::env::var("INDEX_ALL_MESSAGES").as_deref().is_ok_and(|v| v == "1") {
-        let amqp = AMQP::new_auto().await;
-        task = Some(spawn(index::index_existing_messages(db, amqp)));
+        task = Some(spawn(index::index_existing_messages(db, client.clone())));
     }
 
     ctrl_c().await.expect("Failed to wait for ctrl-c");
