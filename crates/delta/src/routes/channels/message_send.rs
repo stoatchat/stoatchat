@@ -58,7 +58,7 @@ pub async fn message_send(
         permissions.throw_if_lacking_channel_permission(ChannelPermission::UploadFiles)?;
     }
 
-    if !permissions.has_channel_permission(ChannelPermission::ManageMessages) {
+    if !permissions.has_channel_permission(ChannelPermission::BypassSlowmode) {
         if let Channel::TextChannel { slowmode: Some(channel_slowmode), id: channel_id, .. } = &channel {
             if *channel_slowmode > 0 {
                 if let Ok(conn) = get_connection().await {
