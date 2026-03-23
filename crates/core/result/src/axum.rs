@@ -37,6 +37,7 @@ impl IntoResponse for Error {
             ErrorType::AlreadyPinned => StatusCode::BAD_REQUEST,
             ErrorType::NotPinned => StatusCode::BAD_REQUEST,
 
+            ErrorType::CantCreateServers => StatusCode::FORBIDDEN,
             ErrorType::UnknownServer => StatusCode::NOT_FOUND,
             ErrorType::InvalidRole => StatusCode::NOT_FOUND,
             ErrorType::Banned => StatusCode::FORBIDDEN,

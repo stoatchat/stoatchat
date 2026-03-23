@@ -344,6 +344,8 @@ pub struct GlobalLimits {
     pub new_user_hours: usize,
 
     pub body_limit_size: usize,
+
+    pub restrict_server_creation: Vec<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]

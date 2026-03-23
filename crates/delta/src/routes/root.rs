@@ -1,8 +1,8 @@
-use std::collections::HashMap;
 use revolt_config::config;
 use revolt_result::Result;
 use rocket::serde::json::Json;
 use serde::Serialize;
+use std::collections::HashMap;
 
 /// # hCaptcha Configuration
 #[derive(Serialize, JsonSchema, Debug)]
@@ -88,6 +88,10 @@ pub struct GlobalLimits {
     /// max server channels
     server_channels: i64,
     body_limit_size: i64,
+
+    /// restrict server creation to these users.
+    /// if blank, all users can create servers
+    pub restrict_server_creation: Vec<String>,
 }
 
 /// # User Limits
@@ -125,7 +129,10 @@ impl UserLimits {
             voice_quality: fl.voice_quality as i64,
             video: fl.video,
             video_resolution: [fl.video_resolution[0] as i64, fl.video_resolution[1] as i64],
-            video_aspect_ratio: [fl.video_aspect_ratio[0] as f64, fl.video_aspect_ratio[1] as f64],
+            video_aspect_ratio: [
+                fl.video_aspect_ratio[0] as f64,
+                fl.video_aspect_ratio[1] as f64,
+            ],
             file_upload_size_limits: fl.file_upload_size_limit,
         }
     }
@@ -219,10 +226,15 @@ pub async fn root() -> Result<Json<RevoltConfig>> {
                     server_roles: config.features.limits.global.server_roles as i64,
                     server_channels: config.features.limits.global.server_channels as i64,
                     body_limit_size: config.features.limits.global.body_limit_size as i64,
+                    restrict_server_creation: config
+                        .features
+                        .limits
+                        .global
+                        .restrict_server_creation,
                 },
                 new_user: UserLimits::from_feature_limits(config.features.limits.new_user),
                 default: UserLimits::from_feature_limits(config.features.limits.default),
-            }
+            },
         },
         ws: config.hosts.events,
         app: config.hosts.app,

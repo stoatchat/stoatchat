@@ -220,6 +220,10 @@ new_user_hours = 72
 # (should be greater than any one file upload limit)
 body_limit_size = 20_000_000
 
+# If any userids are entered here, only those users will be able to create servers.
+# Leave empty to allow all users to create servers
+restrict_server_creation = []
+
 [features.limits.new_user]
 # Limits imposed on new users
 

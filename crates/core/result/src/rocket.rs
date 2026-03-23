@@ -44,6 +44,7 @@ impl<'r> Responder<'r, 'static> for Error {
             ErrorType::NotPinned => Status::BadRequest,
             ErrorType::InvalidFlagValue => Status::BadRequest,
 
+            ErrorType::CantCreateServers => Status::Forbidden,
             ErrorType::UnknownServer => Status::NotFound,
             ErrorType::InvalidRole => Status::NotFound,
             ErrorType::Banned => Status::Forbidden,
