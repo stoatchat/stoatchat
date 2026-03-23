@@ -1,12 +1,12 @@
-use std::collections::HashMap;
-use futures::StreamExt;
-use std::time::SystemTime;
 use bson::{to_bson, Document};
 use futures::try_join;
+use futures::StreamExt;
 use mongodb::options::FindOptions;
-use ulid::Ulid;
 use revolt_models::v0::MessageSort;
 use revolt_result::Result;
+use std::collections::HashMap;
+use std::time::SystemTime;
+use ulid::Ulid;
 
 use crate::{
     AppendMessage, DocumentId, FieldsMessage, IntoDocumentPath, Message, MessageQuery,
@@ -312,34 +312,50 @@ impl AbstractMessages for MongoDb {
     }
 
     /// Delete all messages from a specific author in a server from a certain ULID onwards
-    async fn delete_messages_by_author_since(&self, channels: &[String], author: &str, since: SystemTime) -> Result<HashMap<String, Vec<String>>> {
+    async fn delete_messages_by_author_since(
+        &self,
+        channels: &[String],
+        author: &str,
+        since: SystemTime,
+    ) -> Result<HashMap<String, Vec<String>>> {
         let threshold_ulid = Ulid::from_datetime(since).to_string();
 
         let filter = doc! {
-        "author": author,
-        "channel": { "$in": channels },
-        "_id": { "$gte": &threshold_ulid }
+            "author": author,
+            "channel": { "$in": channels },
+            "_id": { "$gte": &threshold_ulid }
         };
 
-        let find_options = FindOptions::builder()
-            .projection(doc! { "_id": 1, "channel": 1 })
-            .build();
+        let pipeline = vec![
+            doc! { "$match": filter.clone() },
+            doc! {
+                "$group": {
+                    "_id": "$channel",
+                    "message_ids": { "$push": "$_id" }
+                }
+            },
+        ];
 
-        let mut cursor = self.col::<Document>(COL)
-            .find(filter.clone())
-            .with_options(find_options)
+        let mut cursor = self
+            .col::<Document>(COL)
+            .aggregate(pipeline)
             .await
-            .map_err(|_| create_database_error!("find", COL))?;
+            .map_err(|_| create_database_error!("aggregate", COL))?;
 
         let mut deleted_messages: HashMap<String, Vec<String>> = HashMap::new();
 
+        // We still iterate, but now there is only one document per channel, rather than one per message
         while let Some(result) = cursor.next().await {
             if let Ok(doc) = result {
-                if let (Ok(id), Ok(channel)) = (doc.get_str("_id"), doc.get_str("channel")) {
-                    deleted_messages
-                        .entry(channel.to_string())
-                        .or_default()
-                        .push(id.to_string());
+                if let (Ok(channel), Ok(message_ids_bson)) =
+                    (doc.get_str("_id"), doc.get_array("message_ids"))
+                {
+                    let message_ids: Vec<String> = message_ids_bson
+                        .iter()
+                        .filter_map(|bson_val| bson_val.as_str().map(|s| s.to_string()))
+                        .collect();
+
+                    deleted_messages.insert(channel.to_string(), message_ids);
                 }
             }
         }
