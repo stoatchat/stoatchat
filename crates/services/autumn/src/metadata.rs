@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
 use revolt_database::Metadata;
-use revolt_files::{image_size, video_size};
+use revolt_files::{image_size, is_animated, video_size};
 use tempfile::NamedTempFile;
 
 /// Intersection of what infer can detect and what image-rs supports
@@ -26,6 +26,7 @@ pub fn generate_metadata(f: &NamedTempFile, mime_type: &str) -> Metadata {
             .map(|(width, height)| Metadata::Image {
                 width: width as isize,
                 height: height as isize,
+                animated: is_animated(f, mime_type).unwrap_or(false),
             })
             .unwrap_or_default()
     } else if mime_type.starts_with("video/") {

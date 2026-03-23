@@ -13,7 +13,7 @@ We want to hear what you think and appreciate and await your feature suggestions
 
 Typically, you can open issues on the relevant [GitHub repositories](https://github.com/stoatchat).
 
-<!-- Within the Stoat app, you can navigate to the [**feedback tab**](https://app.revolt.chat/settings/feedback), or you can open an issue on the relevant [GitHub repo](https://github.com/revoltchat). -->
+<!-- Within the Stoat app, you can navigate to the [**feedback tab**](https://app.revolt.chat/settings/feedback), or you can open an issue on the relevant [GitHub repo](https://github.com/stoatchat). -->
 
 ### 2. Translate
 
