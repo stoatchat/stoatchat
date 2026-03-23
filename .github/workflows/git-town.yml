@@ -7,6 +7,7 @@ jobs:
   git-town:
     name: Display the branch stack
     runs-on: ubuntu-slim
+    continue-on-error: true
 
     if: ${{ !startsWith(github.head_ref, 'release-please--') }}
 
