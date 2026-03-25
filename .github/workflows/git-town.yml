@@ -1,3 +1,6 @@
+# DO NOT EDIT DIRECTLY IN REPOSITORY
+# Managed in Terraform templates
+
 name: Git Town
 
 on:
@@ -8,7 +11,7 @@ jobs:
     name: Display the branch stack
     runs-on: ubuntu-slim
 
-    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && !startsWith(github.head_ref, 'release-please--') }}
 
     permissions:
       contents: read
