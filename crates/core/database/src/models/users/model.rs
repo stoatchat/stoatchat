@@ -167,7 +167,8 @@ pub static DISCRIMINATOR_SEARCH_SPACE: Lazy<HashSet<String>> = Lazy::new(|| {
 static BLOCKED_USERNAME_PATTERNS: Lazy<Regex> = Lazy::new(|| {
     RegexBuilder::new("`{3}|((discord|rvlt|guilded)\\.gg|https?:\\/\\/)")
         .case_insensitive(true)
-        .build().unwrap()
+        .build()
+        .unwrap()
 });
 
 #[allow(clippy::derivable_impls)]
@@ -208,12 +209,19 @@ impl User {
         let original_username = username;
         let original_username_str = original_username.as_str();
         User::validate_username(original_username_str)?;
-        let (is_username_sanitised,username) = User::sanitise_username(original_username_str);
+
+        let username = User::sanitise_username(original_username_str);
+        let is_username_sanitised = username != original_username;
+
         let mut user = User {
             id: account_id.into().unwrap_or_else(|| Ulid::new().to_string()),
             discriminator: User::find_discriminator(db, &username, None).await?,
             username,
-            display_name: if is_username_sanitised { Some(original_username) } else { Default::default() },
+            display_name: if is_username_sanitised {
+                Some(original_username)
+            } else {
+                Default::default()
+            },
             last_acknowledged_policy_change: Timestamp::now_utc(),
             ..Default::default()
         };
@@ -306,15 +314,15 @@ impl User {
     }
 
     /// sanitise username
-    fn sanitise_username(username: &str) -> (bool, String) {
-        let original_username = username;
+    fn sanitise_username(username: &str) -> String {
         // sanitise homoglyphs
-        let options = decancer::Options::default()
-            .retain_capitalization();
-        let mut username = decancer::cure(&username, options).unwrap().to_string();
+        let options = decancer::Options::default().retain_capitalization();
+        let mut username = decancer::cure(username, options).unwrap().to_string();
 
         if BLOCKED_USERNAME_PATTERNS.is_match(&username) {
-            username = BLOCKED_USERNAME_PATTERNS.replace_all(&mut username, "").into_owned();
+            username = BLOCKED_USERNAME_PATTERNS
+                .replace_all(&mut username, "")
+                .into_owned();
         }
 
         const USERNAME_MIN_LEN: usize = 2;
@@ -323,7 +331,7 @@ impl User {
             username.push_str(&"_".repeat(username_length_diff))
         }
 
-        (original_username != username, username)
+        username
     }
 
     /// Find a user and session ID from a given token and hint
@@ -429,7 +437,8 @@ impl User {
         let original_username = username;
         let original_username_str = original_username.as_str();
         User::validate_username(original_username_str)?;
-        let (is_username_sanitised, username) = User::sanitise_username(&original_username);
+        let username = User::sanitise_username(&original_username);
+        let is_username_sanitised = username != original_username;
         if is_username_sanitised {
             self.update(
                 db,
@@ -440,10 +449,14 @@ impl User {
                             &username,
                             Some((self.discriminator.to_string(), self.id.clone())),
                         )
-                            .await?,
+                        .await?,
                     ),
                     username: Some(username),
-                    display_name: if is_username_sanitised { Some(original_username) } else { Default::default() },
+                    display_name: if is_username_sanitised {
+                        Some(original_username)
+                    } else {
+                        Default::default()
+                    },
                     ..Default::default()
                 },
                 vec![],
@@ -842,7 +855,7 @@ impl User {
 
 #[cfg(test)]
 mod tests {
-    use crate::{User};
+    use crate::User;
 
     #[test]
     fn username_validation() {
@@ -859,9 +872,8 @@ mod tests {
     fn username_sanitisation_clean() {
         let username_clean = "Test";
 
-        let (is_sanitised, username_clean_sanitised) = User::sanitise_username(username_clean);
+        let username_clean_sanitised = User::sanitise_username(username_clean);
 
-        assert!(!is_sanitised);
         assert_eq!(username_clean, username_clean_sanitised)
     }
 
@@ -869,9 +881,9 @@ mod tests {
     fn username_sanitisation_hemoglyphs() {
         let username_hemoglyphs = "𝔽𝕌Ňℕｙ";
 
-        let (is_hemoglyphs_sanitised, username_hemoglyphs_sanitised) = User::sanitise_username(username_hemoglyphs);
+        let username_hemoglyphs_sanitised = User::sanitise_username(username_hemoglyphs);
 
-        assert!(is_hemoglyphs_sanitised);
+        assert_ne!(username_hemoglyphs, username_hemoglyphs_sanitised);
         assert_eq!("funny", username_hemoglyphs_sanitised);
     }
 
@@ -886,24 +898,18 @@ mod tests {
 
         let expected_username = "_test";
 
-        let (is_grave_sanitised, username_grave_sanitised) = User::sanitise_username(username_grave);
-        let (is_discord_sanitised, username_discord_sanitised) = User::sanitise_username(username_discord);
-        let (is_rvlt_sanitised, username_rvlt_sanitised) = User::sanitise_username(username_rvlt);
-        let (is_guilded_sanitised, username_guilded_sanitised) = User::sanitise_username(username_guilded);
-        let (is_http_sanitised, username_http_sanitised) = User::sanitise_username(username_http);
-        let (is_https_sanitised, username_https_sanitised) = User::sanitise_username(username_https);
+        let username_grave_sanitised = User::sanitise_username(username_grave);
+        let username_discord_sanitised = User::sanitise_username(username_discord);
+        let username_rvlt_sanitised = User::sanitise_username(username_rvlt);
+        let username_guilded_sanitised = User::sanitise_username(username_guilded);
+        let username_http_sanitised = User::sanitise_username(username_http);
+        let username_https_sanitised = User::sanitise_username(username_https);
 
-        assert!(is_grave_sanitised);
         assert_eq!(expected_username, username_grave_sanitised);
-        assert!(is_discord_sanitised);
         assert_eq!(expected_username, username_discord_sanitised);
-        assert!(is_rvlt_sanitised);
         assert_eq!(expected_username, username_rvlt_sanitised);
-        assert!(is_guilded_sanitised);
         assert_eq!(expected_username, username_guilded_sanitised);
-        assert!(is_http_sanitised);
         assert_eq!(expected_username, username_http_sanitised);
-        assert!(is_https_sanitised);
         assert_eq!(expected_username, username_https_sanitised);
     }
 
@@ -911,7 +917,7 @@ mod tests {
     fn username_sanitisation_padding() {
         let username_padding = "```a";
 
-        let (_, username) = User::sanitise_username(username_padding);
+        let username = User::sanitise_username(username_padding);
 
         assert_eq!("a_", username);
     }
@@ -926,7 +932,10 @@ mod tests {
             let mut updated_clean = User::create(&db, "Test".to_string(), None, None)
                 .await
                 .unwrap();
-            updated_clean.update_username(&db, "Test2".to_string()).await.unwrap();
+            updated_clean
+                .update_username(&db, "Test2".to_string())
+                .await
+                .unwrap();
 
             let created_sanitised = User::create(&db, "http://test".to_string(), None, None)
                 .await
@@ -935,7 +944,10 @@ mod tests {
             let mut updated_sanitised = User::create(&db, "Test".to_string(), None, None)
                 .await
                 .unwrap();
-            updated_sanitised.update_username(&db, "http://test".to_string()).await.unwrap();
+            updated_sanitised
+                .update_username(&db, "http://test".to_string())
+                .await
+                .unwrap();
 
             assert_eq!(None, created_clean.display_name);
             assert_eq!(None, updated_clean.display_name);
@@ -945,5 +957,4 @@ mod tests {
             assert_eq!("http://test", updated_sanitised.display_name.unwrap());
         });
     }
-
 }
