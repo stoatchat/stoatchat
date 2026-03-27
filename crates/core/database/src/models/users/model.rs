@@ -29,7 +29,7 @@ auto_derived_partial!(
         pub display_name: Option<String>,
         /// User's pronouns
         #[serde(skip_serializing_if = "Option::is_none", default)]
-        pub pronoun: Option<String>,
+        pub pronouns: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         /// Avatar attachment
         pub avatar: Option<File>,
@@ -75,7 +75,7 @@ auto_derived!(
         ProfileContent,
         ProfileBackground,
         DisplayName,
-        Pronoun,
+        Pronouns,
 
         // internal fields
         Suspension,
@@ -175,7 +175,7 @@ impl Default for User {
             username: Default::default(),
             discriminator: Default::default(),
             display_name: Default::default(),
-            pronoun: Default::default(),
+            pronouns: Default::default(),
             avatar: Default::default(),
             relations: Default::default(),
             badges: Default::default(),
@@ -695,7 +695,7 @@ impl User {
                 }
             }
             FieldsUser::DisplayName => self.display_name = None,
-            FieldsUser::Pronoun => self.pronoun = None,
+            FieldsUser::Pronouns => self.pronouns = None,
             FieldsUser::Suspension => self.suspended_until = None,
             FieldsUser::None => {}
         }
