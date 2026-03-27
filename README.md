@@ -72,6 +72,7 @@ Now you can clone and build the project:
 ```bash
 git clone https://github.com/stoatchat/stoatchat stoat-backend
 cd stoat-backend
+mise install
 mise build
 ```
 
