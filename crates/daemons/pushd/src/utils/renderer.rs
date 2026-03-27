@@ -48,7 +48,7 @@ pub async fn render_notification_content(
                 "Unknown Channel".to_string()
             ),
             get_items(
-                parsed.emoji,
+                parsed.emojis,
                 server_id.as_deref(),
                 db,
                 get_emoji_name,
@@ -81,7 +81,7 @@ pub async fn render_notification_content(
                 "Unknown Channel".to_string()
             ),
             get_items(
-                parsed.emoji,
+                parsed.emojis,
                 server_id.as_deref(),
                 db,
                 get_emoji_name,
