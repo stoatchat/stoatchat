@@ -1328,8 +1328,10 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
                     {
                         "key": {
                             "server": 1_i32,
+                            "user": 1_i32,
+                            "action.type": 1_i32,
                         },
-                        "name": "audit_log_server"
+                        "name": "audit_log_filters",
                     },
                 ]
             })
