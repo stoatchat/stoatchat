@@ -31,7 +31,7 @@ pub struct MessageResults {
     pub user_mentions: HashSet<String>,
     pub role_mentions: HashSet<String>,
     pub channel_mentions: HashSet<String>,
-    pub emoji: HashSet<String>,
+    pub emojis: HashSet<String>,
     pub mentions_everyone: bool,
     pub mentions_online: bool,
 }
@@ -75,7 +75,7 @@ impl<'a, I: Iterator<Item = MessageToken<'a>>> Iterator for MessageParserIterato
     }
 }
 
-pub fn parse_message_iter(text: &str) -> impl Iterator<Item = MessageToken> + '_ {
+pub fn parse_message_iter(text: &str) -> impl Iterator<Item = MessageToken<'_>> + '_ {
     MessageParserIterator {
         inner: MessageToken::lexer(text).flatten(),
         temp: VecDeque::new(),
@@ -99,7 +99,7 @@ pub fn parse_message(text: &str) -> MessageResults {
                 results.channel_mentions.insert(id.to_string());
             }
             MessageToken::Emoji(id) => {
-                results.emoji.insert(id.to_string());
+                results.emojis.insert(id.to_string());
             }
             MessageToken::MentionEveryone => results.mentions_everyone = true,
             MessageToken::MentionOnline => results.mentions_online = true,
