@@ -17,6 +17,7 @@ use revolt_database::{
     MessageFlagsValue,
 };
 use revolt_models::v0::{MessageFlags, PushNotification};
+use revolt_result::ToRevoltError;
 
 pub struct MassMessageConsumer {
     #[allow(dead_code)]
@@ -132,7 +133,10 @@ impl MassMessageConsumer {
         let mut payload: MassMessageSentPayload = serde_json::from_str(content.as_str())?;
 
         for push in payload.notifications.iter_mut() {
-            if let Ok(body) = utils::render_notification_content(push, &self.db).await {
+            if let Ok(body) = utils::render_notification_content(push, &self.db)
+                .await
+                .to_internal_error()
+            {
                 push.raw_body = Some(push.body.clone());
                 push.body = body;
             }

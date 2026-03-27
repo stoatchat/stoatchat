@@ -11,6 +11,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use log::debug;
 use revolt_database::{events::rabbit::*, Database};
+use revolt_result::ToRevoltError;
 
 pub struct MessageConsumer {
     #[allow(dead_code)]
@@ -66,7 +67,9 @@ impl MessageConsumer {
         let content = String::from_utf8(content)?;
         let mut payload: MessageSentPayload = serde_json::from_str(content.as_str())?;
 
-        if let Ok(body) = utils::render_notification_content(&payload.notification, &self.db).await
+        if let Ok(body) = utils::render_notification_content(&payload.notification, &self.db)
+            .await
+            .to_internal_error()
         {
             payload.notification.raw_body = Some(payload.notification.body);
             payload.notification.body = body;
