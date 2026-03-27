@@ -77,6 +77,8 @@ call_ring_duration = 30
 [api.livekit.nodes]
 
 [api.users]
+# Minimum allowed length of usernames
+min_username_length = 2
 
 [pushd]
 # this changes the names of the queues to not overlap 

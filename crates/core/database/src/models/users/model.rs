@@ -210,7 +210,7 @@ impl User {
         let original_username_str = original_username.as_str();
         User::validate_username(original_username_str)?;
 
-        let username = User::sanitise_username(original_username_str);
+        let username = User::sanitise_username(original_username_str).await;
         let is_username_sanitised = username != original_username;
 
         let mut user = User {
@@ -314,19 +314,20 @@ impl User {
     }
 
     /// sanitise username
-    fn sanitise_username(username: &str) -> String {
+    async fn sanitise_username(username: &str) -> String {
         // sanitise homoglyphs
         let options = decancer::Options::default().retain_capitalization();
         let mut username = decancer::cure(username, options).unwrap().to_string();
+        username = BLOCKED_USERNAME_PATTERNS
+            .replace_all(&mut username, "")
+            .into_owned();
 
-        if BLOCKED_USERNAME_PATTERNS.is_match(&username) {
-            username = BLOCKED_USERNAME_PATTERNS
-                .replace_all(&mut username, "")
-                .into_owned();
-        }
-
-        const USERNAME_MIN_LEN: usize = 2;
-        let username_length_diff = USERNAME_MIN_LEN.saturating_sub(username.len());
+        let config = revolt_config::config().await;
+        let username_length_diff = config
+            .api
+            .users
+            .min_username_length
+            .saturating_sub(username.len());
         if username_length_diff > 0 {
             username.push_str(&"_".repeat(username_length_diff))
         }
@@ -437,7 +438,7 @@ impl User {
         let original_username = username;
         let original_username_str = original_username.as_str();
         User::validate_username(original_username_str)?;
-        let username = User::sanitise_username(&original_username);
+        let username = User::sanitise_username(&original_username).await;
         let is_username_sanitised = username != original_username;
         if is_username_sanitised {
             self.update(
@@ -868,27 +869,27 @@ mod tests {
         assert!(User::validate_username(username_allowed).is_ok());
     }
 
-    #[test]
-    fn username_sanitisation_clean() {
+    #[async_std::test]
+    async fn username_sanitisation_clean() {
         let username_clean = "Test";
 
-        let username_clean_sanitised = User::sanitise_username(username_clean);
+        let username_clean_sanitised = User::sanitise_username(username_clean).await;
 
         assert_eq!(username_clean, username_clean_sanitised)
     }
 
-    #[test]
-    fn username_sanitisation_hemoglyphs() {
+    #[async_std::test]
+    async fn username_sanitisation_hemoglyphs() {
         let username_hemoglyphs = "𝔽𝕌Ňℕｙ";
 
-        let username_hemoglyphs_sanitised = User::sanitise_username(username_hemoglyphs);
+        let username_hemoglyphs_sanitised = User::sanitise_username(username_hemoglyphs).await;
 
         assert_ne!(username_hemoglyphs, username_hemoglyphs_sanitised);
         assert_eq!("funny", username_hemoglyphs_sanitised);
     }
 
-    #[test]
-    fn username_blocked_patterns() {
+    #[async_std::test]
+    async fn username_blocked_patterns() {
         let username_grave = "```_test";
         let username_discord = "discord.gg_test";
         let username_rvlt = "rvlt.gg_test";
@@ -898,12 +899,12 @@ mod tests {
 
         let expected_username = "_test";
 
-        let username_grave_sanitised = User::sanitise_username(username_grave);
-        let username_discord_sanitised = User::sanitise_username(username_discord);
-        let username_rvlt_sanitised = User::sanitise_username(username_rvlt);
-        let username_guilded_sanitised = User::sanitise_username(username_guilded);
-        let username_http_sanitised = User::sanitise_username(username_http);
-        let username_https_sanitised = User::sanitise_username(username_https);
+        let username_grave_sanitised = User::sanitise_username(username_grave).await;
+        let username_discord_sanitised = User::sanitise_username(username_discord).await;
+        let username_rvlt_sanitised = User::sanitise_username(username_rvlt).await;
+        let username_guilded_sanitised = User::sanitise_username(username_guilded).await;
+        let username_http_sanitised = User::sanitise_username(username_http).await;
+        let username_https_sanitised = User::sanitise_username(username_https).await;
 
         assert_eq!(expected_username, username_grave_sanitised);
         assert_eq!(expected_username, username_discord_sanitised);
@@ -913,11 +914,11 @@ mod tests {
         assert_eq!(expected_username, username_https_sanitised);
     }
 
-    #[test]
-    fn username_sanitisation_padding() {
+    #[async_std::test]
+    async fn username_sanitisation_padding() {
         let username_padding = "```a";
 
-        let username = User::sanitise_username(username_padding);
+        let username = User::sanitise_username(username_padding).await;
 
         assert_eq!("a_", username);
     }

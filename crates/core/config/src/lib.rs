@@ -231,6 +231,7 @@ pub struct LiveKitNode {
 #[derive(Deserialize, Debug, Clone)]
 pub struct ApiUsers {
     pub early_adopter_cutoff: Option<u64>,
+    pub min_username_length: usize,
 }
 
 #[derive(Deserialize, Debug, Clone)]
