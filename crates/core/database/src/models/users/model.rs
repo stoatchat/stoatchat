@@ -206,13 +206,9 @@ impl User {
         I: Into<Option<String>>,
         D: Into<Option<PartialUser>>,
     {
-        let original_username = username;
-        let original_username_str = original_username.as_str();
-        User::validate_username(original_username_str)?;
+        User::validate_username(&username)?;
 
-        let username = User::sanitise_username(original_username_str).await;
-        let is_username_sanitised = username != original_username;
-
+        let new_username = User::sanitise_username(&username).await;
         let mut user = User {
             id: account_id.into().unwrap_or_else(|| Ulid::new().to_string()),
             discriminator: User::find_discriminator(db, &username, None).await?,
