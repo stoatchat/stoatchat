@@ -12,12 +12,6 @@
 The services and libraries that power the Stoat service.<br/>
 <br/>
 
-> [!WARNING]
-> Due to a broken dependency in mongodb >=8.0, Stoat's database service is currently broken on Linux kernel versions >=6.19.
-> This causes the database container to crash after about 30 seconds.
-> Until a patch is released, the only option is likely to downgrade your kernel for the time being.
-> See [the mongodb release notes](https://www.mongodb.com/docs/manual/release-notes/8.0/) for more information.
-
 | Crate              | Path                                               | Description                         |                                                                                                                                                                                                                                                                                                           |
 | ------------------ | -------------------------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `core/config`      | [crates/core/config](crates/core/config)           | Core: Configuration                 | ![Crates.io Version](https://img.shields.io/crates/v/revolt-config) ![Crates.io Version](https://img.shields.io/crates/msrv/revolt-config) ![Crates.io Version](https://img.shields.io/crates/size/revolt-config) ![Crates.io License](https://img.shields.io/crates/l/revolt-config)                     |
@@ -38,6 +32,13 @@ The services and libraries that power the Stoat service.<br/>
 
 </div>
 <br/>
+
+> [!WARNING]
+> Due to a broken dependency in mongodb >=8.0, Stoat's database service is currently broken on Linux kernel versions >=6.19. This causes the database container to crash after about 30 seconds.
+> 
+> Until a patch is released, the only option is likely to downgrade your kernel for the time being.
+> 
+> See [the mongodb release notes](https://www.mongodb.com/docs/manual/release-notes/8.0/) for more information.
 
 ## Minimum Supported Rust Version
 
