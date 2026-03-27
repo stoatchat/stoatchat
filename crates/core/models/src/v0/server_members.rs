@@ -52,6 +52,11 @@ auto_derived_partial!(
         /// Member's nickname
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
         pub nickname: Option<String>,
+
+        /// Member's pronouns
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+        pub pronouns: Option<String>,
+
         /// Avatar attachment
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
         pub avatar: Option<File>,
@@ -89,6 +94,7 @@ auto_derived!(
     /// Optional fields on server member object
     pub enum FieldsMember {
         Nickname,
+        Pronouns,
         Avatar,
         Roles,
         Timeout,
@@ -136,6 +142,9 @@ auto_derived!(
         /// Member nickname
         #[cfg_attr(feature = "validator", validate(length(min = 1, max = 32)))]
         pub nickname: Option<String>,
+        /// Member pronouns
+        #[cfg_attr(feature = "validator", validate(length(min = 1, max = 24)))]
+        pub pronouns: Option<String>,
         /// Attachment Id to set for avatar
         pub avatar: Option<String>,
         /// Array of role ids

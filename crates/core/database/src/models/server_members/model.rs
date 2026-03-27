@@ -28,6 +28,9 @@ auto_derived_partial!(
         /// Member's nickname
         #[serde(skip_serializing_if = "Option::is_none")]
         pub nickname: Option<String>,
+        /// Member's pronouns
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub pronouns: Option<String>,
         /// Avatar attachment
         #[serde(skip_serializing_if = "Option::is_none")]
         pub avatar: Option<File>,
@@ -65,6 +68,7 @@ auto_derived!(
     /// Optional fields on server member object
     pub enum FieldsMember {
         Nickname,
+        Pronouns,
         Avatar,
         Roles,
         Timeout,
@@ -88,6 +92,7 @@ impl Default for Member {
             id: Default::default(),
             joined_at: Timestamp::now_utc(),
             nickname: None,
+            pronouns: None,
             avatar: None,
             roles: vec![],
             timeout: None,
@@ -231,6 +236,7 @@ impl Member {
             FieldsMember::JoinedAt => {}
             FieldsMember::Avatar => self.avatar = None,
             FieldsMember::Nickname => self.nickname = None,
+            FieldsMember::Pronouns => self.pronouns = None,
             FieldsMember::Roles => self.roles.clear(),
             FieldsMember::Timeout => self.timeout = None,
             FieldsMember::CanReceive => self.can_receive = true,
