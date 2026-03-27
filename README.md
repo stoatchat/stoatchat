@@ -130,9 +130,6 @@ Then continue:
 # start other necessary services
 docker compose up -d
 
-# run everything together
-./scripts/start.sh
-# .. or individually
 # run the API server
 cargo run --bin revolt-delta
 # run the events server
