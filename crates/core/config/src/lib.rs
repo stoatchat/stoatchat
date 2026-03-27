@@ -423,6 +423,7 @@ pub struct Settings {
     pub features: Features,
     pub sentry: Sentry,
     pub production: bool,
+    pub disable_events_dont_use: bool,
 }
 
 impl Settings {

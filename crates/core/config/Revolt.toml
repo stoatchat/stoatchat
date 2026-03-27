@@ -1,4 +1,5 @@
 production = false
+disable_events_dont_use = false
 
 [database]
 # MongoDB connection URL
