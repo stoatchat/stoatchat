@@ -294,7 +294,7 @@ impl User {
         // Copy the username for validation
         let username_lowercase = username.to_lowercase();
         // Ensure the username itself isn't blocked
-        const BLOCKED_USERNAMES: &[&str] = &["admin", "revolt"];
+        const BLOCKED_USERNAMES: &[&str] = &["admin", "revolt", "stoat"];
 
         for username in BLOCKED_USERNAMES {
             if username_lowercase == *username {
@@ -934,6 +934,10 @@ mod tests {
                 .await
                 .unwrap();
 
+            let created_disallowed_patterns_sanitised = User::create(&db, "test_stoat.chat".to_string(), None, None)
+                .await
+                .unwrap();
+
             let mut updated_sanitised = User::create(&db, "Test".to_string(), None, None)
                 .await
                 .unwrap();
@@ -942,10 +946,18 @@ mod tests {
                 .await
                 .unwrap();
 
-            assert_eq!(None, created_clean.display_name);
-            assert_eq!(None, updated_clean.display_name);
+            assert_eq!("test", created_clean.username);
+            assert_eq!("Test", created_clean.display_name.unwrap());
+
+            assert_eq!("test2", updated_clean.username);
+            assert_eq!("Test", updated_clean.display_name.unwrap());
+
             assert_eq!("test", created_sanitised.username);
             assert_eq!("http://test", created_sanitised.display_name.unwrap());
+
+            assert_eq!("test_", created_disallowed_patterns_sanitised.username);
+            assert_eq!("test_stoat.chat", created_disallowed_patterns_sanitised.display_name.unwrap());
+
             assert_eq!("test", updated_sanitised.username);
             assert_eq!("http://test", updated_sanitised.display_name.unwrap());
         });
