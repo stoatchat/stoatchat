@@ -170,7 +170,7 @@ impl AbstractServerMembers for MongoDb {
             .session(&mut session)
             .batch_size(config.pushd.mass_mention_chunk_size as u32)
             .await
-            .unwrap(); //.map_err(|_| create_database_error!("find", COL))?;
+            .map_err(|_| create_database_error!("find", COL))?;
 
         return Ok(ChunkedServerMembersGenerator::new_mongo(session, cursor));
     }
