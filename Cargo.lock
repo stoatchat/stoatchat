@@ -6838,8 +6838,10 @@ dependencies = [
 name = "revolt-bonfire"
 version = "0.11.5"
 dependencies = [
+ "amqprs",
  "async-channel 2.5.0",
  "async-std",
+ "async-trait",
  "async-tungstenite",
  "authifier",
  "bincode",

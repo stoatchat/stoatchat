@@ -36,6 +36,7 @@ async-std = { version = "1.8.0", features = [
     "tokio02",
     "attributes",
 ] }
+async-trait = "0.1.89"
 
 # core
 authifier = { version = "1.0.16" }
@@ -48,3 +49,6 @@ revolt-presence = { path = "../core/presence", features = ["redis-is-patched"] }
 
 # redis
 fred = { version = "8.0.1", features = ["subscriber-client"] }
+
+# Redis
+amqprs = { version = "1.7.0" }
