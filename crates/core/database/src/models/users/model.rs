@@ -452,12 +452,7 @@ impl User {
                         )
                         .await?,
                     ),
-                    username: Some(username),
-                    display_name: if is_username_sanitised {
-                        Some(original_username)
-                    } else {
-                        Default::default()
-                    },
+                    username: Some(new_username),
                     ..Default::default()
                 },
                 vec![],
