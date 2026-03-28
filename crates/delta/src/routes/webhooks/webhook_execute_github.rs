@@ -688,11 +688,23 @@ const LIGHT_ORANGE: &str = "#d9916d";
 // for future use
 // const WHITE: &str = "#c3e1c3";
 
-fn shorten_text(text: &str, length: usize) -> String {
-    if text.len() < length {
-        text.to_string()
+fn shorten_single_line_text(text: &str, length: usize) -> String {
+    if text.contains('\n') {
+        let text = text.split('\n').next().unwrap();
+
+        format!("{}...", &text[..text.len().min(length) - 3])
+    } else if text.len() > length {
+        format!("{}...", &text[..length - 3])
     } else {
-        format!("{}...", &text[0..length])
+        text.to_string()
+    }
+}
+
+fn shorten_text(text: &str, length: usize) -> String {
+    if text.len() >= length {
+        format!("{}...", &text[..length - 3])
+    } else {
+        text.to_string()
     }
 }
 
@@ -823,7 +835,7 @@ pub async fn webhook_execute_github(
                                 "[`{}`]({}) {} - {}",
                                 &commit.id[0..=7],
                                 commit.url,
-                                shorten_text(&commit.message, 50),
+                                shorten_single_line_text(&commit.message, 50),
                                 commit.author.name
                             )
                         })

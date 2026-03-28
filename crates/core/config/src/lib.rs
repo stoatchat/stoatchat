@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::Path};
 
 use cached::proc_macro::cached;
-use config::{Config, File, FileFormat};
+use config::{Config, Environment, File, FileFormat};
 use futures_locks::RwLock;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -108,6 +108,8 @@ static CONFIG_BUILDER: Lazy<RwLock<Config>> = Lazy::new(|| {
 
             cwd = path.parent();
         }
+
+        builder = builder.add_source(Environment::with_prefix("REVOLT").separator("__"));
 
         builder.build().unwrap()
     })
@@ -253,6 +255,7 @@ pub struct Pushd {
     pub production: bool,
     pub exchange: String,
     pub mass_mention_chunk_size: usize,
+    pub render_cache_time: usize,
 
     // Queues
     pub message_queue: String,
@@ -349,6 +352,8 @@ pub struct GlobalLimits {
     pub new_user_hours: usize,
 
     pub body_limit_size: usize,
+
+    pub restrict_server_creation: Vec<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -426,6 +431,7 @@ pub struct Settings {
     pub features: Features,
     pub sentry: Sentry,
     pub production: bool,
+    pub disable_events_dont_use: bool,
 }
 
 impl Settings {

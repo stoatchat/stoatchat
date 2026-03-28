@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::consumers::inbound::internal::*;
+use crate::{consumers::inbound::internal::*, utils};
 use amqprs::{
     channel::{BasicPublishArguments, Channel},
     connection::Connection,
@@ -11,6 +11,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use log::debug;
 use revolt_database::{events::rabbit::*, Database};
+use revolt_result::ToRevoltError;
 
 pub struct MessageConsumer {
     #[allow(dead_code)]
@@ -64,7 +65,15 @@ impl MessageConsumer {
         content: Vec<u8>,
     ) -> Result<()> {
         let content = String::from_utf8(content)?;
-        let payload: MessageSentPayload = serde_json::from_str(content.as_str())?;
+        let mut payload: MessageSentPayload = serde_json::from_str(content.as_str())?;
+
+        if let Ok(body) = utils::render_notification_content(&payload.notification, &self.db)
+            .await
+            .to_internal_error()
+        {
+            payload.notification.raw_body = Some(payload.notification.body);
+            payload.notification.body = body;
+        }
 
         debug!("Received message event on origin");
 

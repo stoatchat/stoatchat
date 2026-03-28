@@ -42,8 +42,12 @@ impl<'r> Responder<'r, 'static> for Error {
             ErrorType::NotInGroup => Status::NotFound,
             ErrorType::AlreadyPinned => Status::BadRequest,
             ErrorType::NotPinned => Status::BadRequest,
+            ErrorType::InSlowmode {
+                retry_after: _,
+            } => Status::TooManyRequests,
             ErrorType::InvalidFlagValue => Status::BadRequest,
 
+            ErrorType::CantCreateServers => Status::Forbidden,
             ErrorType::UnknownServer => Status::NotFound,
             ErrorType::InvalidRole => Status::NotFound,
             ErrorType::Banned => Status::Forbidden,

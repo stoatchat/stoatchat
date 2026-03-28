@@ -1,4 +1,5 @@
 production = false
+disable_events_dont_use = false
 
 [database]
 # MongoDB connection URL
@@ -91,6 +92,11 @@ production = true
 # Changes how many users are processed in each chunk when resolving role/everyone mentions.
 # Increasing this will resolve mentions faster, but will consume more memory while resolving.
 mass_mention_chunk_size = 200
+
+# How long pushd will cache resolved names for rendered message notifications.
+# Increasing this will result in lower database usage, but may result in a situation where a user/channel/role name changes 
+# and the notifications still resolve to the old name.
+render_cache_time = 60
 
 # none of these should need changing
 exchange = "revolt.notifications"
@@ -223,6 +229,10 @@ new_user_hours = 72
 # Maximum permissible body size in bytes for uploads
 # (should be greater than any one file upload limit)
 body_limit_size = 20_000_000
+
+# If any userids are entered here, only those users will be able to create servers.
+# Leave empty to allow all users to create servers
+restrict_server_creation = []
 
 [features.limits.new_user]
 # Limits imposed on new users

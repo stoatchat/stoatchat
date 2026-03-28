@@ -39,7 +39,7 @@ Rust 1.86.0 or higher.
 
 ## Development Guide
 
-Before contributing, make yourself familiar with [our contribution guidelines](https://developers.stoat.chat/developing/contrib/) and the [technical documentation for this project](https://stoatchat.github.io/stoatchat/).
+Before contributing, make yourself familiar with [our contribution guidelines](https://developers.stoat.chat/developing/contrib/) and the [technical documentation for this project](https://developers.stoat.chat/).
 
 Before getting started, you'll want to install:
 
@@ -72,6 +72,7 @@ Now you can clone and build the project:
 ```bash
 git clone https://github.com/stoatchat/stoatchat stoat-backend
 cd stoat-backend
+mise install
 mise build
 ```
 
@@ -130,9 +131,6 @@ Then continue:
 # start other necessary services
 docker compose up -d
 
-# run everything together
-./scripts/start.sh
-# .. or individually
 # run the API server
 cargo run --bin revolt-delta
 # run the events server
@@ -212,6 +210,6 @@ TEST_DB=MONGODB cargo nextest run
 
 ## License
 
-The Stoat backend is generally licensed under the [GNU Affero General Public License v3.0](https://github.com/stoatchat/stoatchat/blob/master/LICENSE).
+The Stoat backend is generally licensed under the [GNU Affero General Public License v3.0](https://github.com/stoatchat/stoatchat/blob/main/LICENSE).
 
 **Individual crates may supply their own licenses!**

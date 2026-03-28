@@ -17,12 +17,12 @@ use crate::util::audit_log_reason::AuditLogReason;
 ///
 /// Creates a webhook which 3rd party platforms can use to send messages
 #[openapi(tag = "Webhooks")]
-#[post("/<target>/webhooks", data = "<data>")]
+#[post("/<channel_id>/webhooks", data = "<data>")]
 pub async fn create_webhook(
     db: &State<Database>,
     user: User,
     reason: AuditLogReason,
-    target: Reference<'_>,
+    channel_id: Reference<'_>,
     data: Json<v0::CreateWebhookBody>,
 ) -> Result<Json<v0::Webhook>> {
     let data = data.into_inner();
@@ -32,7 +32,7 @@ pub async fn create_webhook(
         })
     })?;
 
-    let channel = target.as_channel(db).await?;
+    let channel = channel_id.as_channel(db).await?;
 
     if !matches!(channel, Channel::TextChannel { .. } | Channel::Group { .. }) {
         return Err(create_error!(InvalidOperation));
@@ -62,13 +62,13 @@ pub async fn create_webhook(
 
     webhook.create(db).await?;
 
-    if let Some(server) = query.server_ref() {
+    if let Some(server_id) = channel.server() {
         AuditLogEntryAction::WebhookCreate {
             webhook: webhook.id.clone(),
             name: webhook.name.clone(),
             channel: webhook.channel_id.clone(),
         }
-        .insert(db, server.id.clone(), reason, user.id)
+        .insert(db, server_id.to_string(), reason, user.id)
         .await;
     };
 

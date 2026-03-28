@@ -14,6 +14,7 @@ use revolt_config::{config, Settings};
 use tokio::sync::Notify;
 
 mod consumers;
+mod utils;
 use consumers::{
     inbound::{
         ack::AckConsumer, dm_call::DmCallConsumer, fr_accepted::FRAcceptedConsumer,
