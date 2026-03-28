@@ -2,6 +2,7 @@ use revolt_config::config;
 use revolt_result::Result;
 use rocket::serde::json::Json;
 use serde::Serialize;
+use std::collections::HashMap;
 
 /// # hCaptcha Configuration
 #[derive(Serialize, JsonSchema, Debug)]
@@ -54,6 +55,87 @@ pub struct RevoltFeatures {
     pub january: Feature,
     /// Voice server configuration
     pub livekit: VoiceFeature,
+    /// Limits
+    pub limits: LimitsConfig,
+}
+
+/// # Limits For Users
+#[derive(Serialize, JsonSchema, Debug)]
+pub struct LimitsConfig {
+    /// Global Limits
+    pub global: GlobalLimits,
+    /// New User Limits
+    pub new_user: UserLimits,
+    /// Default User Limits
+    pub default: UserLimits,
+}
+
+/// # Global limits
+#[derive(Serialize, JsonSchema, Debug)]
+pub struct GlobalLimits {
+    /// max group size
+    group_size: i64,
+    /// max message embeds
+    message_embeds: i64,
+    /// max replies
+    message_replies: i64,
+    /// max reactions per message
+    message_reactions: i64,
+    /// max server emoji
+    server_emoji: i64,
+    /// max server roles
+    server_roles: i64,
+    /// max server channels
+    server_channels: i64,
+    body_limit_size: i64,
+
+    /// restrict server creation to these users.
+    /// if blank, all users can create servers
+    pub restrict_server_creation: Vec<String>,
+}
+
+/// # User Limits
+#[derive(Serialize, JsonSchema, Debug)]
+pub struct UserLimits {
+    /// Max Outgoing Friend Requests
+    pub outgoing_friend_requests: i64,
+    /// Max Owned Bots
+    pub bots: i64,
+    /// Max message content length
+    pub message_length: i64,
+    /// max message attachments
+    pub message_attachments: i64,
+    /// max servers
+    pub servers: i64,
+    /// max audio quality
+    pub voice_quality: i64,
+    /// video streaming enabled
+    pub video: bool,
+    /// max video resolution (vertical, horizontal)
+    pub video_resolution: [i64; 2],
+    /// min/max aspect ratios
+    pub video_aspect_ratio: [f64; 2],
+    pub file_upload_size_limits: HashMap<String, usize>,
+}
+
+impl UserLimits {
+    fn from_feature_limits(fl: revolt_config::FeaturesLimits) -> UserLimits {
+        UserLimits {
+            outgoing_friend_requests: fl.outgoing_friend_requests as i64,
+            bots: fl.bots as i64,
+            message_length: fl.message_length as i64,
+            message_attachments: fl.message_attachments as i64,
+            servers: fl.servers as i64,
+            voice_quality: fl.voice_quality as i64,
+            video: fl.video,
+            video_resolution: [fl.video_resolution[0] as i64, fl.video_resolution[1] as i64],
+            video_aspect_ratio: [
+                fl.video_aspect_ratio[0] as f64,
+                fl.video_aspect_ratio[1] as f64,
+            ],
+            file_upload_size_limits: fl.file_upload_size_limit,
+        }
+    }
 }
 
 /// # Build Information
@@ -133,6 +215,25 @@ pub async fn root() -> Result<Json<RevoltConfig>> {
                             .clone(),
                     })
                     .collect(),
+            },
+            limits: LimitsConfig {
+                global: GlobalLimits {
+                    group_size: config.features.limits.global.group_size as i64,
+                    message_embeds: config.features.limits.global.message_embeds as i64,
+                    message_replies: config.features.limits.global.message_replies as i64,
+                    message_reactions: config.features.limits.global.message_reactions as i64,
+                    server_emoji: config.features.limits.global.server_emoji as i64,
+                    server_roles: config.features.limits.global.server_roles as i64,
+                    server_channels: config.features.limits.global.server_channels as i64,
+                    body_limit_size: config.features.limits.global.body_limit_size as i64,
+                    restrict_server_creation: config
+                        .features
+                        .limits
+                        .global
+                        .restrict_server_creation,
+                },
+                new_user: UserLimits::from_feature_limits(config.features.limits.new_user),
+                default: UserLimits::from_feature_limits(config.features.limits.default),
             },
         },
         ws: config.hosts.events,

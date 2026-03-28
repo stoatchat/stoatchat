@@ -1,0 +1,147 @@
+name: Bug Report
+description: Report a bug in Stoat — please fill out every required field to help us triage quickly.
+title: "[Bug]: "
+labels:
+  - bug
+  - unconfirmed
+
+body:
+  # ── Thank you section ────────────────────────────────────────────────────────
+  - type: markdown
+    attributes:
+      value: |
+        **Thank you for taking the time to report a bug for Stoat!**
+
+        Please follow the instructions below and provide as much detail as possible to help us understand and reproduce the issue.
+
+  # ── Pre-flight checks ────────────────────────────────────────────────────────
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-flight checklist
+      description: Please confirm all of the following before submitting.
+      options:
+        - label: I am on the latest available version of Stoat.
+          required: true
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
+        - label: This is a bug report, not a support question or feature request.
+          required: true
+
+  # ── Bug description ──────────────────────────────────────────────────────────
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: >
+        What happened? What did you expect to happen instead?
+        Keep this brief — detailed steps go in the next field.
+      placeholder: "Example: When I open a DM thread, new messages from the other person do not appear unless I reload the page."
+    validations:
+      required: true
+
+  # ── Steps to reproduce ───────────────────────────────────────────────────────
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: >
+        Provide a numbered list of every step needed to trigger the bug.
+        The clearer this is, the faster we can fix it.
+      placeholder: |
+        1. Log in to Stoat on the web client.
+        2. Open a direct message conversation.
+        3. Ask the other person to send a message.
+        4. Observe that the message does not appear without reloading.
+    validations:
+      required: true
+
+  # ── Expected behavior ────────────────────────────────────────────────────────
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+      placeholder: "New messages should appear in real time without a page reload."
+    validations:
+      required: true
+
+  # ── Client / platform ────────────────────────────────────────────────────────
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Client / platform
+      description: Which Stoat client are you using?
+      options:
+        - Web (browser)
+        - Stoat for Desktop
+        - Android
+        - iOS
+        - Self-hosted server
+    validations:
+      required: true
+
+  # ── Client version ───────────────────────────────────────────────────────────
+  - type: input
+    id: version
+    attributes:
+      label: Client version
+      description: >
+        Find this in **Settings**. For the web client, include the build
+        number shown in the footer or About page.
+      placeholder: "e.g. Stoat for Desktop 1.3.0 or 0.2.1 (2025-10-10)"
+    validations:
+      required: true
+
+  # ── OS / browser details ─────────────────────────────────────────────────────
+  - type: input
+    id: os
+    attributes:
+      label: OS / browser details
+      description: Your operating system and, for web bugs, your browser and its version.
+      placeholder: "e.g. Windows 11, Chrome 121  or  macOS 14.3, Stoat for Desktop 1.3.0  or  Android 14"
+    validations:
+      required: true
+
+  # ── Reproducibility ──────────────────────────────────────────────────────────
+  - type: dropdown
+    id: reproducibility
+    attributes:
+      label: Reproducibility
+      description: How consistently does this bug occur?
+      options:
+        - Always
+        - Usually
+        - Rarely
+        - Only once
+        - Unknown
+    validations:
+      required: true
+
+  # ── Screenshots or video ─────────────────────────────────────────────────────
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or video
+      description: Paste images or drag-and-drop a screen recording here. GitHub accepts common image and video formats.
+    validations:
+      required: false
+
+  # ── Additional context ───────────────────────────────────────────────────────
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: >
+        Anything else that might help: workarounds you found, links to related issues,
+        self-hosted configuration details (Redis, MongoDB, LiveKit, SMTP), network environment, etc.
+    validations:
+      required: false
+
+  # ── Closing note ─────────────────────────────────────────────────────────────
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        A maintainer will review your report. Please watch for follow-up questions — issues
+        that go unanswered are harder to resolve and may be closed after 30 days of inactivity.

@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::Path};
 
 use cached::proc_macro::cached;
-use config::{Config, File, FileFormat};
+use config::{Config, Environment, File, FileFormat};
 use futures_locks::RwLock;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -109,6 +109,8 @@ static CONFIG_BUILDER: Lazy<RwLock<Config>> = Lazy::new(|| {
             cwd = path.parent();
         }
 
+        builder = builder.add_source(Environment::with_prefix("REVOLT").separator("__"));
+
         builder.build().unwrap()
     })
 });
@@ -117,6 +119,7 @@ static CONFIG_BUILDER: Lazy<RwLock<Config>> = Lazy::new(|| {
 pub struct Database {
     pub mongodb: String,
     pub redis: String,
+    pub redis_pubsub: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -341,6 +344,8 @@ pub struct GlobalLimits {
     pub new_user_hours: usize,
 
     pub body_limit_size: usize,
+
+    pub restrict_server_creation: Vec<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -418,6 +423,7 @@ pub struct Settings {
     pub features: Features,
     pub sentry: Sentry,
     pub production: bool,
+    pub disable_events_dont_use: bool,
 }
 
 impl Settings {
@@ -448,12 +454,14 @@ pub async fn config() -> Settings {
     let mut config = read().await.try_deserialize::<Settings>().unwrap();
 
     // inject REDIS_URI for redis-kiss library
-    if std::env::var("REDIS_URL").is_err() {
+    if std::env::var("REDIS_URI").is_err() {
         std::env::set_var("REDIS_URI", config.database.redis.clone());
     }
 
     // auto-detect production nodes
-    if config.hosts.api.contains("https") && config.hosts.api.contains("revolt.chat") {
+    if config.hosts.api.contains("https")
+        && (config.hosts.api.contains("revolt.chat") || config.hosts.api.contains("stoat.chat"))
+    {
         config.production = true;
     }
 

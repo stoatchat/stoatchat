@@ -1,5 +1,6 @@
 use crate::{
     models::{Channel, User},
+    voice::RoomMetadata,
     Database,
 };
 use livekit_api::{
@@ -102,11 +103,16 @@ impl VoiceClient {
     pub async fn create_room(&self, node: &str, channel: &Channel) -> Result<Room> {
         let room = self.get_node(node)?;
 
+        let metadata = RoomMetadata {
+            server: channel.server().map(|id| id.to_string()),
+        };
+
         room.client
             .create_room(
                 channel.id(),
                 CreateRoomOptions {
                     empty_timeout: 5 * 60, // 5 minutes,
+                    metadata: serde_json::to_string(&metadata).to_internal_error()?,
                     ..Default::default()
                 },
             )

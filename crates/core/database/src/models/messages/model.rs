@@ -1,5 +1,3 @@
-use std::{collections::HashSet, hash::RandomState};
-
 use indexmap::{IndexMap, IndexSet};
 use iso8601_timestamp::Timestamp;
 use revolt_config::{config, FeaturesLimits};
@@ -9,6 +7,8 @@ use revolt_models::v0::{
 };
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission, PermissionValue};
 use revolt_result::{ErrorType, Result};
+use std::time::SystemTime;
+use std::{collections::HashSet, hash::RandomState};
 use ulid::Ulid;
 use validator::Validate;
 
@@ -497,7 +497,7 @@ impl Message {
                     user_mentions.retain(|m| recipients_hash.contains(m));
                     role_mentions.clear();
                 }
-                Channel::TextChannel { ref server, .. }=> {
+                Channel::TextChannel { ref server, .. } => {
                     let mentions_vec = Vec::from_iter(user_mentions.iter().cloned());
 
                     let valid_members = db.fetch_members(server.as_str(), &mentions_vec[..]).await;
@@ -687,8 +687,13 @@ impl Message {
         )
         .await?;
 
+        let is_dm_or_group = matches!(
+            channel,
+            Channel::DirectMessage { .. } | Channel::Group { .. }
+        );
+
         if !self.has_suppressed_notifications()
-            && (self.mentions.is_some() || self.contains_mass_push_mention())
+            && (is_dm_or_group || self.mentions.is_some() || self.contains_mass_push_mention())
         {
             // send Push notifications
             #[cfg(feature = "tasks")]
@@ -1026,6 +1031,31 @@ impl Message {
         }
         .p(channel.to_string())
         .await;
+        Ok(())
+    }
+
+    /// Bulk delete messages by an author since a given time
+    pub async fn bulk_delete_by_author_since(
+        db: &Database,
+        channels: &[String],
+        author: &str,
+        since: SystemTime,
+    ) -> Result<()> {
+        let deleted_groups = db
+            .delete_messages_by_author_since(channels, author, since)
+            .await?;
+
+        for (channel_id, message_ids) in deleted_groups {
+            if !message_ids.is_empty() {
+                EventV1::BulkMessageDelete {
+                    channel: channel_id.clone(),
+                    ids: message_ids,
+                }
+                .p(channel_id)
+                .await;
+            }
+        }
+
         Ok(())
     }
 
