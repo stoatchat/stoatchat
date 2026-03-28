@@ -165,7 +165,7 @@ pub async fn edit(
 
     // 5. Transfer ownership
     if let Some(owner) = owner {
-        let owner_reference = Reference { id: owner.clone() };
+        let owner_reference = Reference::from_unchecked(&owner);
         // Check if member exists
         owner_reference.as_member(db, &server.id).await?;
         let owner_user = owner_reference.as_user(db).await?;
