@@ -207,6 +207,11 @@
                 },
                 {
                     "type": "toml",
+                    "path": "crates/daemons/pushd/Cargo.toml",
+                    "jsonpath": "$.dependencies['revolt-parser'].version"
+                },
+                {
+                    "type": "toml",
                     "path": "crates/daemons/voice-ingress/Cargo.toml",
                     "jsonpath": "$.package.version"
                 },
