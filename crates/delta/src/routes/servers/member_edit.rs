@@ -11,14 +11,18 @@ use revolt_database::{
         set_user_moved_from_voice, set_user_moved_to_voice, sync_user_voice_permissions,
         UserVoiceChannel, VoiceClient,
     },
-    Database, File, PartialMember, User,
+    AuditLogEntryAction, Database, FieldsMember, File, PartialMember, User,
 };
-use revolt_models::v0::{self, FieldsMember};
+use revolt_models::v0;
 
-use revolt_permissions::{calculate_channel_permissions, calculate_server_permissions, ChannelPermission, UserPermission};
+use revolt_permissions::{
+    calculate_channel_permissions, calculate_server_permissions, ChannelPermission, UserPermission,
+};
 use revolt_result::{create_error, Result};
 use rocket::{form::validate::Contains, serde::json::Json, State};
 use validator::Validate;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Edit Member
 ///
@@ -29,6 +33,7 @@ pub async fn edit(
     db: &State<Database>,
     voice_client: &State<VoiceClient>,
     user: User,
+    reason: AuditLogReason,
     server_id: Reference<'_>,
     member_id: Reference<'_>,
     data: Json<v0::DataMemberEdit>,
@@ -70,7 +75,7 @@ pub async fn edit(
         } else if data.remove.contains(&v0::FieldsMember::Avatar) {
             permissions.throw_if_lacking_channel_permission(ChannelPermission::RemoveAvatars)?;
         } else {
-            return Err(create_error!(InvalidOperation))
+            return Err(create_error!(InvalidOperation));
         }
     }
 
@@ -100,11 +105,11 @@ pub async fn edit(
         permissions.throw_if_lacking_channel_permission(ChannelPermission::DeafenMembers)?;
     }
 
-    if data.voice_channel.is_some() && data.remove.contains(&FieldsMember::VoiceChannel) {
+    if data.voice_channel.is_some() && data.remove.contains(&v0::FieldsMember::VoiceChannel) {
         return Err(create_error!(InvalidOperation));
     }
 
-    if data.voice_channel.is_some() || data.remove.contains(&FieldsMember::VoiceChannel) {
+    if data.voice_channel.is_some() || data.remove.contains(&v0::FieldsMember::VoiceChannel) {
         if !voice_client.is_enabled() {
             return Err(create_error!(LiveKitUnavailable));
         };
@@ -126,7 +131,8 @@ pub async fn edit(
             Err(create_error!(UnknownChannel))?
         }
 
-        let channel_permissions = calculate_channel_permissions(&mut query.clone().channel(&channel)).await;
+        let channel_permissions =
+            calculate_channel_permissions(&mut query.clone().channel(&channel)).await;
         channel_permissions.throw_if_lacking_channel_permission(ChannelPermission::Connect)?;
 
         if get_user_voice_channel_in_server(&target_user.id, &server.id)
@@ -202,9 +208,22 @@ pub async fn edit(
         partial.avatar = Some(File::use_user_avatar(db, &avatar, &user.id, &user.id).await?);
     }
 
-    member
-        .update(db, partial, remove.clone().into_iter().map(Into::into).collect())
-        .await?;
+    let remove = remove
+        .into_iter()
+        .map(Into::into)
+        .collect::<Vec<FieldsMember>>();
+
+    let before = member.generate_diff(&partial, &remove);
+
+    member.update(db, partial.clone(), remove.clone()).await?;
+
+    AuditLogEntryAction::MemberEdit {
+        user: member.id.user.clone(),
+        before,
+        after: partial,
+    }
+    .insert(db, server.id.clone(), reason, user.id.clone())
+    .await;
 
     if let Some(new_voice_channel) = new_voice_channel {
         if let Some(channel) = get_user_voice_channel_in_server(&target_user.id, &server.id).await?
@@ -256,7 +275,11 @@ pub async fn edit(
             .private(target_user.id.clone())
             .await;
         };
-    } else if can_publish.is_some() || can_receive.is_some() || remove.contains(FieldsMember::CanPublish) || remove.contains(FieldsMember::CanReceive) {
+    } else if can_publish.is_some()
+        || can_receive.is_some()
+        || remove.contains(FieldsMember::CanPublish)
+        || remove.contains(FieldsMember::CanReceive)
+    {
         if let Some(channel) = get_user_voice_channel_in_server(&target_user.id, &server.id).await?
         {
             let node = get_channel_node(&channel).await?.unwrap();

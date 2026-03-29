@@ -231,6 +231,31 @@ impl Server {
         }
     }
 
+    /// Generates a PartialServer containing the data which has changed in an update
+    pub fn generate_diff(&self, partial: &PartialServer, remove: &[FieldsServer]) -> PartialServer {
+        let mut before = PartialServer::default();
+
+        generate_diff!(
+            self, before, partial, remove,
+            (
+                owner,
+                name,
+                (FieldsServer::Description) description,
+                (FieldsServer::Categories) categories,
+                (FieldsServer::SystemMessages) system_messages,
+                roles,
+                default_permissions,
+                (FieldsServer::Icon) icon,
+                (FieldsServer::Banner) banner,
+                nsfw,
+                analytics,
+                discoverable,
+            )
+        );
+
+        before
+    }
+
     /// Ordered roles list
     pub fn ordered_roles(&self) -> Vec<(String, Role)> {
         let mut ordered_roles = self.roles.clone().into_iter().collect::<Vec<_>>();
@@ -370,8 +395,26 @@ impl Role {
         }
     }
 
+    /// Generates a PartialRole containing the data which has changed in an update
+    pub fn generate_diff(&self, partial: &PartialRole, remove: &[FieldsRole]) -> PartialRole {
+        let mut before = PartialRole::default();
+
+        generate_diff!(
+            self, before, partial, remove,
+            (
+                name,
+                permissions,
+                (FieldsRole::Colour) colour,
+                hoist,
+                rank,
+            )
+        );
+
+        before
+    }
+
     /// Delete a role
-    pub async fn delete(self, db: &Database, server_id: &str) -> Result<()> {
+    pub async fn delete(&self, db: &Database, server_id: &str) -> Result<()> {
         EventV1::ServerRoleDelete {
             id: server_id.to_string(),
             role_id: self.id.clone(),
