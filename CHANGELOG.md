@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.1](https://github.com/stoatchat/stoatchat/compare/v0.12.0...v0.12.1) (2026-03-29)
+
+
+### Bug Fixes
+
+* release-please-3 ([#702](https://github.com/stoatchat/stoatchat/issues/702)) ([8814bf4](https://github.com/stoatchat/stoatchat/commit/8814bf4c239694fe53c8ea7a59c99604d8c78f1d))
+
 ## [0.12.0](https://github.com/stoatchat/stoatchat/compare/v0.11.5...v0.12.0) (2026-03-28)
 
 
