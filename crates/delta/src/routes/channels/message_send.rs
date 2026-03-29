@@ -13,6 +13,8 @@ use rocket::serde::json::Json;
 use rocket::State;
 use validator::Validate;
 
+use crate::util::kafka::KafkaClient;
+
 /// # Send Message
 ///
 /// Sends a message to the given channel.
@@ -21,6 +23,7 @@ use validator::Validate;
 pub async fn message_send(
     db: &State<Database>,
     amqp: &State<AMQP>,
+    kafka: &State<KafkaClient>,
     user: User,
     target: Reference<'_>,
     data: Json<v0::DataMessageSend>,
@@ -137,23 +140,48 @@ pub async fn message_send(
         .as_ref()
         .map(|member| member.clone().into_owned().into());
 
-    Ok(Json(
-        Message::create_from_api(
-            db,
-            Some(amqp),
-            channel,
-            data,
-            v0::MessageAuthor::User(&author),
-            Some(model_user.clone()),
-            model_member.clone(),
-            user.limits().await,
-            idempotency,
-            permissions.has_channel_permission(ChannelPermission::SendEmbeds),
-            allow_mentions,
-        )
+    let m = Message::create_from_api(
+        db,
+        Some(amqp),
+        channel,
+        data,
+        v0::MessageAuthor::User(&author),
+        Some(model_user.clone()),
+        model_member.clone(),
+        user.limits().await,
+        idempotency,
+        permissions.has_channel_permission(ChannelPermission::SendEmbeds),
+        allow_mentions,
+    )
         .await?
-        .into_model(Some(model_user), model_member),
-    ))
+        .into_model(Some(model_user), model_member);
+    
+    let action_id = ulid::Ulid::from_string(&m.id)
+        .expect("our ulids to be correct");
+    let action_id = (action_id.0 >> 64) as u64;
+    let payload = serde_json::json!({
+        "send_time": Utc::now().to_rfc3339(),
+        "data": {
+            "action_id": action_id,
+            "action_name": "create_post",
+            "data": {
+                "user_id": m.author,
+                "ip_address": "127.0.0.1",
+                "event_type": "create_post",
+                "post": {
+                    "text": m.content.clone().unwrap_or_default()
+                }
+            }
+        }
+    }).to_string();
+
+    let record = kafka.create_record()
+        .payload(&payload)
+        .key(&m.id);
+    let sent_message = kafka.enqueue(record).await;
+    dbg!(sent_message);
+    
+    Ok(Json(m))
 }
 
 #[cfg(test)]
