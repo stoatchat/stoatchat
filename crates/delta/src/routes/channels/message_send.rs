@@ -420,7 +420,7 @@ mod test {
         // Delete the message
         message
             .clone()
-            .delete(&harness.db)
+            .delete(&harness.db, None)
             .await
             .expect("Failed to delete message");
 

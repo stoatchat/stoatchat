@@ -19,7 +19,7 @@ pub fn start_workers(db: Database, amqp: AMQP) {
     for _ in 0..WORKER_COUNT {
         task::spawn(ack::worker(db.clone(), amqp.clone()));
         task::spawn(last_message_id::worker(db.clone()));
-        task::spawn(process_embeds::worker(db.clone()));
+        task::spawn(process_embeds::worker(db.clone(), amqp.clone()));
     }
 }
 

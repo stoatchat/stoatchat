@@ -10,6 +10,7 @@ use validator::Validate;
 
 /// # Search for Messages
 ///
+/// DEPRECATED: use /search instead.
 /// This route searches for messages within the given parameters.
 #[openapi(tag = "Messaging")]
 #[post("/<target>/search", data = "<options>")]

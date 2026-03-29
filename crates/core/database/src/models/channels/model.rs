@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 use std::{borrow::Cow, collections::HashMap};
 
-use revolt_config::config;
+use revolt_config::{capture_error, config};
 use revolt_models::v0::{self, MessageAuthor};
 use revolt_permissions::OverrideField;
 use revolt_result::Result;
@@ -339,7 +339,7 @@ impl Channel {
     pub async fn add_user_to_group(
         &mut self,
         db: &Database,
-        amqp: &AMQP,
+        amqp: Option<&AMQP>,
         user: &User,
         by_id: &str,
     ) -> Result<()> {
@@ -376,7 +376,7 @@ impl Channel {
                 .into_message(id.to_string())
                 .send(
                     db,
-                    Some(amqp),
+                    amqp,
                     MessageAuthor::System {
                         username: &user.username,
                         avatar: user.avatar.as_ref().map(|file| file.id.as_ref()),
@@ -669,7 +669,7 @@ impl Channel {
     pub async fn remove_user_from_group(
         &self,
         db: &Database,
-        amqp: &AMQP,
+        amqp: Option<&AMQP>,
         user: &User,
         by_id: Option<&str>,
         silent: bool,
@@ -701,7 +701,7 @@ impl Channel {
                         .into_message(id.to_string())
                         .send(
                             db,
-                            Some(amqp),
+                            amqp,
                             MessageAuthor::System {
                                 username: name,
                                 avatar: None,
@@ -714,7 +714,7 @@ impl Channel {
                         .await
                         .ok();
                     } else {
-                        return self.delete(db).await;
+                        return self.delete(db, amqp).await;
                     }
                 }
 
@@ -741,7 +741,7 @@ impl Channel {
                     .into_message(id.to_string())
                     .send(
                         db,
-                        Some(amqp),
+                        amqp,
                         MessageAuthor::System {
                             username: &user.username,
                             avatar: user.avatar.as_ref().map(|file| file.id.as_ref()),
@@ -763,13 +763,22 @@ impl Channel {
     }
 
     /// Delete a channel
-    pub async fn delete(&self, db: &Database) -> Result<()> {
+    pub async fn delete(&self, db: &Database, amqp: Option<&AMQP>) -> Result<()> {
         let id = self.id().to_string();
         EventV1::ChannelDelete { id: id.clone() }.p(id).await;
         // TODO: missing functionality:
         // - group invites
         // - channels list / categories list on server
-        db.delete_channel(self).await
+        db.delete_channel(self).await?;
+
+        if let Some(amqp) = amqp {
+            if let Err(e) = amqp.delete_channel_search(self.id().to_string()).await {
+                log::error!("Error pushing message to RabbitMQ: {e}");
+                capture_error(&e);
+            }
+        }
+
+        Ok(())
     }
 }
 

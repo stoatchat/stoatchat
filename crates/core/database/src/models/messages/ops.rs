@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 use revolt_result::Result;
 
-use crate::{AppendMessage, FieldsMessage, Message, MessageQuery, PartialMessage};
+use crate::{AppendMessage, FieldsMessage, Message, MessageQuery, PartialMessage, util::ChunkedDatabaseGenerator};
 
 #[cfg(feature = "mongodb")]
 mod mongodb;
@@ -26,7 +26,7 @@ pub trait AbstractMessages: Sync + Send {
     async fn update_message(&self, id: &str, message: &PartialMessage, remove: Vec<FieldsMessage>) -> Result<()>;
 
     /// Append information to a given message
-    async fn append_message(&self, id: &str, append: &AppendMessage) -> Result<()>;
+    async fn append_message(&self, id: &str, append: &AppendMessage) -> Result<Option<Message>>;
 
     /// Add a new reaction to a message
     async fn add_reaction(&self, id: &str, emoji: &str, user: &str) -> Result<()>;
@@ -50,4 +50,5 @@ pub trait AbstractMessages: Sync + Send {
         author: &str,
         since: SystemTime
     ) -> Result<HashMap<String, Vec<String>>>;
+    async fn fetch_all_messages(&self) -> Result<ChunkedDatabaseGenerator<Message>>;
 }

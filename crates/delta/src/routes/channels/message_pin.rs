@@ -1,3 +1,4 @@
+use revolt_config::capture_error;
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     Channel, Database, PartialMessage, SystemMessage, User, AMQP,
@@ -45,6 +46,11 @@ pub async fn message_pin(
             vec![],
         )
         .await?;
+
+    if let Err(e) = amqp.edit_message_search(message.clone()).await {
+        log::error!("Error pushing message to RabbitMQ: {e}");
+        capture_error(&e);
+    }
 
     SystemMessage::MessagePinned {
         id: message.id.clone(),

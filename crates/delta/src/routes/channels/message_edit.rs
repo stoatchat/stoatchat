@@ -1,8 +1,7 @@
 use iso8601_timestamp::Timestamp;
+use revolt_config::capture_error;
 use revolt_database::{
-    tasks,
-    util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, Message, PartialMessage, User,
+    AMQP, Database, Message, PartialMessage, User, tasks, util::{permissions::DatabasePermissionQuery, reference::Reference}
 };
 use revolt_models::v0::{self, Embed};
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
@@ -17,6 +16,7 @@ use validator::Validate;
 #[patch("/<target>/messages/<msg>", data = "<edit>")]
 pub async fn edit(
     db: &State<Database>,
+    amqp: &State<AMQP>,
     user: User,
     target: Reference<'_>,
     msg: Reference<'_>,
@@ -94,6 +94,11 @@ pub async fn edit(
             )
             .await;
         }
+    }
+
+    if let Err(e) = amqp.edit_message_search(message.clone()).await {
+        log::error!("Error pushing message to RabbitMQ: {e}");
+        capture_error(&e);
     }
 
     Ok(Json(message.into_model(None, None)))

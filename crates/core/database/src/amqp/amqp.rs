@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::events::rabbit::*;
-use crate::User;
+use crate::{Message, User};
 use amqprs::channel::{BasicPublishArguments, ExchangeDeclareArguments};
 use amqprs::connection::OpenConnectionArguments;
 use amqprs::{channel::Channel, connection::Connection, error::Error as AMQPError};
@@ -46,6 +46,15 @@ impl AMQP {
         channel
             .exchange_declare(
                 ExchangeDeclareArguments::new(&config.pushd.exchange, "direct")
+                    .durable(true)
+                    .finish(),
+            )
+            .await
+            .expect("Failed to declare exchange");
+
+        channel
+            .exchange_declare(
+                ExchangeDeclareArguments::new(&config.elasticsearch.exchange, "direct")
                     .durable(true)
                     .finish(),
             )
@@ -312,6 +321,106 @@ impl AMQP {
                 BasicPublishArguments::new(
                     &config.pushd.exchange,
                     &config.pushd.get_dm_call_routing_key(),
+                ),
+            )
+            .await
+    }
+
+    pub async fn new_message_search(&self, message: Message) -> Result<(), AMQPError> {
+        let config = revolt_config::config().await;
+
+        let payload = to_string(&message).unwrap();
+
+        debug!(
+            "Sending new message search payload on channel {}: {}",
+            config.elasticsearch.message_queue, payload
+        );
+
+        self.channel
+            .basic_publish(
+                BasicProperties::default()
+                    .with_content_type("application/json")
+                    .with_persistence(true)
+                    .finish(),
+                payload.into(),
+                BasicPublishArguments::new(
+                    &config.elasticsearch.exchange,
+                    &config.elasticsearch.message_queue,
+                ),
+            )
+            .await
+    }
+
+    pub async fn edit_message_search(&self, message: Message) -> Result<(), AMQPError> {
+        let config = revolt_config::config().await;
+
+        let payload = to_string(&message).unwrap();
+
+        debug!(
+            "Sending edit message search payload on channel {}: {}",
+            config.elasticsearch.message_edit_queue, payload
+        );
+
+        self.channel
+            .basic_publish(
+                BasicProperties::default()
+                    .with_content_type("application/json")
+                    .with_persistence(true)
+                    .finish(),
+                payload.into(),
+                BasicPublishArguments::new(
+                    &config.elasticsearch.exchange,
+                    &config.elasticsearch.message_edit_queue,
+                ),
+            )
+            .await
+    }
+
+    pub async fn delete_message_search(&self, message_id: String) -> Result<(), AMQPError> {
+        let config = revolt_config::config().await;
+
+        let payload = to_string(&MessageDeletePayload { message_id }).unwrap();
+
+        debug!(
+            "Sending delete message search payload on channel {}: {}",
+            config.elasticsearch.message_delete_queue, payload
+        );
+
+        self.channel
+            .basic_publish(
+                BasicProperties::default()
+                    .with_content_type("application/json")
+                    .with_persistence(true)
+                    .finish(),
+                payload.into(),
+                BasicPublishArguments::new(
+                    &config.elasticsearch.exchange,
+                    &config.elasticsearch.message_delete_queue,
+                ),
+            )
+            .await
+    }
+
+    pub async fn delete_channel_search(&self, channel_id: String) -> Result<(), AMQPError> {
+        let config = revolt_config::config().await;
+
+        let payload = to_string(&ChannelDeletePayload { channel_id }).unwrap();
+
+        debug!(
+            "Sending delete channel search payload on channel {}: {}",
+            config.elasticsearch.channel_delete_queue, payload
+        );
+
+        self.channel
+            .basic_publish(
+                BasicProperties::default()
+                    .with_content_type("application/json")
+                    .with_persistence(true)
+                    .finish(),
+                payload.into(),
+                BasicPublishArguments::new(
+                    &config.elasticsearch.exchange,
+                    &config.elasticsearch.channel_delete_queue,
                 ),
             )
             .await

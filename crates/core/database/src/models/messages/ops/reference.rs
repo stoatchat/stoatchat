@@ -4,7 +4,11 @@ use indexmap::IndexSet;
 use revolt_result::Result;
 use std::time::SystemTime;
 use ulid::Ulid;
-use crate::{AppendMessage, FieldsMessage, Message, MessageQuery, PartialMessage, ReferenceDb};
+
+use crate::{
+    util::ChunkedDatabaseGenerator, AppendMessage, FieldsMessage, Message, MessageQuery,
+    PartialMessage, ReferenceDb,
+};
 
 use super::AbstractMessages;
 
@@ -207,7 +211,7 @@ impl AbstractMessages for ReferenceDb {
     }
 
     /// Append information to a given message
-    async fn append_message(&self, id: &str, append: &AppendMessage) -> Result<()> {
+    async fn append_message(&self, id: &str, append: &AppendMessage) -> Result<Option<Message>> {
         let mut messages = self.messages.lock().await;
         if let Some(message_data) = messages.get_mut(id) {
             if let Some(embeds) = &append.embeds {
@@ -218,9 +222,11 @@ impl AbstractMessages for ReferenceDb {
                         message_data.embeds = Some(embeds.clone());
                     }
                 }
-            }
 
-            Ok(())
+                Ok(Some(message_data.clone()))
+            } else {
+                Ok(None)
+            }
         } else {
             Err(create_error!(NotFound))
         }
@@ -346,5 +352,11 @@ impl AbstractMessages for ReferenceDb {
             });
 
         Ok(deleted_messages)
+    }
+
+    async fn fetch_all_messages(&self) -> Result<ChunkedDatabaseGenerator<Message>> {
+        Ok(ChunkedDatabaseGenerator::new_reference(
+            self.messages.lock().await.values().cloned().collect(),
+        ))
     }
 }

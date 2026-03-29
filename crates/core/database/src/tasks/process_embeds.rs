@@ -1,4 +1,4 @@
-use crate::{models::Message, AppendMessage, Database};
+use crate::{AMQP, AppendMessage, Database, models::Message};
 
 use futures::future::join_all;
 use linkify::{LinkFinder, LinkKind};
@@ -41,7 +41,7 @@ pub async fn queue(channel: String, id: String, content: String) {
 }
 
 /// Start a new worker
-pub async fn worker(db: Database) {
+pub async fn worker(db: Database, amqp: AMQP) {
     let semaphore = Arc::new(Semaphore::new(
         config().await.api.workers.max_concurrent_connections,
     ));
@@ -49,6 +49,7 @@ pub async fn worker(db: Database) {
     loop {
         let task = Q.pop().await;
         let db = db.clone();
+        let amqp = amqp.clone();
         let semaphore = semaphore.clone();
 
         spawn(async move {
@@ -64,6 +65,7 @@ pub async fn worker(db: Database) {
             if let Ok(embeds) = embeds {
                 if let Err(err) = Message::append(
                     &db,
+                    Some(&amqp),
                     task.id,
                     task.channel,
                     AppendMessage {

@@ -1,6 +1,5 @@
 use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, User,
+    AMQP, Database, User, util::{permissions::DatabasePermissionQuery, reference::Reference}
 };
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::Result;
@@ -14,6 +13,7 @@ use rocket_empty::EmptyResponse;
 #[delete("/<target>/messages/<msg>", rank = 2)]
 pub async fn delete(
     db: &State<Database>,
+    amqp: &State<AMQP>,
     user: User,
     target: Reference<'_>,
     msg: Reference<'_>,
@@ -28,5 +28,5 @@ pub async fn delete(
             .throw_if_lacking_channel_permission(ChannelPermission::ManageMessages)?;
     }
 
-    message.delete(db).await.map(|_| EmptyResponse)
+    message.delete(db, Some(amqp)).await.map(|_| EmptyResponse)
 }

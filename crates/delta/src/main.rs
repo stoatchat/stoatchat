@@ -12,6 +12,7 @@ use revolt_config::config;
 use revolt_database::events::client::EventV1;
 use revolt_database::AMQP;
 use revolt_ratelimits::rocket as ratelimiter;
+use revolt_search::ElasticsearchClient;
 use rocket::{Build, Rocket};
 use rocket_cors::{AllowedOrigins, CorsOptions};
 use rocket_prometheus::PrometheusMetrics;
@@ -24,8 +25,8 @@ use amqprs::{
 };
 use async_std::channel::unbounded;
 use authifier::AuthifierEvent;
-use rocket::data::ToByteUnit;
 use revolt_database::voice::VoiceClient;
+use rocket::data::ToByteUnit;
 
 pub async fn web() -> Rocket<Build> {
     // Get settings
@@ -135,6 +136,15 @@ pub async fn web() -> Rocket<Build> {
         .await
         .expect("Failed to declare exchange");
 
+    channel
+        .exchange_declare(
+            ExchangeDeclareArguments::new(&config.elasticsearch.exchange, "direct")
+                .durable(true)
+                .finish(),
+        )
+        .await
+        .expect("Failed to declare exchange");
+
     let amqp = AMQP::new(connection, channel);
 
     // Launch background task workers
@@ -146,6 +156,13 @@ pub async fn web() -> Rocket<Build> {
 
     // Ratelimits
     let ratelimits = ratelimiter::RatelimitStorage::new(util::ratelimits::DeltaRatelimits);
+
+    // Search
+    let elasticsearch = ElasticsearchClient::new(
+        &config.elasticsearch.host,
+        config.elasticsearch.port,
+        config.elasticsearch.api_key.clone(),
+    );
 
     routes::mount(config, rocket)
         .attach(prometheus.clone())
@@ -160,6 +177,7 @@ pub async fn web() -> Rocket<Build> {
         .manage(cors.clone())
         .manage(voice_client)
         .manage(ratelimits)
+        .manage(elasticsearch)
         .attach(ratelimiter::RatelimitFairing)
         .attach(cors)
         .configure(rocket::Config {
