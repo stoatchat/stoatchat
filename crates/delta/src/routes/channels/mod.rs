@@ -20,6 +20,7 @@ mod message_query;
 mod message_react;
 mod message_search;
 mod message_send;
+mod message_suppress_embeds;
 mod message_unpin;
 mod message_unreact;
 mod permissions_set;
@@ -56,6 +57,7 @@ pub fn routes() -> (Vec<Route>, OpenApi) {
         message_react::react_message,
         message_unreact::unreact_message,
         message_clear_reactions::clear_reactions,
+        message_suppress_embeds::suppress_embeds,
         webhook_create::create_webhook,
         webhook_fetch_all::fetch_webhooks,
     ]
