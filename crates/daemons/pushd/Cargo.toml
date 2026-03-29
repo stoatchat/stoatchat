@@ -18,7 +18,7 @@ revolt-models = { version = "0.12.0", path = "../../core/models", features = [
 revolt-presence = { version = "0.12.0", path = "../../core/presence", features = [
     "redis-is-patched",
 ] }
-revolt-parser = { version = "0.11.5", path = "../../core/parser" }
+revolt-parser = { version = "0.12.0", path = "../../core/parser" }
 
 anyhow = { version = "1.0.98" }
 
