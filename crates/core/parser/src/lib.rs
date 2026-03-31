@@ -262,7 +262,7 @@ mod tests {
         )
         .collect::<Vec<_>>();
 
-        assert_eq!(output.len(), 6);
+        assert_eq!(output.len(), 7);
         assert_eq!(output[0], MessageToken::CodeblockMarker(1));
         assert_eq!(
             output[1],
