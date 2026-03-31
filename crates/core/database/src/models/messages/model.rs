@@ -1,6 +1,4 @@
 use indexmap::{IndexMap, IndexSet};
-#[cfg(feature = "tasks")]
-use isahc::auth;
 use iso8601_timestamp::Timestamp;
 use revolt_config::{config, FeaturesLimits};
 use revolt_models::v0::{
