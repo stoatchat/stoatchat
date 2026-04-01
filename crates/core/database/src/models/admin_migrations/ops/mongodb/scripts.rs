@@ -25,7 +25,7 @@ struct MigrationInfo {
     revision: i32,
 }
 
-pub const LATEST_REVISION: i32 = 51; // MUST BE +1 to last migration
+pub const LATEST_REVISION: i32 = 50; // MUST BE +1 to last migration
 
 pub async fn migrate_database(db: &MongoDb) {
     let migrations = db.col::<Document>("migrations");
@@ -1085,7 +1085,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
         enum Channel {
             Group { owner: String },
             TextChannel { server: String },
-            VoiceChannel { server: String },
+            VoiceChannel { server: String }
         }
 
         let webhooks = db
@@ -1099,12 +1099,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             .await;
 
         for webhook in webhooks {
-            match db
-                .col::<Channel>("channels")
-                .find_one(doc! { "_id": &webhook.channel_id })
-                .await
-                .unwrap()
-            {
+            match db.col::<Channel>("channels").find_one(doc! { "_id": &webhook.channel_id }).await.unwrap() {
                 Some(channel) => {
                     let creator_id = match channel {
                         Channel::Group { owner, .. } => owner,
@@ -1245,7 +1240,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
                         "channel_type": "TextChannel",
                         "voice": {}
                     }
-                },
+                }
             )
             .await
             .expect("Failed to update voice channels");
@@ -1297,7 +1292,10 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             let mut doc = doc! {};
 
             for id in server.roles.keys() {
-                doc.insert(format!("roles.{id}._id"), id);
+                doc.insert(
+                    format!("roles.{id}._id"),
+                    id,
+                );
             }
 
             db.db()
@@ -1307,24 +1305,6 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
                 .unwrap();
         }
     };
-
-    if revision <= 50 {
-        info!("Running migration [revision 50 / 30-03-2026]: Add animated to existing gifs");
-
-        db.db()
-            .collection::<Document>("attachment_hashes")
-            .update_many(
-                doc! {
-                    "content_type": "image/gif",
-                    "metadata.type": "Image",
-                },
-                doc! {
-                    "metadata.animated": true
-                },
-            )
-            .await
-            .expect("Failed to update attachment_hashes");
-        };
 
     // Reminder to update LATEST_REVISION when adding new migrations.
     LATEST_REVISION.max(revision)
