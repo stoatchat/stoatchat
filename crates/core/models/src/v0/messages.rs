@@ -391,6 +391,7 @@ auto_derived!(
 );
 
 /// Message Author Abstraction
+#[derive(Clone)]
 pub enum MessageAuthor<'a> {
     User(&'a User),
     Webhook(&'a Webhook),
