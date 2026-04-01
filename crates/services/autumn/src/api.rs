@@ -1,5 +1,5 @@
 use std::{
-    io::{Cursor, Read},
+    io::{Cursor, Read, Write},
     time::Duration,
 };
 
@@ -15,9 +15,10 @@ use lazy_static::lazy_static;
 use revolt_config::{config, report_internal_error};
 use revolt_database::{iso8601_timestamp::Timestamp, Database, FileHash, Metadata, User};
 use revolt_files::{
-    create_thumbnail, decode_image, fetch_from_s3, upload_to_s3, AUTHENTICATION_TAG_SIZE_BYTES,
+    create_thumbnail, decode_image, fetch_from_s3, is_animated, upload_to_s3,
+    AUTHENTICATION_TAG_SIZE_BYTES,
 };
-use revolt_result::{create_error, Error, Result};
+use revolt_result::{create_error, Error, Result, ToRevoltError};
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use tempfile::NamedTempFile;
@@ -25,7 +26,9 @@ use tokio::time::Instant;
 use tower_http::cors::{AllowHeaders, Any, CorsLayer};
 use utoipa::ToSchema;
 
-use crate::{exif::strip_metadata, metadata::generate_metadata, mime_type::determine_mime_type, AppState};
+use crate::{
+    exif::strip_metadata, metadata::generate_metadata, mime_type::determine_mime_type, AppState,
+};
 
 /// Build the API router
 pub async fn router() -> Router<AppState> {
@@ -380,7 +383,30 @@ async fn fetch_preview(
 
     let hash = file.as_hash(&db).await?;
 
-    let is_animated = matches!(hash.metadata, Metadata::Image { animated: true, .. });
+    let mut data = None;
+
+    // If animated is unset, check the file contents to see if it is animated and update the filehash
+    let is_animated = match &hash.metadata {
+        Metadata::Image {
+            animated: Some(value),
+            ..
+        } => *value,
+        Metadata::Image { animated: None, .. } => {
+            let file_data = retrieve_file_by_hash(&hash).await?;
+
+            let mut named_file = NamedTempFile::new().to_internal_error()?;
+            named_file.write(&file_data).to_internal_error()?;
+
+            data = Some(file_data);
+
+            // If it fails for some reason, set it to not be animated
+            let animated = is_animated(&named_file, &hash.content_type).unwrap_or(false);
+            db.set_attachment_hash_animated(&hash.id, animated).await?;
+
+            animated
+        }
+        _ => false,
+    };
 
     // Only process image files and don't process GIFs if not avatar or icon
     if !matches!(hash.metadata, Metadata::Image { .. })
@@ -392,7 +418,11 @@ async fn fetch_preview(
     }
 
     // Original image data
-    let data = retrieve_file_by_hash(&hash).await?;
+    let data = if let Some(data) = data {
+        data
+    } else {
+        retrieve_file_by_hash(&hash).await?
+    };
 
     // Read image and create thumbnail
     let data = create_thumbnail(

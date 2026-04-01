@@ -51,7 +51,7 @@ auto_derived!(
             width: usize,
             height: usize,
             thumbhash: Option<Vec<u8>>,
-            animated: bool,
+            animated: Option<bool>,
         },
         /// File is a video with specific dimensions
         Video { width: usize, height: usize },
