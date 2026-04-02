@@ -37,7 +37,7 @@ pub fn generate_metadata(f: &NamedTempFile, mime_type: &str) -> Metadata {
                         thumbhash::rgba_to_thumb_hash(width as usize, height as usize, &rgba)
                     })
                     .ok(),
-                animated: is_animated(f, mime_type).unwrap_or(false),
+                animated: is_animated(f, mime_type).or(Some(false)),
             })
             .unwrap_or_default()
     } else if mime_type.starts_with("video/") {

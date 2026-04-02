@@ -17,6 +17,12 @@ pub trait AbstractAttachmentHashes: Sync + Send {
     /// Update an attachment hash nonce value.
     async fn set_attachment_hash_nonce(&self, hash: &str, nonce: &str) -> Result<()>;
 
+    /// Updates the attachments animated metadata value.
+    ///
+    /// The primary use for this is to update the metadata for existing uploaded files, this
+    /// can only be used for images.
+    async fn set_attachment_hash_animated(&self, hash: &str, animated: bool) -> Result<()>;
+
     /// Delete attachment hash by id.
     async fn delete_attachment_hash(&self, id: &str) -> Result<()>;
 }

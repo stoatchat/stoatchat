@@ -46,8 +46,7 @@ auto_derived!(
             width: isize,
             height: isize,
             thumbhash: Option<Vec<u8>>,
-            #[serde(default)]
-            animated: bool,
+            animated: Option<bool>,
         },
         /// File is a video with specific dimensions
         Video { width: isize, height: isize },
