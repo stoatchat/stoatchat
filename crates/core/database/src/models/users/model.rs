@@ -893,7 +893,8 @@ mod tests {
     async fn username_sanitisation_homoglyphs() {
         let username_homoglyphs = "𝔽𝕌Ňℕｙ";
 
-        let username_homoglyphs_sanitised = User::sanitise_username(username_homoglyphs).await.unwrap();
+        let username_homoglyphs_sanitised =
+            User::sanitise_username(username_homoglyphs).await.unwrap();
 
         assert_ne!(username_homoglyphs, username_homoglyphs_sanitised);
         assert_eq!("funny", username_homoglyphs_sanitised);
@@ -910,32 +911,26 @@ mod tests {
 
     #[async_std::test]
     async fn create_user() {
-        use revolt_result::{ErrorType::*, Result};
+        use revolt_result::Result;
 
         database_test!(|db| async move {
-            let created_clean = User::create(&db, "Test".to_string(), None, None)
+            let mut created_clean = User::create(&db, "Test".to_string(), None, None)
                 .await
                 .unwrap();
 
             assert_eq!("Test", created_clean.username);
 
-
-            let mut updated_clean = User::create(&db, "Test".to_string(), None, None)
-                .await
-                .unwrap();
-            updated_clean
+            created_clean
                 .update_username(&db, "Test2".to_string())
                 .await
                 .unwrap();
 
-            assert_eq!("Test2", updated_clean.username);
-
+            assert_eq!("Test2", created_clean.username);
 
             let created_invalid_result: Result<_> =
                 User::create(&db, "stoat.chat".to_string(), None, None).await;
 
             assert!(created_invalid_result.is_err());
-
 
             let mut updated_invalid = User::create(&db, "Test".to_string(), None, None)
                 .await
