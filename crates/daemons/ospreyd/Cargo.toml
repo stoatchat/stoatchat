@@ -25,7 +25,7 @@ rdkafka = "0.39.0"
 
 
 # Core
-revolt-result = { version = "0.11.5", path = "../../core/result" }
-revolt-config = { version = "0.11.5", path = "../../core/config" }
-revolt-database = { version = "0.11.5", path = "../../core/database" }
-revolt-models = { version = "0.11.5", path = "../../core/models" }
+revolt-result = { path = "../../core/result" }
+revolt-config = { path = "../../core/config" }
+revolt-database = { path = "../../core/database" }
+revolt-models = { path = "../../core/models" }
