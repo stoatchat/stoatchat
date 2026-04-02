@@ -91,3 +91,4 @@ livekit-protocol = "0.4.0"
 
 [build-dependencies]
 vergen = "7.5.0"
+

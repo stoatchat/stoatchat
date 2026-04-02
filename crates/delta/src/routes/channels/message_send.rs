@@ -13,6 +13,8 @@ use rocket::serde::json::Json;
 use rocket::State;
 use validator::Validate;
 
+use crate::util::osprey::OspreyClient;
+
 /// # Send Message
 ///
 /// Sends a message to the given channel.
@@ -21,6 +23,7 @@ use validator::Validate;
 pub async fn message_send(
     db: &State<Database>,
     amqp: &State<AMQP>,
+    osprey: &State<OspreyClient>,
     user: User,
     target: Reference<'_>,
     data: Json<v0::DataMessageSend>,
@@ -137,23 +140,25 @@ pub async fn message_send(
         .as_ref()
         .map(|member| member.clone().into_owned().into());
 
-    Ok(Json(
-        Message::create_from_api(
-            db,
-            Some(amqp),
-            channel,
-            data,
-            v0::MessageAuthor::User(&author),
-            Some(model_user.clone()),
-            model_member.clone(),
-            user.limits().await,
-            idempotency,
-            permissions.has_channel_permission(ChannelPermission::SendEmbeds),
-            allow_mentions,
-        )
+    let m = Message::create_from_api(
+        db,
+        Some(amqp),
+        channel,
+        data,
+        v0::MessageAuthor::User(&author),
+        Some(model_user.clone()),
+        model_member.clone(),
+        user.limits().await,
+        idempotency,
+        permissions.has_channel_permission(ChannelPermission::SendEmbeds),
+        allow_mentions,
+    )
         .await?
-        .into_model(Some(model_user), model_member),
-    ))
+        .into_model(Some(model_user), model_member);
+
+    osprey.publish_message(&m).await;
+    
+    Ok(Json(m))
 }
 
 #[cfg(test)]

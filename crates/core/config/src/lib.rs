@@ -410,6 +410,7 @@ pub struct Sentry {
     pub proxy: String,
     pub pushd: String,
     pub crond: String,
+    pub ospreyd: String,
     pub gifbox: String,
 }
 
