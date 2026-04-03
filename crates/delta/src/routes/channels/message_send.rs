@@ -1,4 +1,5 @@
-use chrono::{Duration, Utc};
+use std::time::Duration;
+
 use redis_kiss::{get_connection, redis, AsyncCommands};
 use revolt_database::util::permissions::DatabasePermissionQuery;
 use revolt_database::{
@@ -111,8 +112,12 @@ pub async fn message_send(
     // Disallow mentions for new users (TRUST-0: <12 hours age) in public servers
     let allow_mentions = if let Some(server) = query.server_ref() {
         if server.discoverable {
-            (Utc::now() - ulid::Ulid::from_string(&user.id).unwrap().datetime())
-                >= Duration::hours(12)
+            (ulid::Ulid::from_string(&user.id)
+                .unwrap()
+                .datetime()
+                .elapsed()
+                .expect("Time went backwards"))
+                >= Duration::from_hours(12)
         } else {
             true
         }

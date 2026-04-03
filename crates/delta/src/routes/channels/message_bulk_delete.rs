@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use chrono::Utc;
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
@@ -36,10 +38,9 @@ pub async fn bulk_delete_messages(
         if ulid::Ulid::from_string(id)
             .map_err(|_| create_error!(InvalidOperation))?
             .datetime()
-            .signed_duration_since(Utc::now())
-            .num_days()
-            .abs()
-            > 7
+            .elapsed()
+            .expect("Time went backwards")
+            > Duration::from_hours(7 * 24)  // 7 days
         {
             return Err(create_error!(InvalidOperation));
         }

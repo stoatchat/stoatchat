@@ -10,84 +10,83 @@ publish = false
 
 [dependencies]
 # Test
-rand = "0.8.5"
-redis-kiss = "0.1.4"
+rand = { workspace = true }
+redis-kiss = { workspace = true }
 
 # Utility
-lru = "0.7.0"
-url = "2.2.2"
-log = "0.4.11"
-dashmap = "5.2.0"
-linkify = "0.6.0"
-once_cell = "1.17.1"
-env_logger = "0.7.1"
+lru = { workspace = true }
+url = { workspace = true }
+log = { workspace = true }
+dashmap = { workspace = true }
+linkify = { workspace = true }
+once_cell = { workspace = true }
 
 # Lang. Utilities
-regex = "1"
-num_enum = "0.5.1"
-impl_ops = "0.1.1"
-bitfield = "0.13.2"
+regex = { workspace = true }
+num_enum = { workspace = true }
+impl_ops = { workspace = true }
+bitfield = { workspace = true }
 
 # ID / key generation
-ulid = "0.4.1"
-nanoid = "0.4.0"
+ulid = { workspace = true }
+nanoid = { workspace = true }
 
 # serde
-serde_json = "1.0.57"
-serde = { version = "1.0.115", features = ["derive"] }
-validator = { version = "0.16", features = ["derive"] }
-iso8601-timestamp = { version = "0.2.11", features = [] }
+serde_json = { workspace = true }
+serde = { workspace = true }
+validator = { workspace = true, features = ["derive"] }
+iso8601-timestamp = { workspace = true }
 
 # async
-futures = "0.3.8"
-chrono = "0.4.15"
-async-channel = "1.6.1"
-reqwest = { version = "0.11.4", features = ["json"] }
-async-std = { version = "1.8.0", features = [
+futures = { workspace = true }
+chrono = { workspace = true }
+async-channel = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+async-std = { workspace = true, features = [
     "tokio1",
     "tokio02",
     "attributes",
 ] }
 
 # internal util
-lettre = "0.10.0-alpha.4"
+lettre = { workspace = true }
 
 # web
 
-rocket = { version = "0.5.1", default-features = false, features = ["json"] }
-rocket_cors = { git = "https://github.com/lawliet89/rocket_cors", rev = "072d90359b23e9b291df6b672c07c93de9c46011" }
-rocket_empty = { version = "0.1.1", features = ["schema"] }
-rocket_authifier = { version = "1.0.16" }
-rocket_prometheus = "0.10.0-rc.3"
+rocket = { workspace = true, features = ["json"] }
+rocket_cors = { workspace = true }
+rocket_empty = { workspace = true, features = ["schema"] }
+rocket_authifier = { workspace = true }
+rocket_prometheus = { workspace = true }
 
 # spec generation
-schemars = "0.8.8"
-revolt_rocket_okapi = { version = "0.10.0", features = ["swagger"] }
+schemars = { workspace = true }
+revolt_rocket_okapi = { workspace = true, features = ["swagger"] }
 
 # rabbit
-amqprs = { version = "1.7.0" }
+amqprs = { workspace = true }
 
 # core
-authifier = "1.0.16"
-revolt-config = { path = "../core/config" }
-revolt-database = { path = "../core/database", features = [
+authifier = { workspace = true }
+revolt-config = { workspace = true }
+revolt-database = { workspace = true, features = [
     "rocket-impl",
     "redis-is-patched",
     "voice",
 ] }
-revolt-models = { path = "../core/models", features = [
+revolt-models = { workspace = true, features = [
     "schemas",
     "validator",
     "rocket",
 ] }
-revolt-presence = { path = "../core/presence" }
-revolt-result = { path = "../core/result", features = ["rocket", "okapi"] }
-revolt-permissions = { path = "../core/permissions", features = ["schemas"] }
-revolt-ratelimits = { path = "../core/ratelimits", features = ["rocket"] }
+revolt-presence = { workspace = true }
+revolt-result = { workspace = true, features = ["rocket", "okapi"] }
+revolt-permissions = { workspace = true, features = ["schemas"] }
+revolt-ratelimits = { workspace = true, features = ["rocket"] }
 
 # voice
-livekit-api = "0.4.4"
-livekit-protocol = "0.4.0"
+livekit-api = { workspace = true }
+livekit-protocol = { workspace = true }
 
 [build-dependencies]
-vergen = "7.5.0"
+vergen = { workspace = true }

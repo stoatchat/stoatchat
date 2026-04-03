@@ -7,62 +7,57 @@ publish = false
 
 [dependencies]
 # ID generation
-ulid = "1.1.3"
-nanoid = "0.4.0"
+ulid = { workspace = true }
+nanoid = { workspace = true }
 
 # Media processing
-webp = "0.3.0"
-sha2 = "0.10.8"
-jxl-oxide = "0.8.1"
-kamadak-exif = "0.5.4"
+webp = { workspace = true }
+sha2 = { workspace = true }
+jxl-oxide = { workspace = true }
+kamadak-exif = { workspace = true }
 # revolt_little_exif = "0.5.1"
-image = { version = "0.25.2" } # avif encode requires dav1d system library: features = ["avif-native"]
-thumbhash = "0.1.0"
+image = { workspace = true }
+thumbhash = { workspace = true }
 
 # File processing
-revolt_clamav-client = { version = "0.1.5" }
-simdutf8 = { version = "0.1.4", features = ["aarch64_neon"] }
+revolt_clamav-client = { workspace = true }
+simdutf8 = { workspace = true, features = ["aarch64_neon"] }
 
 # Content type processing
-infer = "0.16.0"
-ffprobe = "0.4.0"
-imagesize = "0.13.0"
+infer = { workspace = true }
+ffprobe = { workspace = true }
+imagesize = { workspace = true }
 
 # Utility
-lazy_static = "1.5.0"
-moka = { version = "0.12.8", features = ["future"] }
+lazy_static = { workspace = true }
+moka = { workspace = true, features = ["future"] }
 
 # Serialisation
-strum_macros = "0.26.4"
-serde_json = "1.0.68"
-serde = { version = "1.0", features = ["derive"] }
+strum_macros = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
 
 # Async runtime
-tokio = { version = "1.0", features = ["full"] }
+tokio = { workspace = true, features = ["full"] }
 
 # Logging
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 # Core crates
-revolt-files = { version = "0.12.0", path = "../../core/files" }
-revolt-config = { version = "0.12.0", path = "../../core/config" }
-revolt-database = { version = "0.12.0", path = "../../core/database", features = [
-    "axum-impl",
-] }
-revolt-result = { version = "0.12.0", path = "../../core/result", features = [
-    "utoipa",
-    "axum",
-] }
-revolt-ratelimits = { version = "0.12.0", path = "../../core/ratelimits", features = ["axum"] }
+revolt-files = { workspace = true }
+revolt-config = { workspace = true }
+revolt-database = { workspace = true, features = ["axum-impl"] }
+revolt-result = { workspace = true, features = ["utoipa", "axum"] }
+revolt-ratelimits = { workspace = true, features = ["axum"] }
 
 # Axum / web server
-tempfile = "3.12.0"
-axum-macros = "0.4.1"
-axum_typed_multipart = "0.12.1"
-axum = { version = "0.7.5", features = ["multipart"] }
-tower-http = { version = "0.5.2", features = ["cors"] }
+tempfile = { workspace = true }
+axum-macros = { workspace = true }
+axum_typed_multipart = { workspace = true }
+axum = { workspace = true, features = ["multipart"] }
+tower-http = { workspace = true, features = ["cors"] }
 
 # OpenAPI & documentation generation
-utoipa-scalar = { version = "0.1.0", features = ["axum"] }
-utoipa = { version = "4.2.3", features = ["axum_extras", "ulid"] }
+utoipa-scalar = { workspace = true, features = ["axum"] }
+utoipa = { workspace = true, features = ["axum_extras", "ulid"] }

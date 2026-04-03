@@ -6,42 +6,35 @@ license = "AGPL-3.0-or-later"
 publish = false
 
 [dependencies]
-revolt-result = { version = "0.12.0", path = "../../core/result" }
-revolt-config = { version = "0.12.0", path = "../../core/config", features = [
-    "report-macros",
-    "anyhow",
-] }
-revolt-database = { version = "0.12.0", path = "../../core/database" }
-revolt-models = { version = "0.12.0", path = "../../core/models", features = [
-    "validator",
-] }
-revolt-presence = { version = "0.12.0", path = "../../core/presence", features = [
-    "redis-is-patched",
-] }
-revolt-parser = { version = "0.12.0", path = "../../core/parser" }
+revolt-result = { workspace = true }
+revolt-config = { workspace = true, features = ["report-macros", "anyhow"] }
+revolt-database = { workspace = true }
+revolt-models = { workspace = true, features = ["validator"] }
+revolt-presence = { workspace = true, features = ["redis-is-patched"] }
+revolt-parser = { workspace = true }
 
-anyhow = { version = "1.0.98" }
+anyhow = { workspace = true }
 
-amqprs = { version = "1.7.0" }
-fcm_v1 = "0.3.0"
-web-push = "0.10.0"
-isahc = { optional = true, version = "1.7", features = ["json"] }
-revolt_a2 = { version = "0.10", default-features = false, features = ["ring"] }
-redis-kiss = "0.1.4"
-tokio = "1.39.2"
-async-trait = "0.1.81"
-ulid = "1.0.0"
+amqprs = { workspace = true }
+fcm_v1 = { workspace = true }
+web-push = { workspace = true }
+isahc = { workspace = true, features = ["json"], optional = true }
+revolt_a2 = { workspace = true, features = ["ring"] }
+redis-kiss = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+ulid = { workspace = true }
 
-authifier = "1.0.16"
+authifier = { workspace = true }
 
-log = "0.4.11"
-pretty_env_logger = "0.4.0"
+log = { workspace = true }
+pretty_env_logger = { workspace = true }
 
-regex = "1.12.3"
+regex = { workspace = true }
 
 #serialization
-serde_json = "1"
-revolt_optional_struct = "0.2.0"
-serde = { version = "1", features = ["derive"] }
-iso8601-timestamp = { version = "0.2.10", features = ["serde", "bson"] }
-base64 = "0.22.1"
+serde_json = { workspace = true }
+revolt_optional_struct = { workspace = true }
+serde = { workspace = true }
+iso8601-timestamp = { workspace = true, features = ["serde", "bson"] }
+base64 = { workspace = true }

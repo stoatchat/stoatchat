@@ -11,13 +11,13 @@ publish = false
 
 [dependencies]
 # Utility
-log = "0.4"
+log = { workspace = true }
 
 # Async
-tokio = { version = "1" }
+tokio = { workspace = true }
 
 # Core
-revolt-database = { version = "0.12.0", path = "../../core/database" }
-revolt-result = { version = "0.12.0", path = "../../core/result" }
-revolt-config = { version = "0.12.0", path = "../../core/config" }
-revolt-files = { version = "0.12.0", path = "../../core/files" }
+revolt-database = { workspace = true }
+revolt-result = { workspace = true }
+revolt-config = { workspace = true }
+revolt-files = { workspace = true }

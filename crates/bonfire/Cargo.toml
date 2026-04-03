@@ -9,42 +9,38 @@ publish = false
 
 [dependencies]
 # util
-log = "*"
-sentry = "0.31.5"
-lru = "0.7.6"
-ulid = "0.5.0"
-once_cell = "1.9.0"
-redis-kiss = "0.1.4"
-lru_time_cache = "0.11.11"
-async-channel = "2.3.1"
+log = { workspace = true }
+sentry = { workspace = true }
+lru = { workspace = true }
+ulid = { workspace = true }
+once_cell = { workspace = true }
+redis-kiss = { workspace = true }
+lru_time_cache = { workspace = true }
+async-channel = { workspace = true }
 
 # parsing
-querystring = "1.1.0"
-regex = "1.11.1"
+querystring = { workspace = true }
+regex = { workspace = true }
 
 # serde
-bincode = "1.3.3"
-serde_json = "1.0.79"
-rmp-serde = "1.0.0"
-serde = "1.0.136"
+bincode = { workspace = true }
+serde_json = { workspace = true }
+rmp-serde = { workspace = true }
+serde = { workspace = true }
 
 # async
-futures = "0.3.21"
-async-tungstenite = { version = "0.17.0", features = ["async-std-runtime"] }
-async-std = { version = "1.8.0", features = [
-    "tokio1",
-    "tokio02",
-    "attributes",
-] }
+futures = { workspace = true }
+async-tungstenite = { workspace = true, features = ["async-std-runtime"] }
+async-std = { workspace = true }
 
 # core
-authifier = { version = "1.0.16" }
-revolt-result = { path = "../core/result" }
-revolt-models = { path = "../core/models" }
-revolt-config = { path = "../core/config" }
-revolt-database = { path = "../core/database", features = ["voice"] }
-revolt-permissions = { path = "../core/permissions" }
-revolt-presence = { path = "../core/presence", features = ["redis-is-patched"] }
+authifier = { workspace = true }
+revolt-result = { workspace = true }
+revolt-models = { workspace = true }
+revolt-config = { workspace = true }
+revolt-database = { workspace = true, features = ["voice"] }
+revolt-permissions = { workspace = true }
+revolt-presence = { workspace = true, features = ["redis-is-patched"] }
 
 # redis
-fred = { version = "8.0.1", features = ["subscriber-client"] }
+fred = { workspace = true, features = ["subscriber-client"] }
