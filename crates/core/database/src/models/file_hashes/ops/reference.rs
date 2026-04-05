@@ -47,13 +47,13 @@ impl AbstractAttachmentHashes for ReferenceDb {
         if let Some(FileHash {
             metadata:
                 Metadata::Image {
-                    animated: Some(animated_metadata),
+                    animated: animated_metadata,
                     ..
                 },
             ..
         }) = hashes.get_mut(hash)
         {
-            *animated_metadata = animated;
+            *animated_metadata = Some(animated);
 
             Ok(())
         } else {

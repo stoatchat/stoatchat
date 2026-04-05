@@ -85,7 +85,8 @@ auto_derived!(
 impl File {
     /// Get the hash entry for this file
     pub async fn as_hash(&self, db: &Database) -> Result<FileHash> {
-        db.fetch_attachment_hash(self.hash.as_ref().unwrap()).await
+        let hash = self.hash.as_ref().ok_or_else(|| create_error!(NotFound))?;
+        db.fetch_attachment_hash(hash).await
     }
 
     /// Use a file for a message attachment
