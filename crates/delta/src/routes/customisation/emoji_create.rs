@@ -1,5 +1,7 @@
 use revolt_config::config;
-use revolt_database::{util::permissions::DatabasePermissionQuery, Database, Emoji, File, User};
+use revolt_database::{
+    util::permissions::DatabasePermissionQuery, Database, Emoji, File, Metadata, User,
+};
 use revolt_models::v0;
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
@@ -58,7 +60,7 @@ pub async fn create_emoji(
         parent: data.parent.into(),
         creator_id: user.id,
         name: data.name,
-        animated: "image/gif" == &attachment.content_type,
+        animated: matches!(attachment.metadata, Metadata::Image { animated: Some(true), .. }),
         nsfw: data.nsfw,
     };
 
