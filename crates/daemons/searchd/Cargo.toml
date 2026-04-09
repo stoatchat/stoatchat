@@ -1,15 +1,15 @@
 [package]
 name = "revolt-searchd"
-version = "0.11.5"
+version = "0.12.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
 publish = false
 
 [dependencies]
 tokio = { version = "1.50.0", features = ["macros"] }
-revolt-database = { version = "0.11.5", path = "../../core/database" }
-revolt-config = { version = "0.11.5", path = "../../core/config" }
-revolt-search = { version = "0.11.5", path = "../../core/search" }
+revolt-database = { version = "0.12.0", path = "../../core/database" }
+revolt-config = { version = "0.12.0", path = "../../core/config" }
+revolt-search = { version = "0.12.0", path = "../../core/search" }
 amqprs = "1.7.0"
 async-trait = "0.1.89"
 log = "0.4.29"

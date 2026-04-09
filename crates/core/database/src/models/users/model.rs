@@ -362,6 +362,17 @@ impl User {
         )
     }
 
+    pub async fn into_mutuals(perspective: &User, users: Vec<User>) -> Vec<v0::User> {
+        let online_ids =
+            filter_online(&users.iter().map(|user| user.id.clone()).collect::<Vec<_>>()).await;
+
+        join_all(users.into_iter().map(|user| async {
+            let is_online = online_ids.contains(&user.id);
+            user.into_known(perspective, is_online).await
+        }))
+        .await
+    }
+
     /// Find a free discriminator for a given username
     pub async fn find_discriminator(
         db: &Database,

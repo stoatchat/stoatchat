@@ -1,39 +1,54 @@
 use std::collections::HashSet;
 
 use iso8601_timestamp::Timestamp;
-use revolt_database::{File, Metadata};
 use revolt_models::v0;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
+/// Message author type
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Hash)]
 pub enum AuthorType {
     User,
-    // Bot,
+    Bot,
     Webhook,
 }
 
+/// Message component
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum MessageComponent {
     Image,
     Video,
-    // Link,
+    Link,
     File,
     Embed,
 }
 
+/// Message search filters
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SearchFilters {
+    /// Message content
     pub content: Option<String>,
+    /// Specific user
     pub author: Option<HashSet<String>>,
+
+    /// Mentions a user
     pub mentions: Option<HashSet<String>>,
+    /// Mentions a role
     pub role_mentions: Option<HashSet<String>>,
+
+    /// Send before a specific date
     pub before_date: Option<Timestamp>,
+    /// Sent after a specific date
     pub after_date: Option<Timestamp>,
+
+    /// What type of user sent the message
     pub author_type: Option<HashSet<AuthorType>>,
+    /// Whether the message is pinned or not
     pub pinned: Option<bool>,
+    /// Require message to have a specific component type
     pub components: Option<HashSet<MessageComponent>>,
 }
 
+/// Message sort order
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum SortOrder {
     Asc,
@@ -41,26 +56,28 @@ pub enum SortOrder {
     Desc,
 }
 
+/// Options for searching messages in a server or channel
 #[derive(Debug, Clone, PartialEq)]
 pub struct SearchTerms {
+    /// Channels to search in
     pub channels: Vec<String>,
-    pub filters: SearchFilters,
-    pub offset: Option<u64>,
-    pub limit: Option<u64>,
-    pub sort: Option<SortOrder>,
-}
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MetadataFile {
-    pub file: File,
-    pub metadata: Metadata,
+    /// Filter options
+    pub filters: SearchFilters,
+
+    /// What index to start the search at
+    pub offset: Option<u64>,
+    /// Max amount of messages to return
+    pub limit: Option<u64>,
+    /// Sort order
+    pub sort: Option<SortOrder>,
 }
 
 impl From<v0::AuthorType> for AuthorType {
     fn from(value: v0::AuthorType) -> Self {
         match value {
             v0::AuthorType::User => AuthorType::User,
-            // v0::AuthorType::Bot => AuthorType::Bot,
+            v0::AuthorType::Bot => AuthorType::Bot,
             v0::AuthorType::Webhook => AuthorType::Webhook,
         }
     }
@@ -71,7 +88,7 @@ impl From<v0::MessageComponent> for MessageComponent {
         match value {
             v0::MessageComponent::Image => MessageComponent::Image,
             v0::MessageComponent::Video => MessageComponent::Video,
-            // v0::MessageComponent::Link => MessageComponent::Link,
+            v0::MessageComponent::Link => MessageComponent::Link,
             v0::MessageComponent::File => MessageComponent::File,
             v0::MessageComponent::Embed => MessageComponent::Embed,
         }

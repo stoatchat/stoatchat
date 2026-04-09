@@ -1,6 +1,6 @@
 use indexmap::{IndexMap, IndexSet};
 use iso8601_timestamp::Timestamp;
-use revolt_config::{FeaturesLimits, capture_error, config};
+use revolt_config::{capture_error, config, FeaturesLimits};
 use revolt_models::v0::{
     self, BulkMessageResponse, DataMessageSend, Embed, MessageAuthor, MessageFlags, MessageSort,
     MessageWebhook, PushNotification, ReplyIntent, SendableEmbed, Text,
@@ -18,7 +18,7 @@ use crate::{
         bulk_permissions::BulkDatabasePermissionQuery, idempotency::IdempotencyKey,
         permissions::DatabasePermissionQuery,
     },
-    Channel, Database, Emoji, File, User, AMQP,
+    Channel, Database, Emoji, File, Member, User, AMQP,
 };
 
 #[cfg(feature = "tasks")]
@@ -210,6 +210,13 @@ auto_derived!(
     pub enum FieldsMessage {
         Pinned,
     }
+
+    /// Message along with the user for the author
+    pub struct MessageWithUser {
+        #[serde(flatten)]
+        pub message: Message,
+        pub user: Option<User>,
+    }
 );
 
 pub struct MessageFlagsValue(pub u32);
@@ -272,8 +279,8 @@ impl Message {
         channel: Channel,
         data: DataMessageSend,
         author: MessageAuthor<'_>,
-        user: Option<v0::User>,
-        member: Option<v0::Member>,
+        user: Option<User>,
+        member: Option<Member>,
         limits: FeaturesLimits,
         mut idempotency: IdempotencyKey,
         generate_embeds: bool,
@@ -610,10 +617,10 @@ impl Message {
 
     /// Send a message without any notifications
     pub async fn send_without_notifications(
-        &mut self,
+        &self,
         db: &Database,
-        user: Option<v0::User>,
-        member: Option<v0::Member>,
+        user: Option<User>,
+        member: Option<Member>,
         is_dm: bool,
         generate_embeds: bool,
         // This determines if this function should queue the mentions task or if somewhere else will.
@@ -623,9 +630,18 @@ impl Message {
         db.insert_message(self).await?;
 
         // Fan out events
-        EventV1::Message(self.clone().into_model(user, member))
-            .p(self.channel.to_string())
-            .await;
+        EventV1::Message(self.clone().into_model(
+            match user {
+                Some(user) => {
+                    let is_online = revolt_presence::is_online(&user.id).await;
+                    Some(user.into_known_static(is_online).await)
+                }
+                None => None,
+            },
+            member.map(Into::into),
+        ))
+        .p(self.channel.to_string())
+        .await;
 
         // Update last_message_id
         #[cfg(feature = "tasks")]
@@ -673,8 +689,8 @@ impl Message {
         db: &Database,
         amqp: Option<&AMQP>, // this is optional mostly for tests.
         author: MessageAuthor<'_>,
-        user: Option<v0::User>,
-        member: Option<v0::Member>,
+        user: Option<User>,
+        member: Option<Member>,
         channel: &Channel,
         generate_embeds: bool,
     ) -> Result<()> {
@@ -704,7 +720,17 @@ impl Message {
                     messages: vec![(
                         Some(
                             PushNotification::from(
-                                self.clone().into_model(user, member),
+                                self.clone().into_model(
+                                    match user.clone() {
+                                        Some(user) => {
+                                            let is_online =
+                                                revolt_presence::is_online(&user.id).await;
+                                            Some(user.into_known_static(is_online).await)
+                                        }
+                                        None => None,
+                                    },
+                                    member.map(Into::into),
+                                ),
                                 Some(author),
                                 channel.to_owned().into(),
                             )
@@ -727,7 +753,7 @@ impl Message {
         }
 
         if let Some(amqp) = amqp {
-            if let Err(e) = amqp.new_message_search(self.clone()).await {
+            if let Err(e) = amqp.new_message_search(self.clone(), user).await {
                 log::error!("Error pushing message to RabbitMQ: {e}");
                 capture_error(&e);
             }
@@ -785,6 +811,7 @@ impl Message {
     pub async fn update(
         &mut self,
         db: &Database,
+        amqp: Option<&AMQP>,
         partial: PartialMessage,
         remove: Vec<FieldsMessage>,
     ) -> Result<()> {
@@ -806,7 +833,72 @@ impl Message {
         .p(self.channel.clone())
         .await;
 
+        if let Some(amqp) = amqp {
+            if let Err(e) = amqp
+                .edit_message_search(self.clone(), self.fetch_author(db).await)
+                .await
+            {
+                log::error!("Error pushing message to RabbitMQ: {e}");
+                capture_error(&e);
+            }
+        }
+
         Ok(())
+    }
+
+    pub async fn fetch_users(
+        db: &Database,
+        messages: &[Message],
+        server_id: Option<&str>,
+    ) -> Result<(Vec<User>, Vec<Member>)> {
+        let user_ids = messages
+            .iter()
+            .flat_map(|m| {
+                let mut users = vec![m.author.clone()];
+                if let Some(system) = &m.system {
+                    match system {
+                        SystemMessage::ChannelDescriptionChanged { by } => users.push(by.clone()),
+                        SystemMessage::ChannelIconChanged { by } => users.push(by.clone()),
+                        SystemMessage::ChannelOwnershipChanged { from, to, .. } => {
+                            users.push(from.clone());
+                            users.push(to.clone())
+                        }
+                        SystemMessage::ChannelRenamed { by, .. } => users.push(by.clone()),
+                        SystemMessage::UserAdded { by, id, .. }
+                        | SystemMessage::UserRemove { by, id, .. } => {
+                            users.push(by.clone());
+                            users.push(id.clone());
+                        }
+                        SystemMessage::UserBanned { id, .. }
+                        | SystemMessage::UserKicked { id, .. }
+                        | SystemMessage::UserJoined { id, .. }
+                        | SystemMessage::UserLeft { id, .. } => {
+                            users.push(id.clone());
+                        }
+                        SystemMessage::Text { .. } => {}
+                        SystemMessage::MessagePinned { by, .. } => {
+                            users.push(by.clone());
+                        }
+                        SystemMessage::MessageUnpinned { by, .. } => {
+                            users.push(by.clone());
+                        }
+                        SystemMessage::CallStarted { by, .. } => users.push(by.clone()),
+                    }
+                }
+                users
+            })
+            .collect::<HashSet<String>>()
+            .into_iter()
+            .collect::<Vec<String>>();
+
+        let users = db.fetch_users(&user_ids).await?;
+        let members = if let Some(server_id) = server_id {
+            db.fetch_members(server_id, &user_ids).await?
+        } else {
+            Vec::new()
+        };
+
+        Ok((users, members))
     }
 
     /// Helper function to fetch many messages with users
@@ -817,74 +909,26 @@ impl Message {
         include_users: Option<bool>,
         server_id: Option<&str>,
     ) -> Result<BulkMessageResponse> {
-        let messages: Vec<v0::Message> = db
-            .fetch_messages(query)
-            .await?
-            .into_iter()
-            .map(|msg| msg.into_model(None, None))
-            .collect();
+        let messages = db.fetch_messages(query).await?;
 
         if let Some(true) = include_users {
-            let user_ids = messages
-                .iter()
-                .flat_map(|m| {
-                    let mut users = vec![m.author.clone()];
-                    if let Some(system) = &m.system {
-                        match system {
-                            v0::SystemMessage::ChannelDescriptionChanged { by } => {
-                                users.push(by.clone())
-                            }
-                            v0::SystemMessage::ChannelIconChanged { by } => users.push(by.clone()),
-                            v0::SystemMessage::ChannelOwnershipChanged { from, to, .. } => {
-                                users.push(from.clone());
-                                users.push(to.clone())
-                            }
-                            v0::SystemMessage::ChannelRenamed { by, .. } => users.push(by.clone()),
-                            v0::SystemMessage::UserAdded { by, id, .. }
-                            | v0::SystemMessage::UserRemove { by, id, .. } => {
-                                users.push(by.clone());
-                                users.push(id.clone());
-                            }
-                            v0::SystemMessage::UserBanned { id, .. }
-                            | v0::SystemMessage::UserKicked { id, .. }
-                            | v0::SystemMessage::UserJoined { id, .. }
-                            | v0::SystemMessage::UserLeft { id, .. } => {
-                                users.push(id.clone());
-                            }
-                            v0::SystemMessage::Text { .. } => {}
-                            v0::SystemMessage::MessagePinned { by, .. } => {
-                                users.push(by.clone());
-                            }
-                            v0::SystemMessage::MessageUnpinned { by, .. } => {
-                                users.push(by.clone());
-                            }
-                            v0::SystemMessage::CallStarted { by, .. } => users.push(by.clone()),
-                        }
-                    }
-                    users
-                })
-                .collect::<HashSet<String>>()
-                .into_iter()
-                .collect::<Vec<String>>();
-            let users = User::fetch_many_ids_as_mutuals(db, perspective, &user_ids).await?;
+            let (users, members) = Message::fetch_users(db, &messages, server_id).await?;
 
             Ok(BulkMessageResponse::MessagesAndUsers {
-                messages,
-                users,
-                members: if let Some(server_id) = server_id {
-                    Some(
-                        db.fetch_members(server_id, &user_ids)
-                            .await?
-                            .into_iter()
-                            .map(Into::into)
-                            .collect(),
-                    )
-                } else {
-                    None
-                },
+                messages: messages
+                    .into_iter()
+                    .map(|msg| msg.into_model(None, None))
+                    .collect(),
+                users: User::into_mutuals(perspective, users).await,
+                members: Some(members.into_iter().map(Into::into).collect()),
             })
         } else {
-            Ok(BulkMessageResponse::JustMessages(messages))
+            Ok(BulkMessageResponse::JustMessages(
+                messages
+                    .into_iter()
+                    .map(|msg| msg.into_model(None, None))
+                    .collect(),
+            ))
         }
     }
 
@@ -898,7 +942,9 @@ impl Message {
     ) -> Result<()> {
         if let Some(message) = db.append_message(&id, &append).await? {
             if let Some(amqp) = amqp {
-                if let Err(e) = amqp.edit_message_search(message).await {
+                let author = message.fetch_author(db).await;
+
+                if let Err(e) = amqp.edit_message_search(message, author).await {
                     log::error!("Error pushing message to RabbitMQ: {e}");
                     capture_error(&e);
                 }
@@ -1134,6 +1180,14 @@ impl Message {
     pub fn remove_field(&mut self, field: &FieldsMessage) {
         match field {
             FieldsMessage::Pinned => self.pinned = None,
+        }
+    }
+
+    pub async fn fetch_author(&self, db: &Database) -> Option<User> {
+        if self.webhook.is_some() {
+            None
+        } else {
+            db.fetch_user(&self.author).await.ok()
         }
     }
 }

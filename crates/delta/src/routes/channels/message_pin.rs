@@ -39,6 +39,7 @@ pub async fn message_pin(
     message
         .update(
             db,
+            Some(amqp),
             PartialMessage {
                 pinned: Some(true),
                 ..Default::default()
@@ -47,7 +48,10 @@ pub async fn message_pin(
         )
         .await?;
 
-    if let Err(e) = amqp.edit_message_search(message.clone()).await {
+    if let Err(e) = amqp
+        .edit_message_search(message.clone(), message.fetch_author(db).await)
+        .await
+    {
         log::error!("Error pushing message to RabbitMQ: {e}");
         capture_error(&e);
     }
@@ -122,8 +126,8 @@ mod test {
                 flags: None,
             },
             v0::MessageAuthor::User(&user.clone().into(&harness.db, Some(&user)).await),
-            Some(user.clone().into(&harness.db, Some(&user)).await),
-            Some(member.into()),
+            Some(user.clone()),
+            Some(member),
             user.limits().await,
             IdempotencyKey::unchecked_from_string("0".to_string()),
             false,

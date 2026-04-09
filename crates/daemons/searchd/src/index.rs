@@ -12,7 +12,7 @@ pub async fn index_existing_messages(db: Database, client: ElasticsearchClient) 
 
     let mut chunk = Vec::new();
 
-    while let Some(message) = generator.next().await {
+    while let Some(message) = generator.next().await.expect("Failed to fetch batch") {
         chunk.push(message);
 
         if chunk.len() >= 1000

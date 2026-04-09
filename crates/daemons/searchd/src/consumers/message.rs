@@ -1,11 +1,15 @@
-use amqprs::{BasicProperties, Deliver, channel::{BasicAckArguments, Channel}, consumer::AsyncConsumer};
+use amqprs::{
+    BasicProperties, Deliver,
+    channel::{BasicAckArguments, BasicRejectArguments, Channel},
+    consumer::AsyncConsumer,
+};
 use async_trait::async_trait;
-use revolt_database::{Database, Message};
+use revolt_database::{Database, events::rabbit::MessageCreatePayload};
 use revolt_search::ElasticsearchClient;
 
 pub struct MessageConsumer {
     client: ElasticsearchClient,
-    database: Database
+    database: Database,
 }
 
 impl MessageConsumer {
@@ -23,13 +27,25 @@ impl AsyncConsumer for MessageConsumer {
         _basic_properties: BasicProperties,
         content: Vec<u8>,
     ) {
-        let message = serde_json::from_slice::<Message>(&content).expect("Failed to decode message");
-        log::debug!("Received message {message:?}");
+        let payload = serde_json::from_slice::<MessageCreatePayload>(&content)
+            .expect("Failed to decode message");
+        log::debug!("Received message {payload:?}");
 
-        if self.client.index_message(&self.database, message).await.is_ok() {
-            channel.basic_ack(BasicAckArguments::new(deliver.delivery_tag(), false)).await.expect("Failed to ack");
+        if self
+            .client
+            .index_message(&self.database, payload.message, payload.user)
+            .await
+            .is_ok()
+        {
+            channel
+                .basic_ack(BasicAckArguments::new(deliver.delivery_tag(), false))
+                .await
+                .expect("Failed to ack");
         } else {
-            // todo requeue
+            channel
+                .basic_reject(BasicRejectArguments::new(deliver.delivery_tag(), true))
+                .await
+                .expect("Failed to reject");
         }
     }
 }

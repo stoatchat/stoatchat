@@ -1,4 +1,5 @@
 use amqprs::{
+    FieldTable,
     channel::{
         BasicConsumeArguments, Channel, ExchangeDeclareArguments, QueueBindArguments,
         QueueDeclareArguments,
@@ -26,7 +27,10 @@ async fn _main() {
         config.elasticsearch.api_key.clone(),
     );
 
-    if std::env::var("REMAKE_MESSAGES_INDEX").as_deref().is_ok_and(|v| v == "1") {
+    if std::env::var("REMAKE_MESSAGES_INDEX")
+        .as_deref()
+        .is_ok_and(|v| v == "1")
+    {
         if client.delete_indexes().await.is_err() {
             log::info!("Index does not existing, skipping.")
         };
@@ -87,7 +91,10 @@ async fn _main() {
 
     let mut task = None;
 
-    if std::env::var("INDEX_ALL_MESSAGES").as_deref().is_ok_and(|v| v == "1") {
+    if std::env::var("INDEX_ALL_MESSAGES")
+        .as_deref()
+        .is_ok_and(|v| v == "1")
+    {
         task = Some(spawn(index::index_existing_messages(db, client.clone())));
     }
 
@@ -119,8 +126,16 @@ async fn make_queue_and_consume<F: AsyncConsumer + Send + 'static>(
         .await
         .expect("Failed to declare pushd exchange");
 
+    let mut table = FieldTable::new();
+    table.insert("x-queue-type".try_into().unwrap(), "quorum".into());
+
     _ = channel
-        .queue_declare(QueueDeclareArguments::new(queue).durable(true).finish())
+        .queue_declare(
+            QueueDeclareArguments::new(queue)
+                .durable(true)
+                .arguments(table)
+                .finish(),
+        )
         .await
         .unwrap()
         .unwrap();

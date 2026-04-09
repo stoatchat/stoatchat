@@ -326,10 +326,14 @@ impl AMQP {
             .await
     }
 
-    pub async fn new_message_search(&self, message: Message) -> Result<(), AMQPError> {
+    pub async fn new_message_search(
+        &self,
+        message: Message,
+        user: Option<User>,
+    ) -> Result<(), AMQPError> {
         let config = revolt_config::config().await;
 
-        let payload = to_string(&message).unwrap();
+        let payload = to_string(&MessageCreatePayload { message, user }).unwrap();
 
         debug!(
             "Sending new message search payload on channel {}: {}",
@@ -351,10 +355,14 @@ impl AMQP {
             .await
     }
 
-    pub async fn edit_message_search(&self, message: Message) -> Result<(), AMQPError> {
+    pub async fn edit_message_search(
+        &self,
+        message: Message,
+        user: Option<User>,
+    ) -> Result<(), AMQPError> {
         let config = revolt_config::config().await;
 
-        let payload = to_string(&message).unwrap();
+        let payload = to_string(&MessageEditPayload { message, user }).unwrap();
 
         debug!(
             "Sending edit message search payload on channel {}: {}",

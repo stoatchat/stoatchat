@@ -1,7 +1,9 @@
 use iso8601_timestamp::Timestamp;
 use revolt_config::capture_error;
 use revolt_database::{
-    AMQP, Database, Message, PartialMessage, User, tasks, util::{permissions::DatabasePermissionQuery, reference::Reference}
+    tasks,
+    util::{permissions::DatabasePermissionQuery, reference::Reference},
+    Database, Message, PartialMessage, User, AMQP,
 };
 use revolt_models::v0::{self, Embed};
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
@@ -82,7 +84,7 @@ pub async fn edit(
 
     partial.embeds = Some(new_embeds);
 
-    message.update(db, partial, vec![]).await?;
+    message.update(db, Some(amqp), partial, vec![]).await?;
 
     // Queue up a task for processing embeds if the we have sufficient permissions
     if permissions.has_channel_permission(ChannelPermission::SendEmbeds) {
@@ -94,11 +96,6 @@ pub async fn edit(
             )
             .await;
         }
-    }
-
-    if let Err(e) = amqp.edit_message_search(message.clone()).await {
-        log::error!("Error pushing message to RabbitMQ: {e}");
-        capture_error(&e);
     }
 
     Ok(Json(message.into_model(None, None)))

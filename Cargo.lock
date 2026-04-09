@@ -4711,6 +4711,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "linkify"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1dfa36d52c581e9ec783a7ce2a5e0143da6237be5811a0b3153fedfdbe9f780"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7270,12 +7279,13 @@ dependencies = [
 
 [[package]]
 name = "revolt-search"
-version = "0.11.5"
+version = "0.12.0"
 dependencies = [
  "elasticsearch",
  "elasticsearch-dsl",
  "futures",
  "iso8601-timestamp",
+ "linkify 0.10.0",
  "revolt-config",
  "revolt-database",
  "revolt-models",
@@ -7286,7 +7296,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-searchd"
-version = "0.11.5"
+version = "0.12.0"
 dependencies = [
  "amqprs",
  "async-trait",

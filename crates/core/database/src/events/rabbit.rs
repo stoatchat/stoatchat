@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use revolt_models::v0::PushNotification;
 use serde::{Deserialize, Serialize};
 
-use crate::User;
+use crate::{Message, User};
 
 #[derive(Serialize, Deserialize)]
 pub struct MessageSentPayload {
@@ -81,10 +81,22 @@ pub struct AckPayload {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessageDeletePayload {
-    pub message_id: String
+    pub message_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChannelDeletePayload {
-    pub channel_id: String
+    pub channel_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MessageCreatePayload {
+    pub message: Message,
+    pub user: Option<User>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MessageEditPayload {
+    pub message: Message,
+    pub user: Option<User>,
 }

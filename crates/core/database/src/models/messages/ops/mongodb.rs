@@ -9,8 +9,8 @@ use std::time::SystemTime;
 use ulid::Ulid;
 
 use crate::{
-    AppendMessage, DocumentId, FieldsMessage, IntoDocumentPath, Message, MessageQuery,
-    MessageTimePeriod, MongoDb, PartialMessage, util::ChunkedDatabaseGenerator,
+    util::ChunkedDatabaseGenerator, AppendMessage, DocumentId, FieldsMessage, IntoDocumentPath,
+    Message, MessageQuery, MessageTimePeriod, MessageWithUser, MongoDb, PartialMessage,
 };
 
 use super::AbstractMessages;
@@ -417,7 +417,8 @@ impl AbstractMessages for MongoDb {
         Ok(deleted_messages)
     }
 
-    async fn fetch_all_messages(&self) -> Result<ChunkedDatabaseGenerator<Message>> {
+    /// Fetches all messages along with their author from every message in decending order
+    async fn fetch_all_messages(&self) -> Result<ChunkedDatabaseGenerator<MessageWithUser>> {
         let mut session = self
             .start_session()
             .await
@@ -431,13 +432,34 @@ impl AbstractMessages for MongoDb {
 
         let cursor = self
             .col::<Message>(COL)
-            .find(doc! {})
-            .sort(doc ! { "_id": -1i32 })
+            .aggregate([
+                doc! {
+                    "$lookup": {
+                        "from": "users",
+                        "localField": "author",
+                        "foreignField": "_id",
+                        "as": "user"
+                    }
+                },
+                doc! {
+                    "$set": {
+                        "user": {
+                            "$first": "$user"
+                        }
+                    }
+                },
+                doc! {
+                    "$sort": {
+                        "_id": -1
+                    }
+                },
+            ])
+            .with_type::<MessageWithUser>()
             .session(&mut session)
             .batch_size(1000)
             .await
             .inspect_err(|e| log::error!("{e}"))
-            .map_err(|_| create_database_error!("find", COL))?;
+            .map_err(|_| create_database_error!("aggregate", COL))?;
 
         Ok(ChunkedDatabaseGenerator::new_mongo(session, cursor))
     }

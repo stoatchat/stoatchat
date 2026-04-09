@@ -1,6 +1,4 @@
-use std::collections::HashSet;
-
-use revolt_database::{util::permissions::DatabasePermissionQuery, Database, User};
+use revolt_database::{util::permissions::DatabasePermissionQuery, Database, Message, User};
 use revolt_models::v0;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result, ToRevoltError};
@@ -66,12 +64,7 @@ pub async fn search_messages(
 
     let message_ids = es.search(terms).await.to_internal_error()?;
 
-    let mut messages = db
-        .fetch_messages_by_id(&message_ids)
-        .await?
-        .into_iter()
-        .map(|msg| msg.into_model(None, None))
-        .collect::<Vec<_>>();
+    let mut messages = db.fetch_messages_by_id(&message_ids).await?;
 
     // Fetching the messages looses the order so resort
     let sort_order = data.sort.unwrap_or_default();
@@ -80,68 +73,15 @@ pub async fn search_messages(
         v0::SortOrder::Desc => b.id.cmp(&a.id),
     });
 
-    // TODO: abstract the user and member fetching logic out
-    let response = if let Some(true) = data.include_users {
-        let user_ids = messages
-            .iter()
-            .flat_map(|m| {
-                let mut users = vec![m.author.clone()];
-                if let Some(system) = &m.system {
-                    match system {
-                        v0::SystemMessage::ChannelDescriptionChanged { by } => {
-                            users.push(by.clone())
-                        }
-                        v0::SystemMessage::ChannelIconChanged { by } => users.push(by.clone()),
-                        v0::SystemMessage::ChannelOwnershipChanged { from, to, .. } => {
-                            users.push(from.clone());
-                            users.push(to.clone())
-                        }
-                        v0::SystemMessage::ChannelRenamed { by, .. } => users.push(by.clone()),
-                        v0::SystemMessage::UserAdded { by, id, .. }
-                        | v0::SystemMessage::UserRemove { by, id, .. } => {
-                            users.push(by.clone());
-                            users.push(id.clone());
-                        }
-                        v0::SystemMessage::UserBanned { id, .. }
-                        | v0::SystemMessage::UserKicked { id, .. }
-                        | v0::SystemMessage::UserJoined { id, .. }
-                        | v0::SystemMessage::UserLeft { id, .. } => {
-                            users.push(id.clone());
-                        }
-                        v0::SystemMessage::Text { .. } => {}
-                        v0::SystemMessage::MessagePinned { by, .. } => {
-                            users.push(by.clone());
-                        }
-                        v0::SystemMessage::MessageUnpinned { by, .. } => {
-                            users.push(by.clone());
-                        }
-                        v0::SystemMessage::CallStarted { by, .. } => users.push(by.clone()),
-                    }
-                }
-                users
-            })
-            .collect::<HashSet<String>>()
-            .into_iter()
-            .collect::<Vec<String>>();
-        let users = User::fetch_many_ids_as_mutuals(db, &user, &user_ids).await?;
+    let (users, members) = Message::fetch_users(db, &messages, server_id.as_deref()).await?;
 
-        v0::BulkMessageResponse::MessagesAndUsers {
-            messages,
-            users,
-            members: if let Some(server_id) = server_id {
-                Some(
-                    db.fetch_members(&server_id, &user_ids)
-                        .await?
-                        .into_iter()
-                        .map(Into::into)
-                        .collect(),
-                )
-            } else {
-                None
-            },
-        }
-    } else {
-        v0::BulkMessageResponse::JustMessages(messages)
+    let response = v0::BulkMessageResponse::MessagesAndUsers {
+        messages: messages
+            .into_iter()
+            .map(|msg| msg.into_model(None, None))
+            .collect(),
+        users: User::into_mutuals(&user, users).await,
+        members: Some(members.into_iter().map(Into::into).collect()),
     };
 
     Ok(Json(response))

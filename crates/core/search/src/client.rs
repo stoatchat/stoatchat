@@ -1,19 +1,25 @@
 use std::fmt::Display;
 
 use elasticsearch::{
-    BulkOperation, BulkParts, CreateParts, DeleteByQueryParts, DeleteParts, Elasticsearch, IndexParts, SearchParts, auth::Credentials, http::{
+    BulkOperation, BulkParts, CreateParts, DeleteByQueryParts, DeleteParts, Elasticsearch,
+    IndexParts, SearchParts,
+    auth::Credentials,
+    http::{
         response::Exception,
         transport::{SingleNodeConnectionPool, TransportBuilder},
-    }, indices::{IndicesCreateParts, IndicesDeleteParts}
+    },
+    indices::{IndicesCreateParts, IndicesDeleteParts},
 };
 use elasticsearch_dsl::{FieldSort, Query, Search, SearchResponse, Sort};
-use revolt_database::{Database, Message};
-use serde_json::{Map, Value, json};
+use linkify::{LinkFinder, LinkKind};
+use revolt_database::{Database, Message, MessageWithUser, User};
+use serde_json::{Map, Value, json, to_value};
 
 pub use elasticsearch;
 
-use crate::{MessageComponent, MetadataFile, SearchTerms};
+use crate::{AuthorType, MessageComponent, SearchTerms};
 
+/// Elasticsearch errors
 #[derive(Debug)]
 pub enum Error {
     Http(elasticsearch::Error),
@@ -42,6 +48,7 @@ impl Display for Error {
     }
 }
 
+/// Higher level elasticsearch API more fit for our specific usecase
 #[derive(Debug, Clone)]
 pub struct ElasticsearchClient {
     pub inner: Elasticsearch,
@@ -61,6 +68,7 @@ impl ElasticsearchClient {
         Self { inner }
     }
 
+    /// Delete messages index along with all documents
     pub async fn delete_indexes(&self) -> Result<(), Error> {
         let exception = self
             .inner
@@ -78,6 +86,7 @@ impl ElasticsearchClient {
         }
     }
 
+    /// Create the messages index
     pub async fn setup_indexes(&self) -> Result<(), Error> {
         let exception = self
             .inner
@@ -98,13 +107,14 @@ impl ElasticsearchClient {
                         },
                         "attachments": {
                             "type": "nested",
+                            "dynamic": false,
                             "properties": {
                                 "metadata.type": {
                                     "type": "keyword"
                                 }
                             }
                         },
-                        // TODO: links
+                        "has_link": { "type": "boolean" },
                     }
                 }
             }))
@@ -120,6 +130,7 @@ impl ElasticsearchClient {
         }
     }
 
+    /// Performs a search for messages, returns a vec of message ids
     pub async fn search(&self, terms: SearchTerms) -> Result<Vec<String>, Error> {
         let mut query = Query::bool().filter(Query::terms("channel", terms.channels));
 
@@ -149,17 +160,32 @@ impl ElasticsearchClient {
 
         if let Some(components) = terms.filters.components {
             let mut components_query = Query::bool();
+            let mut attachments_query = Query::bool();
 
             for component in components {
                 match component {
-                    MessageComponent::Image => components_query = components_query.should(Query::term("attachments.metadata.type", "Image")),
-                    MessageComponent::Video => components_query = components_query.should(Query::term("attachments.metadata.type", "Video")),
-                    MessageComponent::File => components_query = components_query.should(Query::exists("attachments.file._id")),
-                    MessageComponent::Embed => query = query.filter(Query::exists("embeds")),
+                    MessageComponent::Image => {
+                        attachments_query = attachments_query
+                            .should(Query::term("attachments.metadata.type", "Image"))
+                    }
+                    MessageComponent::Video => {
+                        attachments_query = attachments_query
+                            .should(Query::term("attachments.metadata.type", "Video"))
+                    }
+                    MessageComponent::Link => {
+                        components_query = components_query.should(Query::exists("has_link"))
+                    }
+                    MessageComponent::File => {
+                        attachments_query = attachments_query.should(Query::exists("attachments"))
+                    }
+                    MessageComponent::Embed => {
+                        components_query = components_query.should(Query::exists("embeds"))
+                    }
                 };
             }
 
-            query = query.filter(Query::nested("attachments", components_query));
+            query = query
+                .filter(components_query.should(Query::nested("attachments", attachments_query)));
         }
 
         let search = Search::new()
@@ -191,7 +217,13 @@ impl ElasticsearchClient {
         }
     }
 
-    fn create_message_source(&self, _db: &Database, message: Message) -> Value {
+    /// Creates a source for a message which can be stored and indexed into elasticsearch
+    fn create_message_source(
+        &self,
+        _db: &Database,
+        message: Message,
+        author: Option<User>,
+    ) -> Value {
         let mut map = Map::new();
 
         map.insert("channel".to_string(), Value::String(message.channel));
@@ -199,25 +231,25 @@ impl ElasticsearchClient {
         map.insert("author".to_string(), Value::String(message.author));
 
         if let Some(content) = message.content {
+            // Is there a better way to handle this? can elasticsearch index links itself?
+            // Maybe in the future store the domains and be able to filter by that as well
+            let mut finder = LinkFinder::new();
+            finder.kinds(&[LinkKind::Url]);
+
+            if finder.links(&content).next().is_some() {
+                map.insert("has_link".to_string(), Value::Bool(true));
+            }
+
             map.insert("content".to_string(), Value::String(content));
         }
 
         if let Some(attachments) = message.attachments {
-            let mut files = Vec::new();
-
-            for attachment in attachments {
-                // TODO: swap this out for fetching the metadata from FileHash because of deprecation
-                // let metadata = attachment.as_hash(db).await.expect("Failed to fetch FileHash").metadata;
-
-                files.push(MetadataFile {
-                    metadata: attachment.metadata.clone(),
-                    file: attachment,
-                })
-            }
+            // TODO: fetch the file metadata from FileHash because of File.metadata deprecation
+            // let metadata = attachment.as_hash(db).await.expect("Failed to fetch FileHash").metadata;
 
             map.insert(
                 "attachments".to_string(),
-                serde_json::to_value(files).unwrap(),
+                serde_json::to_value(attachments).unwrap(),
             );
         }
 
@@ -243,31 +275,38 @@ impl ElasticsearchClient {
             map.insert("pinned".to_string(), Value::Bool(pinned));
         }
 
-        // TODO: bot
+        // This will turn bot author type to user author type if this is ran on a deleted message,
+        // due to the author not existing anymore so fetching will fail, this is probably niche enough
+        // to not really matter, might try fix in the future.
         map.insert(
             "author_type".to_string(),
-            Value::String(
-                if message.webhook.is_some() {
-                    "webhook"
-                } else {
-                    "user"
-                }
-                .to_string(),
-            ),
+            to_value(if message.webhook.is_some() {
+                AuthorType::Webhook
+            } else if author.is_some_and(|user| user.bot.is_some()) {
+                AuthorType::Bot
+            } else {
+                AuthorType::User
+            })
+            .unwrap(),
         );
 
         Value::Object(map)
     }
 
-    pub async fn bulk_index_messages(&self, db: &Database, messages: Vec<Message>) -> Result<(), Error> {
+    /// Bulk uploads and indexes messages to elasticsearch
+    pub async fn bulk_index_messages(
+        &self,
+        db: &Database,
+        messages: Vec<MessageWithUser>,
+    ) -> Result<(), Error> {
         let mut ops = Vec::<BulkOperation<Value>>::new();
 
         for message in messages {
-            let id = message.id.clone();
-            let source = self.create_message_source(db, message);
+            let id = message.message.id.clone();
+            let source = self.create_message_source(db, message.message, message.user);
 
             ops.push(BulkOperation::create(source).id(id).into());
-        };
+        }
 
         let exception = self
             .inner
@@ -285,9 +324,15 @@ impl ElasticsearchClient {
         }
     }
 
-    pub async fn index_message(&self, db: &Database, message: Message) -> Result<(), Error> {
+    /// Uploads and indexes a single message to elasticsearch
+    pub async fn index_message(
+        &self,
+        db: &Database,
+        message: Message,
+        author: Option<User>,
+    ) -> Result<(), Error> {
         let id = message.id.clone();
-        let source = self.create_message_source(db, message);
+        let source = self.create_message_source(db, message, author);
 
         let exception = self
             .inner
@@ -305,9 +350,15 @@ impl ElasticsearchClient {
         }
     }
 
-    pub async fn edit_message(&self, db: &Database, message: Message) -> Result<(), Error> {
+    /// Updates or upserts an existing message to elasticsearch
+    pub async fn edit_message(
+        &self,
+        db: &Database,
+        message: Message,
+        author: Option<User>,
+    ) -> Result<(), Error> {
         let id = message.id.clone();
-        let source = self.create_message_source(db, message);
+        let source = self.create_message_source(db, message, author);
 
         let exception = self
             .inner
@@ -325,6 +376,7 @@ impl ElasticsearchClient {
         }
     }
 
+    /// Deletes a message from elasticsearch
     pub async fn delete_message(&self, message_id: &str) -> Result<(), Error> {
         let exception = self
             .inner
@@ -341,6 +393,7 @@ impl ElasticsearchClient {
         }
     }
 
+    /// Deletes all messages in a channel from elasticsearch
     pub async fn delete_channel(&self, channel_id: &str) -> Result<(), Error> {
         let exception = self
             .inner
