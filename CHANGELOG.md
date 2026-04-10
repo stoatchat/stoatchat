@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.12.1](https://github.com/stoatchat/stoatchat/compare/v0.12.0...v0.12.1) (2026-04-10)
+
+
+### Bug Fixes
+
+* add migration to update existing files to be animated ([#705](https://github.com/stoatchat/stoatchat/issues/705)) ([f2c056a](https://github.com/stoatchat/stoatchat/commit/f2c056a1515be493b195f3f5db5886c2ddf36700))
+* don't send self dm notifications ([#706](https://github.com/stoatchat/stoatchat/issues/706)) ([f30b729](https://github.com/stoatchat/stoatchat/commit/f30b729ca90d0be6853c57ab4935694e5e59ae56))
+* mise start + missing docker image ([#564](https://github.com/stoatchat/stoatchat/issues/564)) ([fb8fe16](https://github.com/stoatchat/stoatchat/commit/fb8fe1655776791421284a6a093e86f0320c258a))
+* test failure due to wrong assertion ([#707](https://github.com/stoatchat/stoatchat/issues/707)) ([f81e329](https://github.com/stoatchat/stoatchat/commit/f81e3291bdd57af9ceedb2987b111acc7051d69c))
+
 ## [0.12.0](https://github.com/stoatchat/stoatchat/compare/v0.11.5...v0.12.0) (2026-03-28)
 
 
