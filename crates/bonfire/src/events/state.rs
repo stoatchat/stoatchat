@@ -1,7 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-    time::Duration,
+    collections::{HashMap, HashSet}, num::NonZeroUsize, sync::Arc, time::Duration
 };
 
 use async_std::sync::{Mutex, RwLock};
@@ -57,7 +55,7 @@ impl Default for Cache {
             members: Default::default(),
             servers: Default::default(),
 
-            seen_events: LruCache::new(20),
+            seen_events: LruCache::new(NonZeroUsize::new(20).unwrap()),
         }
     }
 }

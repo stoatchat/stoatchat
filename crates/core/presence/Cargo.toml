@@ -14,16 +14,16 @@ redis-is-patched = []
 
 [dev-dependencies]
 # Async
-async-std = { version = "1.8.0", features = ["attributes"] }
+async-std = { workspace = true, features = ["attributes"] }
 
 # Config for loading Redis URI
-revolt-config = { version = "0.12.0", path = "../config" }
+revolt-config = { workspace = true }
 
 [dependencies]
 # Utility
-log = "0.4.17"
-rand = "0.8.5"
-once_cell = "1.17.1"
+log = { workspace = true }
+rand = { workspace = true }
+once_cell = { workspace = true }
 
 # Redis
-redis-kiss = "0.1.4"
+redis-kiss = { workspace = true }

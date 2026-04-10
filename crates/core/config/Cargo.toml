@@ -18,24 +18,24 @@ default = ["test", "sentry"]
 
 [dependencies]
 # Utility
-config = "0.13.3"
-cached = "0.44.0"
-once_cell = "1.18.0"
+config = { workspace = true }
+cached = { workspace = true }
+once_cell = { workspace = true }
 
 # Serde
-serde = { version = "1", features = ["derive"] }
+serde = { workspace = true }
 
 # Async
-futures-locks = "0.7.1"
-async-std = { version = "1.8.0", features = ["attributes"], optional = true }
+futures-locks = { workspace = true }
+async-std = { workspace = true, features = ["attributes"], optional = true }
 
 # Logging
-log = "0.4.14"
-pretty_env_logger = "0.4.0"
+log = { workspace = true }
+pretty_env_logger = { workspace = true }
 
 # Sentry
-sentry = { version = "0.31.5", optional = true }
-sentry-anyhow = { version = "0.38.1", optional = true }
+sentry = { workspace = true, optional = true }
+sentry-anyhow = { workspace = true, optional = true }
 
 # Core
-revolt-result = { version = "0.12.0", path = "../result", optional = true }
+revolt-result = { workspace = true, optional = true }

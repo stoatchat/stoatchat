@@ -15,12 +15,12 @@ cache = ["dep:lru"]
 default = ["tokio"]
 
 [dependencies]
-tokio = { version = "1.47.0", features = ["sync"], optional = true }
-indexmap = { version = "2.13.0", optional = true }
-lru = { version = "0.16.3", optional = true }
+tokio = { workspace = true, features = ["sync"], optional = true }
+indexmap = { workspace = true, optional = true }
+lru = { workspace = true, optional = true }
 
 [dev-dependencies]
-tokio = { version = "1.47.0", features = [
+tokio = { workspace = true, features = [
     "rt",
     "rt-multi-thread",
     "macros",

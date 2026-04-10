@@ -8,4 +8,4 @@ description = "Revolt Backend: Message Parser"
 repository = "https://github.com/stoatchat/stoatchat"
 
 [dependencies]
-logos = { version = "0.15" }
+logos = { workspace = true }
