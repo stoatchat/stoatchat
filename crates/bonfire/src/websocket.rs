@@ -5,7 +5,7 @@ use authifier::AuthifierEvent;
 use fred::{
     error::RedisErrorKind,
     interfaces::{ClientLike, EventInterface, PubsubInterface},
-    types::RedisConfig,
+    types::{ReconnectPolicy, RedisConfig},
 };
 use futures::{
     channel::oneshot,
@@ -225,9 +225,9 @@ async fn listener(
         .unwrap_or(REDIS_URI.to_string());
 
     let redis_config = RedisConfig::from_url(&url).unwrap();
-    let subscriber = match report_internal_error!(
-        fred::types::Builder::from_config(redis_config).build_subscriber_client()
-    ) {
+    let mut builder = fred::types::Builder::from_config(redis_config);
+    builder.set_policy(ReconnectPolicy::new_exponential(8, 100, 30_000, 2));
+    let subscriber = match report_internal_error!(builder.build_subscriber_client()) {
         Ok(subscriber) => subscriber,
         Err(_) => return,
     };
@@ -236,16 +236,21 @@ async fn listener(
         return;
     }
 
+    // Let Fred automatically re-subscribe to tracked channels on reconnect.
+    subscriber.manage_subscriptions();
+
     // Handle Redis connection dropping
     let (clean_up_s, clean_up_r) = async_channel::bounded(1);
     let clean_up_s = Arc::new(Mutex::new(clean_up_s));
     subscriber.on_error(move |err| {
+        warn!("Redis subscriber error: {:?}", err);
         if let RedisErrorKind::Canceled = err.kind() {
             let clean_up_s = clean_up_s.clone();
             spawn(async move {
                 clean_up_s.lock().await.send(()).await.ok();
             });
         }
+        // Transient errors (IO, timeout) are handled by the reconnect policy.
 
         Ok(())
     });
