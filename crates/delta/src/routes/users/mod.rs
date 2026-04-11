@@ -16,12 +16,14 @@ mod open_dm;
 mod remove_friend;
 mod send_friend_request;
 mod unblock_user;
+mod notifications;
 
 pub fn routes() -> (Vec<Route>, OpenApi) {
     openapi_get_routes_spec![
         // User Information
         fetch_self::fetch,
         fetch_user::fetch,
+        notifications::notifications,
         fetch_user_flags::fetch_user_flags,
         edit_user::edit,
         change_username::change_username,
