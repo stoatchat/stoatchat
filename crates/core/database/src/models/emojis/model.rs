@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::str::FromStr;
 
 use once_cell::sync::Lazy;
+use revolt_models::v0;
 use revolt_result::Result;
 use ulid::Ulid;
 
@@ -41,6 +42,12 @@ auto_derived!(
         Server { id: String },
         Detached,
     }
+
+    /// Partial representation of an emoji
+    pub struct PartialEmoji {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub name: Option<String>,
+    }
 );
 
 #[allow(clippy::disallowed_methods)]
@@ -73,6 +80,26 @@ impl Emoji {
         .await;
 
         db.detach_emoji(&self).await
+    }
+
+    /// Update an emoji
+    pub async fn update(&mut self, db: &Database, partial: PartialEmoji) -> Result<()> {
+        if let Some(name) = partial.name.clone() {
+            self.name = name;
+        }
+
+        db.update_emoji(&self.id, &partial).await?;
+
+        EventV1::EmojiUpdate {
+            id: self.id.clone(),
+            data: v0::PartialEmoji {
+                name: partial.name.clone(),
+            },
+        }
+        .p(self.parent().to_string())
+        .await;
+
+        Ok(())
     }
 
     /// Check whether we can use a given emoji

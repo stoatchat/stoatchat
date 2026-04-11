@@ -1,7 +1,7 @@
 use bson::Document;
 use revolt_result::Result;
 
-use crate::Emoji;
+use crate::{Emoji, PartialEmoji};
 use crate::MongoDb;
 
 use super::AbstractEmojis;
@@ -44,6 +44,11 @@ impl AbstractEmojis for MongoDb {
                 }
             }
         )
+    }
+
+    /// Update emoji with new information
+    async fn update_emoji(&self, emoji_id: &str, partial: &PartialEmoji) -> Result<()> {
+        query!(self, update_one_by_id, COL, emoji_id, partial, vec![], None).map(|_| ())
     }
 
     /// Detach an emoji by its id
