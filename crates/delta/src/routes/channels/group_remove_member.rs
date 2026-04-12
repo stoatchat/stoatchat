@@ -1,5 +1,7 @@
 use revolt_database::{
-    AMQP, Channel, Database, User, util::reference::Reference, voice::{UserVoiceChannel, VoiceClient, is_in_voice_channel, remove_user_from_voice_channel}
+    util::reference::Reference,
+    voice::{is_in_voice_channel, remove_user_from_voice_channel, UserVoiceChannel, VoiceClient},
+    Channel, Database, User, AMQP,
 };
 use revolt_permissions::ChannelPermission;
 use revolt_result::{create_error, Result};

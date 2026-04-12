@@ -1,12 +1,14 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Channel, Database, PartialMessage, SystemMessage, User, AMQP,
+    AuditLogEntryAction, Channel, Database, PartialMessage, SystemMessage, User, AMQP,
 };
 use revolt_models::v0::MessageAuthor;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::State;
 use rocket_empty::EmptyResponse;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Pins a message
 ///
@@ -17,6 +19,7 @@ pub async fn message_pin(
     db: &State<Database>,
     amqp: &State<AMQP>,
     user: User,
+    reason: AuditLogReason,
     target: Reference<'_>,
     msg: Reference<'_>,
 ) -> Result<EmptyResponse> {
@@ -64,6 +67,16 @@ pub async fn message_pin(
         false,
     )
     .await?;
+
+    if let Some(server_id) = channel.server() {
+        AuditLogEntryAction::MessagePin {
+            message: message.id.clone(),
+            author: message.author.clone(),
+            channel: message.channel.clone(),
+        }
+        .insert(db, server_id.to_string(), reason, user.id)
+        .await;
+    }
 
     Ok(EmptyResponse)
 }

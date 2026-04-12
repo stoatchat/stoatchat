@@ -4,13 +4,15 @@ use revolt_database::{
         delete_voice_channel, is_in_voice_channel, remove_user_from_voice_channel,
         UserVoiceChannel, VoiceClient,
     },
-    Channel, Database, PartialChannel, User, AMQP,
+    AuditLogEntryAction, Channel, Database, PartialChannel, User, AMQP,
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::State;
 use rocket_empty::EmptyResponse;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Close Channel
 ///
@@ -22,6 +24,7 @@ pub async fn delete(
     voice_client: &State<VoiceClient>,
     amqp: &State<AMQP>,
     user: User,
+    reason: AuditLogReason,
     target: Reference<'_>,
     options: v0::OptionsChannelDelete,
 ) -> Result<EmptyResponse> {
@@ -63,9 +66,16 @@ pub async fn delete(
                 remove_user_from_voice_channel(voice_client, &user_voice_channel, &user.id).await?;
             };
         }
-        Channel::TextChannel { .. } => {
+        Channel::TextChannel { name, server, .. } => {
             permissions.throw_if_lacking_channel_permission(ChannelPermission::ManageChannel)?;
             channel.delete(db).await?;
+
+            AuditLogEntryAction::ChannelDelete {
+                channel: channel.id().to_string(),
+                name: name.clone(),
+            }
+            .insert(db, server.clone(), reason, user.id)
+            .await;
 
             delete_voice_channel(voice_client, &UserVoiceChannel::from_channel(&channel)).await?;
         }

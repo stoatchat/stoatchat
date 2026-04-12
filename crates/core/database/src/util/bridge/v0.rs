@@ -190,7 +190,7 @@ impl From<crate::Channel> for Channel {
                 role_permissions,
                 nsfw,
                 voice,
-                slowmode
+                slowmode,
             } => Channel::TextChannel {
                 id,
                 server,
@@ -202,7 +202,7 @@ impl From<crate::Channel> for Channel {
                 role_permissions,
                 nsfw,
                 voice: voice.map(|voice| voice.into()),
-                slowmode
+                slowmode,
             },
         }
     }
@@ -256,7 +256,7 @@ impl From<Channel> for crate::Channel {
                 role_permissions,
                 nsfw,
                 voice,
-                slowmode
+                slowmode,
             } => crate::Channel::TextChannel {
                 id,
                 server,
@@ -268,7 +268,7 @@ impl From<Channel> for crate::Channel {
                 role_permissions,
                 nsfw,
                 voice: voice.map(|voice| voice.into()),
-                slowmode
+                slowmode,
             },
         }
     }
@@ -307,7 +307,7 @@ impl From<PartialChannel> for crate::PartialChannel {
             default_permissions: value.default_permissions,
             last_message_id: value.last_message_id,
             voice: value.voice.map(|voice| voice.into()),
-            slowmode: value.slowmode
+            slowmode: value.slowmode,
         }
     }
 }
@@ -1401,6 +1401,14 @@ impl From<FieldsMessage> for crate::FieldsMessage {
     }
 }
 
+impl From<crate::VoiceInformation> for VoiceInformation {
+    fn from(value: crate::VoiceInformation) -> Self {
+        VoiceInformation {
+            max_users: value.max_users,
+        }
+    }
+}
+
 impl From<VoiceInformation> for crate::VoiceInformation {
     fn from(value: VoiceInformation) -> Self {
         crate::VoiceInformation {
@@ -1409,10 +1417,138 @@ impl From<VoiceInformation> for crate::VoiceInformation {
     }
 }
 
-impl From<crate::VoiceInformation> for VoiceInformation {
-    fn from(value: crate::VoiceInformation) -> Self {
-        VoiceInformation {
-            max_users: value.max_users,
+impl From<crate::AuditLogEntryAction> for AuditLogEntryAction {
+    fn from(value: crate::AuditLogEntryAction) -> Self {
+        match value {
+            crate::AuditLogEntryAction::MessageDelete { author, channel } => {
+                AuditLogEntryAction::MessageDelete { author, channel }
+            }
+            crate::AuditLogEntryAction::BanCreate { user } => {
+                AuditLogEntryAction::BanCreate { user }
+            }
+            crate::AuditLogEntryAction::BanDelete { user } => {
+                AuditLogEntryAction::BanDelete { user }
+            }
+            crate::AuditLogEntryAction::ChannelCreate { channel, name } => {
+                AuditLogEntryAction::ChannelCreate { channel, name }
+            }
+            crate::AuditLogEntryAction::MemberEdit {
+                user,
+                before,
+                after,
+            } => AuditLogEntryAction::MemberEdit {
+                user,
+                before: before.into(),
+                after: after.into(),
+            },
+            crate::AuditLogEntryAction::MemberKick { user } => {
+                AuditLogEntryAction::MemberKick { user }
+            }
+            crate::AuditLogEntryAction::ServerEdit { before, after } => {
+                AuditLogEntryAction::ServerEdit {
+                    before: before.into(),
+                    after: after.into(),
+                }
+            }
+            crate::AuditLogEntryAction::RoleEdit {
+                role,
+                before,
+                after,
+            } => AuditLogEntryAction::RoleEdit {
+                role,
+                before: before.into(),
+                after: after.into(),
+            },
+            crate::AuditLogEntryAction::RoleCreate { role, name } => {
+                AuditLogEntryAction::RoleCreate { role, name }
+            }
+            crate::AuditLogEntryAction::RoleDelete { role, name } => {
+                AuditLogEntryAction::RoleDelete { role, name }
+            }
+            crate::AuditLogEntryAction::RolesReorder { positions } => {
+                AuditLogEntryAction::RolesReorder { positions }
+            }
+            crate::AuditLogEntryAction::MessageBulkDelete { channel, count } => {
+                AuditLogEntryAction::MessageBulkDelete { channel, count }
+            }
+            crate::AuditLogEntryAction::ChannelEdit {
+                channel,
+                before,
+                after,
+            } => AuditLogEntryAction::ChannelEdit {
+                channel,
+                before: before.into(),
+                after: after.into(),
+            },
+            crate::AuditLogEntryAction::ChannelRolePermissionsEdit {
+                channel,
+                role,
+                permissions,
+            } => AuditLogEntryAction::ChannelRolePermissionsEdit {
+                channel,
+                role,
+                permissions: permissions.into(),
+            },
+            crate::AuditLogEntryAction::ChannelDelete { channel, name } => {
+                AuditLogEntryAction::ChannelDelete { channel, name }
+            }
+            crate::AuditLogEntryAction::InviteDelete { invite, channel } => {
+                AuditLogEntryAction::InviteDelete { invite, channel }
+            }
+            crate::AuditLogEntryAction::WebhookCreate {
+                webhook,
+                name,
+                channel,
+            } => AuditLogEntryAction::WebhookCreate {
+                webhook,
+                name,
+                channel,
+            },
+            crate::AuditLogEntryAction::WebhookDelete {
+                webhook,
+                name,
+                channel,
+            } => AuditLogEntryAction::WebhookDelete {
+                webhook,
+                name,
+                channel,
+            },
+            crate::AuditLogEntryAction::EmojiDelete { emoji, name } => {
+                AuditLogEntryAction::EmojiDelete { emoji, name }
+            }
+            crate::AuditLogEntryAction::MessagePin {
+                message,
+                author,
+                channel,
+            } => AuditLogEntryAction::MessagePin {
+                message,
+                author,
+                channel,
+            },
+            crate::AuditLogEntryAction::MessageUnpin {
+                message,
+                author,
+                channel,
+            } => AuditLogEntryAction::MessageUnpin {
+                message,
+                author,
+                channel,
+            },
+            crate::AuditLogEntryAction::InviteCreate { invite, channel } => {
+                AuditLogEntryAction::InviteCreate { invite, channel }
+            }
+        }
+    }
+}
+
+impl From<crate::AuditLogEntry> for AuditLogEntry {
+    fn from(value: crate::AuditLogEntry) -> Self {
+        AuditLogEntry {
+            id: value.id,
+            server: value.server,
+            reason: value.reason,
+            user: value.user,
+            action: value.action.into(),
         }
     }
 }
