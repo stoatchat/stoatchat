@@ -55,7 +55,7 @@ nanoid = "0.4.0"
 base64 = "0.21.3"
 once_cell = "1.17"
 indexmap = "1.9.1"
-decancer = "1.6.2"
+decancer = "3.3.3"
 deadqueue = "0.2.4"
 linkify = { optional = true, version = "0.8.1" }
 url-escape = { optional = true, version = "0.1.1" }
