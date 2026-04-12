@@ -78,6 +78,7 @@ pub enum ErrorType {
     UnknownChannel,
     UnknownAttachment,
     UnknownMessage,
+    CannotDeleteMessage,
     CannotEditMessage,
     CannotJoinCall,
     TooManyAttachments {
