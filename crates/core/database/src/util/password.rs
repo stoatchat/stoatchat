@@ -52,11 +52,11 @@ pub async fn assert_safe(password: &str) -> Result<()> {
         } else if result.is_ok_and(|b| b) {
             return Ok(())
         }
+    };
 
-        Err(create_error!(CompromisedPassword))
-    } else if TOP_100K_COMPROMISED.contains(password) {
-        Err(create_error!(CompromisedPassword))
-    } else {
-        Ok(())
-    }
+    if TOP_100K_COMPROMISED.contains(password) {
+        return Err(create_error!(CompromisedPassword))
+    };
+
+    Ok(())
 }
