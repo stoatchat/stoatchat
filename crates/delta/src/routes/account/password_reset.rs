@@ -28,7 +28,6 @@ pub async fn password_reset(
     assert_safe(&data.password)
         .await?;
 
-    println!("password {}", data.password);
     // Update the account
     account.password = hash_password(data.password)?;
     account.password_reset = None;

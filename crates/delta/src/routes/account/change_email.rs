@@ -86,7 +86,6 @@ mod tests {
         assert_eq!(res.status(), Status::NoContent);
 
         let account = harness.db.fetch_account(&account.id).await.unwrap();
-        println!("{account:?}");
 
         let (_, code) = harness.assert_email("change_email@smtp.test").await;
         let res = harness.client

@@ -302,7 +302,6 @@ mod tests {
     #[async_std::test]
     async fn fail_totp_invalid_mfa() {
         let harness = TestHarness::new().await;
-        println!("{:?}", harness.db);
         let (mut account, _, _) = harness.new_user().await;
 
         let totp = Totp::Enabled {
