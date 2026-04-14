@@ -25,8 +25,8 @@ impl AbstractUserSettings for ReferenceDb {
     /// Update a subset of user settings
     async fn set_user_settings(&self, id: &str, settings: &UserSettings) -> Result<()> {
         let mut user_settings = self.user_settings.lock().await;
-        if let Some(settings) = user_settings.get_mut(id) {
-            settings.extend(settings.clone());
+        if let Some(existing) = user_settings.get_mut(id) {
+            existing.extend(settings.clone());
         } else {
             user_settings.insert(id.to_string(), settings.clone());
         }
