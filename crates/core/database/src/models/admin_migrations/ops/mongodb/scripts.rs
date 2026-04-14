@@ -26,7 +26,7 @@ struct MigrationInfo {
     revision: i32,
 }
 
-pub const LATEST_REVISION: i32 = 50; // MUST BE +1 to last migration
+pub const LATEST_REVISION: i32 = 51; // MUST BE +1 to last migration
 
 pub async fn migrate_database(db: &MongoDb) {
     let migrations = db.col::<Document>("migrations");
@@ -1474,6 +1474,21 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
                 .unwrap();
         }
     };
+
+    if revision <= 50 {
+        info!("Running migration [revision 50 / 13-04-2026]: Rename invites collection to account_invites");
+
+        db.db()
+            .client()
+            .database("admin")
+            .run_command(doc! {
+                "renameCollection": "revolt.invites",
+                "to": "revolt.account_invites",
+                "dropTarget": true
+            })
+            .await
+            .unwrap();
+    }
 
     // Reminder to update LATEST_REVISION when adding new migrations.
     LATEST_REVISION.max(revision)

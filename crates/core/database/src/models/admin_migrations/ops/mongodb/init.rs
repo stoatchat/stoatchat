@@ -98,6 +98,18 @@ pub async fn create_database(db: &MongoDb) {
         .await
         .expect("Failed to create pubsub collection.");
 
+    db.create_collection("sessions")
+        .await
+        .expect("Failed to create sessions collection.");
+
+    db.create_collection("account_invites")
+        .await
+        .expect("Failed to create account_invites collection.");
+
+    db.create_collection("mfa_tickets")
+        .await
+        .expect("Failed to create mfa_tickets collection.");
+
     db.run_command(doc! {
         "createIndexes": "users",
         "indexes": [
@@ -262,6 +274,90 @@ pub async fn create_database(db: &MongoDb) {
     })
     .await
     .expect("Failed to create ratelimit_events index.");
+
+    db.run_command(doc! {
+        "createIndexes": "accounts",
+        "indexes": [
+            {
+                "key": {
+                    "email": 1
+                },
+                "name": "email",
+                "unique": true,
+                "collation": {
+                    "locale": "en",
+                    "strength": 2
+                }
+            },
+            {
+                "key": {
+                    "email_normalised": 1
+                },
+                "name": "email_normalised",
+                "unique": true,
+                "collation": {
+                    "locale": "en",
+                    "strength": 2
+                }
+            },
+            {
+                "key": {
+                    "verification.token": 1
+                },
+                "name": "email_verification"
+            },
+            {
+                "key": {
+                    "password_reset.token": 1
+                },
+                "name": "password_reset"
+            },
+            {
+                "key": {
+                    "deletion.token": 1
+                },
+                "name": "account_deletion"
+            }
+        ]
+    })
+    .await
+    .unwrap();
+
+    db.run_command(doc! {
+        "createIndexes": "sessions",
+        "indexes": [
+            {
+                "key": {
+                    "token": 1
+                },
+                "name": "token",
+                "unique": true
+            },
+            {
+                "key": {
+                    "user_id": 1
+                },
+                "name": "user_id"
+            }
+        ]
+    })
+    .await
+    .unwrap();
+
+    db.run_command(doc! {
+        "createIndexes": "mfa_tickets",
+        "indexes": [
+            {
+                "key": {
+                    "token": 1
+                },
+                "name": "token",
+                "unique": true
+            }
+        ]
+    })
+    .await
+    .unwrap();
 
     info!("Created database.");
 }

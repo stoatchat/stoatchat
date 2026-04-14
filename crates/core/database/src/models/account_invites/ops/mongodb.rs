@@ -3,8 +3,7 @@ use bson::to_document;
 use mongodb::options::UpdateOptions;
 use revolt_result::Result;
 
-// TODO: rename this to "account_invites"
-const COL: &str = "invites";
+const COL: &str = "account_invites";
 
 #[async_trait]
 impl AbstractAccountInvites for MongoDb {
