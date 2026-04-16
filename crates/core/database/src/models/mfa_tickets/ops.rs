@@ -16,4 +16,7 @@ pub trait AbstractMFATickets: Sync + Send {
 
     /// Delete ticket
     async fn delete_ticket(&self, id: &str) -> Result<()>;
+
+    /// Delete all expired tickets
+    async fn delete_expired_tickets(&self) -> Result<usize>;
 }

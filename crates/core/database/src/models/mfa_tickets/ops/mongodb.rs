@@ -1,7 +1,7 @@
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use crate::{AbstractMFATickets, MFATicket, MongoDb};
-use bson::to_document;
+use bson::{to_document, Document};
 use iso8601_timestamp::Timestamp;
 use mongodb::options::UpdateOptions;
 use revolt_result::Result;
@@ -61,5 +61,19 @@ impl AbstractMFATickets for MongoDb {
             .await
             .map_err(|_| create_database_error!("delete_one", COL))
             .map(|_| ())
+    }
+
+    /// Delete all expired tickets
+    async fn delete_expired_tickets(&self) -> Result<usize> {
+        let threshhold =
+            Ulid::from_datetime(SystemTime::now() - Duration::from_mins(5)).to_string();
+
+        self.col::<Document>(COL)
+            .delete_many(doc! {
+                "_id": { "$lt": threshhold }
+            })
+            .await
+            .map_err(|_| create_database_error!("delete_many", COL))
+            .map(|result| result.deleted_count as usize)
     }
 }

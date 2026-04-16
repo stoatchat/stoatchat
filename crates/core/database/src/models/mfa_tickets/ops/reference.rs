@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use crate::{AbstractMFATickets, MFATicket, ReferenceDb};
 use iso8601_timestamp::Timestamp;
@@ -41,5 +41,17 @@ impl AbstractMFATickets for ReferenceDb {
         } else {
             Err(create_error!(InvalidToken))
         }
+    }
+
+    /// Delete all expired tickets
+    async fn delete_expired_tickets(&self) -> Result<usize> {
+        let threshhold =
+            Ulid::from_datetime(SystemTime::now() - Duration::from_mins(5)).to_string();
+        let mut tickets = self.tickets.lock().await;
+
+        let before = tickets.len();
+        tickets.retain(|_, ticket| ticket.id >= threshhold);
+
+        Ok(before - tickets.len())
     }
 }
