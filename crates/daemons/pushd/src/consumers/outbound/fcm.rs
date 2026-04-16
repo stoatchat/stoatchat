@@ -139,6 +139,10 @@ impl FcmOutboundConsumer {
             }
             PayloadKind::Generic(alert) => {
                 let mut data = HashMap::new();
+                data.insert(
+                    "type".to_string(),
+                    Value::String("push.generic".to_string()),
+                );
                 data.insert("title".to_string(), Value::String(alert.title));
                 data.insert("body".to_string(), Value::String(alert.body));
 
@@ -158,19 +162,20 @@ impl FcmOutboundConsumer {
             PayloadKind::MessageNotification(alert) => {
                 let mut data = HashMap::new();
                 data.insert(
+                    "type".to_string(),
+                    Value::String("push.message".to_string()),
+                );
+                data.insert(
                     "title".to_string(),
                     Value::String(self.format_title(&alert)),
                 );
                 data.insert("body".to_string(), Value::String(alert.body));
                 data.insert("image".to_string(), Value::String(alert.icon));
+                data.insert("tag".to_string(), Value::String(alert.tag));
 
                 let msg = Message {
                     token: Some(payload.token),
                     data: Some(data),
-                    android: Some(AndroidConfig {
-                        collapse_key: Some(alert.tag),
-                        ..Default::default()
-                    }),
                     ..Default::default()
                 };
 
@@ -179,6 +184,10 @@ impl FcmOutboundConsumer {
 
             PayloadKind::DmCallStartEnd(alert) => {
                 let mut data: HashMap<String, Value> = HashMap::new();
+                data.insert(
+                    "type".to_string(),
+                    Value::String("push.dm.call".to_string()),
+                );
                 data.insert(
                     "initiator_id".to_string(),
                     Value::String(alert.initiator_id),
@@ -189,18 +198,11 @@ impl FcmOutboundConsumer {
                     Value::String(alert.started_at.unwrap_or_else(|| "".to_string())),
                 );
                 data.insert("ended".to_string(), Value::Bool(alert.ended));
+                data.insert("duration".to_string(), Value::Number(config().await.api.livekit.call_ring_duration.into()));
 
                 let msg = Message {
                     token: Some(payload.token),
                     data: Some(data),
-                    android: Some(AndroidConfig {
-                        priority: Some(AndroidMessagePriority::High),
-                        ttl: Some(format!(
-                            "{}s",
-                            config().await.api.livekit.call_ring_duration
-                        )),
-                        ..Default::default()
-                    }),
                     ..Default::default()
                 };
 
