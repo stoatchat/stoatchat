@@ -8,10 +8,29 @@ services:
   # MongoDB
   database:
     image: mongo
+    command: ["--replSet", "rs0", "--bind_ip_all"]
     ports:
       - "27017:27017"
     volumes:
       - ./.data/db:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    healthcheck:
+      test: >
+        mongosh --quiet --eval "
+        try {
+          const status = rs.status();
+          if (status.ok === 1 && status.members[0].stateStr === 'PRIMARY') {
+            quit(0);
+          } else {
+            quit(1);
+          }
+        } catch (e) {
+          quit(1);
+        }"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     ulimits:
       nofile:
         soft: 65536
@@ -75,3 +94,34 @@ services:
     network_mode: "host"
     volumes:
       - ./livekit.yml:/etc/livekit.yml
+
+  elasticsearch:
+    image: elasticsearch:9.3.0
+    volumes:
+      - ./.data/elasticsearch:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+    extra_hosts:
+      - host.docker.internal:host-gateway
+      - model-runner.docker.internal:host-gateway
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - indices.id_field_data.enabled=true
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --output /dev/null --silent --head --fail http://elasticsearch:9200",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+  kibana:
+    image: kibana:9.3.1
+    ports:
+      - 5601:5601
+    environment:
+      ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'

@@ -1,7 +1,7 @@
 use bson::{to_bson, Document};
 use futures::try_join;
 use futures::StreamExt;
-use mongodb::options::FindOptions;
+use mongodb::options::{FindOptions, ReadConcern, ReturnDocument};
 use revolt_models::v0::MessageSort;
 use revolt_result::Result;
 use std::collections::{HashMap, HashSet};
@@ -9,8 +9,8 @@ use std::time::SystemTime;
 use ulid::Ulid;
 
 use crate::{
-    AppendMessage, DocumentId, FieldsMessage, IntoDocumentPath, Message, MessageQuery,
-    MessageTimePeriod, MongoDb, PartialMessage,
+    util::ChunkedDatabaseGenerator, AppendMessage, DocumentId, FieldsMessage, IntoDocumentPath,
+    Message, MessageQuery, MessageTimePeriod, MessageWithUser, MongoDb, PartialMessage,
 };
 
 use super::AbstractMessages;
@@ -205,7 +205,7 @@ impl AbstractMessages for MongoDb {
     }
 
     /// Append information to a given message
-    async fn append_message(&self, id: &str, append: &AppendMessage) -> Result<()> {
+    async fn append_message(&self, id: &str, append: &AppendMessage) -> Result<Option<Message>> {
         let mut query = doc! {};
 
         if let Some(embeds) = &append.embeds {
@@ -223,18 +223,18 @@ impl AbstractMessages for MongoDb {
         }
 
         if query.is_empty() {
-            return Ok(());
+            return Ok(None);
         }
 
-        self.col::<Document>(COL)
-            .update_one(
+        self.col::<Message>(COL)
+            .find_one_and_update(
                 doc! {
                     "_id": id
                 },
                 query,
             )
+            .return_document(ReturnDocument::After)
             .await
-            .map(|_| ())
             .map_err(|_| create_database_error!("update_one", COL))
     }
 
@@ -415,6 +415,53 @@ impl AbstractMessages for MongoDb {
             .map_err(|_| create_database_error!("delete_many", COL))?;
 
         Ok(deleted_messages)
+    }
+
+    /// Fetches all messages along with their author from every message in decending order
+    async fn fetch_all_messages(&self) -> Result<ChunkedDatabaseGenerator<MessageWithUser>> {
+        let mut session = self
+            .start_session()
+            .await
+            .map_err(|_| create_database_error!("start_session", COL))?;
+
+        session
+            .start_transaction()
+            .read_concern(ReadConcern::snapshot())
+            .await
+            .map_err(|_| create_database_error!("start_transaction", COL))?;
+
+        let cursor = self
+            .col::<Message>(COL)
+            .aggregate([
+                doc! {
+                    "$lookup": {
+                        "from": "users",
+                        "localField": "author",
+                        "foreignField": "_id",
+                        "as": "user"
+                    }
+                },
+                doc! {
+                    "$set": {
+                        "user": {
+                            "$first": "$user"
+                        }
+                    }
+                },
+                doc! {
+                    "$sort": {
+                        "_id": -1
+                    }
+                },
+            ])
+            .with_type::<MessageWithUser>()
+            .session(&mut session)
+            .batch_size(1000)
+            .await
+            .inspect_err(|e| log::error!("{e}"))
+            .map_err(|_| create_database_error!("aggregate", COL))?;
+
+        Ok(ChunkedDatabaseGenerator::new_mongo(session, cursor))
     }
 }
 

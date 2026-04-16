@@ -46,7 +46,7 @@ pub async fn remove_member(
         }
 
         channel
-            .remove_user_from_group(db, amqp, &member, Some(&user.id), false)
+            .remove_user_from_group(db, Some(amqp), &member, Some(&user.id), false)
             .await?;
     } else {
         return Err(create_error!(InvalidOperation));

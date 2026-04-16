@@ -1,5 +1,5 @@
 [database]
-mongodb = "mongodb://localhost"
+mongodb = "mongodb://localhost?directConnection=true&replicaSet=rs0"
 redis = "redis://localhost/"
 
 [rabbit]

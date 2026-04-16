@@ -1,10 +1,14 @@
-use std::collections::HashMap;
 use futures::future::try_join_all;
 use indexmap::IndexSet;
 use revolt_result::Result;
+use std::collections::HashMap;
 use std::time::SystemTime;
 use ulid::Ulid;
-use crate::{AppendMessage, FieldsMessage, Message, MessageQuery, PartialMessage, ReferenceDb};
+
+use crate::{
+    util::ChunkedDatabaseGenerator, AppendMessage, FieldsMessage, Message, MessageQuery,
+    MessageWithUser, PartialMessage, ReferenceDb,
+};
 
 use super::AbstractMessages;
 
@@ -60,7 +64,7 @@ impl AbstractMessages for ReferenceDb {
 
                 if let Some(pinned) = query.filter.pinned {
                     if message.pinned.unwrap_or_default() == pinned {
-                        return false
+                        return false;
                     }
                 }
 
@@ -191,7 +195,12 @@ impl AbstractMessages for ReferenceDb {
     }
 
     /// Update a given message with new information
-    async fn update_message(&self, id: &str, message: &PartialMessage, remove: Vec<FieldsMessage>) -> Result<()> {
+    async fn update_message(
+        &self,
+        id: &str,
+        message: &PartialMessage,
+        remove: Vec<FieldsMessage>,
+    ) -> Result<()> {
         let mut messages = self.messages.lock().await;
         if let Some(message_data) = messages.get_mut(id) {
             message_data.apply_options(message.to_owned());
@@ -207,7 +216,7 @@ impl AbstractMessages for ReferenceDb {
     }
 
     /// Append information to a given message
-    async fn append_message(&self, id: &str, append: &AppendMessage) -> Result<()> {
+    async fn append_message(&self, id: &str, append: &AppendMessage) -> Result<Option<Message>> {
         let mut messages = self.messages.lock().await;
         if let Some(message_data) = messages.get_mut(id) {
             if let Some(embeds) = &append.embeds {
@@ -218,9 +227,11 @@ impl AbstractMessages for ReferenceDb {
                         message_data.embeds = Some(embeds.clone());
                     }
                 }
-            }
 
-            Ok(())
+                Ok(Some(message_data.clone()))
+            } else {
+                Ok(None)
+            }
         } else {
             Err(create_error!(NotFound))
         }
@@ -294,7 +305,7 @@ impl AbstractMessages for ReferenceDb {
         &self,
         channels: &[String],
         author: &str,
-        since: SystemTime
+        since: SystemTime,
     ) -> Result<HashMap<String, Vec<String>>> {
         let threshold_ulid = Ulid::from_datetime(since).to_string();
         let mut deleted_messages: HashMap<String, Vec<String>> = HashMap::new();
@@ -335,16 +346,31 @@ impl AbstractMessages for ReferenceDb {
         }
 
         // Delete the messages
-        self.messages
-            .lock()
-            .await
-            .retain(|id, message| {
-                let should_keep = !(message.author == author
-                    && channels.contains(&message.channel)
-                    && id.as_str() >= threshold_ulid.as_str());
-                should_keep
-            });
+        self.messages.lock().await.retain(|id, message| {
+            let should_keep = !(message.author == author
+                && channels.contains(&message.channel)
+                && id.as_str() >= threshold_ulid.as_str());
+            should_keep
+        });
 
         Ok(deleted_messages)
+    }
+
+    /// Fetches all messages along with their author from every message in decending order
+    async fn fetch_all_messages(&self) -> Result<ChunkedDatabaseGenerator<MessageWithUser>> {
+        let users = self.users.lock().await;
+
+        Ok(ChunkedDatabaseGenerator::new_reference(
+            self.messages
+                .lock()
+                .await
+                .values()
+                .cloned()
+                .map(|message| MessageWithUser {
+                    user: users.get(&message.author).cloned(),
+                    message,
+                })
+                .collect(),
+        ))
     }
 }

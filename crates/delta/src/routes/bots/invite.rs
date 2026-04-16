@@ -56,7 +56,7 @@ pub async fn invite_bot(
                 .throw_if_lacking_channel_permission(ChannelPermission::InviteOthers)?;
 
             channel
-                .add_user_to_group(db, amqp, &bot_user, &user.id)
+                .add_user_to_group(db, Some(amqp), &bot_user, &user.id)
                 .await
                 .map(|_| EmptyResponse)
         }

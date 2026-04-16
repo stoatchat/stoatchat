@@ -362,6 +362,17 @@ impl User {
         )
     }
 
+    pub async fn into_mutuals(perspective: &User, users: Vec<User>) -> Vec<v0::User> {
+        let online_ids =
+            filter_online(&users.iter().map(|user| user.id.clone()).collect::<Vec<_>>()).await;
+
+        join_all(users.into_iter().map(|user| async {
+            let is_online = online_ids.contains(&user.id);
+            user.into_known(perspective, is_online).await
+        }))
+        .await
+    }
+
     /// Find a free discriminator for a given username
     pub async fn find_discriminator(
         db: &Database,
@@ -510,7 +521,7 @@ impl User {
     pub async fn add_friend(
         &mut self,
         db: &Database,
-        amqp: &AMQP,
+        amqp: Option<&AMQP>,
         target: &mut User,
     ) -> Result<()> {
         match self.relationship_with(&target.id) {
@@ -520,8 +531,10 @@ impl User {
             RelationshipStatus::Blocked => Err(create_error!(Blocked)),
             RelationshipStatus::BlockedOther => Err(create_error!(BlockedByOther)),
             RelationshipStatus::Incoming => {
-                // Accept incoming friend request
-                _ = amqp.friend_request_accepted(self, target).await;
+                if let Some(amqp) = amqp {
+                    // Accept incoming friend request
+                    _ = amqp.friend_request_accepted(self, target).await;
+                };
 
                 self.apply_relationship(
                     db,
@@ -551,7 +564,9 @@ impl User {
                     }));
                 }
 
-                _ = amqp.friend_request_received(target, self).await;
+                if let Some(amqp) = amqp {
+                    _ = amqp.friend_request_received(target, self).await;
+                };
 
                 // Send the friend request
                 self.apply_relationship(

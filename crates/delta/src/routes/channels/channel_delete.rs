@@ -50,7 +50,7 @@ pub async fn delete(
             channel
                 .remove_user_from_group(
                     db,
-                    amqp,
+                    Some(amqp),
                     &user,
                     None,
                     options.leave_silently.unwrap_or_default(),
@@ -65,7 +65,7 @@ pub async fn delete(
         }
         Channel::TextChannel { .. } => {
             permissions.throw_if_lacking_channel_permission(ChannelPermission::ManageChannel)?;
-            channel.delete(db).await?;
+            channel.delete(db, Some(amqp)).await?;
 
             delete_voice_channel(voice_client, &UserVoiceChannel::from_channel(&channel)).await?;
         }

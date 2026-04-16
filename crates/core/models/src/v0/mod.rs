@@ -14,6 +14,7 @@ mod server_members;
 mod servers;
 mod user_settings;
 mod users;
+mod search;
 
 pub use bots::*;
 pub use channel_invites::*;
@@ -31,3 +32,4 @@ pub use server_members::*;
 pub use servers::*;
 pub use user_settings::*;
 pub use users::*;
+pub use search::*;

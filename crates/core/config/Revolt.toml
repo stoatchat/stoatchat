@@ -4,7 +4,7 @@ disable_events_dont_use = false
 [database]
 # MongoDB connection URL
 # Defaults to the container name specified in self-hosted
-mongodb = "mongodb://database"
+mongodb = "mongodb://database?directConnection=true&replicaSet=rs0"
 # Redis connection URL
 # Defaults to the container name specified in self-hosted
 redis = "redis://redis/"
@@ -323,3 +323,14 @@ proxy = ""
 pushd = ""
 crond = ""
 gifbox = ""
+
+[elasticsearch]
+host = "http://elasticsearch"
+port = 9200
+api_key = ""
+
+exchange = "revolt.messages"
+message_queue = "messages.message"
+message_edit_queue = "messages.message_edit"
+message_delete_queue = "messages.message_delete"
+channel_delete_queue = "messages.channel_delete"
