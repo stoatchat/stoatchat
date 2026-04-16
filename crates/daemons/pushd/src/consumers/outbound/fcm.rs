@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use fcm_v1::{
     android::{AndroidConfig, AndroidMessagePriority},
     auth::{Authenticator, ServiceAccountKey},
-    message::{Message, Notification},
+    message::Message,
     Client, Error as FcmError,
 };
 use revolt_config::config;
@@ -138,13 +138,17 @@ impl FcmOutboundConsumer {
                 resp = self.client.send(&msg).await;
             }
             PayloadKind::Generic(alert) => {
+                let mut data = HashMap::new();
+                data.insert("title".to_string(), Value::String(alert.title));
+                data.insert("body".to_string(), Value::String(alert.body));
+
+                if let Some(image) = alert.icon {
+                    data.insert("image".to_string(), Value::String(image));
+                };
+
                 let msg = Message {
                     token: Some(payload.token),
-                    notification: Some(Notification {
-                        title: Some(alert.title),
-                        body: Some(alert.body),
-                        image: alert.icon,
-                    }),
+                    data: Some(data),
                     ..Default::default()
                 };
 
@@ -152,15 +156,17 @@ impl FcmOutboundConsumer {
             }
 
             PayloadKind::MessageNotification(alert) => {
-                let title = self.format_title(&alert);
+                let mut data = HashMap::new();
+                data.insert(
+                    "title".to_string(),
+                    Value::String(self.format_title(&alert)),
+                );
+                data.insert("body".to_string(), Value::String(alert.body));
+                data.insert("image".to_string(), Value::String(alert.icon));
 
                 let msg = Message {
                     token: Some(payload.token),
-                    notification: Some(Notification {
-                        title: Some(title),
-                        body: Some(alert.body),
-                        image: Some(alert.icon),
-                    }),
+                    data: Some(data),
                     android: Some(AndroidConfig {
                         collapse_key: Some(alert.tag),
                         ..Default::default()
@@ -186,7 +192,6 @@ impl FcmOutboundConsumer {
 
                 let msg = Message {
                     token: Some(payload.token),
-                    notification: None,
                     data: Some(data),
                     android: Some(AndroidConfig {
                         priority: Some(AndroidMessagePriority::High),
