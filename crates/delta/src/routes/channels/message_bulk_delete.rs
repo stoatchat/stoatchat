@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use chrono::Utc;
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     Database, Message, User,

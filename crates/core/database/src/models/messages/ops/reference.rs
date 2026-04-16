@@ -249,7 +249,7 @@ impl AbstractMessages for ReferenceDb {
         let mut messages = self.messages.lock().await;
         if let Some(message) = messages.get_mut(id) {
             if let Some(users) = message.reactions.get_mut(emoji) {
-                users.remove(&user.to_string());
+                users.swap_remove(&user.to_string());
             }
 
             Ok(())
@@ -262,7 +262,7 @@ impl AbstractMessages for ReferenceDb {
     async fn clear_reaction(&self, id: &str, emoji: &str) -> Result<()> {
         let mut messages = self.messages.lock().await;
         if let Some(message) = messages.get_mut(id) {
-            message.reactions.remove(emoji);
+            message.reactions.swap_remove(emoji);
             Ok(())
         } else {
             Err(create_error!(NotFound))
