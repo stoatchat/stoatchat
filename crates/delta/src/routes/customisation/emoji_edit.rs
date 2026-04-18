@@ -28,22 +28,16 @@ pub async fn edit_emoji(
 
     let mut emoji = emoji_id.as_emoji(db).await?;
 
-    if matches!(emoji.parent, EmojiParent::Detached) {
-        return Err(create_error!(NotAuthenticated));
-    }
+    match &emoji.parent {
+        EmojiParent::Server { id } => {
+            let server = db.fetch_server(id.as_str()).await?;
 
-    if emoji.creator_id != user.id {
-        match &emoji.parent {
-            EmojiParent::Server { id } => {
-                let server = db.fetch_server(id.as_str()).await?;
-
-                let mut query = DatabasePermissionQuery::new(db, &user).server(&server);
-                calculate_server_permissions(&mut query)
-                    .await
-                    .throw_if_lacking_channel_permission(ChannelPermission::ManageCustomisation)?;
-            }
-            EmojiParent::Detached => return Err(create_error!(NotAuthenticated)),
+            let mut query = DatabasePermissionQuery::new(db, &user).server(&server);
+            calculate_server_permissions(&mut query)
+                .await
+                .throw_if_lacking_channel_permission(ChannelPermission::ManageCustomisation)?;
         }
+        EmojiParent::Detached => return Err(create_error!(NotAuthenticated)),
     }
 
     if data.name.is_none() {
@@ -59,7 +53,7 @@ pub async fn edit_emoji(
 #[cfg(test)]
 mod test {
     use crate::util::test::TestHarness;
-    use revolt_database::{Emoji, EmojiParent};
+    use revolt_database::{Emoji, EmojiParent, Member};
     use revolt_models::v0;
     use rocket::http::{ContentType, Header, Status};
     use ulid::Ulid;
@@ -170,5 +164,49 @@ mod test {
             .await;
 
         assert_eq!(response.status(), Status::Unauthorized);
+    }
+
+    #[rocket::async_test]
+    async fn reject_edit_for_creator_without_manage_customisation() {
+        let harness = TestHarness::new().await;
+        let (_, _, owner) = harness.new_user().await;
+        let (_, creator_session, creator) = harness.new_user().await;
+        let (server, _) = harness.new_server(&owner).await;
+
+        Member::create(&harness.db, &server, &creator, None)
+            .await
+            .expect("`Member` created");
+
+        let emoji_id = Ulid::new().to_string();
+        let emoji = Emoji {
+            id: emoji_id.clone(),
+            parent: EmojiParent::Server {
+                id: server.id.clone(),
+            },
+            creator_id: creator.id.clone(),
+            name: "member_uploaded_name".to_string(),
+            animated: false,
+            nsfw: false,
+        };
+        emoji.create(&harness.db).await.expect("`Emoji` created");
+
+        let response = harness
+            .client
+            .patch(format!("/custom/emoji/{emoji_id}"))
+            .header(Header::new(
+                "x-session-token",
+                creator_session.token.to_string(),
+            ))
+            .header(ContentType::JSON)
+            .body(
+                json!(v0::DataEditEmoji {
+                    name: Some("renamed_without_permission".to_string()),
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Forbidden);
     }
 }
