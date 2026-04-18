@@ -28,6 +28,10 @@ pub async fn edit_emoji(
 
     let mut emoji = emoji_id.as_emoji(db).await?;
 
+    if matches!(emoji.parent, EmojiParent::Detached) {
+        return Err(create_error!(NotAuthenticated));
+    }
+
     if emoji.creator_id != user.id {
         match &emoji.parent {
             EmojiParent::Server { id } => {
@@ -38,7 +42,7 @@ pub async fn edit_emoji(
                     .await
                     .throw_if_lacking_channel_permission(ChannelPermission::ManageCustomisation)?;
             }
-            EmojiParent::Detached => return Ok(Json(emoji.into())),
+            EmojiParent::Detached => return Err(create_error!(NotAuthenticated)),
         }
     }
 
@@ -133,5 +137,38 @@ mod test {
             .await;
 
         assert_eq!(response.status(), Status::BadRequest);
+    }
+
+    #[rocket::async_test]
+    async fn reject_edit_for_detached_emoji() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+
+        let emoji_id = Ulid::new().to_string();
+        let emoji = Emoji {
+            id: emoji_id.clone(),
+            parent: EmojiParent::Detached,
+            creator_id: user.id.clone(),
+            name: "detached_name".to_string(),
+            animated: false,
+            nsfw: false,
+        };
+        emoji.create(&harness.db).await.expect("`Emoji` created");
+
+        let response = harness
+            .client
+            .patch(format!("/custom/emoji/{emoji_id}"))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .header(ContentType::JSON)
+            .body(
+                json!(v0::DataEditEmoji {
+                    name: Some("should_not_apply".to_string()),
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Unauthorized);
     }
 }
