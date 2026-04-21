@@ -14,13 +14,12 @@ anyhow = ["dep:sentry-anyhow"]
 report-macros = ["revolt-result"]
 sentry = ["dep:sentry"]
 test = ["async-std"]
-default = ["test", "sentry"]
+default = ["sentry"]
 
 [dependencies]
 # Utility
 config = { workspace = true }
 cached = { workspace = true }
-once_cell = { workspace = true }
 
 # Serde
 serde = { workspace = true }

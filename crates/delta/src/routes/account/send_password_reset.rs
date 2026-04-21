@@ -52,7 +52,7 @@ mod tests {
     use revolt_models::v0;
     use rocket::http::{ContentType, Status};
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn success() {
         let harness = TestHarness::new().await;
 

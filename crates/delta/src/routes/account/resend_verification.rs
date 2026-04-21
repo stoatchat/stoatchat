@@ -62,7 +62,7 @@ mod tests {
     use rocket::http::{ContentType, Status};
     use revolt_result::{Error, ErrorType};
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn success() {
         let harness = TestHarness::new().await;
 
@@ -105,7 +105,7 @@ mod tests {
         assert_eq!(res.status(), Status::Ok);
     }
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn success_unknown() {
         let harness = TestHarness::new().await;
 
@@ -124,7 +124,7 @@ mod tests {
         assert_eq!(res.status(), Status::NoContent);
     }
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn fail_bad_email() {
         let harness = TestHarness::new().await;
 

@@ -26,7 +26,7 @@ mod tests {
     use revolt_database::MFATicket;
     use rocket::http::{ContentType, Header, Status};
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn success() {
         let harness = TestHarness::new().await;
         let (mut account, session, _) = harness.new_user().await;

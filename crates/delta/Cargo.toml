@@ -86,5 +86,8 @@ revolt-ratelimits = { workspace = true, features = ["rocket"] }
 livekit-api = { workspace = true }
 livekit-protocol = { workspace = true }
 
+[dev-dependencies]
+revolt-config = { workspace = true, features = ["test"] }
+
 [build-dependencies]
 vergen = { workspace = true }

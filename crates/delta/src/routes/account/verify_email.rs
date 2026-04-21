@@ -48,7 +48,7 @@ mod tests {
     use revolt_models::v0;
     use revolt_result::{Error, ErrorType};
     
-    #[async_std::test]
+    #[rocket::async_test]
     async fn success() {
         let harness = TestHarness::new().await;
         let (mut account, _, _) = harness.new_user().await;
@@ -89,7 +89,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn fail_invalid_token() {
         let harness = TestHarness::new().await;
 

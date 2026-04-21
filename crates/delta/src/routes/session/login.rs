@@ -167,7 +167,7 @@ mod tests {
     use revolt_models::v0;
     use revolt_result::{Error, ErrorType};
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn success() {
         let mut harness = TestHarness::new().await;
 
@@ -204,7 +204,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn success_totp_mfa() {
         let harness = TestHarness::new().await;
         let (mut account, _, _) = harness.new_user().await;
@@ -264,7 +264,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn success_totp_stored_mfa() {
         let harness = TestHarness::new().await;
         let (mut account, _, _) = harness.new_user().await;
@@ -299,7 +299,7 @@ mod tests {
         assert!(serde_json::from_str::<v0::Session>(&res.into_string().await.unwrap()).is_ok());
     }
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn fail_totp_invalid_mfa() {
         let harness = TestHarness::new().await;
         let (mut account, _, _) = harness.new_user().await;
@@ -358,7 +358,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn fail_invalid_user() {
         let harness = TestHarness::new().await;
 
@@ -380,7 +380,7 @@ mod tests {
         ));
     }
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn fail_disabled_account() {
         let harness = TestHarness::new().await;
 
@@ -421,7 +421,7 @@ mod tests {
         ));
     }
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn fail_unverified_account() {
         let harness = TestHarness::new().await;
 
@@ -461,7 +461,7 @@ mod tests {
         ));
     }
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn fail_locked_account() {
         let harness = TestHarness::new().await;
 

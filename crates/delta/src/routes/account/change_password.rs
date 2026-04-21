@@ -38,7 +38,7 @@ mod tests {
     use crate::{rocket, util::test::TestHarness};
     use rocket::http::{ContentType, Header, Status};
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn success() {
         let harness = TestHarness::new().await;
         let (_, session, _) = harness.new_user().await;

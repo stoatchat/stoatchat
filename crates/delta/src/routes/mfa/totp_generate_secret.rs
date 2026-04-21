@@ -34,7 +34,7 @@ mod tests {
     use rocket::http::{Header, Status};
     use revolt_models::v0;
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn success() {
         let harness = TestHarness::new().await;
         let (account, session, _) = harness.new_user().await;

@@ -27,7 +27,7 @@ mod tests {
     use rocket::http::{Header, Status};
     use revolt_models::v0;
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn success() {
         let harness = TestHarness::new().await;
         let (_, session, _) = harness.new_user().await;
@@ -45,7 +45,7 @@ mod tests {
         );
     }
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn success_has_recovery_and_totp() {
         let harness = TestHarness::new().await;
         let (mut account, session, _) = harness.new_user().await;

@@ -48,7 +48,7 @@ mod tests {
     use revolt_models::v0;
     use revolt_result::{Error, ErrorType};
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn success() {
         let harness = TestHarness::new().await;
         let (_, session, _) = harness.new_user().await;
@@ -69,7 +69,7 @@ mod tests {
         assert!(res.into_json::<v0::MFATicket>().await.unwrap().validated);
     }
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn success_totp() {
         let harness = TestHarness::new().await;
         let (mut account, session, _) = harness.new_user().await;
@@ -97,7 +97,7 @@ mod tests {
         assert!(res.into_json::<v0::MFATicket>().await.is_some());
     }
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn failure_totp() {
         let harness = TestHarness::new().await;
         let (mut account, session, _) = harness.new_user().await;
@@ -126,7 +126,7 @@ mod tests {
         ));
     }
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn failure_no_totp() {
         let harness = TestHarness::new().await;
         let (mut account, session, _) = harness.new_user().await;

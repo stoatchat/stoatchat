@@ -33,7 +33,7 @@ mod tests {
     use crate::{rocket, util::test::TestHarness};
     use rocket::http::{Header, Status};
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn success() {
         let harness = TestHarness::new().await;
         let (account, session, _) = harness.new_user().await;
@@ -59,7 +59,7 @@ mod tests {
             .is_empty());
     }
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn success_not_including_self() {
         let harness = TestHarness::new().await;
         let (account, session, _) = harness.new_user().await;

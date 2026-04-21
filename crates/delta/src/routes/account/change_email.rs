@@ -35,36 +35,39 @@ pub async fn change_email(
 #[cfg(test)]
 mod tests {
     use crate::{rocket, util::test::TestHarness};
+    use revolt_config::overwrite_config;
     use revolt_models::v0;
     use rocket::http::{ContentType, Header, Status};
 
-    // #[async_std::test]
-    // async fn success() {
-    //     let harness = TestHarness::new().await;
-    //     let (account, session, _) = harness.new_user().await;
+    #[rocket::async_test]
+    async fn success() {
+        overwrite_config(|config| config.api.smtp.host = "".to_string()).await;
 
-    //     let res = harness.client
-    //         .patch("/auth/account/change/email")
-    //         .header(ContentType::JSON)
-    //         .header(Header::new("X-Session-Token", session.token.clone()))
-    //         .body(
-    //             json!({
-    //                 "email": "validexample@valid.com",
-    //                 "current_password": "password_insecure"
-    //             })
-    //             .to_string(),
-    //         )
-    //         .dispatch()
-    //         .await;
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
 
-    //     assert_eq!(res.status(), Status::NoContent);
+        let res = harness.client
+            .patch("/auth/account/change/email")
+            .header(ContentType::JSON)
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .body(
+                json!({
+                    "email": "validexample@valid.com",
+                    "current_password": "password_insecure"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
 
-    //     let account = harness.db.fetch_account(&account.id).await.unwrap();
+        assert_eq!(res.status(), Status::NoContent);
 
-    //     assert_eq!(account.email, "validexample@valid.com");
-    // }
+        let account = harness.db.fetch_account(&account.id).await.unwrap();
 
-    #[async_std::test]
+        assert_eq!(account.email, "validexample@valid.com");
+    }
+
+    #[rocket::async_test]
     async fn success_smtp() {
         let harness = TestHarness::new().await;
         let (account, session, _) = harness.new_user().await;

@@ -53,68 +53,68 @@ mod tests {
     use crate::{rocket, util::test::TestHarness};
     use rocket::http::{ContentType, Status};
 
-    // #[async_std::test]
-    // async fn success() {
-    //     let harness = TestHarness::new().await;
-    //     let (mut account, session, _) = harness.new_user().await;
+    #[rocket::async_test]
+    async fn success() {
+        let harness = TestHarness::new().await;
+        let (mut account, session, _) = harness.new_user().await;
 
-    //     account.password_reset = Some(PasswordReset {
-    //         token: "token".into(),
-    //         expiry: Timestamp::now_utc() + Duration::seconds(100),
-    //     });
+        account.password_reset = Some(PasswordReset {
+            token: "token".into(),
+            expiry: Timestamp::now_utc() + Duration::seconds(100),
+        });
 
-    //     account.save(&harness.db).await.unwrap();
+        account.save(&harness.db).await.unwrap();
 
-    //     let res = harness.client
-    //         .patch("/auth/account/reset_password")
-    //         .header(ContentType::JSON)
-    //         .body(
-    //             json!({
-    //                 "token": "token",
-    //                 "password": "valid-password",
-    //                 "remove_sessions": true
-    //             })
-    //             .to_string(),
-    //         )
-    //         .dispatch()
-    //         .await;
+        let res = harness.client
+            .patch("/auth/account/reset_password")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "token": "token",
+                    "password": "valid-password",
+                    "remove_sessions": true
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
 
-    //     assert_eq!(res.status(), Status::NoContent);
+        assert_eq!(res.status(), Status::NoContent);
 
-    //     // Make sure it was used and can't be used again
-    //     assert!(harness.db
-    //         .fetch_account_with_password_reset("token")
-    //         .await
-    //         .is_err());
+        // Make sure it was used and can't be used again
+        assert!(harness.db
+            .fetch_account_with_password_reset("token")
+            .await
+            .is_err());
 
-    //     let res = harness.client
-    //         .post("/auth/session/login")
-    //         .header(ContentType::JSON)
-    //         .body(
-    //             json!({
-    //                 "email": account.email.clone(),
-    //                 "password": "valid-password"
-    //             })
-    //             .to_string(),
-    //         )
-    //         .dispatch()
-    //         .await;
+        let res = harness.client
+            .post("/auth/session/login")
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "email": account.email.clone(),
+                    "password": "valid-password"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
 
-    //     assert_eq!(res.status(), Status::Ok);
-    //     assert!(res.into_json::<v0::Session>().await.is_some());
+        assert_eq!(res.status(), Status::Ok);
+        assert!(res.into_json::<v0::Session>().await.is_some());
 
-    //     // Ensure sessions were deleted
-    //     assert!(matches!(
-    //         harness
-    //             .db
-    //             .fetch_session(&session.id)
-    //             .await
-    //             .unwrap_err().error_type,
-    //         ErrorType::UnknownUser
-    //     ));
-    // }
+        // Ensure sessions were deleted
+        assert!(matches!(
+            harness
+                .db
+                .fetch_session(&session.id)
+                .await
+                .unwrap_err().error_type,
+            ErrorType::UnknownUser
+        ));
+    }
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn fail_invalid_token() {
         let harness = TestHarness::new().await;
 

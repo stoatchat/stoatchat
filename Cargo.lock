@@ -6912,7 +6912,6 @@ dependencies = [
  "config",
  "futures-locks",
  "log",
- "once_cell",
  "pretty_env_logger",
  "revolt-result",
  "sentry",

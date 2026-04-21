@@ -3,6 +3,7 @@ use std::time::Duration;
 use futures::StreamExt;
 use rand::Rng;
 use redis_kiss::redis::aio::PubSub;
+use revolt_database::util::email::normalise_email;
 use revolt_database::util::password::hash_password;
 use revolt_database::{
     events::client::EventV1, Channel, Database, Member, Message, PartialRole, Server, User, AMQP,
@@ -92,7 +93,7 @@ impl TestHarness {
             id,
             email: email.clone(),
             password: hash_password("password_insecure".to_string()).unwrap(),
-            email_normalised: email,
+            email_normalised: normalise_email(email),
             deletion: None,
             disabled: false,
             lockout: None,

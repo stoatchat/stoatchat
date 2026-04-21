@@ -40,7 +40,7 @@ mod tests {
     use rocket::http::{ContentType, Status};
     use revolt_models::v0;
 
-    #[async_std::test]
+    #[rocket::async_test]
     async fn success() {
         use rocket::http::Header;
 
