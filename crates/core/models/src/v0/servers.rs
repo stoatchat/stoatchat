@@ -106,6 +106,9 @@ auto_derived_partial!(
         /// Ranking of this role
         #[cfg_attr(feature = "serde", serde(default))]
         pub rank: i64,
+        /// Role icon
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+        pub icon: Option<File>,
     },
     "PartialRole"
 );
@@ -123,6 +126,7 @@ auto_derived!(
     /// Optional fields on server object
     pub enum FieldsRole {
         Colour,
+        Icon,
     }
 
     /// Channel category
@@ -278,6 +282,11 @@ auto_derived!(
         ///
         /// **Removed** - no effect, use the edit server role positions route
         pub rank: Option<i64>,
+        /// Role icon
+        ///
+        /// Provide an Autumn attachment Id.
+        #[cfg_attr(feature = "validator", validate(length(min = 1, max = 128)))]
+        pub icon: Option<String>,
         /// Fields to remove from role object
         #[cfg_attr(feature = "serde", serde(default))]
         pub remove: Vec<FieldsRole>,

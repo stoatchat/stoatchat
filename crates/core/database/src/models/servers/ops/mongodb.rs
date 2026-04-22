@@ -172,6 +172,7 @@ impl IntoDocumentPath for FieldsRole {
     fn as_path(&self) -> Option<&'static str> {
         Some(match self {
             FieldsRole::Colour => "colour",
+            FieldsRole::Icon => "icon",
         })
     }
 }

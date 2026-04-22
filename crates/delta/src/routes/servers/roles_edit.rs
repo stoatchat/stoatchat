@@ -1,7 +1,7 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     voice::{sync_voice_permissions, VoiceClient},
-    Database, PartialRole, User
+    Database, File, PartialRole, User,
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
@@ -47,14 +47,27 @@ pub async fn edit(
             name,
             colour,
             hoist,
+            icon,
             remove,
             ..
         } = data;
+
+        if remove.contains(&v0::FieldsRole::Icon) {
+            if let Some(existing_icon) = &role.icon {
+                db.mark_attachment_as_deleted(&existing_icon.id).await?;
+            }
+        }
+
+        let mut final_icon = None;
+        if let Some(icon_id) = icon {
+            final_icon = Some(File::use_role_icon(db, &icon_id, &role_id, &user.id).await?);
+        }
 
         let partial = PartialRole {
             name,
             colour,
             hoist,
+            icon: final_icon,
             ..Default::default()
         };
 
@@ -69,8 +82,9 @@ pub async fn edit(
         for channel_id in &server.channels {
             let channel = Reference::from_unchecked(channel_id).as_channel(db).await?;
 
-            sync_voice_permissions(db, voice_client, &channel, Some(&server), Some(&role_id)).await?;
-        };
+            sync_voice_permissions(db, voice_client, &channel, Some(&server), Some(&role_id))
+                .await?;
+        }
 
         Ok(Json(role.into()))
     } else {
