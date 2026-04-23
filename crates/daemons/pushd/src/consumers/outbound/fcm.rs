@@ -5,15 +5,110 @@ use amqprs::{channel::Channel as AmqpChannel, consumer::AsyncConsumer, BasicProp
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
 use fcm_v1::{
-    android::{AndroidConfig, AndroidMessagePriority},
     auth::{Authenticator, ServiceAccountKey},
-    message::{Message, Notification},
+    message::Message,
     Client, Error as FcmError,
 };
 use revolt_config::config;
 use revolt_database::{events::rabbit::*, Database};
 use revolt_models::v0::{Channel, PushNotification};
 use serde_json::Value;
+
+/// Custom notification data
+#[derive(Debug, Clone, PartialEq)]
+pub enum NotificationData {
+    FRReceived {
+        id: String,
+        username: String,
+    },
+    FRAccepted {
+        id: String,
+        username: String,
+    },
+    Generic {
+        title: String,
+        body: String,
+        image: Option<String>,
+    },
+    Message {
+        title: String,
+        body: String,
+        image: String,
+        tag: String,
+    },
+    DmCallStartEnd {
+        initiator_id: String,
+        channel_id: String,
+        started_at: String,
+        ended: bool,
+        duration: usize,
+    },
+}
+
+impl NotificationData {
+    pub fn get_type(&self) -> &str {
+        match self {
+            NotificationData::FRReceived { .. } => "push.fr.receive",
+            NotificationData::FRAccepted { .. } => "push.fr.accept",
+            NotificationData::Generic { .. } => "push.generic",
+            NotificationData::Message { .. } => "push.message",
+            NotificationData::DmCallStartEnd { .. } => "push.dm.call",
+        }
+    }
+
+    pub fn into_payload(self) -> HashMap<String, Value> {
+        let mut data = HashMap::new();
+        data.insert(
+            "type".to_string(),
+            Value::String(self.get_type().to_string()),
+        );
+
+        match self {
+            NotificationData::FRReceived { id, username } => {
+                data.insert("id".to_string(), Value::String(id));
+                data.insert("username".to_string(), Value::String(username));
+            }
+            NotificationData::FRAccepted { id, username } => {
+                data.insert("id".to_string(), Value::String(id));
+                data.insert("username".to_string(), Value::String(username));
+            }
+            NotificationData::Generic { title, body, image } => {
+                data.insert("title".to_string(), Value::String(title));
+                data.insert("body".to_string(), Value::String(body));
+
+                if let Some(image) = image {
+                    data.insert("image".to_string(), Value::String(image));
+                }
+            }
+            NotificationData::Message {
+                title,
+                body,
+                image,
+                tag,
+            } => {
+                data.insert("title".to_string(), Value::String(title));
+                data.insert("body".to_string(), Value::String(body));
+                data.insert("image".to_string(), Value::String(image));
+                data.insert("tag".to_string(), Value::String(tag));
+            }
+            NotificationData::DmCallStartEnd {
+                initiator_id,
+                channel_id,
+                started_at,
+                ended,
+                duration,
+            } => {
+                data.insert("initiator_id".to_string(), Value::String(initiator_id));
+                data.insert("channel_id".to_string(), Value::String(channel_id));
+                data.insert("started_at".to_string(), Value::String(started_at));
+                data.insert("ended".to_string(), Value::Bool(ended));
+                data.insert("duration".to_string(), Value::Number(duration.into()));
+            }
+        }
+
+        data
+    }
+}
 
 pub struct FcmOutboundConsumer {
     db: Database,
@@ -93,17 +188,14 @@ impl FcmOutboundConsumer {
                     .clone()
                     .ok_or_else(|| anyhow!("missing name"))?;
 
-                let mut data = HashMap::new();
-                data.insert(
-                    "type".to_string(),
-                    Value::String("push.fr.receive".to_string()),
-                );
-                data.insert("id".to_string(), Value::String(alert.from_user.id));
-                data.insert("username".to_string(), Value::String(name));
+                let data = NotificationData::FRReceived {
+                    id: alert.from_user.id,
+                    username: name,
+                };
 
                 let msg = Message {
                     token: Some(payload.token),
-                    data: Some(data),
+                    data: Some(data.into_payload()),
                     ..Default::default()
                 };
 
@@ -121,30 +213,29 @@ impl FcmOutboundConsumer {
                     .clone()
                     .ok_or_else(|| anyhow!("missing name"))?;
 
-                let mut data: HashMap<String, Value> = HashMap::new();
-                data.insert(
-                    "type".to_string(),
-                    Value::String("push.fr.accept".to_string()),
-                );
-                data.insert("id".to_string(), Value::String(alert.accepted_user.id));
-                data.insert("username".to_string(), Value::String(name));
+                let data = NotificationData::FRAccepted {
+                    id: alert.accepted_user.id,
+                    username: name,
+                };
 
                 let msg = Message {
                     token: Some(payload.token),
-                    data: Some(data),
+                    data: Some(data.into_payload()),
                     ..Default::default()
                 };
 
                 resp = self.client.send(&msg).await;
             }
             PayloadKind::Generic(alert) => {
+                let data = NotificationData::Generic {
+                    title: alert.title,
+                    body: alert.body,
+                    image: alert.icon,
+                };
+
                 let msg = Message {
                     token: Some(payload.token),
-                    notification: Some(Notification {
-                        title: Some(alert.title),
-                        body: Some(alert.body),
-                        image: alert.icon,
-                    }),
+                    data: Some(data.into_payload()),
                     ..Default::default()
                 };
 
@@ -152,19 +243,16 @@ impl FcmOutboundConsumer {
             }
 
             PayloadKind::MessageNotification(alert) => {
-                let title = self.format_title(&alert);
+                let data = NotificationData::Message {
+                    title: self.format_title(&alert),
+                    body: alert.body,
+                    image: alert.icon,
+                    tag: alert.tag,
+                };
 
                 let msg = Message {
                     token: Some(payload.token),
-                    notification: Some(Notification {
-                        title: Some(title),
-                        body: Some(alert.body),
-                        image: Some(alert.icon),
-                    }),
-                    android: Some(AndroidConfig {
-                        collapse_key: Some(alert.tag),
-                        ..Default::default()
-                    }),
+                    data: Some(data.into_payload()),
                     ..Default::default()
                 };
 
@@ -172,30 +260,17 @@ impl FcmOutboundConsumer {
             }
 
             PayloadKind::DmCallStartEnd(alert) => {
-                let mut data: HashMap<String, Value> = HashMap::new();
-                data.insert(
-                    "initiator_id".to_string(),
-                    Value::String(alert.initiator_id),
-                );
-                data.insert("channel_id".to_string(), Value::String(alert.channel_id));
-                data.insert(
-                    "started_at".to_string(),
-                    Value::String(alert.started_at.unwrap_or_else(|| "".to_string())),
-                );
-                data.insert("ended".to_string(), Value::Bool(alert.ended));
+                let data = NotificationData::DmCallStartEnd {
+                    initiator_id: alert.initiator_id,
+                    channel_id: alert.channel_id,
+                    started_at: alert.started_at.unwrap_or_else(|| "".to_string()),
+                    ended: alert.ended,
+                    duration: config().await.api.livekit.call_ring_duration,
+                };
 
                 let msg = Message {
                     token: Some(payload.token),
-                    notification: None,
-                    data: Some(data),
-                    android: Some(AndroidConfig {
-                        priority: Some(AndroidMessagePriority::High),
-                        ttl: Some(format!(
-                            "{}s",
-                            config().await.api.livekit.call_ring_duration
-                        )),
-                        ..Default::default()
-                    }),
+                    data: Some(data.into_payload()),
                     ..Default::default()
                 };
 
