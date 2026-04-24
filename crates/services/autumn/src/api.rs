@@ -393,19 +393,12 @@ async fn fetch_preview(
         } => *value,
         Metadata::Image { animated: None, .. } => {
             let file_data = retrieve_file_by_hash(&hash).await?;
+            let mut named_file = NamedTempFile::new().to_internal_error()?;
+            named_file.write_all(&file_data).to_internal_error()?;
             data = Some(file_data);
 
-            // Best-effort animation detection — don't fail the request
-            let animated = NamedTempFile::new()
-                .ok()
-                .and_then(|mut f| {
-                    f.write(data.as_ref().unwrap()).ok()?;
-                    is_animated(&f, &hash.content_type)
-                })
-                .unwrap_or(false);
-
-            // Best-effort DB update
-            let _ = db.set_attachment_hash_animated(&hash.id, animated).await;
+            let animated = is_animated(&named_file, &hash.content_type).unwrap_or(false);
+            db.set_attachment_hash_animated(&hash.id, animated).await?;
 
             animated
         }
