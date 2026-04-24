@@ -2113,9 +2113,13 @@ dependencies = [
 
 [[package]]
 name = "decancer"
-version = "1.6.5"
+version = "3.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "080b09f6adad25c23d8c47c54e52e59b0dc09d079c4b23e0f147dac440359d0d"
+checksum = "a9244323129647178bf41ac861a2cdb9d9c81b9b09d3d0d1de9cd302b33b8a1d"
+dependencies = [
+ "lazy_static",
+ "regex",
+]
 
 [[package]]
 name = "der"

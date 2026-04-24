@@ -7,6 +7,7 @@ use futures::future::join_all;
 use iso8601_timestamp::Timestamp;
 use once_cell::sync::Lazy;
 use rand::seq::SliceRandom;
+use regex::{Regex, RegexBuilder};
 use revolt_config::{config, FeaturesLimits};
 use revolt_models::v0::{self, UserBadges, UserFlags};
 use revolt_presence::filter_online;
@@ -163,6 +164,13 @@ pub static DISCRIMINATOR_SEARCH_SPACE: Lazy<HashSet<String>> = Lazy::new(|| {
     set.into_iter().collect()
 });
 
+static BLOCKED_USERNAME_PATTERNS: Lazy<Regex> = Lazy::new(|| {
+    RegexBuilder::new("`{3}|(discord|rvlt|guilded|stt)\\.gg|(revolt|stoat)\\.chat|https?:\\/\\/")
+        .case_insensitive(true)
+        .build()
+        .unwrap()
+});
+
 #[allow(clippy::derivable_impls)]
 impl Default for User {
     fn default() -> Self {
@@ -198,11 +206,13 @@ impl User {
         I: Into<Option<String>>,
         D: Into<Option<PartialUser>>,
     {
-        let username = User::validate_username(username)?;
+        let new_username = User::sanitise_username(&username).await?;
+        User::validate_username(&new_username)?;
+
         let mut user = User {
             id: account_id.into().unwrap_or_else(|| Ulid::new().to_string()),
-            discriminator: User::find_discriminator(db, &username, None).await?,
-            username,
+            discriminator: User::find_discriminator(db, &new_username, None).await?,
+            username: new_username.clone(),
             last_acknowledged_policy_change: Timestamp::now_utc(),
             ..Default::default()
         };
@@ -278,39 +288,40 @@ impl User {
         }
     }
 
-    /// Sanitise and validate a username can be used
-    pub fn validate_username(username: String) -> Result<String> {
-        // Copy the username for validation
+    /// Validate a username
+    ///
+    /// This will check if the username is a blocked name or contains a blocked pattern.
+    fn validate_username(username: &str) -> Result<()> {
         let username_lowercase = username.to_lowercase();
 
-        // Block homoglyphs
-        if decancer::cure(&username_lowercase).into_str() != username_lowercase {
+        const BLOCKED_USERNAMES: &[&str] = &["admin", "revolt", "stoat"];
+
+        if BLOCKED_USERNAMES.contains(&username_lowercase.as_str())
+            || BLOCKED_USERNAME_PATTERNS.is_match(username)
+        {
             return Err(create_error!(InvalidUsername));
         }
 
-        // Ensure the username itself isn't blocked
-        const BLOCKED_USERNAMES: &[&str] = &["admin", "revolt"];
+        Ok(())
+    }
 
-        for username in BLOCKED_USERNAMES {
-            if username_lowercase == *username {
-                return Err(create_error!(InvalidUsername));
-            }
-        }
+    /// Sanitise a username
+    ///
+    /// This will clean up Unicode homoglyphs and pad to the min username length with underscores.
+    async fn sanitise_username(username: &str) -> Result<String> {
+        let options = decancer::Options::default().retain_capitalization();
+        let mut username = decancer::cure(username, options)
+            .map_err(|_| create_error!(InvalidUsername))?
+            .to_string();
 
-        // Ensure none of the following substrings show up in the username
-        const BLOCKED_SUBSTRINGS: &[&str] = &[
-            "```",
-            "discord.gg",
-            "rvlt.gg",
-            "guilded.gg",
-            "https://",
-            "http://",
-        ];
-
-        for substr in BLOCKED_SUBSTRINGS {
-            if username_lowercase.contains(substr) {
-                return Err(create_error!(InvalidUsername));
-            }
+        let config = revolt_config::config().await;
+        let username_length_diff = config
+            .api
+            .users
+            .min_username_length
+            .saturating_sub(username.len());
+        if username_length_diff > 0 {
+            username.push_str(&"_".repeat(username_length_diff))
         }
 
         Ok(username)
@@ -416,12 +427,14 @@ impl User {
 
     /// Update a user's username
     pub async fn update_username(&mut self, db: &Database, username: String) -> Result<()> {
-        let username = User::validate_username(username)?;
-        if self.username.to_lowercase() == username.to_lowercase() {
+        let new_username = User::sanitise_username(&username).await?;
+        User::validate_username(&new_username)?;
+
+        if self.username.to_lowercase() == new_username.to_lowercase() {
             self.update(
                 db,
                 PartialUser {
-                    username: Some(username),
+                    username: Some(new_username),
                     ..Default::default()
                 },
                 vec![],
@@ -434,12 +447,12 @@ impl User {
                     discriminator: Some(
                         User::find_discriminator(
                             db,
-                            &username,
+                            &new_username,
                             Some((self.discriminator.to_string(), self.id.clone())),
                         )
                         .await?,
                     ),
-                    username: Some(username),
+                    username: Some(new_username),
                     ..Default::default()
                 },
                 vec![],
@@ -823,5 +836,111 @@ impl User {
         };
 
         badges
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::User;
+
+    #[test]
+    fn username_validation_blocked_names() {
+        let username_admin = "Admin";
+        let username_revolt = "Revolt";
+        let username_stoat = "Stoat";
+        let username_allowed = "Allowed";
+
+        assert!(User::validate_username(username_admin).is_err());
+        assert!(User::validate_username(username_revolt).is_err());
+        assert!(User::validate_username(username_stoat).is_err());
+        assert!(User::validate_username(username_allowed).is_ok());
+    }
+
+    #[test]
+    fn username_validation_blocked_patterns() {
+        let username_grave = "```_test";
+        let username_discord = "discord.gg_test";
+        let username_rvlt = "rvlt.gg_test";
+        let username_guilded = "guilded.gg_test";
+        let username_stt = "stt.gg_test";
+        let username_revolt = "revolt.chat_test";
+        let username_stoat = "stoat.chat_test";
+        let username_http = "http://_test";
+        let username_https = "https://_test";
+
+        assert!(User::validate_username(username_grave).is_err());
+        assert!(User::validate_username(username_discord).is_err());
+        assert!(User::validate_username(username_rvlt).is_err());
+        assert!(User::validate_username(username_guilded).is_err());
+        assert!(User::validate_username(username_stt).is_err());
+        assert!(User::validate_username(username_revolt).is_err());
+        assert!(User::validate_username(username_stoat).is_err());
+        assert!(User::validate_username(username_http).is_err());
+        assert!(User::validate_username(username_https).is_err());
+    }
+
+    #[async_std::test]
+    async fn username_sanitisation_clean() {
+        let username_clean = "Test";
+
+        let username_clean_sanitised = User::sanitise_username(username_clean).await;
+
+        assert!(username_clean_sanitised.is_ok());
+        assert_eq!(username_clean, username_clean_sanitised.unwrap());
+    }
+
+    #[async_std::test]
+    async fn username_sanitisation_homoglyphs() {
+        let username_homoglyphs = "𝔽𝕌Ňℕｙ";
+
+        let username_homoglyphs_sanitised =
+            User::sanitise_username(username_homoglyphs).await.unwrap();
+
+        assert_ne!(username_homoglyphs, username_homoglyphs_sanitised);
+        assert_eq!("funny", username_homoglyphs_sanitised);
+    }
+
+    #[async_std::test]
+    async fn username_sanitisation_padding() {
+        let username_padding = "a";
+
+        let username = User::sanitise_username(username_padding).await.unwrap();
+
+        assert_eq!("a_", username);
+    }
+
+    #[async_std::test]
+    async fn create_user() {
+        use revolt_result::Result;
+
+        database_test!(|db| async move {
+            let mut created_clean = User::create(&db, "Test".to_string(), None, None)
+                .await
+                .unwrap();
+
+            assert_eq!("Test", created_clean.username);
+
+            created_clean
+                .update_username(&db, "Test2".to_string())
+                .await
+                .unwrap();
+
+            assert_eq!("Test2", created_clean.username);
+
+            let created_invalid_result: Result<_> =
+                User::create(&db, "stoat.chat".to_string(), None, None).await;
+
+            assert!(created_invalid_result.is_err());
+
+            let mut updated_invalid = User::create(&db, "Test".to_string(), None, None)
+                .await
+                .unwrap();
+
+            let updated_invalid_update_result = updated_invalid
+                .update_username(&db, "http://test".to_string())
+                .await;
+
+            assert!(updated_invalid_update_result.is_err());
+        });
     }
 }
