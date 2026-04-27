@@ -16,9 +16,9 @@ pub async fn admin_delete_channel(
     case: Option<&str>,
 ) -> Result<EmptyResponse> {
     let user = flatten_authorized_user(&auth);
-    if !user_has_permission(user, v0::AdminUserPermissionFlags::ManageAccounts) {
+    if !user_has_permission(user, v0::AdminUserPermissionFlags::ManageChannels) {
         return Err(create_error!(MissingPermission {
-            permission: "ManageAccounts".to_string()
+            permission: "ManageChannels".to_string()
         }));
     }
 
