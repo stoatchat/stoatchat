@@ -163,6 +163,7 @@ pub enum ErrorType {
     FailedValidation {
         error: String,
     },
+    HeaderTooLarge,
 
     // ? Voice errors
     LiveKitUnavailable,

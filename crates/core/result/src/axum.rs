@@ -87,6 +87,7 @@ impl IntoResponse for Error {
             ErrorType::UnknownNode => StatusCode::BAD_REQUEST,
             ErrorType::InvalidFlagValue => StatusCode::BAD_REQUEST,
             ErrorType::FeatureDisabled { .. } => StatusCode::BAD_REQUEST,
+            ErrorType::HeaderTooLarge => StatusCode::BAD_REQUEST,
 
             ErrorType::ProxyError => StatusCode::BAD_REQUEST,
             ErrorType::FileTooSmall => StatusCode::UNPROCESSABLE_ENTITY,

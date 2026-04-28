@@ -1,11 +1,13 @@
 use revolt_config::config;
-use revolt_database::{util::permissions::DatabasePermissionQuery, Database, Emoji, File, User};
+use revolt_database::{AuditLogEntryAction, Database, Emoji, File, User, util::permissions::DatabasePermissionQuery};
 use revolt_models::v0;
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use validator::Validate;
 
 use rocket::{serde::json::Json, State};
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Create New Emoji
 ///
@@ -15,6 +17,7 @@ use rocket::{serde::json::Json, State};
 pub async fn create_emoji(
     db: &State<Database>,
     user: User,
+    reason: AuditLogReason,
     emoji_id: String,
     data: Json<v0::DataCreateEmoji>,
 ) -> Result<Json<v0::Emoji>> {
@@ -55,8 +58,8 @@ pub async fn create_emoji(
     // Create the emoji object
     let emoji = Emoji {
         id: emoji_id,
-        parent: data.parent.into(),
-        creator_id: user.id,
+        parent: data.parent.clone().into(),
+        creator_id: user.id.clone(),
         name: data.name,
         animated: "image/gif" == &attachment.content_type,
         nsfw: data.nsfw,
@@ -64,5 +67,12 @@ pub async fn create_emoji(
 
     // Save emoji
     emoji.create(db).await?;
+
+    if let v0::EmojiParent::Server { id: server_id } = data.parent {
+        AuditLogEntryAction::EmojiCreate { emoji: emoji.id.clone(), name: emoji.name.clone() }
+            .insert(db, server_id, reason, user.id, None)
+            .await;
+    }
+
     Ok(Json(emoji.into()))
 }

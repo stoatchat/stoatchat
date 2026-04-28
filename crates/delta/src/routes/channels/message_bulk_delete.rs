@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, Message, User,
+    AuditLogEntryAction, Database, Message, User,
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
@@ -10,6 +10,8 @@ use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 use rocket_empty::EmptyResponse;
 use validator::Validate;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Bulk Delete Messages
 ///
@@ -23,6 +25,7 @@ use validator::Validate;
 pub async fn bulk_delete_messages(
     db: &State<Database>,
     user: User,
+    reason: AuditLogReason,
     target: Reference<'_>,
     options: Json<v0::OptionsBulkDelete>,
 ) -> Result<EmptyResponse> {
@@ -51,7 +54,16 @@ pub async fn bulk_delete_messages(
         .await
         .throw_if_lacking_channel_permission(ChannelPermission::ManageMessages)?;
 
-    Message::bulk_delete(db, target.id, options.ids)
-        .await
-        .map(|_| EmptyResponse)
+    Message::bulk_delete(db, target.id, options.ids.clone()).await?;
+
+    if let Some(server) = channel.server() {
+        AuditLogEntryAction::MessageBulkDelete {
+            channel: channel.id().to_string(),
+            count: options.ids.len(),
+        }
+        .insert(db, server.to_string(), reason, user.id, None)
+        .await;
+    };
+
+    Ok(EmptyResponse)
 }
