@@ -19,7 +19,7 @@ pub async fn webhook_delete_message(
 
     let message = message_id.as_message(db).await?;
 
-    if message.author == webhook.id {
+    if message.author != webhook.id {
         return Err(create_error!(CannotDeleteMessage));
     }
 
