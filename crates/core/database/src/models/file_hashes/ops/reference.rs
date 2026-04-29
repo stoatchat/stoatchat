@@ -1,7 +1,6 @@
 use revolt_result::Result;
 
-use crate::FileHash;
-use crate::ReferenceDb;
+use crate::{FileHash, Metadata, ReferenceDb};
 
 use super::AbstractAttachmentHashes;
 
@@ -33,6 +32,29 @@ impl AbstractAttachmentHashes for ReferenceDb {
         let mut hashes = self.file_hashes.lock().await;
         if let Some(file) = hashes.get_mut(hash) {
             file.iv = nonce.to_owned();
+            Ok(())
+        } else {
+            Err(create_error!(NotFound))
+        }
+    }
+
+    /// Updates the attachments animated metadata value.
+    ///
+    /// The primary use for this is to update the metadata for existing uploaded files, this
+    /// can only be used for images.
+    async fn set_attachment_hash_animated(&self, hash: &str, animated: bool) -> Result<()> {
+        let mut hashes = self.file_hashes.lock().await;
+        if let Some(FileHash {
+            metadata:
+                Metadata::Image {
+                    animated: Some(animated_metadata),
+                    ..
+                },
+            ..
+        }) = hashes.get_mut(hash)
+        {
+            *animated_metadata = animated;
+
             Ok(())
         } else {
             Err(create_error!(NotFound))

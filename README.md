@@ -39,7 +39,7 @@ Rust 1.86.0 or higher.
 
 ## Development Guide
 
-Before contributing, make yourself familiar with [our contribution guidelines](https://developers.stoat.chat/developing/contrib/) and the [technical documentation for this project](https://stoatchat.github.io/stoatchat/).
+Before contributing, make yourself familiar with [our contribution guidelines](https://developers.stoat.chat/developing/contrib/) and the [technical documentation for this project](https://developers.stoat.chat/).
 
 Before getting started, you'll want to install:
 
@@ -72,8 +72,17 @@ Now you can clone and build the project:
 ```bash
 git clone https://github.com/stoatchat/stoatchat stoat-backend
 cd stoat-backend
+mise install
 mise build
 ```
+
+> [!TIP]
+> You can override `BUILDER` in your `.env` file to run cargo with mold if you installed it:
+>
+> ```bash
+> # .env
+> BUILDER = "mold --run cargo"
+> ```
 
 A default configuration `Revolt.toml` is present in this project that is suited for development.
 
@@ -111,7 +120,7 @@ If you'd like to change anything, create a `Revolt.overrides.toml` file and spec
 >       - "14672:15672"
 > ```
 >
-> And corresponding Revolt configuration:
+> With the corresponding Revolt configuration:
 >
 > ```toml
 > #     Revolt.overrides.toml
@@ -123,35 +132,25 @@ If you'd like to change anything, create a `Revolt.overrides.toml` file and spec
 > [rabbit]
 > port = 14072
 > ```
+>
+> And mise configuration
+>
+> ```bash
+> #.env
+> DATABASE_PORT = "14017"
+> RABBIT_PORT = "14072"
+> REDIS_PORT = "14079"
+> ```
 
 Then continue:
 
 ```bash
-# start other necessary services
-docker compose up -d
+cp livekit.example.yml livekit.yml
 
-# run everything together
-./scripts/start.sh
-# .. or individually
-# run the API server
-cargo run --bin revolt-delta
-# run the events server
-cargo run --bin revolt-bonfire
-# run the file server
-cargo run --bin revolt-autumn
-# run the proxy server
-cargo run --bin revolt-january
-# run the tenor proxy
-cargo run --bin revolt-gifbox
-# run the push daemon (not usually needed in regular development)
-cargo run --bin revolt-pushd
-
-# hint:
-# mold -run <cargo build, cargo run, etc...>
-# mold -run ./scripts/start.sh
+mise start
 ```
 
-You can start a web client by doing the following:
+You can start a web client by doing the following in another terminal:
 
 ```bash
 # if you do not have yarn yet and have a modern Node.js:
@@ -164,6 +163,9 @@ cd stoat-web
 ```
 
 When signing up, go to http://localhost:14080 to find confirmation/password reset emails.
+
+To stop all services, hit (CTRL + c) in the terminal you ran `mise start` and run `mise docker:stop`
+
 
 ## Deployment Guide
 
@@ -200,7 +202,7 @@ If you have bumped the crate versions, proceed to [GitHub releases](https://gith
 First, start the required services:
 
 ```sh
-docker compose -f docker-compose.db.yml up -d
+docker compose up -d
 ```
 
 Now run tests for whichever database:
@@ -212,6 +214,6 @@ TEST_DB=MONGODB cargo nextest run
 
 ## License
 
-The Stoat backend is generally licensed under the [GNU Affero General Public License v3.0](https://github.com/stoatchat/stoatchat/blob/master/LICENSE).
+The Stoat backend is generally licensed under the [GNU Affero General Public License v3.0](https://github.com/stoatchat/stoatchat/blob/main/LICENSE).
 
 **Individual crates may supply their own licenses!**

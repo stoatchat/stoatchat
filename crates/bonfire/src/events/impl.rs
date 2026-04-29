@@ -400,29 +400,33 @@ impl State {
     }
 
     /// Push presence change to the user and all associated server topics
-    pub async fn broadcast_presence_change(&self, _target: bool) {
-        // disabled events
-        // if if let Some(status) = &self.cache.users.get(&self.cache.user_id).unwrap().status {
-        //     status.presence != Some(Presence::Invisible)
-        // } else {
-        //     true
-        // } {
-        //     let event = EventV1::UserUpdate {
-        //         id: self.cache.user_id.clone(),
-        //         data: v0::PartialUser {
-        //             online: Some(target),
-        //             ..Default::default()
-        //         },
-        //         clear: vec![],
-        //         event_id: Some(ulid::Ulid::new().to_string()),
-        //     };
+    pub async fn broadcast_presence_change(&self, target: bool) {
+        let config = revolt_config::config().await;
+        if config.disable_events_dont_use {
+            return;
+        }
 
-        //     for server in self.cache.servers.keys() {
-        //         event.clone().p(server.clone()).await;
-        //     }
+        if if let Some(status) = &self.cache.users.get(&self.cache.user_id).unwrap().status {
+            status.presence != Some(Presence::Invisible)
+        } else {
+            true
+        } {
+            let event = EventV1::UserUpdate {
+                id: self.cache.user_id.clone(),
+                data: v0::PartialUser {
+                    online: Some(target),
+                    ..Default::default()
+                },
+                clear: vec![],
+                event_id: Some(ulid::Ulid::new().to_string()),
+            };
 
-        //     event.p(self.cache.user_id.clone()).await;
-        // }
+            for server in self.cache.servers.keys() {
+                event.clone().p(server.clone()).await;
+            }
+
+            event.p(self.cache.user_id.clone()).await;
+        }
     }
 
     /// Handle an incoming event for protocol version 1

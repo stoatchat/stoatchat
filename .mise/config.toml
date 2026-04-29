@@ -16,4 +16,13 @@ idiomatic_version_file_enable_tools = ["rust"]
 [tasks.start]
 description = "Run all services"
 depends = ["docker:start", "build"]
+wait_for = ["docker:start", "build"]
 run = [{ task = "service:*" }]
+
+[env]
+BUILDER = "cargo"
+DOCKER_NETWORK_NAME = "stoatchat_default"
+DATABASE_PORT = "27017"
+RABBIT_PORT = "5672"
+REDIS_PORT = "6379"
+_.file = { path = ".env", tools = true }

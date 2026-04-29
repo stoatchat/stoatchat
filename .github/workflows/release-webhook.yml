@@ -1,3 +1,6 @@
+# DO NOT EDIT DIRECTLY IN REPOSITORY
+# Managed in Terraform templates
+
 name: Release Webhook
 
 on:

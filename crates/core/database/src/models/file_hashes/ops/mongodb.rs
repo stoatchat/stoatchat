@@ -48,6 +48,29 @@ impl AbstractAttachmentHashes for MongoDb {
             .map_err(|_| create_database_error!("update_one", COL))
     }
 
+    /// Updates the attachments animated metadata value.
+    ///
+    /// The primary use for this is to update the metadata for existing uploaded files, this
+    /// can only be used for images.
+    async fn set_attachment_hash_animated(&self, hash: &str, animated: bool) -> Result<()> {
+        self.col::<FileHash>(COL)
+            .update_one(
+                doc! {
+                    "_id": hash,
+                    "metadata.type": "Image",
+                    "metadata.animated": { "$exists": false },
+                },
+                doc! {
+                    "$set": {
+                        "metadata.animated": animated
+                    }
+                },
+            )
+            .await
+            .map(|_| ())
+            .map_err(|_| create_database_error!("update_one", COL))
+    }
+
     /// Delete attachment hash by id.
     async fn delete_attachment_hash(&self, id: &str) -> Result<()> {
         query!(self, delete_one_by_id, COL, id).map(|_| ())

@@ -252,6 +252,9 @@ auto_derived!(
         /// Must be enabled in order to show up on [Revolt Discover](https://rvlt.gg).
         pub analytics: Option<bool>,
 
+        /// User id of the new owner
+        pub owner: Option<String>,
+
         /// Fields to remove from server object
         #[cfg_attr(feature = "serde", serde(default))]
         pub remove: Vec<FieldsServer>,

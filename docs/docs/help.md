@@ -13,7 +13,7 @@ We want to hear what you think and appreciate and await your feature suggestions
 
 Typically, you can open issues on the relevant [GitHub repositories](https://github.com/stoatchat).
 
-<!-- Within the Stoat app, you can navigate to the [**feedback tab**](https://app.revolt.chat/settings/feedback), or you can open an issue on the relevant [GitHub repo](https://github.com/revoltchat). -->
+<!-- Within the Stoat app, you can navigate to the [**feedback tab**](https://app.revolt.chat/settings/feedback), or you can open an issue on the relevant [GitHub repo](https://github.com/stoatchat). -->
 
 ### 2. Translate
 
@@ -23,7 +23,7 @@ You can contribute translations through [**Weblate**](https://translate.stoat.ch
 ### 3. Donate
 
 Stoat is not backed by a big company, is not currently monetised (for example, via a subscription service) and does not serve you advertisements; as such, Stoat currently relies entirely on donations.
-You can learn more about donating [here](https://wiki.revolt.chat/notes/project/financial-support/) - if you want to make a larger donation, please consult me first.
+You can learn more about donating [here](https://ko-fi.com/stoatchat) - if you want to make a larger donation, please consult me first.
 
 ### 4. Join the project
 

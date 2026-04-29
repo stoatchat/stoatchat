@@ -7,17 +7,17 @@ use rocket::{serde::json::Json, State};
 ///
 /// Fetch details of a bot you own by its id.
 #[openapi(tag = "Bots")]
-#[get("/<bot>")]
+#[get("/<bot_id>")]
 pub async fn fetch_bot(
     db: &State<Database>,
     user: User,
-    bot: Reference<'_>,
+    bot_id: Reference<'_>,
 ) -> Result<Json<FetchBotResponse>> {
     if user.bot.is_some() {
         return Err(create_error!(IsBot));
     }
 
-    let bot = bot.as_bot(db).await?;
+    let bot = bot_id.as_bot(db).await?;
     if bot.owner != user.id {
         return Err(create_error!(NotFound));
     }

@@ -75,6 +75,8 @@ pub enum ChannelPermission {
     Masquerade = 1 << 28,
     /// React to messages with emojis
     React = 1 << 29,
+    /// Bypass slowmode
+    BypassSlowmode = 1 << 39,
 
     // * Voice permissions
     /// Connect to a voice channel
@@ -99,7 +101,7 @@ pub enum ChannelPermission {
     MentionRoles = 1 << 38,
 
     // * Misc. permissions
-    // % Bits 38 to 52: free area
+    // % Bits 39 to 52: free area
     // % Bits 53 to 64: do not use
 
     // * Grant all permissions

@@ -41,6 +41,7 @@ pub async fn edit(
         && data.nsfw.is_none()
         && data.owner.is_none()
         && data.voice.is_none()
+        && data.slowmode.is_none()
         && data.remove.is_empty()
     {
         return Ok(Json(channel.into()));
@@ -200,6 +201,7 @@ pub async fn edit(
             icon,
             nsfw,
             voice,
+            slowmode,
             ..
         } => {
             if data.remove.contains(&v0::FieldsChannel::Icon) {
@@ -246,6 +248,11 @@ pub async fn edit(
             if let Some(new_voice) = data.voice {
                 *voice = Some(new_voice.clone().into());
                 partial.voice = Some(new_voice.into());
+            }
+
+            if let Some(new_slowmode) = data.slowmode {
+                *slowmode = Some(new_slowmode);
+                partial.slowmode = Some(new_slowmode);
             }
         }
         _ => return Err(create_error!(InvalidOperation)),

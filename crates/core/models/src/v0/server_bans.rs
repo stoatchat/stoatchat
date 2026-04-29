@@ -19,6 +19,9 @@ auto_derived!(
         /// Ban reason
         #[cfg_attr(feature = "validator", validate(length(min = 0, max = 1024)))]
         pub reason: Option<String>,
+        /// Messages to delete in seconds
+        #[cfg_attr(feature = "validator", validate(range(min = 0, max = 604800)))]
+        pub delete_message_seconds: Option<i64>,
     }
 
     /// Just enough information to list a ban

@@ -133,7 +133,10 @@ auto_derived!(
         #[serde(rename = "message_unpinned")]
         MessageUnpinned { id: String, by: String },
         #[serde(rename = "call_started")]
-        CallStarted { by: String, finished_at: Option<Timestamp> },
+        CallStarted {
+            by: String,
+            finished_at: Option<Timestamp>,
+        },
     }
 
     /// Name and / or avatar override information
@@ -201,6 +204,9 @@ auto_derived!(
         pub image: Option<String>,
         /// Message content or system message information
         pub body: String,
+        /// The raw body, if the body has been rendered
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub raw_body: Option<String>,
         /// Unique tag, usually the channel ID
         pub tag: String,
         /// Timestamp at which this notification was created
@@ -255,7 +261,7 @@ auto_derived!(
         pub nonce: Option<String>,
 
         /// Message content to send
-        #[cfg_attr(feature = "validator", validate(length(min = 0, max = 2000)))]
+        #[cfg_attr(feature = "validator", validate(length(min = 0)))]
         pub content: Option<String>,
         /// Attachments to include in message
         pub attachments: Option<Vec<String>>,
@@ -339,7 +345,7 @@ auto_derived!(
     #[cfg_attr(feature = "validator", derive(Validate))]
     pub struct DataEditMessage {
         /// New message content
-        #[cfg_attr(feature = "validator", validate(length(min = 1, max = 2000)))]
+        #[cfg_attr(feature = "validator", validate(length(min = 1)))]
         pub content: Option<String>,
         /// Embeds to include in the message
         #[cfg_attr(feature = "validator", validate(length(min = 0, max = 10)))]
@@ -385,6 +391,7 @@ auto_derived!(
 );
 
 /// Message Author Abstraction
+#[derive(Clone)]
 pub enum MessageAuthor<'a> {
     User(&'a User),
     Webhook(&'a Webhook),
@@ -508,6 +515,7 @@ impl PushNotification {
             icon,
             image,
             body,
+            raw_body: None,
             tag: channel.id().to_string(),
             timestamp,
             url: format!("{}/channel/{}/{}", config.hosts.app, channel.id(), msg.id),

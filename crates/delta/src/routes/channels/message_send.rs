@@ -1,9 +1,11 @@
-use chrono::{Duration, Utc};
+use std::time::Duration;
+
+use redis_kiss::{get_connection, redis, AsyncCommands};
 use revolt_database::util::permissions::DatabasePermissionQuery;
 use revolt_database::{
     util::idempotency::IdempotencyKey, util::reference::Reference, Database, User,
 };
-use revolt_database::{Interactions, Message, AMQP};
+use revolt_database::{Channel, Interactions, Message, AMQP};
 use revolt_models::v0;
 use revolt_permissions::PermissionQuery;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
@@ -57,6 +59,50 @@ pub async fn message_send(
         permissions.throw_if_lacking_channel_permission(ChannelPermission::UploadFiles)?;
     }
 
+    if !permissions.has_channel_permission(ChannelPermission::BypassSlowmode) {
+        if let Channel::TextChannel {
+            slowmode: Some(channel_slowmode),
+            id: channel_id,
+            ..
+        } = &channel
+        {
+            if *channel_slowmode > 0 {
+                if let Ok(conn) = get_connection().await {
+                    let mut conn = conn.into_inner();
+
+                    let slowmode_key = format!("slowmode:{}:{}", user.id, channel_id);
+
+                    // Atomic check-and-set: only set if absent and apply expiry in one command.
+                    let set_result: Option<String> = conn
+                        .set_options(
+                            &slowmode_key,
+                            "1", // The value doesn't matter, only the key's existence
+                            redis::SetOptions::default()
+                                .conditional_set(redis::ExistenceCheck::NX)
+                                .with_expiration(redis::SetExpiry::EX(*channel_slowmode as usize)),
+                        )
+                        .await
+                        .unwrap_or(None);
+
+                    // If `set_result` is None, the `NX` condition failed because the key already exists.
+                    // This means the user is currently in slowmode.
+                    if set_result.is_none() {
+                        // Fetch the remaining TTL to accurately populate the retry_after field
+                        let ttl: i64 = conn.ttl(&slowmode_key).await.unwrap_or(0);
+
+                        // Redis returns positive integers for valid TTLs
+                        if ttl > 0 {
+                            return Err(create_error!(InSlowmode {
+                                retry_after: ttl as u64
+                            }));
+                        }
+                    }
+                }
+                // If Redis connection fails, just skip the slowmode check
+            }
+        }
+    }
+
     // Ensure interactions information is correct
     if let Some(interactions) = &data.interactions {
         let interactions: Interactions = interactions.clone().into();
@@ -66,8 +112,12 @@ pub async fn message_send(
     // Disallow mentions for new users (TRUST-0: <12 hours age) in public servers
     let allow_mentions = if let Some(server) = query.server_ref() {
         if server.discoverable {
-            (Utc::now() - ulid::Ulid::from_string(&user.id).unwrap().datetime())
-                >= Duration::hours(12)
+            (ulid::Ulid::from_string(&user.id)
+                .unwrap()
+                .datetime()
+                .elapsed()
+                .expect("Time went backwards"))
+                >= Duration::from_hours(12)
         } else {
             true
         }
@@ -186,6 +236,7 @@ mod test {
             }),
             last_message_id: None,
             voice: None,
+            slowmode: None,
         };
         locked_channel
             .update(&harness.db, partial, vec![])

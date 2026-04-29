@@ -1,6 +1,6 @@
 [package]
 name = "revolt-crond"
-version = "0.11.5"
+version = "0.12.1"
 license = "AGPL-3.0-or-later"
 authors = ["Paul Makles <me@insrt.uk>"]
 edition = "2021"
@@ -11,13 +11,13 @@ publish = false
 
 [dependencies]
 # Utility
-log = "0.4"
+log = { workspace = true }
 
 # Async
-tokio = { version = "1" }
+tokio = { workspace = true }
 
 # Core
-revolt-database = { version = "0.11.5", path = "../../core/database" }
-revolt-result = { version = "0.11.5", path = "../../core/result" }
-revolt-config = { version = "0.11.5", path = "../../core/config" }
-revolt-files = { version = "0.11.5", path = "../../core/files" }
+revolt-database = { workspace = true }
+revolt-result = { workspace = true }
+revolt-config = { workspace = true }
+revolt-files = { workspace = true }

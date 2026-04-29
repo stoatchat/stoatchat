@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use authifier::models::{totp::Totp, Account, ValidatedTicket};
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     Database, File, PartialServer, User,
@@ -7,7 +8,7 @@ use revolt_database::{
 use revolt_models::v0;
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
-use rocket::{serde::json::Json, State};
+use rocket::{serde::json::Json, Request, State};
 use validator::Validate;
 
 /// # Edit Server
@@ -17,9 +18,11 @@ use validator::Validate;
 #[patch("/<target>", data = "<data>")]
 pub async fn edit(
     db: &State<Database>,
+    account: Account,
     user: User,
     target: Reference<'_>,
     data: Json<v0::DataEditServer>,
+    validated_ticket: Option<ValidatedTicket>,
 ) -> Result<Json<v0::Server>> {
     let data = data.into_inner();
     data.validate().map_err(|error| {
@@ -43,6 +46,7 @@ pub async fn edit(
         && data.flags.is_none()
         && data.analytics.is_none()
         && data.discoverable.is_none()
+        && data.owner.is_none()
         && data.remove.is_empty()
     {
         return Ok(Json(server.into()));
@@ -55,6 +59,17 @@ pub async fn edit(
         || !data.remove.is_empty()
     {
         permissions.throw_if_lacking_channel_permission(ChannelPermission::ManageServer)?;
+    }
+
+    // Check we are the server owner or privileged if changing sensitive fields
+    if data.owner.is_some() {
+        if user.id != server.owner && !user.privileged {
+            return Err(create_error!(NotOwner));
+        }
+
+        if validated_ticket.is_none() {
+            return Err(create_error!(InvalidCredentials));
+        }
     }
 
     // Check we are privileged if changing sensitive fields
@@ -80,6 +95,7 @@ pub async fn edit(
         // nsfw,
         discoverable,
         analytics,
+        owner,
         remove,
     } = data;
 
@@ -92,6 +108,7 @@ pub async fn edit(
         // nsfw,
         discoverable,
         analytics,
+        owner: owner.clone(),
         ..Default::default()
     };
 
@@ -144,6 +161,21 @@ pub async fn edit(
     if let Some(banner) = banner {
         partial.banner = Some(File::use_server_banner(db, &banner, &server.id, &user.id).await?);
         server.banner = partial.banner.clone();
+    }
+
+    // 5. Transfer ownership
+    if let Some(owner) = owner {
+        let owner_reference = Reference::from_unchecked(&owner);
+        // Check if member exists
+        owner_reference.as_member(db, &server.id).await?;
+        let owner_user = owner_reference.as_user(db).await?;
+
+        if owner_user.bot.is_some() {
+            return Err(create_error!(InvalidOperation));
+        }
+
+        server.owner = owner;
+        partial.owner = Some(server.owner.clone());
     }
 
     server

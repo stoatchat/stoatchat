@@ -216,7 +216,7 @@ fn custom_openapi_spec() -> OpenApi {
             }),
             license: Some(License {
                 name: "AGPLv3".to_owned(),
-                url: Some("https://github.com/revoltchat/delta/blob/master/LICENSE".to_owned()),
+                url: Some("https://github.com/stoatchat/stoatchat/blob/main/crates/delta/LICENSE".to_owned()),
                 ..Default::default()
             }),
             version: env!("CARGO_PKG_VERSION").to_string(),

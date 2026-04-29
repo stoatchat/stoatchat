@@ -1,3 +1,4 @@
+use revolt_config::config;
 use revolt_database::{Database, Member, Server, User};
 use revolt_models::v0;
 use revolt_result::{create_error, Result};
@@ -18,6 +19,24 @@ pub async fn create_server(
 ) -> Result<Json<v0::CreateServerLegacyResponse>> {
     if user.bot.is_some() {
         return Err(create_error!(IsBot));
+    }
+
+    let config = config().await;
+
+    if !config
+        .features
+        .limits
+        .global
+        .restrict_server_creation
+        .is_empty()
+        && !config
+            .features
+            .limits
+            .global
+            .restrict_server_creation
+            .contains(&user.id)
+    {
+        return Err(create_error!(CantCreateServers));
     }
 
     let data = data.into_inner();
