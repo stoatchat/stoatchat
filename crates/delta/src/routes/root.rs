@@ -92,6 +92,8 @@ pub struct GlobalLimits {
     /// restrict server creation to these users.
     /// if blank, all users can create servers
     pub restrict_server_creation: Vec<String>,
+    /// New user hours
+    new_user_hours: i64,
 }
 
 /// # User Limits
@@ -231,6 +233,7 @@ pub async fn root() -> Result<Json<RevoltConfig>> {
                         .limits
                         .global
                         .restrict_server_creation,
+                    new_user_hours: config.features.limits.global.new_user_hours as i64,
                 },
                 new_user: UserLimits::from_feature_limits(config.features.limits.new_user),
                 default: UserLimits::from_feature_limits(config.features.limits.default),
