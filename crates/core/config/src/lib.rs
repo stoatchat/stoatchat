@@ -303,6 +303,11 @@ impl Pushd {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct January {
+    pub blocked_domains: Vec<String>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct FilesLimit {
     pub min_file_size: usize,
     pub min_resolution: [usize; 2],
@@ -421,6 +426,7 @@ pub struct Settings {
     pub hosts: Hosts,
     pub api: Api,
     pub pushd: Pushd,
+    pub january: January,
     pub files: Files,
     pub features: Features,
     pub sentry: Sentry,

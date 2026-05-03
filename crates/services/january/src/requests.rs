@@ -1,12 +1,13 @@
 use encoding_rs::{Encoding, UTF_8_INIT};
 use lazy_static::lazy_static;
 use mime::Mime;
+use pdk_ip_filter_lib::IpFilter;
 use regex::Regex;
 use reqwest::{
     header::{self, CONTENT_TYPE},
     redirect, Client, Response,
 };
-use revolt_config::report_internal_error;
+use revolt_config::{config, report_internal_error};
 use revolt_files::{create_thumbnail, decode_image, image_size_vec, is_valid_image, video_size};
 use revolt_models::v0::{Embed, Image, ImageSize, Video};
 use revolt_result::{create_error, Error, Result};
@@ -14,6 +15,7 @@ use std::{
     io::{Cursor, Write},
     time::Duration,
 };
+use url::{Host, Url};
 
 lazy_static! {
     /// Request client
@@ -23,7 +25,7 @@ lazy_static! {
         .redirect(redirect::Policy::custom(|attempt| {
             if attempt.previous().len() > 5 { // TODO config
                 attempt.error("too many redirects")
-            } else if attempt.url().host_str() == Some("jan.revolt.chat") { // TODO config
+            } else if attempt.url().host_str() == Some("proxy.stoatusercontent.com") { // TODO config
                 attempt.stop()
             } else {
                 attempt.follow()
@@ -33,10 +35,10 @@ lazy_static! {
         .expect("reqwest Client");
 
     /// Spoof User Agent as Discord
-    static ref RE_USER_AGENT_SPOOFING_AS_DISCORD: Regex = Regex::new("^(?:(?:https?:)?//)?(?:(?:vx|fx)?twitter|(?:fixv|fixup)?x|(?:old\\.|new\\.|www\\.)reddit).com").expect("valid regex");
+    static ref RE_USER_AGENT_SPOOFING_AS_DISCORD: Regex = Regex::new("^(?:(?:vx|fx)?twitter|(?:fixv|fixup)?x|(?:old\\.|new\\.|www\\.)reddit).com").expect("valid regex");
 
     /// Regex for matching new Reddit URLs
-    static ref RE_URL_NEW_REDDIT: Regex = Regex::new("^(?:(?:https?:)?//)?(?:(?:new\\.|www\\.)?reddit).com").expect("valid regex");
+    static ref RE_URL_NEW_REDDIT: Regex = Regex::new("^(?:(?:new\\.|www\\.)?reddit).com").expect("valid regex");
 
     /// Cache for proxy results
     static ref PROXY_CACHE: moka::future::Cache<String, Result<(String, Vec<u8>)>> = moka::future::Cache::builder()
@@ -59,6 +61,28 @@ lazy_static! {
         .max_capacity(10_000) // Cache up to 10k embeds
         .time_to_live(Duration::from_secs(60)) // For up to 1 minute
         .build();
+
+    static ref IP_BLOCKLIST: IpFilter = IpFilter::block(&[
+        "10.0.0.0/8", // something something modern problem require modern solutions
+        "192.168.0.0/16",
+        "172.16.0.0/16",
+        "172.17.0.0/16",
+        "172.18.0.0/16",
+        "172.19.0.0/16",
+        "172.20.0.0/16",
+        "172.21.0.0/16",
+        "172.22.0.0/16",
+        "172.23.0.0/16",
+        "172.24.0.0/16",
+        "172.25.0.0/16",
+        "172.26.0.0/16",
+        "172.27.0.0/16",
+        "172.28.0.0/16",
+        "172.29.0.0/16",
+        "172.30.0.0/16",
+        "172.31.0.0/16",
+        "172.32.0.0/16"]
+    ).unwrap();
 }
 
 /// Information about a successful request
@@ -73,7 +97,7 @@ impl Request {
         if let Some(hit) = PROXY_CACHE.get(url).await {
             hit
         } else {
-            let Request { response, mime } = Request::new(url).await?;
+            let Request { response, mime } = Request::new_from_str(url).await?;
 
             if matches!(mime.type_(), mime::IMAGE | mime::VIDEO) {
                 let bytes = report_internal_error!(response.bytes().await);
@@ -135,7 +159,7 @@ impl Request {
             let request = if let Some(request) = request {
                 request
             } else {
-                let request = Request::new(url).await?;
+                let request = Request::new_from_str(url).await?;
                 if matches!(request.mime.type_(), mime::IMAGE) {
                     request
                 } else {
@@ -173,7 +197,7 @@ impl Request {
             let response = if let Some(Request { response, .. }) = request {
                 response
             } else {
-                let Request { response, mime } = Request::new(url).await?;
+                let Request { response, mime } = Request::new_from_str(url).await?;
                 if matches!(mime.type_(), mime::VIDEO) {
                     response
                 } else {
@@ -212,7 +236,7 @@ impl Request {
         if let Some(hit) = EMBED_CACHE.get(&url).await {
             Ok(hit)
         } else {
-            let request = Request::new(&url).await?;
+            let request = Request::new_from_str(&url).await?;
             let embed = match (request.mime.type_(), request.mime.subtype()) {
                 (_, mime::HTML) => {
                     let content_type = request
@@ -255,15 +279,19 @@ impl Request {
     }
 
     /// Send a new request to a service
-    pub async fn new(url: &str) -> Result<Request> {
+    pub async fn new(url: Url) -> Result<Request> {
+        let url_host_str = url.host_str().ok_or(create_error!(ProxyError))?.to_string();
+
+        Request::url_is_blacklisted(&url).await?;
+
         let response = CLIENT
             .get(url)
             .header(
                 "User-Agent",
-                if RE_USER_AGENT_SPOOFING_AS_DISCORD.is_match(url) {
+                if RE_USER_AGENT_SPOOFING_AS_DISCORD.is_match(&url_host_str) {
                     "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)"
                 } else {
-                    "Mozilla/5.0 (compatible; January/2.0; +https://github.com/revoltchat/backend)"
+                    "Mozilla/5.0 (compatible; January/2.0; +https://github.com/stoatchat/stoatchat)"
                 },
             )
             .header("Accept-Language", "en-US,en;q=0.5")
@@ -290,12 +318,44 @@ impl Request {
         Ok(Request { response, mime })
     }
 
+    pub async fn new_from_str(url: &str) -> Result<Request> {
+        let proper_url = Url::parse(url).map_err(|_| create_error!(ProxyError))?;
+        Request::new(proper_url).await
+    }
+
     /// Check if something exists
-    pub async fn exists(url: &str) -> bool {
+    pub async fn exists(url: Url) -> bool {
         if let Ok(response) = CLIENT.head(url).send().await {
             response.status().is_success()
         } else {
             false
         }
+    }
+
+    pub async fn exists_from_str(url: &str) -> Result<bool> {
+        let proper_url = Url::parse(url).map_err(|_| create_error!(ProxyError))?;
+        Ok(Request::exists(proper_url).await)
+    }
+
+    pub async fn url_is_blacklisted(url: &Url) -> Result<()> {
+        if let Some(host) = url.host() {
+            match host {
+                Host::Ipv4(ipv4) => {
+                    let url_str = ipv4.to_string();
+                    if !IP_BLOCKLIST.is_allowed(&url_str) {
+                        return Err(create_error!(InvalidOperation));
+                    }
+                }
+                Host::Domain(domain) => {
+                    let config = config().await;
+                    if config.january.blocked_domains.iter().any(|x| x == domain) {
+                        return Err(create_error!(InvalidOperation));
+                    }
+                }
+                _ => (),
+            }
+        };
+
+        Ok(())
     }
 }

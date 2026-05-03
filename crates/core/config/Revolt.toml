@@ -132,6 +132,8 @@ pkcs8 = ""
 key_id = ""
 team_id = ""
 
+[january]
+blocked_domains = []
 
 [files]
 # Encryption key for stored files
