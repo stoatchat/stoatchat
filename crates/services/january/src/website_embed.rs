@@ -236,11 +236,12 @@ pub async fn populate_special(original_url: String, metadata: &mut WebsiteMetada
             metadata.site_name.take();
 
             // Verify the video exists
-            if !crate::requests::Request::exists(&format!(
+            if !crate::requests::Request::exists_from_str(&format!(
                 "http://img.youtube.com/vi/{}/sddefault.jpg",
                 id
             ))
             .await
+            .unwrap_or(false)
             {
                 return;
             }
