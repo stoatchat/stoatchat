@@ -190,7 +190,7 @@ impl From<crate::Channel> for Channel {
                 role_permissions,
                 nsfw,
                 voice,
-                slowmode
+                slowmode,
             } => Channel::TextChannel {
                 id,
                 server,
@@ -202,7 +202,7 @@ impl From<crate::Channel> for Channel {
                 role_permissions,
                 nsfw,
                 voice: voice.map(|voice| voice.into()),
-                slowmode
+                slowmode,
             },
         }
     }
@@ -256,7 +256,7 @@ impl From<Channel> for crate::Channel {
                 role_permissions,
                 nsfw,
                 voice,
-                slowmode
+                slowmode,
             } => crate::Channel::TextChannel {
                 id,
                 server,
@@ -268,7 +268,7 @@ impl From<Channel> for crate::Channel {
                 role_permissions,
                 nsfw,
                 voice: voice.map(|voice| voice.into()),
-                slowmode
+                slowmode,
             },
         }
     }
@@ -307,7 +307,7 @@ impl From<PartialChannel> for crate::PartialChannel {
             default_permissions: value.default_permissions,
             last_message_id: value.last_message_id,
             voice: value.voice.map(|voice| voice.into()),
-            slowmode: value.slowmode
+            slowmode: value.slowmode,
         }
     }
 }
@@ -926,6 +926,7 @@ impl From<crate::Role> for Role {
             colour: value.colour,
             hoist: value.hoist,
             rank: value.rank,
+            icon: value.icon.map(|f| f.into()),
         }
     }
 }
@@ -939,6 +940,7 @@ impl From<Role> for crate::Role {
             colour: value.colour,
             hoist: value.hoist,
             rank: value.rank,
+            icon: value.icon.map(|f| f.into()),
         }
     }
 }
@@ -952,6 +954,7 @@ impl From<crate::PartialRole> for PartialRole {
             colour: value.colour,
             hoist: value.hoist,
             rank: value.rank,
+            icon: value.icon.map(|f| f.into()),
         }
     }
 }
@@ -965,6 +968,7 @@ impl From<PartialRole> for crate::PartialRole {
             colour: value.colour,
             hoist: value.hoist,
             rank: value.rank,
+            icon: value.icon.map(|f| f.into()),
         }
     }
 }
@@ -973,6 +977,7 @@ impl From<crate::FieldsRole> for FieldsRole {
     fn from(value: crate::FieldsRole) -> Self {
         match value {
             crate::FieldsRole::Colour => FieldsRole::Colour,
+            crate::FieldsRole::Icon => FieldsRole::Icon,
         }
     }
 }
@@ -981,6 +986,7 @@ impl From<FieldsRole> for crate::FieldsRole {
     fn from(value: FieldsRole) -> Self {
         match value {
             FieldsRole::Colour => crate::FieldsRole::Colour,
+            FieldsRole::Icon => crate::FieldsRole::Icon,
         }
     }
 }
