@@ -78,3 +78,10 @@ pub struct AckPayload {
     pub channel_id: String,
     pub message_id: String,
 }
+
+/// This is not the same as the AckPayload above, as the state for this event is stored in redis to allow for state updates while the event is queued.
+#[derive(Serialize, Deserialize)]
+pub struct AckEventPayload {
+    pub user_id: String,
+    pub channel_id: String,
+}

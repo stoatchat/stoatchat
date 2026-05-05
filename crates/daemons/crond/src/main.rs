@@ -1,7 +1,7 @@
 use revolt_config::configure;
 use revolt_database::DatabaseInfo;
 use revolt_result::Result;
-use tasks::{file_deletion, prune_dangling_files, prune_members};
+use tasks::{acks, file_deletion, prune_dangling_files, prune_members};
 use tokio::try_join;
 
 pub mod tasks;
@@ -14,7 +14,8 @@ async fn main() -> Result<()> {
     try_join!(
         file_deletion::task(db.clone()),
         prune_dangling_files::task(db.clone()),
-        prune_members::task(db.clone())
+        prune_members::task(db.clone()),
+        acks::task(db.clone())
     )
     .map(|_| ())
 }

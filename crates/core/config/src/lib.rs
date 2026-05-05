@@ -123,11 +123,18 @@ pub struct Database {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct RabbitQueues {
+    pub acks: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct Rabbit {
     pub host: String,
     pub port: u16,
     pub username: String,
     pub password: String,
+    pub default_exchange: String,
+    pub queues: RabbitQueues,
 }
 
 #[derive(Deserialize, Debug, Clone)]

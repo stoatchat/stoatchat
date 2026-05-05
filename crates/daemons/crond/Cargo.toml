@@ -16,6 +16,19 @@ log = { workspace = true }
 # Async
 tokio = { workspace = true }
 
+# Redis
+redis-kiss = { workspace = true }
+
+# RabbitMQ
+lapin = { workspace = true }
+futures-lite = "2.6.1"
+
+# Processing
+serde_json = { workspace = true }
+revolt_optional_struct = { workspace = true }
+serde = { workspace = true }
+iso8601-timestamp = { workspace = true, features = ["serde", "bson"] }
+
 # Core
 revolt-database = { workspace = true }
 revolt-result = { workspace = true }
