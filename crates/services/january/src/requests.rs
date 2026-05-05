@@ -38,6 +38,9 @@ lazy_static! {
     /// Regex for matching new Reddit URLs
     static ref RE_URL_NEW_REDDIT: Regex = Regex::new("^(?:(?:https?:)?//)?(?:(?:new\\.|www\\.)?reddit).com").expect("valid regex");
 
+    /// Regex for matching YouTube Shorts URLs
+    static ref RE_URL_YOUTUBE_SHORTS: Regex = Regex::new("^(?:(?:https?:)?//)?(?:(?:www\\.)?youtube\\.com)/shorts/([a-zA-Z0-9_-]+)").expect("valid regex");
+
     /// Cache for proxy results
     static ref PROXY_CACHE: moka::future::Cache<String, Result<(String, Vec<u8>)>> = moka::future::Cache::builder()
         .weigher(|_key, value: &Result<(String, Vec<u8>)>| -> u32 {
@@ -206,6 +209,13 @@ impl Request {
                 // Reddit has a bunch of clickbait-y marketing on the new URLs, so we use the old site instead
                 .replace(&url, "https://old.reddit.com")
                 .to_string();
+        }
+
+        // Re-map Youtube Shorts to regular Youtube links
+        if let Some(captures) = RE_URL_YOUTUBE_SHORTS.captures(&url) {
+            if let Some(video_id) = captures.get(1) {
+                url = format!("https://youtube.com/watch?v={}", video_id.as_str());
+            }
         }
 
         // Generate the actual embed
