@@ -36,9 +36,7 @@ impl IntoResponse for Error {
             ErrorType::NotInGroup => StatusCode::NOT_FOUND,
             ErrorType::AlreadyPinned => StatusCode::BAD_REQUEST,
             ErrorType::NotPinned => StatusCode::BAD_REQUEST,
-            ErrorType::InSlowmode {
-                retry_after: _,
-            } => StatusCode::TOO_MANY_REQUESTS,
+            ErrorType::InSlowmode { retry_after: _ } => StatusCode::TOO_MANY_REQUESTS,
 
             ErrorType::CantCreateServers => StatusCode::FORBIDDEN,
             ErrorType::UnknownServer => StatusCode::NOT_FOUND,
@@ -78,7 +76,7 @@ impl IntoResponse for Error {
             ErrorType::DuplicateNonce => StatusCode::CONFLICT,
             ErrorType::VosoUnavailable => StatusCode::BAD_REQUEST,
             ErrorType::NotFound => StatusCode::NOT_FOUND,
-            ErrorType::NoEffect => StatusCode::OK,
+            ErrorType::NoEffect => StatusCode::BAD_REQUEST,
             ErrorType::FailedValidation { .. } => StatusCode::BAD_REQUEST,
             ErrorType::LiveKitUnavailable => StatusCode::BAD_REQUEST,
             ErrorType::NotConnected => StatusCode::BAD_REQUEST,

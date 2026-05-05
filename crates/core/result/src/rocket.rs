@@ -42,9 +42,7 @@ impl<'r> Responder<'r, 'static> for Error {
             ErrorType::NotInGroup => Status::NotFound,
             ErrorType::AlreadyPinned => Status::BadRequest,
             ErrorType::NotPinned => Status::BadRequest,
-            ErrorType::InSlowmode {
-                retry_after: _,
-            } => Status::TooManyRequests,
+            ErrorType::InSlowmode { retry_after: _ } => Status::TooManyRequests,
             ErrorType::InvalidFlagValue => Status::BadRequest,
 
             ErrorType::CantCreateServers => Status::Forbidden,
@@ -84,7 +82,7 @@ impl<'r> Responder<'r, 'static> for Error {
             ErrorType::NotAuthenticated => Status::Unauthorized,
             ErrorType::DuplicateNonce => Status::Conflict,
             ErrorType::NotFound => Status::NotFound,
-            ErrorType::NoEffect => Status::Ok,
+            ErrorType::NoEffect => Status::BadRequest,
             ErrorType::FailedValidation { .. } => Status::BadRequest,
             ErrorType::LiveKitUnavailable => Status::BadRequest,
             ErrorType::NotAVoiceChannel => Status::BadRequest,
