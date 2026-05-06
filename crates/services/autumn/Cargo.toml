@@ -18,6 +18,7 @@ kamadak-exif = { workspace = true }
 # revolt_little_exif = "0.5.1"
 image = { workspace = true }
 thumbhash = { workspace = true }
+lcms2 = { workspace = true }
 
 # File processing
 revolt_clamav-client = { workspace = true }

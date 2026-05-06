@@ -134,6 +134,7 @@ kamadak-exif = "0.5.4"
 webp = "0.3.0"
 image = "0.25.2"  # avif encode requires dav1d system library: features = ["avif-native"]
 thumbhash = "0.1.0"
+lcms2 = "6.1.1" # for color profile processing
 
 # File processing
 revolt_clamav-client = "0.1.5"

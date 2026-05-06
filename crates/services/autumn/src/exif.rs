@@ -1,7 +1,7 @@
 use std::io::{Cursor, Read};
 
 use exif::Reader;
-use image::{ImageFormat, ImageReader};
+use image::{ImageEncoder, ImageFormat, ImageReader};
 use revolt_config::report_internal_error;
 use revolt_database::Metadata;
 use revolt_result::{create_error, Result};
@@ -17,8 +17,8 @@ pub async fn strip_metadata(
 ) -> Result<(Vec<u8>, Metadata)> {
     match &metadata {
         Metadata::Image {
-            width,
-            height,
+            width: _,
+            height: _,
             thumbhash,
             animated,
         } => match mime {
@@ -46,11 +46,12 @@ pub async fn strip_metadata(
                 let mut cursor = Cursor::new(buf);
 
                 // Decode the image
-                let image = report_internal_error!(report_internal_error!(ImageReader::new(
-                    &mut cursor
-                )
-                .with_guessed_format())?
-                .decode());
+                let reader =
+                    report_internal_error!(ImageReader::new(&mut cursor).with_guessed_format())?;
+                let mut decoder = report_internal_error!(reader.into_decoder())?;
+                let mut icc_profile =
+                    report_internal_error!(image::ImageDecoder::icc_profile(&mut decoder))?;
+                let mut image = report_internal_error!(image::DynamicImage::from_decoder(decoder))?;
 
                 // Reset read position
                 cursor.set_position(0);
@@ -71,38 +72,95 @@ pub async fn strip_metadata(
 
                 // Apply the EXIF rotation
                 // See https://jdhao.github.io/2019/07/31/image_rotation_exif_info/
-                report_internal_error!(match &rotation {
-                    2 => image?.fliph(),
-                    3 => image?.rotate180(),
-                    4 => image?.rotate180().fliph(),
-                    5 => image?.rotate90().fliph(),
-                    6 => image?.rotate90(),
-                    7 => image?.rotate270().fliph(),
-                    8 => image?.rotate270(),
-                    _ => image?,
-                }
-                .write_to(
-                    &mut writer,
-                    match mime {
-                        "image/jpeg" => ImageFormat::Jpeg,
-                        "image/png" => ImageFormat::Png,
-                        "image/avif" => ImageFormat::Avif,
-                        "image/tiff" => ImageFormat::Tiff,
-                        _ => todo!(),
-                    },
-                ))?;
-
-                // Calculate dimensions after rotation.
-                let (width, height) = match &rotation {
-                    2 | 4 | 5 | 7 => (*height, *width),
-                    _ => (*width, *height),
+                image = match &rotation {
+                    2 => image.fliph(),
+                    3 => image.rotate180(),
+                    4 => image.rotate180().fliph(),
+                    5 => image.rotate90().fliph(),
+                    6 => image.rotate90(),
+                    7 => image.rotate270().fliph(),
+                    8 => image.rotate270(),
+                    _ => image,
                 };
+
+                if let Some(icc) = &icc_profile {
+                    if let Ok(src_profile) = lcms2::Profile::new_icc(icc) {
+                        let dst_profile = lcms2::Profile::new_srgb();
+
+                        let format = if image.color().has_alpha() {
+                            lcms2::PixelFormat::RGBA_8
+                        } else {
+                            lcms2::PixelFormat::RGB_8
+                        };
+
+                        if let Ok(t) = lcms2::Transform::new(
+                            &src_profile,
+                            format,
+                            &dst_profile,
+                            format,
+                            lcms2::Intent::Perceptual,
+                        ) {
+                            if image.color().has_alpha() {
+                                let mut rgba_image = image.into_rgba8();
+                                t.transform_in_place(rgba_image.as_mut());
+                                image = image::DynamicImage::ImageRgba8(rgba_image);
+                            } else {
+                                let mut rgb_image = image.into_rgb8();
+                                t.transform_in_place(rgb_image.as_mut());
+                                image = image::DynamicImage::ImageRgb8(rgb_image);
+                            }
+                            icc_profile = None;
+                        }
+                    }
+                }
+
+                let color_type = image.color();
+                let width = image.width();
+                let height = image.height();
+
+                report_internal_error!(match mime {
+                    "image/jpeg" => {
+                        let mut encoder = image::codecs::jpeg::JpegEncoder::new(&mut writer);
+                        if let Some(icc) = &icc_profile {
+                            let _ = encoder.set_icc_profile(icc.clone());
+                        }
+                        encoder.write_image(image.as_bytes(), width, height, color_type.into())
+                    }
+                    "image/png" => {
+                        let mut encoder = image::codecs::png::PngEncoder::new(&mut writer);
+                        if let Some(icc) = &icc_profile {
+                            let _ = encoder.set_icc_profile(icc.clone());
+                        }
+                        encoder.write_image(image.as_bytes(), width, height, color_type.into())
+                    }
+                    "image/avif" => {
+                        // avif encoder doesn't implement set_icc_profile currently
+                        let encoder = image::codecs::avif::AvifEncoder::new(&mut writer);
+                        encoder.write_image(image.as_bytes(), width, height, color_type.into())
+                    }
+                    "image/tiff" => {
+                        let mut encoder = image::codecs::tiff::TiffEncoder::new(&mut writer);
+                        if let Some(icc) = &icc_profile {
+                            let _ = encoder.set_icc_profile(icc.clone());
+                        }
+                        encoder.write_image(image.as_bytes(), width, height, color_type.into())
+                    }
+                    "image/webp" => {
+                        let mut encoder =
+                            image::codecs::webp::WebPEncoder::new_lossless(&mut writer);
+                        if let Some(icc) = &icc_profile {
+                            let _ = encoder.set_icc_profile(icc.clone());
+                        }
+                        encoder.write_image(image.as_bytes(), width, height, color_type.into())
+                    }
+                    _ => unreachable!(),
+                })?;
 
                 Ok((
                     bytes,
                     Metadata::Image {
-                        width,
-                        height,
+                        width: width as isize,
+                        height: height as isize,
                         thumbhash: thumbhash.clone(),
                         animated: *animated,
                     },
