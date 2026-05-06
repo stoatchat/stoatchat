@@ -24,7 +24,7 @@ use sha2::Digest;
 use tempfile::NamedTempFile;
 use tokio::time::Instant;
 use tower_http::cors::{AllowHeaders, Any, CorsLayer};
-use urlencoding::encode;
+use url_escape::encode_component;
 use utoipa::ToSchema;
 
 use crate::{
@@ -480,7 +480,7 @@ async fn fetch_file(
     // Ensure filename is correct
     if file_name != file.filename {
         if file_name == "original" {
-            let safe_filename = encode(&file.filename);
+            let safe_filename = encode_component(&file.filename);
 
             return Ok(
                 Redirect::permanent(&format!("/{tag}/{file_id}/{}", safe_filename)).into_response(),
