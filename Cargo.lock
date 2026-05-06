@@ -6820,6 +6820,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "ulid 1.2.1",
+ "urlencoding",
  "utoipa",
  "utoipa-scalar",
  "webp",
