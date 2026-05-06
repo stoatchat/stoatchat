@@ -129,4 +129,7 @@ pub trait AbstractServerMembers: Sync + Send {
 
     /// Fetch all members who have been marked for deletion.
     async fn remove_dangling_members(&self) -> Result<()>;
+
+    /// Removes a user from every server they are in
+    async fn clear_memberships(&self, user_id: &str) -> Result<()>;
 }

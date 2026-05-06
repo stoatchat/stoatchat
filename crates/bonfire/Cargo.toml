@@ -34,7 +34,6 @@ async-tungstenite = { workspace = true, features = ["async-std-runtime"] }
 async-std = { workspace = true }
 
 # core
-authifier = { workspace = true }
 revolt-result = { workspace = true }
 revolt-models = { workspace = true }
 revolt-config = { workspace = true }

@@ -1,8 +1,11 @@
 use std::{collections::HashSet, str::FromStr, time::Duration};
 
-use crate::{events::client::EventV1, Database, File, RatelimitEvent, AMQP};
+use crate::{
+    events::client::EventV1,
+    util::email::{email_templates, send_email},
+    Database, File, RatelimitEvent, AMQP,
+};
 
-use authifier::config::{EmailVerificationConfig, Template};
 use futures::future::join_all;
 use iso8601_timestamp::Timestamp;
 use once_cell::sync::Lazy;
@@ -718,22 +721,11 @@ impl User {
         duration_days: Option<usize>,
         reason: Option<Vec<String>>,
     ) -> Result<()> {
-        let authifier = db.clone().to_authifier().await;
-        let mut account = authifier
-            .database
-            .find_account(&self.id)
-            .await
-            .map_err(|_| create_error!(InternalError))?;
+        let mut account = db.fetch_account(&self.id).await?;
 
-        account
-            .disable(&authifier)
-            .await
-            .map_err(|_| create_error!(InternalError))?;
+        account.disable(db).await?;
 
-        account
-            .delete_all_sessions(&authifier, None)
-            .await
-            .map_err(|_| create_error!(InternalError))?;
+        account.delete_all_sessions(db, None).await?;
 
         self.update(
             db,
@@ -749,18 +741,15 @@ impl User {
         .await?;
 
         if let Some(reason) = reason {
-            if let EmailVerificationConfig::Enabled { smtp, .. } =
-                authifier.config.email_verification
-            {
-                smtp.send_email(
+            let config = config().await;
+
+            if !config.api.smtp.host.is_empty() {
+                let templates = email_templates().await;
+
+                send_email(
+                    &config.api.smtp,
                     account.email.clone(),
-                    // maybe move this to common area?
-                    &Template {
-                        title: "Account Suspension".to_string(),
-                        html: Some(include_str!("../../../templates/suspension.html").to_owned()),
-                        text: include_str!("../../../templates/suspension.txt").to_owned(),
-                        url: Default::default(),
-                    },
+                    &templates.suspension,
                     json!({
                         "email": account.email,
                         "list": reason.join(", "),
@@ -809,7 +798,9 @@ impl User {
             db,
             PartialUser {
                 username: Some(format!("Deleted User {}", self.id)),
+                discriminator: Some("0000".to_string()),
                 flags: Some(2),
+                relations: Some(Vec::new()),
                 ..Default::default()
             },
             vec![
@@ -836,6 +827,51 @@ impl User {
         };
 
         badges
+    }
+
+    /// Removes all relationships which include the user
+    pub async fn clear_relationships(&self, db: &Database) -> Result<()> {
+        let user_ids = self
+            .relations
+            .iter()
+            .flatten()
+            .map(|relation| relation.id.clone())
+            .collect();
+
+        db.clear_user_relationships(&self.id, user_ids).await
+    }
+
+    /// Removes user from all joined groups
+    pub async fn remove_from_all_groups(&self, db: &Database) -> Result<()> {
+        let groups = db.find_group_message_channels(&self.id).await?
+            .into_iter().map(|channel| channel.id().to_string())
+            .collect();
+
+        db.remove_user_from_groups(groups, &self.id).await?;
+
+        Ok(())
+    }
+
+    /// Deletes the user along with:
+    /// - deletes owned bots, servers and messages
+    /// - removes user from all groups
+    /// - clears relationships
+    pub async fn delete(&mut self, db: &Database) -> Result<()> {
+        for bot in db.fetch_bots_by_user(&self.id).await? {
+            bot.delete(db).await?;
+        }
+
+        for server in db.fetch_owned_servers(&self.id).await? {
+            server.delete(db).await?;
+        }
+
+        self.remove_from_all_groups(db).await?;
+        db.clear_memberships(&self.id).await?;
+        self.clear_relationships(db).await?;
+        db.delete_messages_by_user(&self.id).await?;
+        self.mark_deleted(db).await?;
+
+        Ok(())
     }
 }
 

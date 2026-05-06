@@ -11,17 +11,16 @@ repository = "https://github.com/stoatchat/stoatchat"
 
 [features]
 # Databases
-mongodb = ["dep:mongodb", "bson", "authifier/database-mongodb"]
+mongodb = ["dep:mongodb", "bson"]
 
 # ... Other
 tasks = ["isahc", "linkify", "url-escape"]
-async-std-runtime = ["async-std", "authifier/async-std-runtime"]
+async-std-runtime = ["async-std"]
 rocket-impl = [
     "rocket",
     "schemars",
     "revolt_okapi",
     "revolt_rocket_okapi",
-    "authifier/rocket_impl",
 ]
 axum-impl = ["axum", "revolt-result/axum"]
 redis-is-patched = ["revolt-presence/redis-is-patched"]
@@ -54,6 +53,8 @@ linkify = { workspace = true, optional = true }
 url-escape = { workspace = true, optional = true }
 validator = { workspace = true, features = ["derive"] }
 isahc = { workspace = true, features = ["json"], optional = true }
+base32 = { workspace = true }
+sha1 = { workspace = true }
 
 # Serialisation
 serde_json = { workspace = true }
@@ -90,9 +91,6 @@ rocket = { workspace = true, features = ["json"], optional = true }
 revolt_okapi = { workspace = true, optional = true }
 revolt_rocket_okapi = { workspace = true, optional = true }
 
-# Authifier
-authifier = { workspace = true }
-
 # RabbitMQ
 amqprs = { workspace = true }
 
@@ -100,3 +98,14 @@ amqprs = { workspace = true }
 livekit-api = { workspace = true, optional = true }
 livekit-protocol = { workspace = true, optional = true }
 livekit-runtime = { workspace = true, features = ["tokio"], optional = true }
+
+# Security
+totp-lite = { workspace = true }
+rust-argon2 = { workspace = true }
+
+# Email
+lettre = { workspace = true }
+handlebars = { workspace = true }
+
+# Web Requests
+reqwest = { workspace = true, features = ["json", "form"] }

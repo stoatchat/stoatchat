@@ -16,7 +16,6 @@ use revolt_result::ToRevoltError;
 pub struct MessageConsumer {
     #[allow(dead_code)]
     db: Database,
-    authifier_db: authifier::Database,
     conn: Option<Connection>,
     channel: Option<Channel>,
 }
@@ -48,10 +47,9 @@ impl Channeled for MessageConsumer {
 }
 
 impl MessageConsumer {
-    pub fn new(db: Database, authifier_db: authifier::Database) -> MessageConsumer {
+    pub fn new(db: Database) -> MessageConsumer {
         MessageConsumer {
             db,
-            authifier_db,
             conn: None,
             channel: None,
         }
@@ -78,8 +76,8 @@ impl MessageConsumer {
         debug!("Received message event on origin");
 
         if let Ok(sessions) = self
-            .authifier_db
-            .find_sessions_with_subscription(&payload.users)
+            .db
+            .fetch_sessions_with_subscription(&payload.users)
             .await
         {
             let config = revolt_config::config().await;

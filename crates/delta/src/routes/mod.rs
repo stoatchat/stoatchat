@@ -17,6 +17,9 @@ mod servers;
 mod sync;
 mod users;
 mod webhooks;
+mod account;
+mod session;
+mod mfa;
 
 pub fn mount(config: Settings, mut rocket: Rocket<Build>) -> Rocket<Build> {
     let settings = OpenApiSettings::default();
@@ -33,9 +36,9 @@ pub fn mount(config: Settings, mut rocket: Rocket<Build>) -> Rocket<Build> {
             "/invites" => invites::routes(),
             "/custom" => customisation::routes(),
             "/safety" => safety::routes(),
-            "/auth/account" => rocket_authifier::routes::account::routes(),
-            "/auth/session" => rocket_authifier::routes::session::routes(),
-            "/auth/mfa" => rocket_authifier::routes::mfa::routes(),
+            "/auth/account" => account::routes(),
+            "/auth/session" => session::routes(),
+            "/auth/mfa" => mfa::routes(),
             "/onboard" => onboard::routes(),
             "/policy" => policy::routes(),
             "/push" => push::routes(),
@@ -54,9 +57,9 @@ pub fn mount(config: Settings, mut rocket: Rocket<Build>) -> Rocket<Build> {
             "/invites" => invites::routes(),
             "/custom" => customisation::routes(),
             "/safety" => safety::routes(),
-            "/auth/account" => rocket_authifier::routes::account::routes(),
-            "/auth/session" => rocket_authifier::routes::session::routes(),
-            "/auth/mfa" => rocket_authifier::routes::mfa::routes(),
+            "/auth/account" => account::routes(),
+            "/auth/session" => session::routes(),
+            "/auth/mfa" => mfa::routes(),
             "/onboard" => onboard::routes(),
             "/policy" => policy::routes(),
             "/push" => push::routes(),
@@ -76,9 +79,9 @@ pub fn mount(config: Settings, mut rocket: Rocket<Build>) -> Rocket<Build> {
             "/invites" => invites::routes(),
             "/custom" => customisation::routes(),
             "/safety" => safety::routes(),
-            "/auth/account" => rocket_authifier::routes::account::routes(),
-            "/auth/session" => rocket_authifier::routes::session::routes(),
-            "/auth/mfa" => rocket_authifier::routes::mfa::routes(),
+            "/auth/account" => account::routes(),
+            "/auth/session" => session::routes(),
+            "/auth/mfa" => mfa::routes(),
             "/onboard" => onboard::routes(),
             "/push" => push::routes(),
             "/sync" => sync::routes(),
@@ -96,9 +99,9 @@ pub fn mount(config: Settings, mut rocket: Rocket<Build>) -> Rocket<Build> {
             "/invites" => invites::routes(),
             "/custom" => customisation::routes(),
             "/safety" => safety::routes(),
-            "/auth/account" => rocket_authifier::routes::account::routes(),
-            "/auth/session" => rocket_authifier::routes::session::routes(),
-            "/auth/mfa" => rocket_authifier::routes::mfa::routes(),
+            "/auth/account" => account::routes(),
+            "/auth/session" => session::routes(),
+            "/auth/mfa" => mfa::routes(),
             "/onboard" => onboard::routes(),
             "/push" => push::routes(),
             "/sync" => sync::routes()

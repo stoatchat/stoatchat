@@ -28,7 +28,6 @@ revolt_rocket_okapi = { workspace = true, optional = true }
 axum = { workspace = true, optional = true, features = ["macros"] }
 
 serde = { workspace = true }
-authifier = { workspace = true }
 dashmap = { workspace = true }
 async-trait = { workspace = true }
 log = { workspace = true }

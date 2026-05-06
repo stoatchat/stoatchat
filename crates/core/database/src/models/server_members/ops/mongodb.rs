@@ -326,6 +326,15 @@ impl AbstractServerMembers for MongoDb {
             .map(|_| ())
             .map_err(|_| create_database_error!("count_documents", COL))
     }
+
+    /// Removes a user from every server they are in
+    async fn clear_memberships(&self, user_id: &str) -> Result<()> {
+        self.col::<Member>(COL)
+            .delete_many(doc! { "_id.user": user_id })
+            .await
+            .map(|_| ())
+            .map_err(|_| create_database_error!("delete_many", COL))
+    }
 }
 
 impl IntoDocumentPath for FieldsMember {

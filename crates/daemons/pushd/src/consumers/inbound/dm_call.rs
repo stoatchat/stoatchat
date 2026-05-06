@@ -15,7 +15,6 @@ use revolt_database::{events::rabbit::*, Database};
 pub struct DmCallConsumer {
     #[allow(dead_code)]
     db: Database,
-    authifier_db: authifier::Database,
     conn: Option<Connection>,
     channel: Option<Channel>,
 }
@@ -47,10 +46,9 @@ impl Channeled for DmCallConsumer {
 }
 
 impl DmCallConsumer {
-    pub fn new(db: Database, authifier_db: authifier::Database) -> DmCallConsumer {
+    pub fn new(db: Database) -> DmCallConsumer {
         DmCallConsumer {
             db,
-            authifier_db,
             conn: None,
             channel: None,
         }
@@ -96,7 +94,7 @@ impl DmCallConsumer {
         let config = revolt_config::config().await;
 
         for user_id in call_recipients {
-            if let Ok(sessions) = self.authifier_db.find_sessions(&user_id).await {
+            if let Ok(sessions) = self.db.fetch_sessions(&user_id).await {
                 for session in sessions {
                     if let Some(sub) = session.subscription {
                         let mut sendable = PayloadToService {

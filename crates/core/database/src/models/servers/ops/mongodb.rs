@@ -1,5 +1,5 @@
 use bson::{to_document, Bson, Document};
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use revolt_result::Result;
 
 use crate::{FieldsRole, FieldsServer, PartialRole, PartialServer, Role, Server};
@@ -41,6 +41,17 @@ impl AbstractServers for MongoDb {
             })
             .collect()
             .await)
+    }
+
+    async fn fetch_owned_servers(&self, user_id: &str) -> Result<Vec<Server>> {
+        query!(
+            self,
+            find,
+            COL,
+            doc! {
+                "owner": user_id
+            }
+        )
     }
 
     /// Update a server with new information

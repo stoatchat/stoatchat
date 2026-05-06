@@ -6,12 +6,11 @@ use amqprs::{
     BasicProperties, Deliver,
 };
 use async_trait::async_trait;
-use revolt_database::{events::rabbit::*, Database};
+use revolt_database::{Database, Session, events::rabbit::*};
 
 pub struct AckConsumer {
     #[allow(dead_code)]
     db: Database,
-    authifier_db: authifier::Database,
     conn: Option<Connection>,
     channel: Option<Channel>,
 }
@@ -43,10 +42,9 @@ impl Channeled for AckConsumer {
 }
 
 impl AckConsumer {
-    pub fn new(db: Database, authifier_db: authifier::Database) -> AckConsumer {
+    pub fn new(db: Database) -> AckConsumer {
         AckConsumer {
             db,
-            authifier_db,
             conn: None,
             channel: None,
         }
@@ -85,11 +83,11 @@ impl AsyncConsumer for AckConsumer {
             return;
         }
 
-        if let Ok(sessions) = self.authifier_db.find_sessions(&payload.user_id).await {
+        if let Ok(sessions) = self.db.fetch_sessions(&payload.user_id).await {
             let config = revolt_config::config().await;
             // Step 2: find any apple sessions, since we don't need to calculate this for anything else.
             // If there's no apple sessions, we can return early
-            let apple_sessions: Vec<&authifier::models::Session> = sessions
+            let apple_sessions: Vec<&Session> = sessions
                 .iter()
                 .filter(|session| {
                     if let Some(sub) = &session.subscription {

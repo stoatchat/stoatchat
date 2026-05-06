@@ -200,4 +200,13 @@ impl AbstractServerMembers for ReferenceDb {
     async fn remove_dangling_members(&self) -> Result<()> {
         todo!()
     }
+
+    /// Removes a user from every server they are in
+    async fn clear_memberships(&self, user_id: &str) -> Result<()> {
+        let mut server_members = self.server_members.lock().await;
+
+        server_members.retain(|_, v| v.id.user != user_id);
+
+        Ok(())
+    }
 }

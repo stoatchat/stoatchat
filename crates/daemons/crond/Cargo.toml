@@ -15,6 +15,7 @@ log = { workspace = true }
 
 # Async
 tokio = { workspace = true }
+futures = { workspace = true }
 
 # Core
 revolt-database = { workspace = true }

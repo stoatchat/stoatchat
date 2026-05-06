@@ -69,6 +69,19 @@ impl AbstractChannels for MongoDb {
         )
     }
 
+    // Fetch all group dms for a user
+    async fn find_group_message_channels(&self, user_id: &str) -> Result<Vec<Channel>> {
+        query!(
+            self,
+            find,
+            COL,
+            doc! {
+                "channel_type": "Group",
+                "recipients": user_id
+            }
+        )
+    }
+
     // Fetch saved messages channel
     async fn find_saved_messages_channel(&self, user_id: &str) -> Result<Channel> {
         query!(
@@ -180,13 +193,29 @@ impl AbstractChannels for MongoDb {
             .map_err(|_| create_database_error!("update_one", "channels"))
     }
 
+    // Remove a user from all specified groups
+    async fn remove_user_from_groups(&self, channel_ids: Vec<String>, user_id: &str) -> Result<()> {
+        self.col::<Document>(COL)
+            .update_many(
+                doc! {
+                    "_id": { "$in": channel_ids },
+                },
+                doc! {
+                    "$pull": {
+                        "recipients": user_id
+                    }
+                },
+            )
+            .await
+            .map(|_| ())
+            .map_err(|_| create_database_error!("update_many", COL))
+    }
+
     // Delete a channel
     async fn delete_channel(&self, channel: &Channel) -> Result<()> {
         let id = channel.id().to_string();
         let server_id = match channel {
-            Channel::TextChannel { server, .. } => {
-                Some(server)
-            }
+            Channel::TextChannel { server, .. } => Some(server),
             _ => None,
         };
 

@@ -49,6 +49,10 @@ from_address = "noreply@example.com"
 # port = 587
 # use_tls = true
 
+[api.smtp.expiry]
+expire_verification = 604800  # 3600 * 24 * 7
+expire_password_reset = 86400  # 3600 * 24
+expire_account_deletion = 86400  # 3600 * 24
 
 [api.security]
 # Authifier Shield API key
@@ -66,6 +70,10 @@ tenor_key = ""
 # hCaptcha configuration
 hcaptcha_key = ""
 hcaptcha_sitekey = ""
+
+[api.security.shield]
+host = ""
+key = ""
 
 [api.workers]
 # Maximum concurrent connections (to proxy server)

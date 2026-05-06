@@ -1,9 +1,10 @@
-use std::{collections::HashMap, path::Path};
+#[cfg(feature = "test")]
+use std::sync::OnceLock;
+use std::{collections::HashMap, path::Path, sync::LazyLock};
 
 use cached::proc_macro::cached;
 use config::{Config, Environment, File, FileFormat};
 use futures_locks::RwLock;
-use once_cell::sync::Lazy;
 use serde::Deserialize;
 
 #[cfg(feature = "sentry")]
@@ -66,12 +67,27 @@ static CONFIG_SEARCH_PATHS: [&str; 3] = [
 static TEST_OVERRIDE_PATH: &str = "Revolt.test-overrides.toml";
 
 /// Configuration builder
-static CONFIG_BUILDER: Lazy<RwLock<Config>> = Lazy::new(|| {
+static CONFIG_BUILDER: LazyLock<RwLock<Config>> = LazyLock::new(|| {
     RwLock::new({
         let mut builder = Config::builder().add_source(File::from_str(
             include_str!("../Revolt.toml"),
             FileFormat::Toml,
         ));
+
+        let cwd = std::env::current_dir().unwrap();
+        let mut cwd: Option<&Path> = Some(&cwd);
+
+        while let Some(path) = cwd {
+            for config_path in CONFIG_SEARCH_PATHS {
+                let config_path = path.join(config_path);
+                if config_path.exists() {
+                    builder = builder
+                        .add_source(File::new(config_path.to_str().unwrap(), FileFormat::Toml));
+                }
+            }
+
+            cwd = path.parent();
+        }
 
         if std::env::var("TEST_DB").is_ok() {
             builder = builder.add_source(File::from_str(
@@ -92,21 +108,6 @@ static CONFIG_BUILDER: Lazy<RwLock<Config>> = Lazy::new(|| {
                     path = current_path.parent();
                 }
             }
-        }
-
-        let cwd = std::env::current_dir().unwrap();
-        let mut cwd: Option<&Path> = Some(&cwd);
-
-        while let Some(path) = cwd {
-            for config_path in CONFIG_SEARCH_PATHS {
-                let config_path = path.join(config_path);
-                if config_path.exists() {
-                    builder = builder
-                        .add_source(File::new(config_path.to_str().unwrap(), FileFormat::Toml));
-                }
-            }
-
-            cwd = path.parent();
         }
 
         builder = builder.add_source(Environment::with_prefix("REVOLT").separator("__"));
@@ -155,6 +156,18 @@ pub struct ApiSmtp {
     pub port: Option<i32>,
     pub use_tls: Option<bool>,
     pub use_starttls: Option<bool>,
+    pub expiry: EmailExpiry,
+}
+
+/// Email expiration config
+#[derive(Deserialize, Debug, Clone)]
+pub struct EmailExpiry {
+    /// How long email verification codes should last for (in seconds)
+    pub expire_verification: i64,
+    /// How long password reset codes should last for (in seconds)
+    pub expire_password_reset: i64,
+    /// How long account deletion codes should last for (in seconds)
+    pub expire_account_deletion: i64,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -195,8 +208,14 @@ pub struct ApiSecurityCaptcha {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct ApiSecurityShield {
+    pub host: String,
+    pub key: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct ApiSecurity {
-    pub authifier_shield_key: String,
+    pub shield: ApiSecurityShield,
     pub voso_legacy_token: String,
     pub captcha: ApiSecurityCaptcha,
     pub trust_cloudflare: bool,
@@ -451,8 +470,7 @@ pub async fn read() -> Config {
     CONFIG_BUILDER.read().await.clone()
 }
 
-#[cached(time = 30)]
-pub async fn config() -> Settings {
+pub async fn config_no_cache() -> Settings {
     let mut config = read().await.try_deserialize::<Settings>().unwrap();
 
     // inject REDIS_URI for redis-kiss library
@@ -468,6 +486,34 @@ pub async fn config() -> Settings {
     }
 
     config
+}
+
+#[cached(time = 30)]
+pub async fn config() -> Settings {
+    #[cfg(feature = "test")]
+    if let Some(overwrites) = CONFIG_OVERWRITES.get() {
+        return overwrites.clone();
+    }
+
+    config_no_cache().await
+}
+
+#[cfg(feature = "test")]
+static CONFIG_OVERWRITES: OnceLock<Settings> = OnceLock::new();
+
+/// Modify the config values for a test, this can only be called once
+///
+/// This will also fail if two or more tests are running in the same process and both try to modify the config,
+/// This could happen if tests where run under `cargo test` instead of `nextest`.
+#[cfg(feature = "test")]
+pub async fn overwrite_config(f: impl FnOnce(&mut Settings)) {
+    let mut config = config_no_cache().await;
+
+    f(&mut config);
+
+    CONFIG_OVERWRITES.set(config).expect(
+        "Cannot overwrite config multiple times, make sure you are running tests through nextest.",
+    );
 }
 
 /// Configure logging and common Rust variables

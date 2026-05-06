@@ -56,7 +56,6 @@ lettre = { workspace = true }
 rocket = { workspace = true, features = ["json"] }
 rocket_cors = { workspace = true }
 rocket_empty = { workspace = true, features = ["schema"] }
-rocket_authifier = { workspace = true }
 rocket_prometheus = { workspace = true }
 
 # spec generation
@@ -67,7 +66,6 @@ revolt_rocket_okapi = { workspace = true, features = ["swagger"] }
 amqprs = { workspace = true }
 
 # core
-authifier = { workspace = true }
 revolt-config = { workspace = true }
 revolt-database = { workspace = true, features = [
     "rocket-impl",
@@ -87,6 +85,9 @@ revolt-ratelimits = { workspace = true, features = ["rocket"] }
 # voice
 livekit-api = { workspace = true }
 livekit-protocol = { workspace = true }
+
+[dev-dependencies]
+revolt-config = { workspace = true, features = ["test"] }
 
 [build-dependencies]
 vergen = { workspace = true }
