@@ -27,6 +27,8 @@ tokio = { workspace = true, features = [] }
 
 # Web requests
 reqwest = { workspace = true, features = ["json"] }
+pdk-ip-filter-lib = "1.8.0"
+url = { workspace = true }
 
 # Logging
 tracing = { workspace = true }
