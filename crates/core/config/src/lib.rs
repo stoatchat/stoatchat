@@ -310,6 +310,11 @@ impl Pushd {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct January {
+    pub blocked_domains: Vec<String>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct FilesLimit {
     pub min_file_size: usize,
     pub min_resolution: [usize; 2],
@@ -385,6 +390,16 @@ pub struct FeaturesLimitsCollection {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct LegalLinks {
+    /// Terms of Service URL
+    pub terms_of_service: String,
+    /// Privacy Policy URL
+    pub privacy_policy: String,
+    /// Guidelines URL
+    pub guidelines: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct FeaturesAdvanced {
     #[serde(default)]
     pub process_message_delay_limit: u16,
@@ -401,6 +416,7 @@ impl Default for FeaturesAdvanced {
 #[derive(Deserialize, Debug, Clone)]
 pub struct Features {
     pub limits: FeaturesLimitsCollection,
+    pub legal_links: LegalLinks,
     pub webhooks_enabled: bool,
     pub mass_mentions_send_notifications: bool,
     pub mass_mentions_enabled: bool,
@@ -428,6 +444,7 @@ pub struct Settings {
     pub hosts: Hosts,
     pub api: Api,
     pub pushd: Pushd,
+    pub january: January,
     pub files: Files,
     pub features: Features,
     pub sentry: Sentry,
