@@ -21,7 +21,7 @@ redis-kiss = { workspace = true }
 
 # RabbitMQ
 lapin = { workspace = true }
-futures-lite = "2.6.1"
+futures-lite = { workspace = true }
 
 # Processing
 serde_json = { workspace = true }

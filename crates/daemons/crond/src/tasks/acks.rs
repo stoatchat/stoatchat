@@ -86,7 +86,6 @@ pub async fn task(db: Database) -> Result<()> {
     Ok(())
 }
 
-/// Process an ack and return the message id that is being acked.
 #[allow(clippy::disallowed_methods)]
 async fn process_channel_ack(
     db: &Database,
