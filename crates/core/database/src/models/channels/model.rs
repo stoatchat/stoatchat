@@ -653,7 +653,7 @@ impl Channel {
         .private(user.to_string())
         .await;
 
-        crate::util::acker::ack(user, self.id(), message, amqp).await
+        crate::util::acker::ack_channel(user, self.id(), message, amqp).await
     }
 
     /// Remove user from a group

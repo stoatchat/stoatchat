@@ -12,7 +12,6 @@ use amqprs::{BasicProperties, FieldTable};
 use revolt_models::v0::PushNotification;
 use revolt_presence::filter_online;
 
-use revolt_result::ToRevoltError;
 use serde_json::to_string;
 
 #[derive(Clone)]
@@ -361,12 +360,18 @@ impl AMQP {
     }
 
     /// # Send an ack to crond for processing
-    pub async fn process_ack(&self, user_id: &str, channel_id: &str) -> Result<(), AMQPError> {
+    pub async fn process_ack(
+        &self,
+        user_id: &str,
+        channel_id: Option<&str>,
+        server_id: Option<&str>,
+    ) -> Result<(), AMQPError> {
         let config = revolt_config::config().await;
 
         let payload = AckEventPayload {
             user_id: user_id.to_string(),
-            channel_id: channel_id.to_string(),
+            channel_id: channel_id.map(|value| value.to_string()),
+            server_id: server_id.map(|value| value.to_string()),
         };
         let payload = to_string(&payload).unwrap();
 

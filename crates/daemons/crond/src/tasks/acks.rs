@@ -9,7 +9,7 @@ use log::info;
 use redis_kiss::{get_connection, AsyncCommands, Conn as RedisConnection};
 use revolt_config::config;
 use revolt_database::{events::rabbit::AckEventPayload, Database};
-use revolt_result::{create_error, Result, ToRevoltError};
+use revolt_result::{Result, ToRevoltError};
 use serde_json;
 
 pub async fn task(db: Database) -> Result<()> {
@@ -61,7 +61,15 @@ pub async fn task(db: Database) -> Result<()> {
             let payload: std::result::Result<AckEventPayload, _> =
                 serde_json::from_slice(&delivery.data);
             if let Ok(payload) = payload {
-                if let Err(e) = process_task(&db, payload, &mut redis).await {
+                info!("{:?}", payload);
+                if let Err(e) = process_channel_ack(
+                    &db,
+                    payload.user_id,
+                    payload.channel_id.unwrap(),
+                    &mut redis,
+                )
+                .await
+                {
                     revolt_config::capture_error(&e);
                     _ = delivery.reject(BasicRejectOptions { requeue: false }).await;
                 } else {
@@ -78,15 +86,14 @@ pub async fn task(db: Database) -> Result<()> {
     Ok(())
 }
 
+/// Process an ack and return the message id that is being acked.
 #[allow(clippy::disallowed_methods)]
-async fn process_task(
+async fn process_channel_ack(
     db: &Database,
-    payload: AckEventPayload,
+    user: String,
+    channel: String,
     redis: &mut RedisConnection,
 ) -> Result<()> {
-    let user = payload.user_id;
-    let channel = payload.channel_id;
-
     let message_id: Option<String> = redis
         .get_del(format!("acker:{user}+{channel}"))
         .await

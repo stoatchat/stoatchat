@@ -34,3 +34,4 @@ revolt-database = { workspace = true }
 revolt-result = { workspace = true }
 revolt-config = { workspace = true }
 revolt-files = { workspace = true }
+revolt-permissions = { workspace = true }
