@@ -1,5 +1,6 @@
 use std::io::Cursor;
 
+use crate::utils::apply_icc_profile;
 use image::{GenericImageView, ImageError, ImageReader};
 use revolt_database::Metadata;
 use revolt_files::{image_size, is_animated, video_size};
@@ -36,20 +37,7 @@ pub fn generate_metadata(f: &NamedTempFile, mime_type: &str) -> Metadata {
                     let mut img = image::DynamicImage::from_decoder(decoder).ok()?;
 
                     if let Some(icc) = icc_profile {
-                        if let Ok(src_profile) = lcms2::Profile::new_icc(&icc) {
-                            let dst_profile = lcms2::Profile::new_srgb();
-                            if let Ok(t) = lcms2::Transform::new(
-                                &src_profile,
-                                lcms2::PixelFormat::RGBA_8,
-                                &dst_profile,
-                                lcms2::PixelFormat::RGBA_8,
-                                lcms2::Intent::Perceptual,
-                            ) {
-                                let mut rgba_image = img.into_rgba8();
-                                t.transform_in_place(rgba_image.as_mut());
-                                img = image::DynamicImage::ImageRgba8(rgba_image);
-                            }
-                        }
+                        img = apply_icc_profile(img, &icc);
                     }
 
                     let img = img.thumbnail(100, 100);

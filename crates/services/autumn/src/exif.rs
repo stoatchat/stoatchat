@@ -1,12 +1,23 @@
 use std::io::{Cursor, Read};
 
+use crate::utils::apply_icc_profile;
 use exif::Reader;
-use image::{ImageEncoder, ImageFormat, ImageReader};
+use image::{ImageEncoder, ImageReader};
 use revolt_config::report_internal_error;
 use revolt_database::Metadata;
 use revolt_result::{create_error, Result};
 use tempfile::NamedTempFile;
 use tokio::process::Command;
+
+macro_rules! encode_with_icc {
+    ($encoder:expr, $icc:expr, $image:expr, $width:expr, $height:expr, $color:expr) => {{
+        let mut encoder = $encoder;
+        if let Some(icc) = $icc {
+            let _ = encoder.set_icc_profile(icc.clone());
+        }
+        encoder.write_image($image, $width, $height, $color)
+    }};
+}
 
 /// Strip EXIF data from given file and produce new file and metadata
 pub async fn strip_metadata(
@@ -84,34 +95,8 @@ pub async fn strip_metadata(
                 };
 
                 if let Some(icc) = &icc_profile {
-                    if let Ok(src_profile) = lcms2::Profile::new_icc(icc) {
-                        let dst_profile = lcms2::Profile::new_srgb();
-
-                        let format = if image.color().has_alpha() {
-                            lcms2::PixelFormat::RGBA_8
-                        } else {
-                            lcms2::PixelFormat::RGB_8
-                        };
-
-                        if let Ok(t) = lcms2::Transform::new(
-                            &src_profile,
-                            format,
-                            &dst_profile,
-                            format,
-                            lcms2::Intent::Perceptual,
-                        ) {
-                            if image.color().has_alpha() {
-                                let mut rgba_image = image.into_rgba8();
-                                t.transform_in_place(rgba_image.as_mut());
-                                image = image::DynamicImage::ImageRgba8(rgba_image);
-                            } else {
-                                let mut rgb_image = image.into_rgb8();
-                                t.transform_in_place(rgb_image.as_mut());
-                                image = image::DynamicImage::ImageRgb8(rgb_image);
-                            }
-                            icc_profile = None;
-                        }
-                    }
+                    image = apply_icc_profile(image, icc);
+                    icc_profile = None;
                 }
 
                 let color_type = image.color();
@@ -119,40 +104,39 @@ pub async fn strip_metadata(
                 let height = image.height();
 
                 report_internal_error!(match mime {
-                    "image/jpeg" => {
-                        let mut encoder = image::codecs::jpeg::JpegEncoder::new(&mut writer);
-                        if let Some(icc) = &icc_profile {
-                            let _ = encoder.set_icc_profile(icc.clone());
-                        }
-                        encoder.write_image(image.as_bytes(), width, height, color_type.into())
-                    }
-                    "image/png" => {
-                        let mut encoder = image::codecs::png::PngEncoder::new(&mut writer);
-                        if let Some(icc) = &icc_profile {
-                            let _ = encoder.set_icc_profile(icc.clone());
-                        }
-                        encoder.write_image(image.as_bytes(), width, height, color_type.into())
-                    }
+                    "image/jpeg" => encode_with_icc!(
+                        image::codecs::jpeg::JpegEncoder::new(&mut writer),
+                        &icc_profile,
+                        image.as_bytes(),
+                        width,
+                        height,
+                        color_type.into()
+                    ),
+                    "image/png" => encode_with_icc!(
+                        image::codecs::png::PngEncoder::new(&mut writer),
+                        &icc_profile,
+                        image.as_bytes(),
+                        width,
+                        height,
+                        color_type.into()
+                    ),
                     "image/avif" => {
                         // avif encoder doesn't implement set_icc_profile currently
-                        let encoder = image::codecs::avif::AvifEncoder::new(&mut writer);
-                        encoder.write_image(image.as_bytes(), width, height, color_type.into())
+                        image::codecs::avif::AvifEncoder::new(&mut writer).write_image(
+                            image.as_bytes(),
+                            width,
+                            height,
+                            color_type.into(),
+                        )
                     }
-                    "image/tiff" => {
-                        let mut encoder = image::codecs::tiff::TiffEncoder::new(&mut writer);
-                        if let Some(icc) = &icc_profile {
-                            let _ = encoder.set_icc_profile(icc.clone());
-                        }
-                        encoder.write_image(image.as_bytes(), width, height, color_type.into())
-                    }
-                    "image/webp" => {
-                        let mut encoder =
-                            image::codecs::webp::WebPEncoder::new_lossless(&mut writer);
-                        if let Some(icc) = &icc_profile {
-                            let _ = encoder.set_icc_profile(icc.clone());
-                        }
-                        encoder.write_image(image.as_bytes(), width, height, color_type.into())
-                    }
+                    "image/tiff" => encode_with_icc!(
+                        image::codecs::tiff::TiffEncoder::new(&mut writer),
+                        &icc_profile,
+                        image.as_bytes(),
+                        width,
+                        height,
+                        color_type.into()
+                    ),
                     _ => unreachable!(),
                 })?;
 
