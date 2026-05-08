@@ -61,7 +61,7 @@ secret = "ZjCofRlfm6GGtjlifmNpCDkcQbEIIVC0"
 # S3 protocol endpoint
 endpoint = "http://127.0.0.1:14009"
 # S3 region name
-region = "minio"
+region = "us-east-1"
 # S3 protocol key ID
 access_key_id = "minioautumn"
 # S3 protocol access key
