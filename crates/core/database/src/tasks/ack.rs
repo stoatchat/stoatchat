@@ -105,7 +105,11 @@ pub async fn handle_ack_event(
 
                 if mentions_acked > 0 {
                     if let Err(err) = amqp
-                        .ack_message(user.to_string(), channel.to_string(), id.to_owned())
+                        .ack_notification_message(
+                            user.to_string(),
+                            channel.to_string(),
+                            id.to_owned(),
+                        )
                         .await
                     {
                         revolt_config::capture_error(&err);
@@ -192,9 +196,7 @@ pub async fn handle_ack_event(
                     .expect("Failed to fetch channel from db");
 
                 if let TextChannel { server, .. } = channel {
-                    if let Err(err) =
-                        amqp.mass_mention_message_sent(server, mass_mentions).await
-                    {
+                    if let Err(err) = amqp.mass_mention_message_sent(server, mass_mentions).await {
                         revolt_config::capture_error(&err);
                     }
                 } else {

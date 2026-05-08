@@ -38,6 +38,7 @@ revolt-models = { workspace = true, features = ["validator"] }
 revolt-presence = { workspace = true }
 revolt-permissions = { workspace = true, features = ["serde", "bson"] }
 revolt-parser = { workspace = true }
+revolt-coalesced = { workspace = true }
 
 # Utility
 log = { workspace = true }

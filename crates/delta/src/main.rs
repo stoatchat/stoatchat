@@ -24,8 +24,8 @@ use amqprs::{
 };
 use async_std::channel::unbounded;
 use authifier::AuthifierEvent;
-use rocket::data::ToByteUnit;
 use revolt_database::voice::VoiceClient;
+use rocket::data::ToByteUnit;
 
 pub async fn web() -> Rocket<Build> {
     // Get settings
@@ -93,22 +93,6 @@ pub async fn web() -> Rocket<Build> {
     )
     .into();
 
-    let swagger_0_8 = revolt_rocket_okapi::swagger_ui::make_swagger_ui(
-        &revolt_rocket_okapi::swagger_ui::SwaggerUIConfig {
-            url: "/0.8/openapi.json".to_owned(),
-            ..Default::default()
-        },
-    )
-    .into();
-
-    let swagger_0_8 = revolt_rocket_okapi::swagger_ui::make_swagger_ui(
-        &revolt_rocket_okapi::swagger_ui::SwaggerUIConfig {
-            url: "/0.8/openapi.json".to_owned(),
-            ..Default::default()
-        },
-    )
-    .into();
-
     // Voice handler
     let voice_client = VoiceClient::new(config.api.livekit.nodes.clone());
     // Configure Rabbit
@@ -136,6 +120,9 @@ pub async fn web() -> Rocket<Build> {
         .expect("Failed to declare exchange");
 
     let amqp = AMQP::new(connection, channel);
+    amqp.configure_channels()
+        .await
+        .expect("Failed to configure channels");
 
     // Launch background task workers
     revolt_database::tasks::start_workers(db.clone(), amqp.clone());
@@ -153,7 +140,6 @@ pub async fn web() -> Rocket<Build> {
         .mount("/", rocket_cors::catch_all_options_routes())
         .mount("/", ratelimiter::routes())
         .mount("/swagger/", swagger)
-        .mount("/0.8/swagger/", swagger_0_8)
         .manage(authifier)
         .manage(db)
         .manage(amqp)
