@@ -1,6 +1,6 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, User,
+    Database, User, AMQP,
 };
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
@@ -14,6 +14,7 @@ use rocket_empty::EmptyResponse;
 #[put("/<target>/ack/<message>")]
 pub async fn ack(
     db: &State<Database>,
+    amqp: &State<AMQP>,
     user: User,
     target: Reference<'_>,
     message: Reference<'_>,
@@ -29,7 +30,7 @@ pub async fn ack(
         .throw_if_lacking_channel_permission(ChannelPermission::ViewChannel)?;
 
     channel
-        .ack(&user.id, message.id)
+        .ack(&user.id, message.id, amqp)
         .await
         .map(|_| EmptyResponse)
 }

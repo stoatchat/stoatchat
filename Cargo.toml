@@ -159,6 +159,7 @@ authifier = "1.0.16"
 
 # RabbitMQ
 amqprs = "1.7.0"
+lapin = "4.7.1"
 
 # Voice
 livekit-api = "0.4.4"
@@ -184,6 +185,7 @@ url = "2.2.2"
 impl_ops = "0.1.1"
 lazy_static = "1.5.0"
 mime = "0.3.17"
+futures-lite = "2.6.1"
 
 # Build Dependencies
 vergen = "7.5.0"

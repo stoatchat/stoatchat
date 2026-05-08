@@ -1,6 +1,6 @@
 use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, User,
+    util::{acker, permissions::DatabasePermissionQuery, reference::Reference},
+    Database, User, AMQP,
 };
 use revolt_permissions::PermissionQuery;
 use revolt_result::{create_error, Result};
@@ -12,7 +12,12 @@ use rocket_empty::EmptyResponse;
 /// Mark all channels in a server as read.
 #[openapi(tag = "Server Information")]
 #[put("/<target>/ack")]
-pub async fn ack(db: &State<Database>, user: User, target: Reference<'_>) -> Result<EmptyResponse> {
+pub async fn ack(
+    db: &State<Database>,
+    amqp: &State<AMQP>,
+    user: User,
+    target: Reference<'_>,
+) -> Result<EmptyResponse> {
     if user.bot.is_some() {
         return Err(create_error!(IsBot));
     }
@@ -23,7 +28,6 @@ pub async fn ack(db: &State<Database>, user: User, target: Reference<'_>) -> Res
         return Err(create_error!(NotFound));
     }
 
-    db.acknowledge_channels(&user.id, &server.channels)
-        .await
-        .map(|_| EmptyResponse)
+    acker::ack_server(&user, &server, db, amqp).await?;
+    Ok(EmptyResponse)
 }

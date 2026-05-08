@@ -2,7 +2,10 @@ use std::collections::HashSet;
 
 use crate::events::rabbit::*;
 use crate::User;
-use amqprs::channel::{BasicPublishArguments, ExchangeDeclareArguments};
+use amqprs::channel::{
+    BasicPublishArguments, ExchangeDeclareArguments, ExchangeType, QueueBindArguments,
+    QueueDeclareArguments,
+};
 use amqprs::connection::OpenConnectionArguments;
 use amqprs::{channel::Channel, connection::Connection, error::Error as AMQPError};
 use amqprs::{BasicProperties, FieldTable};
@@ -53,6 +56,43 @@ impl AMQP {
             .expect("Failed to declare exchange");
 
         AMQP::new(connection, channel)
+    }
+
+    pub async fn configure_channels(&self) -> revolt_result::Result<()> {
+        let config = revolt_config::config().await;
+
+        self.channel
+            .exchange_declare(
+                ExchangeDeclareArguments::new(
+                    &config.rabbit.default_exchange,
+                    &ExchangeType::Topic.to_string(),
+                )
+                .durable(true)
+                .finish(),
+            )
+            .await
+            .expect("Failed to declare exchange");
+
+        // Configure acks channel & routing
+        self.channel
+            .queue_declare(
+                QueueDeclareArguments::new(&config.rabbit.queues.acks)
+                    .durable(true)
+                    .no_wait(true)
+                    .finish(),
+            )
+            .await
+            .expect("Failed to bind queue");
+
+        self.channel
+            .queue_bind(QueueBindArguments::new(
+                &config.rabbit.queues.acks,
+                &config.rabbit.default_exchange,
+                &config.rabbit.queues.acks,
+            ))
+            .await
+            .expect("Failed to bind channel");
+        Ok(())
     }
 
     pub async fn friend_request_accepted(
@@ -232,7 +272,9 @@ impl AMQP {
             .await
     }
 
-    pub async fn ack_message(
+    /// # Sends an ack to pushd to update badges on iPhones.
+    /// Not to be confused with the process_ack function, which handles sending all acks to crond for processing.
+    pub async fn ack_notification_message(
         &self,
         user_id: String,
         channel_id: String,
@@ -312,6 +354,43 @@ impl AMQP {
                 BasicPublishArguments::new(
                     &config.pushd.exchange,
                     &config.pushd.get_dm_call_routing_key(),
+                ),
+            )
+            .await
+    }
+
+    /// # Send an ack to crond for processing
+    pub async fn process_ack(
+        &self,
+        user_id: &str,
+        channel_id: Option<&str>,
+        server_id: Option<&str>,
+    ) -> Result<(), AMQPError> {
+        let config = revolt_config::config().await;
+
+        let payload = AckEventPayload {
+            user_id: user_id.to_string(),
+            channel_id: channel_id.map(|value| value.to_string()),
+            server_id: server_id.map(|value| value.to_string()),
+        };
+        let payload = to_string(&payload).unwrap();
+
+        info!(
+            "Sending ack processor event on exchange {}, channel {}: {}",
+            config.rabbit.default_exchange, config.rabbit.queues.acks, payload
+        );
+
+        self.channel
+            .basic_publish(
+                BasicProperties::default()
+                    .with_content_type("application/json")
+                    .with_persistence(true)
+                    //.with_headers(headers)
+                    .finish(),
+                payload.into(),
+                BasicPublishArguments::new(
+                    &config.rabbit.default_exchange,
+                    &config.rabbit.queues.acks,
                 ),
             )
             .await
