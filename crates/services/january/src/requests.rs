@@ -10,9 +10,10 @@ use reqwest::{
 use revolt_config::{config, report_internal_error};
 use revolt_files::{create_thumbnail, decode_image, image_size_vec, is_valid_image, video_size};
 use revolt_models::v0::{Embed, Image, ImageSize, Video};
-use revolt_result::{create_error, Error, Result};
+use revolt_result::{create_error, Error, Result, ToRevoltError};
 use std::{
     io::{Cursor, Write},
+    str::FromStr,
     time::Duration,
 };
 use url::{Host, Url};
@@ -22,15 +23,7 @@ lazy_static! {
     static ref CLIENT: Client = reqwest::Client::builder()
         .timeout(Duration::from_secs(10)) // TODO config
         .connect_timeout(Duration::from_secs(5)) // TODO config
-        .redirect(redirect::Policy::custom(|attempt| {
-            if attempt.previous().len() > 5 { // TODO config
-                attempt.error("too many redirects")
-            } else if attempt.url().host_str() == Some("proxy.stoatusercontent.com") { // TODO config
-                attempt.stop()
-            } else {
-                attempt.follow()
-            }
-        }))
+        .redirect(redirect::Policy::none())
         .build()
         .expect("reqwest Client");
 
@@ -38,6 +31,7 @@ lazy_static! {
     static ref RE_USER_AGENT_SPOOFING_AS_DISCORD: Regex = Regex::new("^(?:(?:vx|fx)?twitter|(?:fixv|fixup)?x|(?:old\\.|new\\.|www\\.)reddit).com").expect("valid regex");
 
     /// Regex for matching new Reddit URLs
+    static ref RE_URL_NEW_REDDIT: Regex = Regex::new("^(?:(?:new\\.|www\\.)?reddit).com").expect("valid regex");
     static ref RE_URL_NEW_REDDIT: Regex = Regex::new("^(?:(?:new\\.|www\\.)?reddit).com").expect("valid regex");
 
     /// Regex for matching YouTube Shorts URLs
@@ -66,25 +60,14 @@ lazy_static! {
         .build();
 
     static ref IP_BLOCKLIST: IpFilter = IpFilter::block(&[
-        "10.0.0.0/8", // something something modern problem require modern solutions
+        "10.0.0.0/8",
         "192.168.0.0/16",
-        "172.16.0.0/16",
-        "172.17.0.0/16",
-        "172.18.0.0/16",
-        "172.19.0.0/16",
-        "172.20.0.0/16",
-        "172.21.0.0/16",
-        "172.22.0.0/16",
-        "172.23.0.0/16",
-        "172.24.0.0/16",
-        "172.25.0.0/16",
-        "172.26.0.0/16",
-        "172.27.0.0/16",
-        "172.28.0.0/16",
-        "172.29.0.0/16",
-        "172.30.0.0/16",
-        "172.31.0.0/16",
-        "172.32.0.0/16"]
+        "127.0.0.0/8",
+        "172.16.0.0/12",
+        "169.254.0.0/16",
+        "::1",
+        "fc00::/7"
+        ]
     ).unwrap();
 }
 
@@ -290,11 +273,14 @@ impl Request {
 
     /// Send a new request to a service
     pub async fn new(url: Url) -> Result<Request> {
+        let mut url = url;
         let url_host_str = url.host_str().ok_or(create_error!(ProxyError))?.to_string();
 
         Request::url_is_blacklisted(&url).await?;
+        let mut redirect_count = 0;
 
-        let response = CLIENT
+        loop {
+            let response = CLIENT
             .get(url)
             .header(
                 "User-Agent",
@@ -309,23 +295,47 @@ impl Request {
             .await
             .map_err(|_| create_error!(ProxyError))?;
 
-        if !response.status().is_success() {
-            tracing::error!("{:?}", response);
-            return Err(create_error!(ProxyError));
+            if response.status().is_redirection() {
+                redirect_count += 1;
+
+                if redirect_count > 5 {
+                    return Err(create_error!(ProxyError));
+                }
+                if let Some(location) = response.headers().get("location") {
+                    let location = location.to_str().map_err(|_| create_error!(ProxyError))?;
+                    url = Url::from_str(location).to_internal_error()?;
+
+                    if !Request::url_is_blacklisted(&url).await? {
+                        continue;
+                    }
+                } else {
+                    return Err(create_error!(ProxyError));
+                }
+            }
+
+            if !response.status().is_success() {
+                tracing::error!("{:?}", response);
+                return Err(create_error!(ProxyError));
+            }
+
+            let content_type = response
+                .headers()
+                .get(CONTENT_TYPE)
+                .ok_or(create_error!(ProxyError))?
+                .to_str()
+                .map_err(|_| create_error!(ProxyError))?;
+
+            let mime: mime::Mime = content_type
+                .parse()
+                .map_err(|_| create_error!(ProxyError))?;
+
+            return Ok(Request { response, mime });
         }
+    }
 
-        let content_type = response
-            .headers()
-            .get(CONTENT_TYPE)
-            .ok_or(create_error!(ProxyError))?
-            .to_str()
-            .map_err(|_| create_error!(ProxyError))?;
-
-        let mime: mime::Mime = content_type
-            .parse()
-            .map_err(|_| create_error!(ProxyError))?;
-
-        Ok(Request { response, mime })
+    pub async fn new_from_str(url: &str) -> Result<Request> {
+        let proper_url = Url::parse(url).map_err(|_| create_error!(ProxyError))?;
+        Request::new(proper_url).await
     }
 
     pub async fn new_from_str(url: &str) -> Result<Request> {
@@ -347,7 +357,7 @@ impl Request {
         Ok(Request::exists(proper_url).await)
     }
 
-    pub async fn url_is_blacklisted(url: &Url) -> Result<()> {
+    pub async fn url_is_blacklisted(url: &Url) -> Result<bool> {
         if let Some(host) = url.host() {
             match host {
                 Host::Ipv4(ipv4) => {
@@ -357,15 +367,38 @@ impl Request {
                     }
                 }
                 Host::Domain(domain) => {
+                    let mut domain = domain.to_string();
+
                     let config = config().await;
-                    if config.january.blocked_domains.iter().any(|x| x == domain) {
+
+                    // First step: TLDs and blocked domains
+                    if !domain.contains(".") // lazily block TLDs
+                        || config.january.blocked_domains.iter().any(|x| x == &domain)
+                    {
                         return Err(create_error!(InvalidOperation));
+                    }
+
+                    if !domain.contains(":") {
+                        domain += ":80";
+                    }
+
+                    // Second step: resolve the IP and check the blocklist
+                    if let Ok(mut resolved_ip) = tokio::net::lookup_host(domain.clone()).await {
+                        if let Some(resolved_ip) = resolved_ip.next() {
+                            if !IP_BLOCKLIST.is_allowed(&resolved_ip.ip().to_string()) {
+                                return Err(create_error!(InvalidOperation));
+                            }
+                        } else {
+                            return Err(create_error!(InvalidOperation));
+                        }
+                    } else {
+                        return Err(create_error!(ProxyError));
                     }
                 }
                 _ => (),
             }
         };
 
-        Ok(())
+        Ok(false)
     }
 }

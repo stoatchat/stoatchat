@@ -317,6 +317,12 @@ emojis = 500_000
 # default: 5
 process_message_delay_limit = 5
 
+[features.legal_links]
+# URLs for legal documents
+terms_of_service = ""
+privacy_policy = ""
+guidelines = ""
+
 [sentry]
 # Configuration for Sentry error reporting
 api = ""

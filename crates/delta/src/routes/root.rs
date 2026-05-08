@@ -57,6 +57,8 @@ pub struct RevoltFeatures {
     pub livekit: VoiceFeature,
     /// Limits
     pub limits: LimitsConfig,
+    /// Legal links
+    pub legal_links: LegalLinks,
 }
 
 /// # Limits For Users
@@ -68,6 +70,17 @@ pub struct LimitsConfig {
     pub new_user: UserLimits,
     /// Default User Limits
     pub default: UserLimits,
+}
+
+/// # Legal links
+#[derive(Serialize, JsonSchema, Debug)]
+pub struct LegalLinks {
+    /// Terms of Service URL
+    pub terms_of_service: String,
+    /// Privacy Policy URL
+    pub privacy_policy: String,
+    /// Guidelines URL
+    pub guidelines: String,
 }
 
 /// # Global limits
@@ -237,6 +250,11 @@ pub async fn root() -> Result<Json<RevoltConfig>> {
                 },
                 new_user: UserLimits::from_feature_limits(config.features.limits.new_user),
                 default: UserLimits::from_feature_limits(config.features.limits.default),
+            },
+            legal_links: LegalLinks {
+                terms_of_service: config.features.legal_links.terms_of_service,
+                privacy_policy: config.features.legal_links.privacy_policy,
+                guidelines: config.features.legal_links.guidelines,
             },
         },
         ws: config.hosts.events,

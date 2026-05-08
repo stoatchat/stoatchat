@@ -383,6 +383,16 @@ pub struct FeaturesLimitsCollection {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct LegalLinks {
+    /// Terms of Service URL
+    pub terms_of_service: String,
+    /// Privacy Policy URL
+    pub privacy_policy: String,
+    /// Guidelines URL
+    pub guidelines: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct FeaturesAdvanced {
     #[serde(default)]
     pub process_message_delay_limit: u16,
@@ -399,6 +409,7 @@ impl Default for FeaturesAdvanced {
 #[derive(Deserialize, Debug, Clone)]
 pub struct Features {
     pub limits: FeaturesLimitsCollection,
+    pub legal_links: LegalLinks,
     pub webhooks_enabled: bool,
     pub mass_mentions_send_notifications: bool,
     pub mass_mentions_enabled: bool,
