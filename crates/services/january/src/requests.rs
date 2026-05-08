@@ -32,7 +32,6 @@ lazy_static! {
 
     /// Regex for matching new Reddit URLs
     static ref RE_URL_NEW_REDDIT: Regex = Regex::new("^(?:(?:new\\.|www\\.)?reddit).com").expect("valid regex");
-    static ref RE_URL_NEW_REDDIT: Regex = Regex::new("^(?:(?:new\\.|www\\.)?reddit).com").expect("valid regex");
 
     /// Regex for matching YouTube Shorts URLs
     static ref RE_URL_YOUTUBE_SHORTS: Regex = Regex::new("^(?:(?:https?:)?//)?(?:(?:www\\.)?youtube\\.com)/shorts/([a-zA-Z0-9_-]+)").expect("valid regex");
@@ -331,11 +330,6 @@ impl Request {
 
             return Ok(Request { response, mime });
         }
-    }
-
-    pub async fn new_from_str(url: &str) -> Result<Request> {
-        let proper_url = Url::parse(url).map_err(|_| create_error!(ProxyError))?;
-        Request::new(proper_url).await
     }
 
     pub async fn new_from_str(url: &str) -> Result<Request> {
