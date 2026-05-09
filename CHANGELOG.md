@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.13.0](https://github.com/stoatchat/stoatchat/compare/v0.12.1...v0.13.0) (2026-05-08)
+
+
+### Features
+
+* add embed support for YouTube Shorts ([#734](https://github.com/stoatchat/stoatchat/issues/734)) ([d46c7f7](https://github.com/stoatchat/stoatchat/commit/d46c7f7f3c04524c0639c3e0a122626f8e0b3bf7))
+* add emoji rename endpoint ([#714](https://github.com/stoatchat/stoatchat/issues/714)) ([23ad135](https://github.com/stoatchat/stoatchat/commit/23ad1359834bb7d07a460b8678d6a6ebffc73eb0))
+* add legal links to root payload ([#733](https://github.com/stoatchat/stoatchat/issues/733)) ([21d8201](https://github.com/stoatchat/stoatchat/commit/21d82018cf84ab0fdd10613d254b9562aea8eea3))
+* add role icon support ([#724](https://github.com/stoatchat/stoatchat/issues/724)) ([841985d](https://github.com/stoatchat/stoatchat/commit/841985d3b994df1c6eefab2fc7ecbd77ab22c493))
+* Add webhook endpoints for editing and deleting messages ([#682](https://github.com/stoatchat/stoatchat/issues/682)) ([6f3441c](https://github.com/stoatchat/stoatchat/commit/6f3441cf4acac2a8e6e1bf07a279a153b80f7956))
+* automatically sanitise usernames on create/update ([#689](https://github.com/stoatchat/stoatchat/issues/689)) ([e937697](https://github.com/stoatchat/stoatchat/commit/e93769786c7669485a659ee471630740d3cea702))
+* blacklist private ip ranges and add january domain blocklist ([#731](https://github.com/stoatchat/stoatchat/issues/731)) ([6b41db9](https://github.com/stoatchat/stoatchat/commit/6b41db984bb491b2e58324309cc70d8c14e0b814))
+* Rewrite acks ([#741](https://github.com/stoatchat/stoatchat/issues/741)) ([ab5bd47](https://github.com/stoatchat/stoatchat/commit/ab5bd47a39ee889de0b5ae6e7b560620853daead))
+
+
+### Bug Fixes
+
+* add new_user_hours to configuration limits ([#729](https://github.com/stoatchat/stoatchat/issues/729)) ([279f5d5](https://github.com/stoatchat/stoatchat/commit/279f5d5fd7af2df55902c706859ec07f569cdb1e))
+* add reconnection policy to Redis subscriber to prevent ghost state ([#708](https://github.com/stoatchat/stoatchat/issues/708)) ([057f2bb](https://github.com/stoatchat/stoatchat/commit/057f2bb8b359f8b942741a30ff54eeb8fbe3e0b1))
+* docker compose file had personal url in it ([#742](https://github.com/stoatchat/stoatchat/issues/742)) ([0719985](https://github.com/stoatchat/stoatchat/commit/0719985ac5636590f91e6f9ec4b68f3eded70c13))
+* don't strip ICC from exif ([#735](https://github.com/stoatchat/stoatchat/issues/735)) ([d76a711](https://github.com/stoatchat/stoatchat/commit/d76a71141f3e508f6308ba52fa28eaeb56fb3438))
+* dont send notification in fcm ([#721](https://github.com/stoatchat/stoatchat/issues/721)) ([89171e9](https://github.com/stoatchat/stoatchat/commit/89171e9bd0f15711157e78c6eec0fe7b480de93a))
+* encode filenames in redirects ([#737](https://github.com/stoatchat/stoatchat/issues/737)) ([9fd7128](https://github.com/stoatchat/stoatchat/commit/9fd7128f800badbd184baf943d4f799e601201e4))
+* january ip redirects & domain resolver ([#738](https://github.com/stoatchat/stoatchat/issues/738)) ([356491e](https://github.com/stoatchat/stoatchat/commit/356491e934b274f9e895df883dd63ef0b3123510))
+* update message length validation to remove upper limit ([#723](https://github.com/stoatchat/stoatchat/issues/723)) ([ed4fd5e](https://github.com/stoatchat/stoatchat/commit/ed4fd5ebfe6d0ea534a0898da4afdc1f4e2cd6c5))
+* use correct response for NoEffect errors ([#732](https://github.com/stoatchat/stoatchat/issues/732)) ([5378cd2](https://github.com/stoatchat/stoatchat/commit/5378cd22b4c7d85f44c31a6af0dda00941b80d5c))
+
 ## [0.12.1](https://github.com/stoatchat/stoatchat/compare/v0.12.0...v0.12.1) (2026-04-10)
 
 
