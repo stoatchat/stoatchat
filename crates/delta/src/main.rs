@@ -119,7 +119,7 @@ pub async fn web() -> Rocket<Build> {
         .await
         .expect("Failed to declare exchange");
 
-    let amqp = AMQP::new(connection, channel);
+    let mut amqp = AMQP::new(connection, channel);
     amqp.configure_channels()
         .await
         .expect("Failed to configure channels");
