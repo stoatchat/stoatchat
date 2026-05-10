@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.1](https://github.com/stoatchat/stoatchat/compare/v0.13.0...v0.13.1) (2026-05-10)
+
+
+### Bug Fixes
+
+* amqprs startup bug ([#744](https://github.com/stoatchat/stoatchat/issues/744)) ([1100eaf](https://github.com/stoatchat/stoatchat/commit/1100eaf46f849f2509ae01ac497556ca33bde778))
+
 ## [0.13.0](https://github.com/stoatchat/stoatchat/compare/v0.12.1...v0.13.0) (2026-05-08)
 
 
