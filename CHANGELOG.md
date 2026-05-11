@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.2](https://github.com/stoatchat/stoatchat/compare/v0.13.1...v0.13.2) (2026-05-11)
+
+
+### Bug Fixes
+
+* update default exchange to `revolt.default` ([#746](https://github.com/stoatchat/stoatchat/issues/746)) ([fcb8091](https://github.com/stoatchat/stoatchat/commit/fcb8091cd7a00d7f26c798daa33aae4b923b2a8b))
+
 ## [0.13.1](https://github.com/stoatchat/stoatchat/compare/v0.13.0...v0.13.1) (2026-05-10)
 
 
