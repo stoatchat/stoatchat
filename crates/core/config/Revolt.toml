@@ -30,7 +30,7 @@ host = "rabbit"
 port = 5672
 username = "rabbituser"
 password = "rabbitpass"
-default_exchange = "revolt"
+default_exchange = "revolt.default"
 
 [rabbit.queues]
 acks = "internal.ack"
