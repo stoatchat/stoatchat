@@ -175,31 +175,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "amqp_serde"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5f450f572a1ec4cdb4af7af09cbd0c7c3e1b9da2bfc7414c059a780993a8e16"
-dependencies = [
- "bytes 1.11.1",
- "serde",
- "serde_bytes",
-]
-
-[[package]]
-name = "amqprs"
-version = "1.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f1b4afcbd862e16c272b7625b6b057930b052d63c720bc90f6afab0d9abe8a8"
-dependencies = [
- "amqp_serde",
- "async-trait",
- "bytes 1.11.1",
- "serde",
- "serde_bytes_ng",
- "tokio 1.51.0",
-]
-
-[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7633,7 +7608,6 @@ dependencies = [
 name = "revolt-database"
 version = "0.13.4"
 dependencies = [
- "amqprs",
  "async-lock 2.8.0",
  "async-recursion",
  "async-std",
@@ -7648,6 +7622,7 @@ dependencies = [
  "indexmap 2.13.1",
  "isahc",
  "iso8601-timestamp",
+ "lapin",
  "linkify",
  "livekit-api",
  "livekit-protocol",
@@ -7684,7 +7659,6 @@ dependencies = [
 name = "revolt-delta"
 version = "0.13.4"
 dependencies = [
- "amqprs",
  "async-channel 2.5.0",
  "async-std",
  "authifier",
@@ -7694,6 +7668,7 @@ dependencies = [
  "futures",
  "impl_ops",
  "iso8601-timestamp",
+ "lapin",
  "lettre",
  "linkify",
  "livekit-api",
@@ -7867,7 +7842,6 @@ dependencies = [
 name = "revolt-pushd"
 version = "0.13.4"
 dependencies = [
- "amqprs",
  "anyhow",
  "async-trait",
  "authifier",
@@ -7875,6 +7849,7 @@ dependencies = [
  "fcm_v1",
  "isahc",
  "iso8601-timestamp",
+ "lapin",
  "log",
  "pretty_env_logger",
  "redis-kiss",
@@ -7931,7 +7906,6 @@ dependencies = [
 name = "revolt-voice-ingress"
 version = "0.13.4"
 dependencies = [
- "amqprs",
  "async-std",
  "chrono",
  "futures",
@@ -8985,15 +8959,6 @@ checksum = "a5d440709e79d88e51ac01c4b72fc6cb7314017bb7da9eeff678aa94c10e3ea8"
 dependencies = [
  "serde",
  "serde_core",
-]
-
-[[package]]
-name = "serde_bytes_ng"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bdb0ebce8684e2253f964e8b6ce51f0ccc6666bbb448fb4a6788088bda6544b6"
-dependencies = [
- "serde",
 ]
 
 [[package]]

@@ -1,10 +1,12 @@
+use std::convert::TryInto;
+
 use authifier::{
     models::{Account, EmailVerification, Session},
     Authifier,
 };
 use futures::StreamExt;
 use rand::Rng;
-use redis_kiss::redis::aio::PubSub;
+use redis_kiss::{redis::aio::PubSub};
 use revolt_database::{
     events::client::EventV1, Channel, Database, Member, Message, PartialRole, Server, User, AMQP,
 };
@@ -49,19 +51,7 @@ impl TestHarness {
             .expect("`Authifier`")
             .clone();
 
-        let connection = amqprs::connection::Connection::open(
-            &amqprs::connection::OpenConnectionArguments::new(
-                &config.rabbit.host,
-                config.rabbit.port,
-                &config.rabbit.username,
-                &config.rabbit.password,
-            ),
-        )
-        .await
-        .unwrap();
-        let channel = connection.open_channel(None).await.unwrap();
-
-        let amqp = AMQP::new(connection, channel);
+        let amqp = AMQP::new_auto().await;
 
         TestHarness {
             client,

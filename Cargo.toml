@@ -159,7 +159,6 @@ opentelemetry-appender-tracing = "0.31.1"
 authifier = "1.0.16"
 
 # RabbitMQ
-amqprs = "1.7.0"
 lapin = "4.7.1"
 
 # Voice

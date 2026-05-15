@@ -64,7 +64,7 @@ schemars = { workspace = true }
 revolt_rocket_okapi = { workspace = true, features = ["swagger"] }
 
 # rabbit
-amqprs = { workspace = true }
+lapin = { workspace = true, features = ["tokio"] }
 
 # core
 authifier = { workspace = true }
