@@ -47,7 +47,7 @@ impl AMQP {
             .expect("Failed to open RabbitMQ channel");
 
         let mut resp = AMQP::new(connection, channel);
-        resp.configure_channels().await?;
+        //resp.configure_channels().await?;
         Ok(resp)
     }
 
