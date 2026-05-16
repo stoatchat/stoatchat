@@ -11,22 +11,24 @@ pub async fn task(db: Database) -> Result<()> {
         let files = db.fetch_deleted_attachments().await?;
 
         for file in files {
-            let count = db
-                .count_file_hash_references(file.hash.as_ref().expect("no `hash` present"))
-                .await?;
-
-            // No other files reference this file on disk anymore
-            if count <= 1 {
-                let file_hash = db
-                    .fetch_attachment_hash(file.hash.as_ref().expect("no `hash` present"))
+            if let Some(hash) = &file.hash {
+                let count = db
+                    .count_file_hash_references(hash)
                     .await?;
 
-                // Delete from S3
-                delete_from_s3(&file_hash.bucket_id, &file_hash.path).await?;
+                // No other files reference this file on disk anymore
+                if count <= 1 {
+                    let file_hash = db
+                        .fetch_attachment_hash(hash)
+                        .await?;
 
-                // Delete the hash
-                db.delete_attachment_hash(&file_hash.id).await?;
-                info!("Deleted file hash {}", file_hash.id);
+                    // Delete from S3
+                    delete_from_s3(&file_hash.bucket_id, &file_hash.path).await?;
+
+                    // Delete the hash
+                    db.delete_attachment_hash(&file_hash.id).await?;
+                    info!("Deleted file hash {}", file_hash.id);
+                }
             }
 
             // Delete the file
