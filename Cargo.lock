@@ -570,7 +570,7 @@ dependencies = [
  "futures-util",
  "log",
  "pin-project-lite 0.2.17",
- "tungstenite",
+ "tungstenite 0.17.3",
 ]
 
 [[package]]
@@ -5048,11 +5048,14 @@ dependencies = [
  "prost",
  "rand 0.9.2",
  "reqwest 0.12.28",
+ "rustls-native-certs 0.6.3",
  "scopeguard",
  "serde",
  "serde_json",
  "sha2",
  "thiserror 2.0.18",
+ "tokio-rustls 0.24.1",
+ "tokio-tungstenite",
  "url",
 ]
 
@@ -7419,16 +7422,22 @@ dependencies = [
  "http-body 1.0.1",
  "http-body-util",
  "hyper 1.9.0",
+ "hyper-rustls 0.27.7",
  "hyper-util",
  "js-sys",
  "log",
  "percent-encoding",
  "pin-project-lite 0.2.17",
+ "quinn",
+ "rustls 0.23.37",
+ "rustls-native-certs 0.8.3",
+ "rustls-pki-types",
  "serde",
  "serde_json",
  "serde_urlencoded",
  "sync_wrapper 1.0.2",
  "tokio 1.51.0",
+ "tokio-rustls 0.26.4",
  "tower",
  "tower-http 0.6.8",
  "tower-service",
@@ -7665,6 +7674,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "tokio 1.51.0",
  "ulid 1.2.1",
  "unicode-segmentation",
  "url-escape",
@@ -9892,6 +9902,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-tungstenite"
+version = "0.20.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "212d5dcb2a1ce06d81107c3d0ffa3121fe974b73f068c8282cb1c32328113b6c"
+dependencies = [
+ "futures-util",
+ "log",
+ "rustls 0.21.12",
+ "rustls-native-certs 0.6.3",
+ "tokio 1.51.0",
+ "tokio-rustls 0.24.1",
+ "tungstenite 0.20.1",
+]
+
+[[package]]
 name = "tokio-util"
 version = "0.7.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10141,6 +10166,26 @@ dependencies = [
  "log",
  "rand 0.8.5",
  "sha-1",
+ "thiserror 1.0.69",
+ "url",
+ "utf-8",
+]
+
+[[package]]
+name = "tungstenite"
+version = "0.20.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e3dac10fd62eaf6617d3a904ae222845979aec67c615d1c842b4002c7666fb9"
+dependencies = [
+ "byteorder",
+ "bytes 1.11.1",
+ "data-encoding",
+ "http 0.2.12",
+ "httparse",
+ "log",
+ "rand 0.8.5",
+ "rustls 0.21.12",
+ "sha1",
  "thiserror 1.0.69",
  "url",
  "utf-8",
