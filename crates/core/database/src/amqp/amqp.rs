@@ -4,7 +4,10 @@ use std::sync::Arc;
 use crate::events::rabbit::*;
 use crate::User;
 use lapin::{
-    Channel, Connection, ConnectionProperties, Error as AMQPError, options::BasicPublishOptions, protocol::basic::AMQPProperties, types::{AMQPValue, FieldTable}
+    options::BasicPublishOptions,
+    protocol::basic::AMQPProperties,
+    types::{AMQPValue, FieldTable},
+    Channel, Connection, ConnectionProperties, Error as AMQPError,
 };
 use revolt_models::v0::PushNotification;
 use revolt_presence::filter_online;
@@ -44,19 +47,31 @@ impl AMQP {
     pub async fn new_auto() -> Self {
         let config = revolt_config::config().await;
 
-        let connection = Arc::new(Connection::connect(&format!(
-                "amqp://{}:{}@{}:{}",
-                &config.rabbit.username,
-                &config.rabbit.password,
-                &config.rabbit.host,
-                &config.rabbit.port,
-            ), ConnectionProperties::default()).await.expect("Failed to connect to RabbitMQ"));
+        let connection = Arc::new(
+            Connection::connect(
+                &format!(
+                    "amqp://{}:{}@{}:{}",
+                    &config.rabbit.username,
+                    &config.rabbit.password,
+                    &config.rabbit.host,
+                    &config.rabbit.port,
+                ),
+                ConnectionProperties::default(),
+            )
+            .await
+            .expect("Failed to connect to RabbitMQ"),
+        );
 
         Self::new(connection).await
     }
 
     async fn create_channel(connection: &Connection) -> Arc<Channel> {
-        Arc::new(connection.create_channel().await.expect("Failed to create channel"))
+        Arc::new(
+            connection
+                .create_channel()
+                .await
+                .expect("Failed to create channel"),
+        )
     }
 
     pub async fn friend_request_accepted(
@@ -77,27 +92,17 @@ impl AMQP {
             payload
         );
 
-        // self.channel
-        //     .basic_publish(
-        //         BasicProperties::default()
-        //             .with_content_type("application/json")
-        //             .with_persistence(true)
-        //             .finish(),
-        //         payload.into(),
-        //         BasicPublishArguments::new(
-        //             &config.pushd.exchange,
-        //             &config.pushd.get_fr_accepted_routing_key(),
-        //         ),
-        //     )
-        //     .await
-
-        self.friend_request_accepted.basic_publish(
-            config.pushd.exchange.clone().into(),
-            config.pushd.get_fr_accepted_routing_key().into(),
-            BasicPublishOptions::default(),
-            payload.as_bytes(),
-            AMQPProperties::default().with_content_type("application/json".into()),
-        ).await?;
+        self.friend_request_accepted
+            .basic_publish(
+                config.pushd.exchange.clone().into(),
+                config.pushd.get_fr_accepted_routing_key().into(),
+                BasicPublishOptions::default(),
+                payload.as_bytes(),
+                AMQPProperties::default()
+                    .with_content_type("application/json".into())
+                    .with_delivery_mode(2),
+            )
+            .await?;
 
         Ok(())
     }
@@ -120,27 +125,17 @@ impl AMQP {
             payload
         );
 
-        // self.channel
-        //     .basic_publish(
-        //         BasicProperties::default()
-        //             .with_content_type("application/json")
-        //             .with_persistence(true)
-        //             .finish(),
-        //         payload.into(),
-        //         BasicPublishArguments::new(
-        //             &config.pushd.exchange,
-        //             &config.pushd.get_fr_received_routing_key(),
-        //         ),
-        //     )
-        //     .await
-
-        self.friend_request_received.basic_publish(
-            config.pushd.exchange.clone().into(),
-            config.pushd.get_fr_received_routing_key().into(),
-            BasicPublishOptions::default(),
-            payload.as_bytes(),
-            AMQPProperties::default().with_content_type("application/json".into()),
-        ).await?;
+        self.friend_request_received
+            .basic_publish(
+                config.pushd.exchange.clone().into(),
+                config.pushd.get_fr_received_routing_key().into(),
+                BasicPublishOptions::default(),
+                payload.as_bytes(),
+                AMQPProperties::default()
+                    .with_content_type("application/json".into())
+                    .with_delivery_mode(2),
+            )
+            .await?;
 
         Ok(())
     }
@@ -167,27 +162,17 @@ impl AMQP {
             payload
         );
 
-        // self.channel
-        //     .basic_publish(
-        //         BasicProperties::default()
-        //             .with_content_type("application/json")
-        //             .with_persistence(true)
-        //             .finish(),
-        //         payload.into(),
-        //         BasicPublishArguments::new(
-        //             &config.pushd.exchange,
-        //             &config.pushd.get_generic_routing_key(),
-        //         ),
-        //     )
-        //     .await
-
-        self.generic_message.basic_publish(
-            config.pushd.exchange.clone().into(),
-            config.pushd.get_generic_routing_key().into(),
-            BasicPublishOptions::default(),
-            payload.as_bytes(),
-            AMQPProperties::default().with_content_type("application/json".into()),
-        ).await?;
+        self.generic_message
+            .basic_publish(
+                config.pushd.exchange.clone().into(),
+                config.pushd.get_generic_routing_key().into(),
+                BasicPublishOptions::default(),
+                payload.as_bytes(),
+                AMQPProperties::default()
+                    .with_content_type("application/json".into())
+                    .with_delivery_mode(2),
+            )
+            .await?;
 
         Ok(())
     }
@@ -220,27 +205,17 @@ impl AMQP {
             payload
         );
 
-        // self.channel
-        //     .basic_publish(
-        //         BasicProperties::default()
-        //             .with_content_type("application/json")
-        //             .with_persistence(true)
-        //             .finish(),
-        //         payload.into(),
-        //         BasicPublishArguments::new(
-        //             &config.pushd.exchange,
-        //             &config.pushd.get_message_routing_key(),
-        //         ),
-        //     )
-        //     .await
-
-        self.message_sent.basic_publish(
-            config.pushd.exchange.clone().into(),
-            config.pushd.get_message_routing_key().into(),
-            BasicPublishOptions::default(),
-            payload.as_bytes(),
-            AMQPProperties::default().with_content_type("application/json".into()),
-        ).await?;
+        self.message_sent
+            .basic_publish(
+                config.pushd.exchange.clone().into(),
+                config.pushd.get_message_routing_key().into(),
+                BasicPublishOptions::default(),
+                payload.as_bytes(),
+                AMQPProperties::default()
+                    .with_content_type("application/json".into())
+                    .with_delivery_mode(2),
+            )
+            .await?;
 
         Ok(())
     }
@@ -265,24 +240,17 @@ impl AMQP {
             routing_key, payload
         );
 
-        // self.channel
-        //     .basic_publish(
-        //         BasicProperties::default()
-        //             .with_content_type("application/json")
-        //             .with_persistence(true)
-        //             .finish(),
-        //         payload.into(),
-        //         BasicPublishArguments::new(&config.pushd.exchange, routing_key.as_str()),
-        //     )
-        //     .await
-
-        self.mass_mention_message_sent.basic_publish(
-            config.pushd.exchange.clone().into(),
-            routing_key.into(),
-            BasicPublishOptions::default(),
-            payload.as_bytes(),
-            AMQPProperties::default().with_content_type("application/json".into()),
-        ).await?;
+        self.mass_mention_message_sent
+            .basic_publish(
+                config.pushd.exchange.clone().into(),
+                routing_key.into(),
+                BasicPublishOptions::default(),
+                payload.as_bytes(),
+                AMQPProperties::default()
+                    .with_content_type("application/json".into())
+                    .with_delivery_mode(2),
+            )
+            .await?;
 
         Ok(())
     }
@@ -315,25 +283,17 @@ impl AMQP {
             AMQPValue::LongString(format!("{}-{}", &user_id, &channel_id).into()),
         );
 
-        // self.channel
-        //     .basic_publish(
-        //         BasicProperties::default()
-        //             .with_content_type("application/json")
-        //             .with_persistence(true)
-        //             //.with_headers(headers)
-        //             .finish(),
-        //         payload.into(),
-        //         BasicPublishArguments::new(&config.pushd.exchange, &config.pushd.ack_queue),
-        //     )
-        //     .await
-
-        self.ack_notification_message.basic_publish(
-            config.pushd.exchange.clone().into(),
-            config.pushd.ack_queue.into(),
-            BasicPublishOptions::default(),
-            payload.as_bytes(),
-            AMQPProperties::default().with_content_type("application/json".into()),
-        ).await?;
+        self.ack_notification_message
+            .basic_publish(
+                config.pushd.exchange.clone().into(),
+                config.pushd.ack_queue.into(),
+                BasicPublishOptions::default(),
+                payload.as_bytes(),
+                AMQPProperties::default()
+                    .with_content_type("application/json".into())
+                    .with_delivery_mode(2),
+            )
+            .await?;
 
         Ok(())
     }
@@ -369,27 +329,17 @@ impl AMQP {
             payload
         );
 
-        // self.channel
-        //     .basic_publish(
-        //         BasicProperties::default()
-        //             .with_content_type("application/json")
-        //             .with_persistence(true)
-        //             .finish(),
-        //         payload.into(),
-        //         BasicPublishArguments::new(
-        //             &config.pushd.exchange,
-        //             &config.pushd.get_dm_call_routing_key(),
-        //         ),
-        //     )
-        //     .await
-
-        self.dm_call_updated.basic_publish(
-            config.pushd.exchange.clone().into(),
-            config.pushd.get_dm_call_routing_key().into(),
-            BasicPublishOptions::default(),
-            payload.as_bytes(),
-            AMQPProperties::default().with_content_type("application/json".into()),
-        ).await?;
+        self.dm_call_updated
+            .basic_publish(
+                config.pushd.exchange.clone().into(),
+                config.pushd.get_dm_call_routing_key().into(),
+                BasicPublishOptions::default(),
+                payload.as_bytes(),
+                AMQPProperties::default()
+                    .with_content_type("application/json".into())
+                    .with_delivery_mode(2),
+            )
+            .await?;
 
         Ok(())
     }
@@ -415,28 +365,17 @@ impl AMQP {
             config.rabbit.default_exchange, config.rabbit.queues.acks, payload
         );
 
-        // self.process_ack
-        //     .basic_publish(
-        //         BasicProperties::default()
-        //             .with_content_type("application/json")
-        //             .with_persistence(true)
-        //             //.with_headers(headers)
-        //             .finish(),
-        //         payload.into(),
-        //         BasicPublishArguments::new(
-        //             &config.rabbit.default_exchange,
-        //             &config.rabbit.queues.acks,
-        //         ),
-        //     )
-        //     .await
-
-            self.process_ack.basic_publish(
-            config.rabbit.default_exchange.clone().into(),
-            config.rabbit.queues.acks.into(),
-            BasicPublishOptions::default(),
-            payload.as_bytes(),
-            AMQPProperties::default().with_content_type("application/json".into()),
-        ).await?;
+        self.process_ack
+            .basic_publish(
+                config.rabbit.default_exchange.clone().into(),
+                config.rabbit.queues.acks.into(),
+                BasicPublishOptions::default(),
+                payload.as_bytes(),
+                AMQPProperties::default()
+                    .with_content_type("application/json".into())
+                    .with_delivery_mode(2),
+            )
+            .await?;
 
         Ok(())
     }
