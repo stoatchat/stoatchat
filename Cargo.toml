@@ -192,13 +192,13 @@ futures-lite = "2.6.1"
 vergen = "7.5.0"
 
 # Local packages
-revolt-coalesced = { version = "0.13.3", path = "crates/core/coalesced" }
-revolt-config = { version = "0.13.3", path = "crates/core/config" }
-revolt-database = { version = "0.13.3", path = "crates/core/database" }
-revolt-files = { version = "0.13.3", path = "crates/core/files" }
-revolt-models = { version = "0.13.3", path = "crates/core/models" }
-revolt-parser = { version = "0.13.3", path = "crates/core/parser" }
-revolt-permissions = { version = "0.13.3", path = "crates/core/permissions" }
-revolt-presence = { version = "0.13.3", path = "crates/core/presence" }
-revolt-ratelimits = { version = "0.13.3", path = "crates/core/ratelimits" }
-revolt-result = { version = "0.13.3", path = "crates/core/result" }
+revolt-coalesced = { version = "0.13.4", path = "crates/core/coalesced" }
+revolt-config = { version = "0.13.4", path = "crates/core/config" }
+revolt-database = { version = "0.13.4", path = "crates/core/database" }
+revolt-files = { version = "0.13.4", path = "crates/core/files" }
+revolt-models = { version = "0.13.4", path = "crates/core/models" }
+revolt-parser = { version = "0.13.4", path = "crates/core/parser" }
+revolt-permissions = { version = "0.13.4", path = "crates/core/permissions" }
+revolt-presence = { version = "0.13.4", path = "crates/core/presence" }
+revolt-ratelimits = { version = "0.13.4", path = "crates/core/ratelimits" }
+revolt-result = { version = "0.13.4", path = "crates/core/result" }

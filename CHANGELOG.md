@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.4](https://github.com/stoatchat/stoatchat/compare/v0.13.3...v0.13.4) (2026-05-16)
+
+
+### Bug Fixes
+
+* add TLS feature to livekit-api crate ([#753](https://github.com/stoatchat/stoatchat/issues/753)) ([6cfee1f](https://github.com/stoatchat/stoatchat/commit/6cfee1f601c1e084df7c8f1e7a5e8a560d1dd514))
+
 ## [0.13.3](https://github.com/stoatchat/stoatchat/compare/v0.13.2...v0.13.3) (2026-05-15)
 
 
