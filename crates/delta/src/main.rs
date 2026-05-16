@@ -8,10 +8,6 @@ extern crate serde_json;
 pub mod routes;
 pub mod util;
 
-use lapin::{
-    options::ExchangeDeclareOptions, types::FieldTable, Connection, ConnectionProperties,
-    ExchangeKind,
-};
 use revolt_config::config;
 use revolt_database::{AMQP, events::client::EventV1};
 use revolt_ratelimits::rocket as ratelimiter;

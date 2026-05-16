@@ -1,5 +1,3 @@
-use std::convert::TryInto;
-
 use authifier::{
     models::{Account, EmailVerification, Session},
     Authifier,
@@ -27,8 +25,6 @@ pub struct TestHarness {
 
 impl TestHarness {
     pub async fn new() -> TestHarness {
-        let config = revolt_config::config().await;
-
         let client = Client::tracked(crate::web().await)
             .await
             .expect("valid rocket instance");
