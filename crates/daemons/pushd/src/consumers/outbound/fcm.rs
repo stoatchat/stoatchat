@@ -1,14 +1,14 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use amqprs::{channel::Channel as AmqpChannel, consumer::AsyncConsumer, BasicProperties, Deliver};
-
-use anyhow::{anyhow, bail, Result};
+use crate::utils::Consumer;
+use anyhow::{bail, Result};
 use async_trait::async_trait;
 use fcm_v1::{
     auth::{Authenticator, ServiceAccountKey},
     message::Message,
     Client, Error as FcmError,
 };
+use lapin::{message::Delivery, Channel as AMQPChannel, Connection};
 use revolt_config::config;
 use revolt_database::{events::rabbit::*, Database};
 use revolt_models::v0::{Channel, PushNotification};
@@ -110,8 +110,13 @@ impl NotificationData {
     }
 }
 
+#[derive(Clone)]
+#[allow(unused)]
 pub struct FcmOutboundConsumer {
     db: Database,
+    authifier_db: authifier::Database,
+    connection: Arc<Connection>,
+    channel: Arc<AMQPChannel>,
     client: Client,
 }
 
@@ -135,12 +140,21 @@ impl FcmOutboundConsumer {
     }
 }
 
-impl FcmOutboundConsumer {
-    pub async fn new(db: Database) -> Result<FcmOutboundConsumer, &'static str> {
+#[async_trait]
+impl Consumer for FcmOutboundConsumer {
+    async fn create(
+        db: Database,
+        authifier_db: authifier::Database,
+        connection: Arc<Connection>,
+        channel: Arc<AMQPChannel>,
+    ) -> Self {
         let config = revolt_config::config().await;
 
-        Ok(FcmOutboundConsumer {
+        Self {
             db,
+            authifier_db,
+            connection,
+            channel,
             client: Client::new(
                 Authenticator::service_account::<&str>(ServiceAccountKey {
                     key_type: Some(config.pushd.fcm.key_type),
@@ -160,33 +174,27 @@ impl FcmOutboundConsumer {
                 false,
                 Duration::from_secs(5),
             ),
-        })
+        }
     }
 
-    async fn consume_event(
-        &mut self,
-        _channel: &AmqpChannel,
-        _deliver: Deliver,
-        _basic_properties: BasicProperties,
-        content: Vec<u8>,
-    ) -> Result<()> {
-        let content = String::from_utf8(content)?;
-        let payload: PayloadToService = serde_json::from_str(content.as_str())?;
+    fn channel(&self) -> &Arc<AMQPChannel> {
+        &self.channel
+    }
+
+    async fn consume(&self, delivery: Delivery) -> Result<()> {
+        let payload: PayloadToService = serde_json::from_slice(&delivery.data)?;
 
         #[allow(clippy::needless_late_init)]
         let resp: Result<Message, FcmError>;
 
         match payload.notification {
             PayloadKind::FRReceived(alert) => {
-                let name = alert
-                    .from_user
-                    .display_name
-                    .or(Some(format!(
+                let name = alert.from_user.display_name.clone().unwrap_or_else(|| {
+                    format!(
                         "{}#{}",
                         alert.from_user.username, alert.from_user.discriminator
-                    )))
-                    .clone()
-                    .ok_or_else(|| anyhow!("missing name"))?;
+                    )
+                });
 
                 let data = NotificationData::FRReceived {
                     id: alert.from_user.id,
@@ -203,15 +211,12 @@ impl FcmOutboundConsumer {
             }
 
             PayloadKind::FRAccepted(alert) => {
-                let name = alert
-                    .accepted_user
-                    .display_name
-                    .or(Some(format!(
+                let name = alert.accepted_user.display_name.clone().unwrap_or_else(|| {
+                    format!(
                         "{}#{}",
                         alert.accepted_user.username, alert.accepted_user.discriminator
-                    )))
-                    .clone()
-                    .ok_or_else(|| anyhow!("missing name"))?;
+                    )
+                });
 
                 let data = NotificationData::FRAccepted {
                     id: alert.accepted_user.id,
@@ -282,43 +287,21 @@ impl FcmOutboundConsumer {
             }
         }
 
-        if let Err(err) = resp {
-            match err {
-                FcmError::Auth => {
-                    if let Err(err) = self
-                        .db
-                        .remove_push_subscription_by_session_id(&payload.session_id)
-                        .await
-                    {
-                        revolt_config::capture_error(&err);
-                    }
-                }
-                err => {
+        match resp {
+            Err(FcmError::Auth) => {
+                if let Err(err) = self
+                    .db
+                    .remove_push_subscription_by_session_id(&payload.session_id)
+                    .await
+                {
                     revolt_config::capture_error(&err);
                 }
             }
-        }
+            res => {
+                res?;
+            }
+        };
 
         Ok(())
-    }
-}
-
-#[allow(unused_variables)]
-#[async_trait]
-impl AsyncConsumer for FcmOutboundConsumer {
-    async fn consume(
-        &mut self,
-        channel: &AmqpChannel,
-        deliver: Deliver,
-        basic_properties: BasicProperties,
-        content: Vec<u8>,
-    ) {
-        if let Err(err) = self
-            .consume_event(channel, deliver, basic_properties, content)
-            .await
-        {
-            revolt_config::capture_anyhow(&err);
-            eprintln!("Failed to process FCM event: {err:?}");
-        }
     }
 }

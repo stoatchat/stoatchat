@@ -4,19 +4,19 @@ use std::{
     sync::Arc,
 };
 
+use anyhow::Result;
 use async_trait::async_trait;
 use lapin::{
     message::{Delivery, DeliveryResult},
     options::BasicPublishOptions,
-    Channel, Connection, ConsumerDelegate,
+    BasicProperties, Channel, Connection, ConsumerDelegate, Error as AMQPError,
 };
-use log::{debug, warn};
+use log::debug;
 use revolt_database::Database;
-use revolt_result::Result;
 
 #[async_trait]
 pub trait Consumer: Clone + Send + Sync + 'static {
-    fn create(
+    async fn create(
         db: Database,
         authifier_db: authifier::Database,
         connection: Arc<Connection>,
@@ -25,8 +25,44 @@ pub trait Consumer: Clone + Send + Sync + 'static {
     fn channel(&self) -> &Arc<Channel>;
     async fn consume(&self, delivery: Delivery) -> Result<()>;
 
-    async fn publish_message(&self, payload: Vec<u8>, args: BasicPublishOptions) {
-        todo!()
+    async fn publish_message_with_options(
+        &self,
+        payload: &[u8],
+        exchange: &str,
+        routing_key: &str,
+        options: BasicPublishOptions,
+        properties: BasicProperties,
+    ) -> Result<(), AMQPError> {
+        let channel = self.channel();
+
+        channel
+            .basic_publish(
+                exchange.into(),
+                routing_key.into(),
+                options,
+                payload,
+                properties,
+            )
+            .await?;
+        debug!("Sent message to queue for target {}", routing_key);
+
+        Ok(())
+    }
+
+    async fn publish_message(
+        &self,
+        payload: &[u8],
+        exchange: &str,
+        routing_key: &str,
+    ) -> Result<(), AMQPError> {
+        self.publish_message_with_options(
+            payload,
+            exchange,
+            routing_key,
+            BasicPublishOptions::default(),
+            BasicProperties::default(),
+        )
+        .await
     }
 }
 
@@ -43,6 +79,7 @@ impl<C: Consumer> ConsumerDelegate for Delegate<C> {
 
                 Box::pin(async move {
                     if let Err(e) = consumer.consume(delivery).await {
+                        revolt_config::capture_anyhow(&e);
                         log::error!("{e:?}");
                     };
                 })
