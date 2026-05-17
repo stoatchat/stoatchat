@@ -4,7 +4,7 @@ use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     Database, Message, PartialMessage, User,
 };
-use revolt_models::v0::{self, Embed};
+use revolt_models::v0::{self, Embed, MessageFlags};
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
@@ -47,6 +47,11 @@ pub async fn edit(
         return Err(create_error!(CannotEditMessage));
     }
 
+    // Check if embeds are suppressed
+    let current_flags = message.flags.unwrap_or(0);
+    let embeds_suppressed = current_flags & MessageFlags::SuppressEmbeds as u32 != 0;
+    
+
     message.edited = Some(Timestamp::now_utc());
     let mut partial = PartialMessage {
         edited: message.edited,
@@ -76,7 +81,39 @@ pub async fn edit(
         new_embeds.clear();
 
         for embed in embeds {
-            new_embeds.push(message.create_embed(db, embed).await?);
+            new_embeds.push(
+                message.create_embed(db, embed).await?
+            );
+        }
+    }
+
+    // 4. Handle attachment removal
+    if let Some(remove_attachments) = &edit.remove_attachments {
+        // Validate that all attachment IDs exist in the message
+        if let Some(ref attachments) = message.attachments {
+            for attachment_id in remove_attachments {
+                if !attachments.iter().any(|file| &file.id == attachment_id) {
+                    return Err(create_error!(NotFound));
+                }
+            }
+
+            // Remove specified attachments
+            let mut updated_attachments = attachments.clone();
+            let removed_files: Vec<_> = attachments
+                .iter()
+                .filter(|file| remove_attachments.contains(&file.id))
+                .cloned()
+                .collect();
+
+            updated_attachments.retain(|file| !remove_attachments.contains(&file.id));
+            partial.attachments = Some(updated_attachments);
+
+            // Mark removed files for cleanup
+            for file in removed_files {
+                db.mark_attachment_as_deleted(&file.id).await?;
+            }
+        } else if !remove_attachments.is_empty() {
+            return Err(create_error!(InvalidOperation));
         }
     }
 
@@ -84,8 +121,8 @@ pub async fn edit(
 
     message.update(db, partial, vec![]).await?;
 
-    // Queue up a task for processing embeds if the we have sufficient permissions
-    if permissions.has_channel_permission(ChannelPermission::SendEmbeds) {
+    // Queue up a task for processing embeds if sufficient permissions and embeds aren't suppressed
+    if permissions.has_channel_permission(ChannelPermission::SendEmbeds) && !embeds_suppressed {
         if let Some(content) = edit.content {
             tasks::process_embeds::queue(
                 message.channel.to_string(),
