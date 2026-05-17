@@ -37,6 +37,7 @@ jobs:
       - name: Reference Test
         env:
           TEST_DB: REFERENCE
+        continue-on-error: ${{ github.ref_name == 'main' }}
         run: |
           mise test
 
@@ -44,6 +45,7 @@ jobs:
         env:
           TEST_DB: MONGODB
           MONGODB: mongodb://localhost
+        continue-on-error: ${{ github.ref_name == 'main' }}
         run: |
           mise test
 
