@@ -119,10 +119,10 @@ pub async fn web() -> Rocket<Build> {
         .await
         .expect("Failed to declare exchange");
 
-    let amqp = AMQP::new(connection, channel);
-    amqp.configure_channels()
-        .await
-        .expect("Failed to configure channels");
+    let mut amqp = AMQP::new(connection, channel);
+    // amqp.configure_channels()
+    //     .await
+    //     .expect("Failed to configure channels");
 
     // Launch background task workers
     revolt_database::tasks::start_workers(db.clone(), amqp.clone());

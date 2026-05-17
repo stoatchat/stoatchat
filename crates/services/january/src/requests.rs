@@ -4,6 +4,7 @@ use mime::Mime;
 use pdk_ip_filter_lib::IpFilter;
 use regex::Regex;
 use reqwest::{
+    dns::{Addrs, Name, Resolve},
     header::{self, CONTENT_TYPE},
     redirect, Client, Response,
 };
@@ -11,6 +12,7 @@ use revolt_config::{config, report_internal_error};
 use revolt_files::{create_thumbnail, decode_image, image_size_vec, is_valid_image, video_size};
 use revolt_models::v0::{Embed, Image, ImageSize, Video};
 use revolt_result::{create_error, Error, Result, ToRevoltError};
+use std::net::{IpAddr, SocketAddr};
 use std::{
     io::{Cursor, Write},
     str::FromStr,
@@ -21,6 +23,7 @@ use url::{Host, Url};
 lazy_static! {
     /// Request client
     static ref CLIENT: Client = reqwest::Client::builder()
+        .dns_resolver(CachedDnsResolver {})
         .timeout(Duration::from_secs(10)) // TODO config
         .connect_timeout(Duration::from_secs(5)) // TODO config
         .redirect(redirect::Policy::none())
@@ -58,16 +61,71 @@ lazy_static! {
         .time_to_live(Duration::from_secs(60)) // For up to 1 minute
         .build();
 
+    static ref DNS_CACHE: moka::future::Cache<String, Vec<SocketAddr>> = moka::future::Cache::builder()
+        .max_capacity(10_000)
+        .time_to_idle(Duration::from_secs(30))
+        .build();
+
     static ref IP_BLOCKLIST: IpFilter = IpFilter::block(&[
+        "0.0.0.0/8",
         "10.0.0.0/8",
         "192.168.0.0/16",
         "127.0.0.0/8",
         "172.16.0.0/12",
         "169.254.0.0/16",
         "::1",
-        "fc00::/7"
+        "fc00::/7",
         ]
     ).unwrap();
+}
+
+#[derive(Clone)]
+pub struct IPRequest {
+    url: Url,
+    ip: IpAddr,
+    pub blocked: bool,
+}
+
+impl From<IPRequest> for Url {
+    fn from(value: IPRequest) -> Self {
+        let mut url = value.url.clone();
+        url.set_host(Some(&value.ip.to_string()))
+            .map(|_| url)
+            .unwrap_or(value.url)
+    }
+}
+
+struct CachedDnsResolver {}
+
+impl reqwest::dns::Resolve for CachedDnsResolver {
+    fn resolve(&self, name: Name) -> reqwest::dns::Resolving {
+        Box::pin(async move {
+            {
+                if let Some(addrs) = DNS_CACHE.get(&name.as_str().to_string()).await {
+                    let resp: Addrs = Box::new(addrs.clone().into_iter());
+                    return Ok(resp);
+                }
+            }
+
+            let mut lookup = name.as_str().to_string();
+            if !lookup.contains(":") {
+                lookup += ":0";
+            }
+
+            let fallback: Vec<SocketAddr> = tokio::net::lookup_host(&lookup)
+                .await
+                .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?
+                .collect();
+
+            {
+                DNS_CACHE
+                    .insert(name.as_str().to_string().clone(), fallback.clone())
+                    .await;
+                let addrs: Addrs = Box::new(fallback.clone().into_iter());
+                Ok(addrs)
+            }
+        })
+    }
 }
 
 /// Information about a successful request
@@ -275,7 +333,12 @@ impl Request {
         let mut url = url;
         let url_host_str = url.host_str().ok_or(create_error!(ProxyError))?.to_string();
 
-        Request::url_is_blacklisted(&url).await?;
+        let mut blocker = Request::url_is_blacklisted(&url).await?;
+
+        if blocker.blocked {
+            return Err(create_error!(InvalidOperation));
+        }
+
         let mut redirect_count = 0;
 
         loop {
@@ -304,9 +367,13 @@ impl Request {
                     let location = location.to_str().map_err(|_| create_error!(ProxyError))?;
                     url = Url::from_str(location).to_internal_error()?;
 
-                    if !Request::url_is_blacklisted(&url).await? {
-                        continue;
+                    blocker = Request::url_is_blacklisted(&url).await?;
+
+                    if blocker.blocked {
+                        return Err(create_error!(InvalidOperation));
                     }
+
+                    continue;
                 } else {
                     return Err(create_error!(ProxyError));
                 }
@@ -351,17 +418,25 @@ impl Request {
         Ok(Request::exists(proper_url).await)
     }
 
-    pub async fn url_is_blacklisted(url: &Url) -> Result<bool> {
+    pub async fn url_is_blacklisted(url: &Url) -> Result<IPRequest> {
+        let resolved_address: IpAddr;
+
         if let Some(host) = url.host() {
             match host {
                 Host::Ipv4(ipv4) => {
-                    let url_str = ipv4.to_string();
-                    if !IP_BLOCKLIST.is_allowed(&url_str) {
+                    resolved_address = ipv4.into();
+                    if !IP_BLOCKLIST.is_allowed(&ipv4.to_string()) {
+                        return Err(create_error!(InvalidOperation));
+                    }
+                }
+                Host::Ipv6(ipv6) => {
+                    resolved_address = ipv6.into();
+                    if !IP_BLOCKLIST.is_allowed(&ipv6.to_string()) {
                         return Err(create_error!(InvalidOperation));
                     }
                 }
                 Host::Domain(domain) => {
-                    let mut domain = domain.to_string();
+                    let domain = domain.to_string();
 
                     let config = config().await;
 
@@ -372,14 +447,22 @@ impl Request {
                         return Err(create_error!(InvalidOperation));
                     }
 
-                    if !domain.contains(":") {
-                        domain += ":80";
-                    }
-
                     // Second step: resolve the IP and check the blocklist
-                    if let Ok(mut resolved_ip) = tokio::net::lookup_host(domain.clone()).await {
+                    let resolver = CachedDnsResolver {};
+                    if let Ok(mut resolved_ip) = resolver
+                        .resolve(
+                            Name::from_str(&domain)
+                                .map_err(|_| create_error!(ProxyError))
+                                .unwrap(),
+                        )
+                        .await
+                    {
                         if let Some(resolved_ip) = resolved_ip.next() {
-                            if !IP_BLOCKLIST.is_allowed(&resolved_ip.ip().to_string()) {
+                            resolved_address = resolved_ip.ip();
+                            let resolved_string = resolved_address.to_string();
+                            if !IP_BLOCKLIST.is_allowed(&resolved_string)
+                                || resolved_string.contains("::ffff:")
+                            {
                                 return Err(create_error!(InvalidOperation));
                             }
                         } else {
@@ -389,10 +472,15 @@ impl Request {
                         return Err(create_error!(ProxyError));
                     }
                 }
-                _ => (),
             }
+        } else {
+            return Err(create_error!(ProxyError));
         };
 
-        Ok(false)
+        Ok(IPRequest {
+            url: url.clone(),
+            ip: resolved_address,
+            blocked: false,
+        })
     }
 }

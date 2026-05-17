@@ -29,7 +29,7 @@ impl AMQP {
         }
     }
 
-    pub async fn new_auto() -> AMQP {
+    pub async fn new_auto() -> revolt_result::Result<AMQP> {
         let config = revolt_config::config().await;
 
         let connection = Connection::open(&OpenConnectionArguments::new(
@@ -46,20 +46,25 @@ impl AMQP {
             .await
             .expect("Failed to open RabbitMQ channel");
 
-        channel
-            .exchange_declare(
-                ExchangeDeclareArguments::new(&config.pushd.exchange, "direct")
-                    .durable(true)
-                    .finish(),
-            )
-            .await
-            .expect("Failed to declare exchange");
-
-        AMQP::new(connection, channel)
+        let mut resp = AMQP::new(connection, channel);
+        //resp.configure_channels().await?;
+        Ok(resp)
     }
 
-    pub async fn configure_channels(&self) -> revolt_result::Result<()> {
+    pub async fn repoen_channel(&mut self) {
+        self.channel = self
+            .connection
+            .open_channel(None)
+            .await
+            .expect("Failed to open RabbitMQ channel");
+    }
+
+    pub async fn configure_channels(&mut self) -> revolt_result::Result<()> {
         let config = revolt_config::config().await;
+
+        if !self.channel.is_open() {
+            self.repoen_channel().await;
+        }
 
         self.channel
             .exchange_declare(
