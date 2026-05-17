@@ -58,7 +58,7 @@ impl AbstractAttachmentHashes for MongoDb {
                 doc! {
                     "_id": hash,
                     "metadata.type": "Image",
-                    "metadata.animated": { "$exists": false },
+                    "metadata.animated": null,
                 },
                 doc! {
                     "$set": {
