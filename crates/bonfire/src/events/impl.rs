@@ -299,7 +299,6 @@ impl State {
                     }
                 }
             }
-            println!("Found slowmodes: {slowmodes:?}");
             Some(slowmodes)
         } else {
             None
