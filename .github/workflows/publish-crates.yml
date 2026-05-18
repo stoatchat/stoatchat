@@ -21,4 +21,6 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish
-        run: CARGO_REGISTRY_TOKEN=${{ secrets.CRATES_IO_PUBLISH_TOKEN}} mise publish --workspace
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: mise publish --workspace
