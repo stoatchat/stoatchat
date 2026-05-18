@@ -90,8 +90,6 @@ pub enum EventV1 {
 
         #[serde(skip_serializing_if = "Option::is_none")]
         policy_changes: Option<Vec<PolicyChange>>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        channel_slowmodes: Option<Vec<ChannelSlowmode>>,
     },
 
     /// Ping response

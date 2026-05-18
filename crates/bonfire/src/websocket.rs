@@ -13,7 +13,7 @@ use futures::{
     stream::{SplitSink, SplitStream},
     FutureExt, SinkExt, StreamExt, TryStreamExt,
 };
-use redis_kiss::{PayloadType, REDIS_PAYLOAD_TYPE, REDIS_URI};
+use redis_kiss::{get_connection, AsyncCommands, PayloadType, REDIS_PAYLOAD_TYPE, REDIS_URI};
 use revolt_config::report_internal_error;
 use revolt_database::{
     events::{client::EventV1, server::ClientMessage},
@@ -32,6 +32,7 @@ use sentry::Level;
 
 use crate::config::{ProtocolConfiguration, WebsocketHandshakeCallback};
 use crate::events::state::{State, SubscriptionStateChange};
+use revolt_models::v0;
 
 type WsReader = SplitStream<WebSocketStream<TcpStream>>;
 type WsWriter = SplitSink<WebSocketStream<TcpStream>, async_tungstenite::tungstenite::Message>;
@@ -126,6 +127,14 @@ pub async fn client(db: &'static Database, stream: TcpStream, addr: SocketAddr) 
 
     if report_internal_error!(write.send(config.encode(&ready_payload)).await).is_err() {
         return;
+    }
+
+    let slowmodes = fetch_user_slowmodes(&user_id).await.unwrap_or_default();
+    if !slowmodes.is_empty() {
+        let event = EventV1::UserSlowmodes { slowmodes };
+        if report_internal_error!(write.send(config.encode(&event)).await).is_err() {
+            return;
+        }
     }
 
     // Create presence session.
@@ -526,5 +535,30 @@ async fn worker(
                 }
             }
         }
+    }
+}
+
+async fn fetch_user_slowmodes(user_id: &str) -> Option<Vec<v0::ChannelSlowmode>> {
+    if let Ok(conn) = get_connection().await {
+        let mut conn = conn.into_inner();
+        let pattern = format!("slowmode:{}:*", user_id);
+        let keys: Vec<String> = conn.keys(&pattern).await.unwrap_or_default();
+
+        let mut slowmodes = vec![];
+        for key in keys {
+            let ttl: i64 = conn.ttl(&key).await.unwrap_or(-1);
+            if ttl > 0 {
+                if let Some(channel_id) = key.split(':').nth(2) {
+                    slowmodes.push(v0::ChannelSlowmode {
+                        channel_id: channel_id.to_string(),
+                        duration: ttl as u64,
+                        retry_after: ttl as u64,
+                    });
+                }
+            }
+        }
+        Some(slowmodes)
+    } else {
+        None
     }
 }

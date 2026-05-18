@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use futures::future::join_all;
-use redis_kiss::{get_connection, AsyncCommands};
+use redis_kiss::AsyncCommands;
 use revolt_database::{
     events::client::{EventV1, ReadyPayloadFields},
     util::permissions::DatabasePermissionQuery,
@@ -9,7 +9,6 @@ use revolt_database::{
     Channel, Database, Member, MemberCompositeKey, Presence, RelationshipStatus,
 };
 use revolt_models::v0;
-use revolt_models::v0::ChannelSlowmode;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_presence::filter_online;
 use revolt_result::Result;
@@ -264,46 +263,6 @@ impl State {
             None
         };
 
-        // Fetch active slowmodes from Redis
-        let channel_slowmodes = if let Ok(conn) = get_connection().await {
-            let mut conn = conn.into_inner();
-            let pattern = format!("slowmode:{}:*", user.id);
-            let keys: Vec<String> = conn.keys(&pattern).await.unwrap_or_default();
-
-            let mut slowmodes = vec![];
-            for key in keys {
-                let ttl: i64 = conn.ttl(&key).await.unwrap_or(-1);
-                if ttl > 0 {
-                    if let Some(channel_id) = key.split(':').nth(2) {
-                        let duration = self
-                            .cache
-                            .channels
-                            .get(channel_id)
-                            .and_then(|ch| match ch {
-                                Channel::TextChannel {
-                                    slowmode: Some(s), ..
-                                } => Some(*s),
-                                _ => None,
-                            })
-                            .unwrap_or(0);
-
-                        // If cache says 0 but key exists with valid TTL, the slowmode was
-                        // active when set — use TTL as a best-effort duration fallback
-                        let effective_duration = if duration > 0 { duration } else { ttl as u64 };
-
-                        slowmodes.push(ChannelSlowmode {
-                            channel_id: channel_id.to_string(),
-                            duration: effective_duration,
-                            retry_after: ttl as u64,
-                        });
-                    }
-                }
-            }
-            Some(slowmodes)
-        } else {
-            None
-        };
-
         // Copy data into local state cache.
         self.cache.users = users.iter().cloned().map(|x| (x.id.clone(), x)).collect();
         self.cache
@@ -369,7 +328,6 @@ impl State {
             channel_unreads,
 
             policy_changes,
-            channel_slowmodes,
         })
     }
 
