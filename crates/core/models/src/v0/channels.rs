@@ -314,6 +314,12 @@ auto_derived!(
         /// Only used when the user is the first one connected.
         pub recipients: Option<Vec<String>>,
     }
+
+    pub struct ChannelSlowmode {
+        pub channel_id: String,
+        pub duration: u64,
+        pub retry_after: u64,
+    }
 );
 
 impl Channel {
