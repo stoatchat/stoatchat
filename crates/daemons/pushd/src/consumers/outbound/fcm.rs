@@ -34,7 +34,7 @@ pub enum NotificationData {
         body: String,
         image: String,
         channel: String,
-        author_id: String,
+        author: String,
         author_name: String,
     },
     DmCallStartEnd {
@@ -86,7 +86,7 @@ impl NotificationData {
                 body,
                 image,
                 channel,
-                author_id,
+                author,
                 author_name,
             } => {
                 data.insert("message".to_string(), Value::String(message));
@@ -94,7 +94,7 @@ impl NotificationData {
                 data.insert("body".to_string(), Value::String(body));
                 data.insert("image".to_string(), Value::String(image));
                 data.insert("channel".to_string(), Value::String(channel));
-                data.insert("author_id".to_string(), Value::String(author_id));
+                data.insert("author".to_string(), Value::String(author));
                 data.insert("author_name".to_string(), Value::String(author_name));
             }
             NotificationData::DmCallStartEnd {
@@ -234,7 +234,7 @@ impl FcmOutboundConsumer {
                     body: alert.body,
                     image: alert.icon,
                     channel: alert.message.channel,
-                    author_id: alert.message.author,
+                    author: alert.message.author,
                     author_name: alert.author,
                 };
 
