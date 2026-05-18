@@ -90,7 +90,6 @@ impl NotificationData {
                 author_name,
             } => {
                 data.insert("message".to_string(), Value::String(message));
-
                 data.insert("body".to_string(), Value::String(body));
                 data.insert("image".to_string(), Value::String(image));
                 data.insert("channel".to_string(), Value::String(channel));
