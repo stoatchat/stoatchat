@@ -3,7 +3,7 @@ use lapin::{
     options::*,
     types::FieldTable,
     uri::{AMQPAuthority, AMQPQueryString, AMQPUri, AMQPUserInfo},
-    ConnectionBuilder, ConnectionProperties,
+    ConnectionBuilder, ConnectionProperties, ExchangeKind,
 };
 use log::info;
 use redis_kiss::{get_connection, AsyncCommands, Conn as RedisConnection};
@@ -45,6 +45,42 @@ pub async fn task(db: Database) -> Result<()> {
         .create_channel()
         .await
         .expect("Failed to create channel");
+
+    reader_channel
+        .exchange_declare(
+            config.rabbit.default_exchange.clone().into(),
+            ExchangeKind::Topic,
+            ExchangeDeclareOptions {
+                durable: true,
+                ..Default::default()
+            },
+            FieldTable::default(),
+        )
+        .await
+        .expect("Failed to declare exchange");
+
+    reader_channel
+        .queue_declare(
+            config.rabbit.queues.acks.clone().into(),
+            QueueDeclareOptions {
+                durable: true,
+                ..Default::default()
+            },
+            FieldTable::default(),
+        )
+        .await
+        .expect("Failed to bind queue");
+
+    reader_channel
+        .queue_bind(
+            config.rabbit.queues.acks.clone().into(),
+            config.rabbit.default_exchange.into(),
+            config.rabbit.queues.acks.clone().into(),
+            QueueBindOptions::default(),
+            FieldTable::default(),
+        )
+        .await
+        .expect("Failed to bind channel");
 
     let mut consumer = reader_channel
         .basic_consume(

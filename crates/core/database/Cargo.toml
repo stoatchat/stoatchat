@@ -95,7 +95,7 @@ revolt_rocket_okapi = { workspace = true, optional = true }
 authifier = { workspace = true }
 
 # RabbitMQ
-amqprs = { workspace = true }
+lapin = { workspace = true, features = ["tokio"] }
 
 # Voice
 livekit-api = { workspace = true, features = ["rustls-tls-native-roots"], optional = true }
