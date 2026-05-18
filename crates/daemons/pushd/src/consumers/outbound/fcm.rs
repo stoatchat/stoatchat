@@ -11,7 +11,6 @@ use fcm_v1::{
 };
 use revolt_config::config;
 use revolt_database::{events::rabbit::*, Database};
-use revolt_models::v0::{Channel, PushNotification};
 use serde_json::Value;
 
 /// Custom notification data
@@ -31,10 +30,12 @@ pub enum NotificationData {
         image: Option<String>,
     },
     Message {
-        title: String,
+        message: String,
         body: String,
         image: String,
-        tag: String,
+        channel: String,
+        author: String,
+        author_name: String,
     },
     DmCallStartEnd {
         initiator_id: String,
@@ -81,15 +82,19 @@ impl NotificationData {
                 }
             }
             NotificationData::Message {
-                title,
+                message,
                 body,
                 image,
-                tag,
+                channel,
+                author,
+                author_name,
             } => {
-                data.insert("title".to_string(), Value::String(title));
+                data.insert("message".to_string(), Value::String(message));
                 data.insert("body".to_string(), Value::String(body));
                 data.insert("image".to_string(), Value::String(image));
-                data.insert("tag".to_string(), Value::String(tag));
+                data.insert("channel".to_string(), Value::String(channel));
+                data.insert("author".to_string(), Value::String(author));
+                data.insert("author_name".to_string(), Value::String(author_name));
             }
             NotificationData::DmCallStartEnd {
                 initiator_id,
@@ -113,26 +118,6 @@ impl NotificationData {
 pub struct FcmOutboundConsumer {
     db: Database,
     client: Client,
-}
-
-impl FcmOutboundConsumer {
-    fn format_title(&self, notification: &PushNotification) -> String {
-        // ideally this changes depending on context
-        // in a server, it would look like "Sendername, #channelname in servername"
-        // in a group, it would look like "Sendername in groupname"
-        // in a dm it should just be "Sendername".
-        // not sure how feasible all those are given the PushNotification object as it currently stands.
-
-        #[allow(deprecated)]
-        match &notification.channel {
-            Channel::DirectMessage { .. } => notification.author.clone(),
-            Channel::Group { name, .. } => format!("{}, #{}", notification.author, name),
-            Channel::TextChannel { name, .. } => {
-                format!("{} in #{}", notification.author, name)
-            }
-            _ => "Unknown".to_string(),
-        }
-    }
 }
 
 impl FcmOutboundConsumer {
@@ -244,10 +229,12 @@ impl FcmOutboundConsumer {
 
             PayloadKind::MessageNotification(alert) => {
                 let data = NotificationData::Message {
-                    title: self.format_title(&alert),
+                    message: alert.message.id,
                     body: alert.body,
                     image: alert.icon,
-                    tag: alert.tag,
+                    channel: alert.message.channel,
+                    author: alert.message.author,
+                    author_name: alert.author,
                 };
 
                 let msg = Message {

@@ -152,6 +152,7 @@ pub async fn web() -> Rocket<Build> {
             limits: rocket::data::Limits::default().limit("string", 5.megabytes()),
             address: Ipv4Addr::new(0, 0, 0, 0).into(),
             port: 14702,
+            ip_header: Some("X-Forwarded-For".into()),
             ..Default::default()
         })
 }
