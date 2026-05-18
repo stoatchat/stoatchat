@@ -11,7 +11,6 @@ use fcm_v1::{
 };
 use revolt_config::config;
 use revolt_database::{events::rabbit::*, Database};
-use revolt_models::v0::{Channel, PushNotification};
 use serde_json::Value;
 
 /// Custom notification data
@@ -31,6 +30,7 @@ pub enum NotificationData {
         image: Option<String>,
     },
     Message {
+        message: String,
         body: String,
         image: String,
         channel: String,
@@ -82,12 +82,15 @@ impl NotificationData {
                 }
             }
             NotificationData::Message {
+                message,
                 body,
                 image,
                 channel,
                 author_id,
                 author_name,
             } => {
+                data.insert("message".to_string(), Value::String(message));
+
                 data.insert("body".to_string(), Value::String(body));
                 data.insert("image".to_string(), Value::String(image));
                 data.insert("channel".to_string(), Value::String(channel));
@@ -227,6 +230,7 @@ impl FcmOutboundConsumer {
 
             PayloadKind::MessageNotification(alert) => {
                 let data = NotificationData::Message {
+                    message: alert.message.id,
                     body: alert.body,
                     image: alert.icon,
                     channel: alert.message.channel,
