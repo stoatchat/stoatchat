@@ -539,26 +539,40 @@ async fn worker(
 }
 
 async fn fetch_user_slowmodes(user_id: &str) -> Option<Vec<v0::ChannelSlowmode>> {
-    if let Ok(conn) = get_connection().await {
-        let mut conn = conn.into_inner();
-        let pattern = format!("slowmode:{}:*", user_id);
-        let keys: Vec<String> = conn.keys(&pattern).await.unwrap_or_default();
+    let mut conn = get_connection().await.ok()?.into_inner();
+    let idx_key = format!("slowmode_idx:{}", user_id);
 
-        let mut slowmodes = vec![];
-        for key in keys {
-            let ttl: i64 = conn.ttl(&key).await.unwrap_or(-1);
-            if ttl > 0 {
-                if let Some(channel_id) = key.split(':').nth(2) {
-                    slowmodes.push(v0::ChannelSlowmode {
-                        channel_id: channel_id.to_string(),
-                        duration: ttl as u64,
-                        retry_after: ttl as u64,
-                    });
-                }
-            }
-        }
-        Some(slowmodes)
-    } else {
-        None
+    let channel_ids: Vec<String> = conn.smembers(&idx_key).await.unwrap_or_default();
+    if channel_ids.is_empty() {
+        return Some(vec![]);
     }
+
+    // Bulk fetch all TTLs in one round trip
+    let mut pipe = redis_kiss::redis::pipe();
+    for channel_id in &channel_ids {
+        pipe.ttl(format!("slowmode:{}:{}", user_id, channel_id));
+    }
+    let ttls: Vec<i64> = pipe.query_async(&mut conn).await.unwrap_or_default();
+
+    // Partition into alive/expired in one pass
+    let mut slowmodes = vec![];
+    let mut expired = vec![];
+    for (channel_id, ttl) in channel_ids.iter().zip(ttls.iter()) {
+        if *ttl > 0 {
+            slowmodes.push(v0::ChannelSlowmode {
+                channel_id: channel_id.clone(),
+                duration: *ttl as u64,
+                retry_after: *ttl as u64,
+            });
+        } else {
+            expired.push(channel_id.as_str());
+        }
+    }
+
+    // Bulk remove all expired members in one SREM call
+    if !expired.is_empty() {
+        conn.srem::<_, _, ()>(&idx_key, expired).await.ok();
+    }
+
+    Some(slowmodes)
 }

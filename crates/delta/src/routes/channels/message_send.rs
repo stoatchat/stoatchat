@@ -86,6 +86,16 @@ pub async fn message_send(
                         .await
                         .unwrap_or(None);
 
+                    if set_result.is_some() {
+                        let idx_key = format!("slowmode_idx:{}", user.id);
+                        conn.sadd::<_, _, ()>(&idx_key, channel_id.as_str())
+                            .await
+                            .ok();
+                        conn.expire::<_, ()>(&idx_key, *channel_slowmode as usize)
+                            .await
+                            .ok();
+                    }
+
                     // If `set_result` is None, the `NX` condition failed because the key already exists.
                     // This means the user is currently in slowmode.
                     if set_result.is_none() {
