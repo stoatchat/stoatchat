@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.13.6](https://github.com/stoatchat/stoatchat/compare/v0.13.5...v0.13.6) (2026-05-18)
+
+
+### Features
+
+* Update FCM payload for android notifications ([#766](https://github.com/stoatchat/stoatchat/issues/766)) ([acbc087](https://github.com/stoatchat/stoatchat/commit/acbc087982e9aeb05cabc5ab4c9b1291f67490ad))
+* user slowmode events ([#760](https://github.com/stoatchat/stoatchat/issues/760)) ([af0d8aa](https://github.com/stoatchat/stoatchat/commit/af0d8aad14dc68d88159d0e1c714077d362e21e4))
+
+
+### Bug Fixes
+
+* include `minio` region as tests need it ([#761](https://github.com/stoatchat/stoatchat/issues/761)) ([298742d](https://github.com/stoatchat/stoatchat/commit/298742dbad4eafae356f976c56b9db23904b0c3a))
+* set env var for publishing crates ([#768](https://github.com/stoatchat/stoatchat/issues/768)) ([018afaf](https://github.com/stoatchat/stoatchat/commit/018afaf38f6330d92dad2a68b640c0cb3f6b639a))
+* Use proper headers to determine IP when not behind cloudflare ([#764](https://github.com/stoatchat/stoatchat/issues/764)) ([494c8b7](https://github.com/stoatchat/stoatchat/commit/494c8b7cabaae2a51039a7a5b559d5e2e5279554))
+* voice ingress crashing due to new Result in AMQP::new_auto() ([#765](https://github.com/stoatchat/stoatchat/issues/765)) ([2871632](https://github.com/stoatchat/stoatchat/commit/2871632382395cb20cbe0047c542d3ac31ff3f03))
+
+
+### Miscellaneous Chores
+
+* switch to lapin ([#767](https://github.com/stoatchat/stoatchat/issues/767)) ([5b19853](https://github.com/stoatchat/stoatchat/commit/5b1985381ae829a92c80a19e91a414cd9dc4de93))
+
 ## [0.13.5](https://github.com/stoatchat/stoatchat/compare/v0.13.4...v0.13.5) (2026-05-17)
 
 
