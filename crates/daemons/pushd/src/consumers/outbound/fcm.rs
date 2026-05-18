@@ -125,8 +125,6 @@ pub struct FcmOutboundConsumer {
     client: Client,
 }
 
-impl FcmOutboundConsumer {
-
 #[async_trait]
 impl Consumer for FcmOutboundConsumer {
     async fn create(
