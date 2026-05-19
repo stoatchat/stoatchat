@@ -5,14 +5,14 @@ use lapin::{
     uri::{AMQPAuthority, AMQPQueryString, AMQPUri, AMQPUserInfo},
     ConnectionBuilder, ConnectionProperties, ExchangeKind,
 };
-use log::info;
+use log::{debug, info};
 use redis_kiss::{get_connection, AsyncCommands, Conn as RedisConnection};
 use revolt_config::config;
-use revolt_database::{events::rabbit::AckEventPayload, Database};
+use revolt_database::{events::rabbit::AckEventPayload, Database, AMQP};
 use revolt_result::{Result, ToRevoltError};
 use serde_json;
 
-pub async fn task(db: Database) -> Result<()> {
+pub async fn task(db: Database, amqp: AMQP) -> Result<()> {
     let config = config().await;
 
     let mut redis = get_connection()
@@ -94,12 +94,14 @@ pub async fn task(db: Database) -> Result<()> {
 
     while let Some(delivery) = consumer.next().await {
         if let Ok(delivery) = delivery {
-            let payload: std::result::Result<AckEventPayload, _> =
-                serde_json::from_slice(&delivery.data);
+            let payload = serde_json::from_slice::<AckEventPayload>(&delivery.data);
+
             if let Ok(payload) = payload {
-                info!("{:?}", payload);
+                debug!("Received ack event: {payload:?}");
+
                 if let Err(e) = process_channel_ack(
                     &db,
+                    &amqp,
                     payload.user_id,
                     payload.channel_id.unwrap(),
                     &mut redis,
@@ -125,6 +127,7 @@ pub async fn task(db: Database) -> Result<()> {
 #[allow(clippy::disallowed_methods)]
 async fn process_channel_ack(
     db: &Database,
+    amqp: &AMQP,
     user: String,
     channel: String,
     redis: &mut RedisConnection,
@@ -135,28 +138,24 @@ async fn process_channel_ack(
         .to_internal_error()?;
 
     if let Some(message_id) = message_id {
-        // This will be uncommented eventually, but we need to sort out the transition to lapin first. For now we'll simply disable the badge update logic.
-        // We also drop a db request as a bonus.
+        let unread = db.fetch_unread(&user, &channel).await?;
+        let updated = db.acknowledge_message(&channel, &user, &message_id).await?;
 
-        //let unread = db.fetch_unread(&user, &channel).await?;
-        let _updated = db.acknowledge_message(&channel, &user, &message_id).await?;
         info!("Set new state for ack: {}:{}:{}", channel, user, message_id);
 
-        // if let (Some(before), Some(after)) = (unread, updated) {
-        //     let before_mentions = before.mentions.unwrap_or_default().len();
-        //     let after_mentions = after.mentions.unwrap_or_default().len();
+        if let (Some(before), Some(after)) = (unread, updated) {
+            let before_mentions = before.mentions.unwrap_or_default().len();
+            let after_mentions = after.mentions.unwrap_or_default().len();
 
-        //     let mentions_acked = before_mentions - after_mentions;
-
-        //     if mentions_acked > 0 {
-        //         if let Err(err) = amqp
-        //             .ack_message(user.to_string(), channel.to_string(), payload.message_id)
-        //             .await
-        //         {
-        //             revolt_config::capture_error(&err);
-        //         }
-        //     };
-        // }
+            if after_mentions < before_mentions {
+                if let Err(err) = amqp
+                    .ack_notification_message(user.to_string(), channel.to_string(), message_id)
+                    .await
+                {
+                    revolt_config::capture_error(&err);
+                }
+            };
+        }
 
         Ok(())
     } else {
