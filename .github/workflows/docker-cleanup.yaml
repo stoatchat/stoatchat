@@ -14,32 +14,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  enumerate:
+  cleanup:
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.head.repo.fork }}
-    outputs:
-      packages: ${{ steps.list.outputs.packages }}
-    steps:
-      - id: list
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ORG: stoatchat
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          packages=$(gh api --paginate \
-            "/orgs/${ORG}/packages?package_type=container" \
-            --jq "[.[] | select(.repository.full_name == \"${REPO}\") | .name]")
-          echo "packages=${packages}" >> "$GITHUB_OUTPUT"
-
-  cleanup:
-    needs: enumerate
-    runs-on: ubuntu-latest
-    if: ${{ needs.enumerate.outputs.packages != '[]' }}
     strategy:
       fail-fast: false
       matrix:
-        package: ${{ fromJSON(needs.enumerate.outputs.packages) }}
+        package:
+          - base
+          - api
+          - events
+          - file-server
+          - proxy
+          - gifbox
+          - crond
+          - pushd
+          - voice-ingress
     steps:
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
