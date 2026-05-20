@@ -1,5 +1,89 @@
 # Changelog
 
+## [0.13.6](https://github.com/stoatchat/stoatchat/compare/v0.13.5...v0.13.6) (2026-05-18)
+
+
+### Features
+
+* Update FCM payload for android notifications ([#766](https://github.com/stoatchat/stoatchat/issues/766)) ([acbc087](https://github.com/stoatchat/stoatchat/commit/acbc087982e9aeb05cabc5ab4c9b1291f67490ad))
+* user slowmode events ([#760](https://github.com/stoatchat/stoatchat/issues/760)) ([af0d8aa](https://github.com/stoatchat/stoatchat/commit/af0d8aad14dc68d88159d0e1c714077d362e21e4))
+
+
+### Bug Fixes
+
+* include `minio` region as tests need it ([#761](https://github.com/stoatchat/stoatchat/issues/761)) ([298742d](https://github.com/stoatchat/stoatchat/commit/298742dbad4eafae356f976c56b9db23904b0c3a))
+* set env var for publishing crates ([#768](https://github.com/stoatchat/stoatchat/issues/768)) ([018afaf](https://github.com/stoatchat/stoatchat/commit/018afaf38f6330d92dad2a68b640c0cb3f6b639a))
+* Use proper headers to determine IP when not behind cloudflare ([#764](https://github.com/stoatchat/stoatchat/issues/764)) ([494c8b7](https://github.com/stoatchat/stoatchat/commit/494c8b7cabaae2a51039a7a5b559d5e2e5279554))
+* voice ingress crashing due to new Result in AMQP::new_auto() ([#765](https://github.com/stoatchat/stoatchat/issues/765)) ([2871632](https://github.com/stoatchat/stoatchat/commit/2871632382395cb20cbe0047c542d3ac31ff3f03))
+
+
+### Miscellaneous Chores
+
+* switch to lapin ([#767](https://github.com/stoatchat/stoatchat/issues/767)) ([5b19853](https://github.com/stoatchat/stoatchat/commit/5b1985381ae829a92c80a19e91a414cd9dc4de93))
+
+## [0.13.5](https://github.com/stoatchat/stoatchat/compare/v0.13.4...v0.13.5) (2026-05-17)
+
+
+### Bug Fixes
+
+* dont panic on hash missing when deleting files ([#755](https://github.com/stoatchat/stoatchat/issues/755)) ([c902077](https://github.com/stoatchat/stoatchat/commit/c902077cf51076fee11712eb732dc8a8f786fc4b))
+
+## [0.13.4](https://github.com/stoatchat/stoatchat/compare/v0.13.3...v0.13.4) (2026-05-16)
+
+
+### Bug Fixes
+
+* add TLS feature to livekit-api crate ([#753](https://github.com/stoatchat/stoatchat/issues/753)) ([6cfee1f](https://github.com/stoatchat/stoatchat/commit/6cfee1f601c1e084df7c8f1e7a5e8a560d1dd514))
+
+## [0.13.3](https://github.com/stoatchat/stoatchat/compare/v0.13.2...v0.13.3) (2026-05-15)
+
+
+### Bug Fixes
+
+* don't automatically set up rabbitmq in delta ([#749](https://github.com/stoatchat/stoatchat/issues/749)) ([7647cfc](https://github.com/stoatchat/stoatchat/commit/7647cfc8d93aba99f5faef13eb3d970097540d76))
+* don't declare queues which seem to cause the backend to crash in prod ([7647cfc](https://github.com/stoatchat/stoatchat/commit/7647cfc8d93aba99f5faef13eb3d970097540d76))
+
+## [0.13.2](https://github.com/stoatchat/stoatchat/compare/v0.13.1...v0.13.2) (2026-05-11)
+
+
+### Bug Fixes
+
+* update default exchange to `revolt.default` ([#746](https://github.com/stoatchat/stoatchat/issues/746)) ([fcb8091](https://github.com/stoatchat/stoatchat/commit/fcb8091cd7a00d7f26c798daa33aae4b923b2a8b))
+
+## [0.13.1](https://github.com/stoatchat/stoatchat/compare/v0.13.0...v0.13.1) (2026-05-10)
+
+
+### Bug Fixes
+
+* amqprs startup bug ([#744](https://github.com/stoatchat/stoatchat/issues/744)) ([1100eaf](https://github.com/stoatchat/stoatchat/commit/1100eaf46f849f2509ae01ac497556ca33bde778))
+
+## [0.13.0](https://github.com/stoatchat/stoatchat/compare/v0.12.1...v0.13.0) (2026-05-08)
+
+
+### Features
+
+* add embed support for YouTube Shorts ([#734](https://github.com/stoatchat/stoatchat/issues/734)) ([d46c7f7](https://github.com/stoatchat/stoatchat/commit/d46c7f7f3c04524c0639c3e0a122626f8e0b3bf7))
+* add emoji rename endpoint ([#714](https://github.com/stoatchat/stoatchat/issues/714)) ([23ad135](https://github.com/stoatchat/stoatchat/commit/23ad1359834bb7d07a460b8678d6a6ebffc73eb0))
+* add legal links to root payload ([#733](https://github.com/stoatchat/stoatchat/issues/733)) ([21d8201](https://github.com/stoatchat/stoatchat/commit/21d82018cf84ab0fdd10613d254b9562aea8eea3))
+* add role icon support ([#724](https://github.com/stoatchat/stoatchat/issues/724)) ([841985d](https://github.com/stoatchat/stoatchat/commit/841985d3b994df1c6eefab2fc7ecbd77ab22c493))
+* Add webhook endpoints for editing and deleting messages ([#682](https://github.com/stoatchat/stoatchat/issues/682)) ([6f3441c](https://github.com/stoatchat/stoatchat/commit/6f3441cf4acac2a8e6e1bf07a279a153b80f7956))
+* automatically sanitise usernames on create/update ([#689](https://github.com/stoatchat/stoatchat/issues/689)) ([e937697](https://github.com/stoatchat/stoatchat/commit/e93769786c7669485a659ee471630740d3cea702))
+* blacklist private ip ranges and add january domain blocklist ([#731](https://github.com/stoatchat/stoatchat/issues/731)) ([6b41db9](https://github.com/stoatchat/stoatchat/commit/6b41db984bb491b2e58324309cc70d8c14e0b814))
+* Rewrite acks ([#741](https://github.com/stoatchat/stoatchat/issues/741)) ([ab5bd47](https://github.com/stoatchat/stoatchat/commit/ab5bd47a39ee889de0b5ae6e7b560620853daead))
+
+
+### Bug Fixes
+
+* add new_user_hours to configuration limits ([#729](https://github.com/stoatchat/stoatchat/issues/729)) ([279f5d5](https://github.com/stoatchat/stoatchat/commit/279f5d5fd7af2df55902c706859ec07f569cdb1e))
+* add reconnection policy to Redis subscriber to prevent ghost state ([#708](https://github.com/stoatchat/stoatchat/issues/708)) ([057f2bb](https://github.com/stoatchat/stoatchat/commit/057f2bb8b359f8b942741a30ff54eeb8fbe3e0b1))
+* docker compose file had personal url in it ([#742](https://github.com/stoatchat/stoatchat/issues/742)) ([0719985](https://github.com/stoatchat/stoatchat/commit/0719985ac5636590f91e6f9ec4b68f3eded70c13))
+* don't strip ICC from exif ([#735](https://github.com/stoatchat/stoatchat/issues/735)) ([d76a711](https://github.com/stoatchat/stoatchat/commit/d76a71141f3e508f6308ba52fa28eaeb56fb3438))
+* dont send notification in fcm ([#721](https://github.com/stoatchat/stoatchat/issues/721)) ([89171e9](https://github.com/stoatchat/stoatchat/commit/89171e9bd0f15711157e78c6eec0fe7b480de93a))
+* encode filenames in redirects ([#737](https://github.com/stoatchat/stoatchat/issues/737)) ([9fd7128](https://github.com/stoatchat/stoatchat/commit/9fd7128f800badbd184baf943d4f799e601201e4))
+* january ip redirects & domain resolver ([#738](https://github.com/stoatchat/stoatchat/issues/738)) ([356491e](https://github.com/stoatchat/stoatchat/commit/356491e934b274f9e895df883dd63ef0b3123510))
+* update message length validation to remove upper limit ([#723](https://github.com/stoatchat/stoatchat/issues/723)) ([ed4fd5e](https://github.com/stoatchat/stoatchat/commit/ed4fd5ebfe6d0ea534a0898da4afdc1f4e2cd6c5))
+* use correct response for NoEffect errors ([#732](https://github.com/stoatchat/stoatchat/issues/732)) ([5378cd2](https://github.com/stoatchat/stoatchat/commit/5378cd22b4c7d85f44c31a6af0dda00941b80d5c))
+
 ## [0.12.1](https://github.com/stoatchat/stoatchat/compare/v0.12.0...v0.12.1) (2026-04-10)
 
 

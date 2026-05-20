@@ -1,6 +1,6 @@
 [package]
 name = "revolt-delta"
-version = "0.12.1"
+version = "0.13.6"
 license = "AGPL-3.0-or-later"
 authors = ["Paul Makles <paulmakles@gmail.com>"]
 edition = "2018"
@@ -64,7 +64,7 @@ schemars = { workspace = true }
 revolt_rocket_okapi = { workspace = true, features = ["swagger"] }
 
 # rabbit
-amqprs = { workspace = true }
+lapin = { workspace = true, features = ["tokio"] }
 
 # core
 authifier = { workspace = true }

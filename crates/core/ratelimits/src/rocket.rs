@@ -1,12 +1,12 @@
 use async_trait::async_trait;
 use log::info;
+use revolt_config::config;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::uri::Origin;
 use rocket::http::{Method, Status};
 use rocket::request::{FromRequest, Outcome};
 use rocket::serde::json::Json;
 use rocket::{Data, Request, Response, State};
-use revolt_config::config;
 
 use revolt_rocket_okapi::r#gen::OpenApiGenerator;
 use revolt_rocket_okapi::request::{OpenApiFromRequest, RequestHeaderInput};
@@ -28,8 +28,8 @@ pub type RatelimitStorage = crate::ratelimiter::RatelimitStorage<RocketRequestKi
 /// Find the remote IP of the client
 fn to_ip(request: &'_ rocket::Request<'_>) -> String {
     request
-        .remote()
-        .map(|x| x.ip().to_string())
+        .client_ip()
+        .map(|r| r.to_string())
         .unwrap_or_default()
 }
 

@@ -1,6 +1,6 @@
 [package]
 name = "revolt-pushd"
-version = "0.12.1"
+version = "0.13.6"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 publish = false
@@ -15,7 +15,7 @@ revolt-parser = { workspace = true }
 
 anyhow = { workspace = true }
 
-amqprs = { workspace = true }
+lapin = { workspace = true }
 fcm_v1 = { workspace = true }
 web-push = { workspace = true }
 isahc = { workspace = true, features = ["json"], optional = true }

@@ -1,12 +1,14 @@
 use std::time::Duration;
 
 use redis_kiss::{get_connection, redis, AsyncCommands};
+use revolt_database::events::client::EventV1;
 use revolt_database::util::permissions::DatabasePermissionQuery;
 use revolt_database::{
     util::idempotency::IdempotencyKey, util::reference::Reference, Database, User,
 };
 use revolt_database::{Channel, Interactions, Message, AMQP};
 use revolt_models::v0;
+use revolt_models::v0::ChannelSlowmode;
 use revolt_permissions::PermissionQuery;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
@@ -84,6 +86,16 @@ pub async fn message_send(
                         .await
                         .unwrap_or(None);
 
+                    if set_result.is_some() {
+                        let idx_key = format!("slowmode_idx:{}", user.id);
+                        conn.sadd::<_, _, ()>(&idx_key, channel_id.as_str())
+                            .await
+                            .ok();
+                        conn.expire::<_, ()>(&idx_key, *channel_slowmode as usize)
+                            .await
+                            .ok();
+                    }
+
                     // If `set_result` is None, the `NX` condition failed because the key already exists.
                     // This means the user is currently in slowmode.
                     if set_result.is_none() {
@@ -92,10 +104,29 @@ pub async fn message_send(
 
                         // Redis returns positive integers for valid TTLs
                         if ttl > 0 {
+                            EventV1::UserSlowmodes {
+                                slowmodes: vec![ChannelSlowmode {
+                                    channel_id: channel_id.to_string(),
+                                    duration: *channel_slowmode,
+                                    retry_after: ttl as u64,
+                                }],
+                            }
+                            .private(user.id.clone())
+                            .await;
                             return Err(create_error!(InSlowmode {
                                 retry_after: ttl as u64
                             }));
                         }
+                    } else {
+                        EventV1::UserSlowmodes {
+                            slowmodes: vec![ChannelSlowmode {
+                                channel_id: channel_id.to_string(),
+                                duration: *channel_slowmode,
+                                retry_after: *channel_slowmode,
+                            }],
+                        }
+                        .private(user.id.clone())
+                        .await;
                     }
                 }
                 // If Redis connection fails, just skip the slowmode check

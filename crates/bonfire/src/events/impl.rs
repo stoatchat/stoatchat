@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use futures::future::join_all;
+use redis_kiss::AsyncCommands;
 use revolt_database::{
     events::client::{EventV1, ReadyPayloadFields},
     util::permissions::DatabasePermissionQuery,
