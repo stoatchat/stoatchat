@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.7](https://github.com/stoatchat/stoatchat/compare/v0.13.6...v0.13.7) (2026-05-21)
+
+
+### Bug Fixes
+
+* sanitize emoji input to handle variation selectors ([#774](https://github.com/stoatchat/stoatchat/issues/774)) ([2d308e0](https://github.com/stoatchat/stoatchat/commit/2d308e03d58c19f27b5b4d65dc2a15ef20b56190))
+* update mention count badge for channel acks ([#769](https://github.com/stoatchat/stoatchat/issues/769)) ([0d9ae50](https://github.com/stoatchat/stoatchat/commit/0d9ae508d9d2199f0e408b8ca634d20489be6f61))
+
 ## [0.13.6](https://github.com/stoatchat/stoatchat/compare/v0.13.5...v0.13.6) (2026-05-18)
 
 
