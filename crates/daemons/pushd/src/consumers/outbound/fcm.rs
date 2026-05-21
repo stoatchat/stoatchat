@@ -1,17 +1,16 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use amqprs::{channel::Channel as AmqpChannel, consumer::AsyncConsumer, BasicProperties, Deliver};
-
-use anyhow::{anyhow, bail, Result};
+use crate::utils::Consumer;
+use anyhow::{bail, Result};
 use async_trait::async_trait;
 use fcm_v1::{
     auth::{Authenticator, ServiceAccountKey},
     message::Message,
     Client, Error as FcmError,
 };
+use lapin::{message::Delivery, Channel as AMQPChannel, Connection};
 use revolt_config::config;
 use revolt_database::{events::rabbit::*, Database};
-use revolt_models::v0::{Channel, PushNotification};
 use serde_json::Value;
 
 /// Custom notification data
@@ -31,10 +30,12 @@ pub enum NotificationData {
         image: Option<String>,
     },
     Message {
-        title: String,
+        message: String,
         body: String,
         image: String,
-        tag: String,
+        channel: String,
+        author: String,
+        author_name: String,
     },
     DmCallStartEnd {
         initiator_id: String,
@@ -81,15 +82,19 @@ impl NotificationData {
                 }
             }
             NotificationData::Message {
-                title,
+                message,
                 body,
                 image,
-                tag,
+                channel,
+                author,
+                author_name,
             } => {
-                data.insert("title".to_string(), Value::String(title));
+                data.insert("message".to_string(), Value::String(message));
                 data.insert("body".to_string(), Value::String(body));
                 data.insert("image".to_string(), Value::String(image));
-                data.insert("tag".to_string(), Value::String(tag));
+                data.insert("channel".to_string(), Value::String(channel));
+                data.insert("author".to_string(), Value::String(author));
+                data.insert("author_name".to_string(), Value::String(author_name));
             }
             NotificationData::DmCallStartEnd {
                 initiator_id,
@@ -110,37 +115,31 @@ impl NotificationData {
     }
 }
 
+#[derive(Clone)]
+#[allow(unused)]
 pub struct FcmOutboundConsumer {
     db: Database,
+    authifier_db: authifier::Database,
+    connection: Arc<Connection>,
+    channel: Arc<AMQPChannel>,
     client: Client,
 }
 
-impl FcmOutboundConsumer {
-    fn format_title(&self, notification: &PushNotification) -> String {
-        // ideally this changes depending on context
-        // in a server, it would look like "Sendername, #channelname in servername"
-        // in a group, it would look like "Sendername in groupname"
-        // in a dm it should just be "Sendername".
-        // not sure how feasible all those are given the PushNotification object as it currently stands.
-
-        #[allow(deprecated)]
-        match &notification.channel {
-            Channel::DirectMessage { .. } => notification.author.clone(),
-            Channel::Group { name, .. } => format!("{}, #{}", notification.author, name),
-            Channel::TextChannel { name, .. } => {
-                format!("{} in #{}", notification.author, name)
-            }
-            _ => "Unknown".to_string(),
-        }
-    }
-}
-
-impl FcmOutboundConsumer {
-    pub async fn new(db: Database) -> Result<FcmOutboundConsumer, &'static str> {
+#[async_trait]
+impl Consumer for FcmOutboundConsumer {
+    async fn create(
+        db: Database,
+        authifier_db: authifier::Database,
+        connection: Arc<Connection>,
+        channel: Arc<AMQPChannel>,
+    ) -> Self {
         let config = revolt_config::config().await;
 
-        Ok(FcmOutboundConsumer {
+        Self {
             db,
+            authifier_db,
+            connection,
+            channel,
             client: Client::new(
                 Authenticator::service_account::<&str>(ServiceAccountKey {
                     key_type: Some(config.pushd.fcm.key_type),
@@ -160,33 +159,27 @@ impl FcmOutboundConsumer {
                 false,
                 Duration::from_secs(5),
             ),
-        })
+        }
     }
 
-    async fn consume_event(
-        &mut self,
-        _channel: &AmqpChannel,
-        _deliver: Deliver,
-        _basic_properties: BasicProperties,
-        content: Vec<u8>,
-    ) -> Result<()> {
-        let content = String::from_utf8(content)?;
-        let payload: PayloadToService = serde_json::from_str(content.as_str())?;
+    fn channel(&self) -> &Arc<AMQPChannel> {
+        &self.channel
+    }
+
+    async fn consume(&self, delivery: Delivery) -> Result<()> {
+        let payload: PayloadToService = serde_json::from_slice(&delivery.data)?;
 
         #[allow(clippy::needless_late_init)]
         let resp: Result<Message, FcmError>;
 
         match payload.notification {
             PayloadKind::FRReceived(alert) => {
-                let name = alert
-                    .from_user
-                    .display_name
-                    .or(Some(format!(
+                let name = alert.from_user.display_name.clone().unwrap_or_else(|| {
+                    format!(
                         "{}#{}",
                         alert.from_user.username, alert.from_user.discriminator
-                    )))
-                    .clone()
-                    .ok_or_else(|| anyhow!("missing name"))?;
+                    )
+                });
 
                 let data = NotificationData::FRReceived {
                     id: alert.from_user.id,
@@ -203,15 +196,12 @@ impl FcmOutboundConsumer {
             }
 
             PayloadKind::FRAccepted(alert) => {
-                let name = alert
-                    .accepted_user
-                    .display_name
-                    .or(Some(format!(
+                let name = alert.accepted_user.display_name.clone().unwrap_or_else(|| {
+                    format!(
                         "{}#{}",
                         alert.accepted_user.username, alert.accepted_user.discriminator
-                    )))
-                    .clone()
-                    .ok_or_else(|| anyhow!("missing name"))?;
+                    )
+                });
 
                 let data = NotificationData::FRAccepted {
                     id: alert.accepted_user.id,
@@ -244,10 +234,12 @@ impl FcmOutboundConsumer {
 
             PayloadKind::MessageNotification(alert) => {
                 let data = NotificationData::Message {
-                    title: self.format_title(&alert),
+                    message: alert.message.id,
                     body: alert.body,
                     image: alert.icon,
-                    tag: alert.tag,
+                    channel: alert.message.channel,
+                    author: alert.message.author,
+                    author_name: alert.author,
                 };
 
                 let msg = Message {
@@ -282,43 +274,21 @@ impl FcmOutboundConsumer {
             }
         }
 
-        if let Err(err) = resp {
-            match err {
-                FcmError::Auth => {
-                    if let Err(err) = self
-                        .db
-                        .remove_push_subscription_by_session_id(&payload.session_id)
-                        .await
-                    {
-                        revolt_config::capture_error(&err);
-                    }
-                }
-                err => {
+        match resp {
+            Err(FcmError::Auth) => {
+                if let Err(err) = self
+                    .db
+                    .remove_push_subscription_by_session_id(&payload.session_id)
+                    .await
+                {
                     revolt_config::capture_error(&err);
                 }
             }
-        }
+            res => {
+                res?;
+            }
+        };
 
         Ok(())
-    }
-}
-
-#[allow(unused_variables)]
-#[async_trait]
-impl AsyncConsumer for FcmOutboundConsumer {
-    async fn consume(
-        &mut self,
-        channel: &AmqpChannel,
-        deliver: Deliver,
-        basic_properties: BasicProperties,
-        content: Vec<u8>,
-    ) {
-        if let Err(err) = self
-            .consume_event(channel, deliver, basic_properties, content)
-            .await
-        {
-            revolt_config::capture_anyhow(&err);
-            eprintln!("Failed to process FCM event: {err:?}");
-        }
     }
 }

@@ -34,6 +34,7 @@ services:
     environment:
       MINIO_ROOT_USER: minioautumn
       MINIO_ROOT_PASSWORD: minioautumn
+      MINIO_REGION: minio
     volumes:
       - ./.data/minio:/data
     ports:

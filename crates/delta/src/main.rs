@@ -9,8 +9,7 @@ pub mod routes;
 pub mod util;
 
 use revolt_config::config;
-use revolt_database::events::client::EventV1;
-use revolt_database::AMQP;
+use revolt_database::{AMQP, events::client::EventV1};
 use revolt_ratelimits::rocket as ratelimiter;
 use rocket::{Build, Rocket};
 use rocket_cors::{AllowedOrigins, CorsOptions};
@@ -18,10 +17,6 @@ use rocket_prometheus::PrometheusMetrics;
 use std::net::Ipv4Addr;
 use std::str::FromStr;
 
-use amqprs::{
-    channel::ExchangeDeclareArguments,
-    connection::{Connection, OpenConnectionArguments},
-};
 use async_std::channel::unbounded;
 use authifier::AuthifierEvent;
 use revolt_database::voice::VoiceClient;
@@ -36,7 +31,6 @@ pub async fn web() -> Rocket<Build> {
 
     // Setup database
     let db = revolt_database::DatabaseInfo::Auto.connect().await.unwrap();
-    log::info!("database_here {db:?}");
     db.migrate_database().await.unwrap();
 
     // Setup Authifier event channel
@@ -96,33 +90,8 @@ pub async fn web() -> Rocket<Build> {
     // Voice handler
     let voice_client = VoiceClient::new(config.api.livekit.nodes.clone());
     // Configure Rabbit
-    let connection = Connection::open(&OpenConnectionArguments::new(
-        &config.rabbit.host,
-        config.rabbit.port,
-        &config.rabbit.username,
-        &config.rabbit.password,
-    ))
-    .await
-    .expect("Failed to connect to RabbitMQ");
 
-    let channel = connection
-        .open_channel(None)
-        .await
-        .expect("Failed to open RabbitMQ channel");
-
-    channel
-        .exchange_declare(
-            ExchangeDeclareArguments::new(&config.pushd.exchange, "direct")
-                .durable(true)
-                .finish(),
-        )
-        .await
-        .expect("Failed to declare exchange");
-
-    let mut amqp = AMQP::new(connection, channel);
-    // amqp.configure_channels()
-    //     .await
-    //     .expect("Failed to configure channels");
+    let amqp = AMQP::new_auto().await;
 
     // Launch background task workers
     revolt_database::tasks::start_workers(db.clone(), amqp.clone());
@@ -152,6 +121,7 @@ pub async fn web() -> Rocket<Build> {
             limits: rocket::data::Limits::default().limit("string", 5.megabytes()),
             address: Ipv4Addr::new(0, 0, 0, 0).into(),
             port: 14702,
+            ip_header: Some("X-Forwarded-For".into()),
             ..Default::default()
         })
 }
