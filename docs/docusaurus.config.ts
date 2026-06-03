@@ -6,7 +6,7 @@ import type { ScalarOptions } from '@scalar/docusaurus';
 const config: Config = {
   title: 'Stoat Developers',
   tagline: 'Developer documentation for Stoat',
-  favicon: 'https://stoat.chat/favicon.svg',
+  favicon: 'https://stoat.chat/favicon-stoat.svg',
 
   future: {
     v4: true,
