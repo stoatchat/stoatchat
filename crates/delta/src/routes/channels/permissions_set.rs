@@ -2,7 +2,7 @@ use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference}, voice::{sync_voice_permissions, VoiceClient}, Database, User
 };
 use revolt_models::v0;
-use revolt_permissions::{calculate_channel_permissions, ChannelPermission, Override};
+use revolt_permissions::{calculate_channel_permissions, ChannelPermission, Override, PermissionQuery};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 
@@ -24,6 +24,8 @@ pub async fn set_role_permissions(
     let channel = target.as_channel(db).await?;
     let mut query = DatabasePermissionQuery::new(db, &user).channel(&channel);
     let permissions: revolt_permissions::PermissionValue = calculate_channel_permissions(&mut query).await;
+
+    query.set_server_from_channel().await;
 
     permissions.throw_if_lacking_channel_permission(ChannelPermission::ManagePermissions)?;
 
