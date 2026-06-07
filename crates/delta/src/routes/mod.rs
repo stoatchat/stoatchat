@@ -187,12 +187,12 @@ fn custom_openapi_spec() -> OpenApi {
         servers: vec![
             Server {
                 url: "https://api.stoat.chat".to_owned(),
-                description: Some("Revolt Production".to_owned()),
+                description: Some("Stoat Production".to_owned()),
                 ..Default::default()
             },
             Server {
                 url: "https://beta.stoat.chat/api".to_owned(),
-                description: Some("Revolt Staging".to_owned()),
+                description: Some("Stoat Beta".to_owned()),
                 ..Default::default()
             },
         ],
@@ -206,19 +206,19 @@ fn custom_openapi_spec() -> OpenApi {
             Tag {
                 name: "Core".to_owned(),
                 description: Some(
-                    "Use in your applications to determine information about the Revolt node"
+                    "Use in your applications to determine information about the Stoat node"
                         .to_owned(),
                 ),
                 ..Default::default()
             },
             Tag {
                 name: "User Information".to_owned(),
-                description: Some("Query and fetch users on Revolt".to_owned()),
+                description: Some("Query and fetch users on Stoat".to_owned()),
                 ..Default::default()
             },
             Tag {
                 name: "Direct Messaging".to_owned(),
-                description: Some("Direct message other users on Revolt".to_owned()),
+                description: Some("Direct message other users on Stoat".to_owned()),
                 ..Default::default()
             },
             Tag {
@@ -235,7 +235,7 @@ fn custom_openapi_spec() -> OpenApi {
             },
             Tag {
                 name: "Channel Information".to_owned(),
-                description: Some("Query and fetch channels on Revolt".to_owned()),
+                description: Some("Query and fetch channels on Stoat".to_owned()),
                 ..Default::default()
             },
             Tag {
@@ -265,7 +265,7 @@ fn custom_openapi_spec() -> OpenApi {
             },
             Tag {
                 name: "Server Information".to_owned(),
-                description: Some("Query and fetch servers on Revolt".to_owned()),
+                description: Some("Query and fetch servers on Stoat".to_owned()),
                 ..Default::default()
             },
             Tag {
@@ -301,7 +301,7 @@ fn custom_openapi_spec() -> OpenApi {
             Tag {
                 name: "Onboarding".to_owned(),
                 description: Some(
-                    "After signing up to Revolt, users must pick a unique username".to_owned(),
+                    "After signing up to Stoat, users must pick a unique username".to_owned(),
                 ),
                 ..Default::default()
             },
@@ -313,7 +313,7 @@ fn custom_openapi_spec() -> OpenApi {
             Tag {
                 name: "Web Push".to_owned(),
                 description: Some(
-                    "Subscribe to and receive Revolt push notifications while offline".to_owned(),
+                    "Subscribe to and receive Stoat push notifications while offline".to_owned(),
                 ),
                 ..Default::default()
             },
