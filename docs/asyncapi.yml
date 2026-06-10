@@ -1,0 +1,1117 @@
+asyncapi: "2.6.0"
+
+info:
+  title: Stoat Gateway
+  version: "1.0.0"
+  description: |
+    The Stoat real-time WebSocket gateway (Bonfire).
+
+    Clients connect via WebSocket and must authenticate before receiving events.
+    See the [establishing a connection](https://stoatchat.github.io/docs/developers/events/establishing)
+    guide for the full connection flow.
+
+    ## Subscriptions
+
+    After authentication, the server sends a `Ready` event and begins
+    forwarding events for all resources the authenticated user can access.
+    Clients do not need to manually subscribe to individual channels.
+
+  license:
+    name: AGPL-3.0-or-later
+    url: https://www.gnu.org/licenses/agpl-3.0.html
+
+servers:
+  production:
+    url: "wss://ws.stoatchat.gg"
+    protocol: wss
+    description: Production Stoat gateway
+
+defaultContentType: application/json
+
+# ---------------------------------------------------------------------------
+# Channels
+# ---------------------------------------------------------------------------
+# The Stoat gateway is a single WebSocket endpoint. AsyncAPI channels are
+# used here to group logically related event directions (client→server vs
+# server→client) rather than distinct WebSocket paths.
+
+channels:
+  /:
+    description: The WebSocket connection endpoint.
+    bindings:
+      ws:
+        bindingVersion: "0.1.0"
+
+    # ------------------------------------------------------------------
+    # Client → Server messages
+    # ------------------------------------------------------------------
+    publish:
+      summary: Messages sent by the client to the server
+      message:
+        oneOf:
+          - $ref: "#/components/messages/Authenticate"
+          - $ref: "#/components/messages/BeginTyping"
+          - $ref: "#/components/messages/EndTyping"
+          - $ref: "#/components/messages/Ping"
+          - $ref: "#/components/messages/Subscribe"
+
+    # ------------------------------------------------------------------
+    # Server → Client messages
+    # ------------------------------------------------------------------
+    subscribe:
+      summary: Events pushed by the server to the client
+      message:
+        oneOf:
+          # Connection lifecycle
+          - $ref: "#/components/messages/Error"
+          - $ref: "#/components/messages/Authenticated"
+          - $ref: "#/components/messages/Logout"
+          - $ref: "#/components/messages/Ready"
+          - $ref: "#/components/messages/Pong"
+          - $ref: "#/components/messages/Bulk"
+
+          # Messages
+          - $ref: "#/components/messages/Message"
+          - $ref: "#/components/messages/MessageUpdate"
+          - $ref: "#/components/messages/MessageAppend"
+          - $ref: "#/components/messages/MessageDelete"
+          - $ref: "#/components/messages/MessageReact"
+          - $ref: "#/components/messages/MessageUnreact"
+          - $ref: "#/components/messages/MessageRemoveReaction"
+          - $ref: "#/components/messages/BulkMessageDelete"
+
+          # Channels
+          - $ref: "#/components/messages/ChannelCreate"
+          - $ref: "#/components/messages/ChannelUpdate"
+          - $ref: "#/components/messages/ChannelDelete"
+          - $ref: "#/components/messages/ChannelGroupJoin"
+          - $ref: "#/components/messages/ChannelGroupLeave"
+          - $ref: "#/components/messages/ChannelStartTyping"
+          - $ref: "#/components/messages/ChannelStopTyping"
+          - $ref: "#/components/messages/ChannelAck"
+
+          # Servers
+          - $ref: "#/components/messages/ServerCreate"
+          - $ref: "#/components/messages/ServerUpdate"
+          - $ref: "#/components/messages/ServerDelete"
+          - $ref: "#/components/messages/ServerMemberUpdate"
+          - $ref: "#/components/messages/ServerMemberJoin"
+          - $ref: "#/components/messages/ServerMemberLeave"
+          - $ref: "#/components/messages/ServerRoleUpdate"
+          - $ref: "#/components/messages/ServerRoleDelete"
+
+          # Users
+          - $ref: "#/components/messages/UserUpdate"
+          - $ref: "#/components/messages/UserRelationship"
+          - $ref: "#/components/messages/UserPlatformWipe"
+
+          # Emojis & Webhooks
+          - $ref: "#/components/messages/EmojiCreate"
+          - $ref: "#/components/messages/EmojiDelete"
+          - $ref: "#/components/messages/WebhookCreate"
+          - $ref: "#/components/messages/WebhookUpdate"
+          - $ref: "#/components/messages/WebhookDelete"
+
+          # Auth
+          - $ref: "#/components/messages/Auth"
+
+          # Voice / Audio
+          - $ref: "#/components/messages/VoiceChannelJoin"
+          - $ref: "#/components/messages/VoiceChannelLeave"
+          - $ref: "#/components/messages/VoiceChannelMove"
+          - $ref: "#/components/messages/UserVoiceStateUpdate"
+          - $ref: "#/components/messages/UserMoveVoiceChannel"
+
+# ---------------------------------------------------------------------------
+# Components
+# ---------------------------------------------------------------------------
+components:
+
+  # -------------------------------------------------------------------------
+  # Schemas
+  # -------------------------------------------------------------------------
+  schemas:
+
+    UserVoiceState:
+      type: object
+      description: Real-time voice state for a single user in a voice channel.
+      required:
+        - id
+        - joined_at
+        - is_receiving
+        - is_publishing
+        - screensharing
+        - camera
+      properties:
+        id:
+          type: string
+          description: The user's ID.
+          example: "01HHXYZABCDEF0123456"
+        joined_at:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of when the user joined the channel.
+          example: "2024-01-15T12:34:56.000Z"
+        is_receiving:
+          type: boolean
+          description: Whether the user is receiving (listening to) other participants' audio.
+        is_publishing:
+          type: boolean
+          description: Whether the user is publishing a microphone audio track.
+        screensharing:
+          type: boolean
+          description: Whether the user is currently sharing their screen.
+        camera:
+          type: boolean
+          description: Whether the user's camera is enabled.
+
+    PartialUserVoiceState:
+      type: object
+      description: |
+        A sparse update to a `UserVoiceState`. Only fields that changed are
+        included. The `id` field is always present.
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          description: The user's ID.
+          example: "01HHXYZABCDEF0123456"
+        is_receiving:
+          type: boolean
+          description: Updated receiving state, if changed.
+        is_publishing:
+          type: boolean
+          description: Updated publishing state, if changed.
+        screensharing:
+          type: boolean
+          description: Updated screensharing state, if changed.
+        camera:
+          type: boolean
+          description: Updated camera state, if changed.
+
+    ChannelVoiceState:
+      type: object
+      description: Full voice state of a channel, listing all connected participants.
+      required:
+        - id
+        - participants
+      properties:
+        id:
+          type: string
+          description: The channel's ID.
+          example: "01HHXYZABCDEF0123456"
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserVoiceState"
+          description: Voice states for all currently connected participants.
+
+  # -------------------------------------------------------------------------
+  # Messages — Client → Server
+  # -------------------------------------------------------------------------
+  messages:
+
+    Authenticate:
+      name: Authenticate
+      summary: Authenticate with the gateway.
+      description: Must be the first message sent after opening the WebSocket.
+      payload:
+        type: object
+        required: [type, token]
+        properties:
+          type:
+            type: string
+            const: Authenticate
+          token:
+            type: string
+            description: User session token or bot token.
+            example: "your-session-token"
+
+    BeginTyping:
+      name: BeginTyping
+      summary: Signal that the user has started typing in a channel.
+      payload:
+        type: object
+        required: [type, channel]
+        properties:
+          type:
+            type: string
+            const: BeginTyping
+          channel:
+            type: string
+            description: ID of the channel being typed in.
+
+    EndTyping:
+      name: EndTyping
+      summary: Signal that the user has stopped typing in a channel.
+      payload:
+        type: object
+        required: [type, channel]
+        properties:
+          type:
+            type: string
+            const: EndTyping
+          channel:
+            type: string
+            description: ID of the channel.
+
+    Ping:
+      name: Ping
+      summary: Ping the server. The server echoes back a `Pong` with the same `data`.
+      payload:
+        type: object
+        required: [type, data]
+        properties:
+          type:
+            type: string
+            const: Ping
+          data:
+            oneOf:
+              - type: integer
+              - type: array
+                items:
+                  type: integer
+
+    Subscribe:
+      name: Subscribe
+      summary: Subscribe to `UserUpdate` events for members of a server.
+      description: |
+        Subscriptions expire after 15 minutes. A client may hold at most 5
+        active subscriptions. Has no effect for bot sessions. Should only be
+        sent while the app is in focus, at most once every 10 minutes per server.
+      payload:
+        type: object
+        required: [type, server_id]
+        properties:
+          type:
+            type: string
+            const: Subscribe
+          server_id:
+            type: string
+
+  # -------------------------------------------------------------------------
+  # Messages — Server → Client (general)
+  # -------------------------------------------------------------------------
+
+    Error:
+      name: Error
+      summary: An error occurred during authentication.
+      payload:
+        type: object
+        required: [type, error]
+        properties:
+          type:
+            type: string
+            const: Error
+          error:
+            type: string
+            enum:
+              - LabelMe
+              - InternalError
+              - InvalidSession
+              - OnboardingNotFinished
+              - AlreadyAuthenticated
+
+    Authenticated:
+      name: Authenticated
+      summary: Connection authenticated; events will follow shortly.
+      payload:
+        type: object
+        required: [type]
+        properties:
+          type:
+            type: string
+            const: Authenticated
+
+    Logout:
+      name: Logout
+      summary: The current session has been invalidated.
+      description: The WebSocket connection will be closed immediately after this event.
+      payload:
+        type: object
+        required: [type]
+        properties:
+          type:
+            type: string
+            const: Logout
+
+    Ready:
+      name: Ready
+      summary: Initial data snapshot sent after successful authentication.
+      description: |
+        Contains the client's initial data set. All fields are optional; the
+        server omits fields that are empty or not applicable.
+      payload:
+        type: object
+        required: [type]
+        properties:
+          type:
+            type: string
+            const: Ready
+          users:
+            type: array
+            items:
+              type: object
+            description: User objects visible to this client.
+          servers:
+            type: array
+            items:
+              type: object
+            description: Server objects the user is a member of.
+          channels:
+            type: array
+            items:
+              type: object
+            description: Channel objects accessible to the user.
+          members:
+            type: array
+            items:
+              type: object
+            description: Server member objects for the user across all joined servers.
+          emojis:
+            type: array
+            items:
+              type: object
+          voice_states:
+            type: array
+            items:
+              $ref: "#/components/schemas/ChannelVoiceState"
+            description: |
+              Voice states for all voice channels the user is subscribed to
+              that currently have active participants.
+          user_settings:
+            type: object
+          channel_unreads:
+            type: array
+            items:
+              type: object
+          policy_changes:
+            type: array
+            items:
+              type: object
+
+    Pong:
+      name: Pong
+      summary: Response to a client `Ping`.
+      payload:
+        type: object
+        required: [type, data]
+        properties:
+          type:
+            type: string
+            const: Pong
+          data:
+            oneOf:
+              - type: integer
+              - type: array
+                items:
+                  type: integer
+
+    Bulk:
+      name: Bulk
+      summary: A batch of events bundled into a single WebSocket frame.
+      description: Process each item of `v` as if it were its own top-level event.
+      payload:
+        type: object
+        required: [type, v]
+        properties:
+          type:
+            type: string
+            const: Bulk
+          v:
+            type: array
+            items:
+              type: object
+            description: Array of event payloads.
+
+    Message:
+      name: Message
+      summary: A new message was sent.
+      payload:
+        type: object
+        required: [type]
+        properties:
+          type:
+            type: string
+            const: Message
+
+    MessageUpdate:
+      name: MessageUpdate
+      summary: An existing message was edited or otherwise updated.
+      payload:
+        type: object
+        required: [type, id, channel, data]
+        properties:
+          type:
+            type: string
+            const: MessageUpdate
+          id:
+            type: string
+          channel:
+            type: string
+          data:
+            type: object
+            description: Partial Message object.
+          clear:
+            type: array
+            items:
+              type: string
+
+    MessageAppend:
+      name: MessageAppend
+      summary: Data was appended to an existing message (e.g. embeds resolved).
+      payload:
+        type: object
+        required: [type, id, channel, append]
+        properties:
+          type:
+            type: string
+            const: MessageAppend
+          id:
+            type: string
+          channel:
+            type: string
+          append:
+            type: object
+            properties:
+              embeds:
+                type: array
+                items:
+                  type: object
+
+    MessageDelete:
+      name: MessageDelete
+      summary: A message was deleted.
+      payload:
+        type: object
+        required: [type, id, channel]
+        properties:
+          type:
+            type: string
+            const: MessageDelete
+          id:
+            type: string
+          channel:
+            type: string
+
+    MessageReact:
+      name: MessageReact
+      summary: A reaction was added to a message.
+      payload:
+        type: object
+        required: [type, id, channel_id, user_id, emoji_id]
+        properties:
+          type:
+            type: string
+            const: MessageReact
+          id:
+            type: string
+          channel_id:
+            type: string
+          user_id:
+            type: string
+          emoji_id:
+            type: string
+
+    MessageUnreact:
+      name: MessageUnreact
+      summary: A user's reaction was removed from a message.
+      payload:
+        type: object
+        required: [type, id, channel_id, user_id, emoji_id]
+        properties:
+          type:
+            type: string
+            const: MessageUnreact
+          id:
+            type: string
+          channel_id:
+            type: string
+          user_id:
+            type: string
+          emoji_id:
+            type: string
+
+    MessageRemoveReaction:
+      name: MessageRemoveReaction
+      summary: A specific emoji reaction was removed from a message entirely.
+      payload:
+        type: object
+        required: [type, id, channel_id, emoji_id]
+        properties:
+          type:
+            type: string
+            const: MessageRemoveReaction
+          id:
+            type: string
+          channel_id:
+            type: string
+          emoji_id:
+            type: string
+
+    BulkMessageDelete:
+      name: BulkMessageDelete
+      summary: Multiple messages were deleted at once.
+      payload:
+        type: object
+        required: [type, channel, ids]
+        properties:
+          type:
+            type: string
+            const: BulkMessageDelete
+          channel:
+            type: string
+          ids:
+            type: array
+            items:
+              type: string
+
+    ChannelCreate:
+      name: ChannelCreate
+      summary: A new channel was created.
+      payload:
+        type: object
+        required: [type]
+        properties:
+          type:
+            type: string
+            const: ChannelCreate
+
+    ChannelUpdate:
+      name: ChannelUpdate
+      summary: A channel was updated.
+      payload:
+        type: object
+        required: [type, id, data]
+        properties:
+          type:
+            type: string
+            const: ChannelUpdate
+          id:
+            type: string
+          data:
+            type: object
+            description: Partial Channel object.
+          clear:
+            type: array
+            items:
+              type: string
+            description: Fields to clear (e.g. "Icon", "Description").
+
+    ChannelDelete:
+      name: ChannelDelete
+      summary: A channel was deleted.
+      payload:
+        type: object
+        required: [type, id]
+        properties:
+          type:
+            type: string
+            const: ChannelDelete
+          id:
+            type: string
+
+    ChannelGroupJoin:
+      name: ChannelGroupJoin
+      summary: A user joined a group channel.
+      payload:
+        type: object
+        required: [type, id, user]
+        properties:
+          type:
+            type: string
+            const: ChannelGroupJoin
+          id:
+            type: string
+          user:
+            type: string
+
+    ChannelGroupLeave:
+      name: ChannelGroupLeave
+      summary: A user left a group channel.
+      payload:
+        type: object
+        required: [type, id, user]
+        properties:
+          type:
+            type: string
+            const: ChannelGroupLeave
+          id:
+            type: string
+          user:
+            type: string
+
+    ChannelStartTyping:
+      name: ChannelStartTyping
+      summary: A user started typing in a channel.
+      payload:
+        type: object
+        required: [type, id, user]
+        properties:
+          type:
+            type: string
+            const: ChannelStartTyping
+          id:
+            type: string
+          user:
+            type: string
+
+    ChannelStopTyping:
+      name: ChannelStopTyping
+      summary: A user stopped typing in a channel.
+      payload:
+        type: object
+        required: [type, id, user]
+        properties:
+          type:
+            type: string
+            const: ChannelStopTyping
+          id:
+            type: string
+          user:
+            type: string
+
+    ChannelAck:
+      name: ChannelAck
+      summary: The user acknowledged messages in a channel up to a message ID.
+      payload:
+        type: object
+        required: [type, id, user, message_id]
+        properties:
+          type:
+            type: string
+            const: ChannelAck
+          id:
+            type: string
+          user:
+            type: string
+          message_id:
+            type: string
+
+    ServerCreate:
+      name: ServerCreate
+      summary: The user joined a new server (or a new server was created).
+      payload:
+        type: object
+        required: [type, id, server, channels, emojis, voice_states]
+        properties:
+          type:
+            type: string
+            const: ServerCreate
+          id:
+            type: string
+          server:
+            type: object
+          channels:
+            type: array
+            items:
+              type: object
+          emojis:
+            type: array
+            items:
+              type: object
+          voice_states:
+            type: array
+            items:
+              $ref: "#/components/schemas/ChannelVoiceState"
+            description: Active voice states for voice channels in this server.
+
+    ServerUpdate:
+      name: ServerUpdate
+      summary: A server's details were updated.
+      payload:
+        type: object
+        required: [type, id, data]
+        properties:
+          type:
+            type: string
+            const: ServerUpdate
+          id:
+            type: string
+          data:
+            type: object
+          clear:
+            type: array
+            items:
+              type: string
+
+    ServerDelete:
+      name: ServerDelete
+      summary: A server was deleted.
+      payload:
+        type: object
+        required: [type, id]
+        properties:
+          type:
+            type: string
+            const: ServerDelete
+          id:
+            type: string
+
+    ServerMemberUpdate:
+      name: ServerMemberUpdate
+      summary: A server member's details were updated.
+      payload:
+        type: object
+        required: [type, id, data]
+        properties:
+          type:
+            type: string
+            const: ServerMemberUpdate
+          id:
+            type: object
+            required: [server, user]
+            properties:
+              server:
+                type: string
+              user:
+                type: string
+          data:
+            type: object
+          clear:
+            type: array
+            items:
+              type: string
+
+    ServerMemberJoin:
+      name: ServerMemberJoin
+      summary: A user joined a server.
+      payload:
+        type: object
+        required: [type, id, user, member]
+        properties:
+          type:
+            type: string
+            const: ServerMemberJoin
+          id:
+            type: string
+          user:
+            type: string
+            description: "Deprecated: use member.id.user instead."
+          member:
+            type: object
+
+    ServerMemberLeave:
+      name: ServerMemberLeave
+      summary: A user left (or was removed from) a server.
+      payload:
+        type: object
+        required: [type, id, user, reason]
+        properties:
+          type:
+            type: string
+            const: ServerMemberLeave
+          id:
+            type: string
+          user:
+            type: string
+          reason:
+            type: string
+            enum: [Leave, Kick, Ban]
+
+    ServerRoleUpdate:
+      name: ServerRoleUpdate
+      summary: A server role was created or updated.
+      payload:
+        type: object
+        required: [type, id, role_id, data]
+        properties:
+          type:
+            type: string
+            const: ServerRoleUpdate
+          id:
+            type: string
+          role_id:
+            type: string
+          data:
+            type: object
+          clear:
+            type: array
+            items:
+              type: string
+
+    ServerRoleDelete:
+      name: ServerRoleDelete
+      summary: A server role was deleted.
+      payload:
+        type: object
+        required: [type, id, role_id]
+        properties:
+          type:
+            type: string
+            const: ServerRoleDelete
+          id:
+            type: string
+          role_id:
+            type: string
+
+    UserUpdate:
+      name: UserUpdate
+      summary: A user was updated.
+      payload:
+        type: object
+        required: [type, id, data]
+        properties:
+          type:
+            type: string
+            const: UserUpdate
+          id:
+            type: string
+          data:
+            type: object
+          clear:
+            type: array
+            items:
+              type: string
+
+    UserRelationship:
+      name: UserRelationship
+      summary: The authenticated user's relationship with another user changed.
+      payload:
+        type: object
+        required: [type, id, user]
+        properties:
+          type:
+            type: string
+            const: UserRelationship
+          id:
+            type: string
+          user:
+            type: object
+
+    UserPlatformWipe:
+      name: UserPlatformWipe
+      summary: A user was platform banned or deleted their account.
+      description: |
+        Clients should remove all associated data for this user:
+        messages, DM channels, relationships, and server memberships.
+      payload:
+        type: object
+        required: [type, user_id, flags]
+        properties:
+          type:
+            type: string
+            const: UserPlatformWipe
+          user_id:
+            type: string
+          flags:
+            type: integer
+
+    EmojiCreate:
+      name: EmojiCreate
+      summary: A new emoji was created.
+      payload:
+        type: object
+        required: [type]
+        properties:
+          type:
+            type: string
+            const: EmojiCreate
+
+    EmojiDelete:
+      name: EmojiDelete
+      summary: An emoji was deleted.
+      payload:
+        type: object
+        required: [type, id]
+        properties:
+          type:
+            type: string
+            const: EmojiDelete
+          id:
+            type: string
+
+    WebhookCreate:
+      name: WebhookCreate
+      summary: A webhook was created.
+      payload:
+        type: object
+        required: [type]
+        properties:
+          type:
+            type: string
+            const: WebhookCreate
+
+    WebhookUpdate:
+      name: WebhookUpdate
+      summary: A webhook was updated.
+      payload:
+        type: object
+        required: [type, id, data, remove]
+        properties:
+          type:
+            type: string
+            const: WebhookUpdate
+          id:
+            type: string
+          data:
+            type: object
+          remove:
+            type: array
+            items:
+              type: string
+
+    WebhookDelete:
+      name: WebhookDelete
+      summary: A webhook was deleted.
+      payload:
+        type: object
+        required: [type, id]
+        properties:
+          type:
+            type: string
+            const: WebhookDelete
+          id:
+            type: string
+
+    Auth:
+      name: Auth
+      summary: Forwarded authentication event from Authifier.
+      description: |
+        Currently only session deletion events are forwarded.
+        `event_type` will be one of `DeleteSession` or `DeleteAllSessions`.
+      payload:
+        type: object
+        required: [type, event_type]
+        properties:
+          type:
+            type: string
+            const: Auth
+          event_type:
+            type: string
+            enum: [DeleteSession, DeleteAllSessions]
+          user_id:
+            type: string
+          session_id:
+            type: string
+            description: Present for DeleteSession.
+          exclude_session_id:
+            type: string
+            description: Present for DeleteAllSessions; the session that was NOT deleted.
+
+  # -------------------------------------------------------------------------
+  # Messages — Server → Client (Voice / Audio)
+  # -------------------------------------------------------------------------
+
+    VoiceChannelJoin:
+      name: VoiceChannelJoin
+      summary: A user connected to a voice channel.
+      description: |
+        Emitted when a user successfully joins a voice channel via the LiveKit
+        server. The user starts with `is_receiving: true` and all publishing
+        flags set to `false`; subsequent `UserVoiceStateUpdate` events reflect
+        track changes.
+      payload:
+        type: object
+        required: [type, id, state]
+        properties:
+          type:
+            type: string
+            const: VoiceChannelJoin
+          id:
+            type: string
+            description: ID of the voice channel that was joined.
+          state:
+            $ref: "#/components/schemas/UserVoiceState"
+
+    VoiceChannelLeave:
+      name: VoiceChannelLeave
+      summary: A user disconnected from a voice channel.
+      description: |
+        Not emitted when the user is being moved to another channel — use
+        `VoiceChannelMove` for that case.
+      payload:
+        type: object
+        required: [type, id, user]
+        properties:
+          type:
+            type: string
+            const: VoiceChannelLeave
+          id:
+            type: string
+            description: ID of the voice channel that was left.
+          user:
+            type: string
+            description: ID of the user who disconnected.
+
+    VoiceChannelMove:
+      name: VoiceChannelMove
+      summary: A user was moved from one voice channel to another by a moderator.
+      description: |
+        Published on the **destination** channel's topic. Clients should remove
+        the user from `from` without showing a leave notification, and add them
+        to `to` with the provided `state`.
+      payload:
+        type: object
+        required: [type, user, from, to, state]
+        properties:
+          type:
+            type: string
+            const: VoiceChannelMove
+          user:
+            type: string
+            description: ID of the user being moved.
+          from:
+            type: string
+            description: ID of the source voice channel.
+          to:
+            type: string
+            description: ID of the destination voice channel.
+          state:
+            $ref: "#/components/schemas/UserVoiceState"
+            description: Fresh voice state for the user in the destination channel.
+
+    UserVoiceStateUpdate:
+      name: UserVoiceStateUpdate
+      summary: A user's voice state changed.
+      description: |
+        Emitted when a user mutes/unmutes their microphone, enables/disables
+        their camera or screen share, or when a permission change forces a
+        capability to change. Only fields that actually changed are included in
+        `data`; `id` is always present.
+      payload:
+        type: object
+        required: [type, id, channel_id, data]
+        properties:
+          type:
+            type: string
+            const: UserVoiceStateUpdate
+          id:
+            type: string
+            description: ID of the user whose state changed.
+          channel_id:
+            type: string
+            description: ID of the voice channel.
+          data:
+            $ref: "#/components/schemas/PartialUserVoiceState"
+
+    UserMoveVoiceChannel:
+      name: UserMoveVoiceChannel
+      summary: You were moved to a different voice channel.
+      description: |
+        **Private event** — only delivered to the user being moved.
+
+        Disconnect from the current LiveKit room and reconnect to the
+        destination room using the provided `token`. Look up the server URL
+        for `node` via the `/nodes` API endpoint (or reuse the URL already in
+        use if the node has not changed).
+      payload:
+        type: object
+        required: [type, node, from, to, token]
+        properties:
+          type:
+            type: string
+            const: UserMoveVoiceChannel
+          node:
+            type: string
+            description: Name of the LiveKit node hosting the destination channel.
+          from:
+            type: string
+            description: ID of the channel you are being moved from.
+          to:
+            type: string
+            description: ID of the channel you are being moved to.
+          token:
+            type: string
+            description: Short-lived LiveKit JWT for connecting to the destination room.
