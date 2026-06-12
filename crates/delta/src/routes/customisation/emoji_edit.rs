@@ -173,7 +173,7 @@ mod test {
         let (_, creator_session, creator) = harness.new_user().await;
         let (server, _) = harness.new_server(&owner).await;
 
-        Member::create(&harness.db, &server, &creator, None)
+        Member::create(&harness.db, &server, &creator, None, false)
             .await
             .expect("`Member` created");
 
