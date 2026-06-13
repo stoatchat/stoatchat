@@ -1,7 +1,5 @@
 use rocket::serde::json::Json;
-use crate::routes::admin::util::{
-    create_audit_action, flatten_authorized_user, user_has_permission,
-};
+use crate::routes::admin::util::{create_audit_action, flatten_authorized_user, user_has_permission};
 use revolt_database::{util::reference::Reference, AdminAuthorization, Channel, Database, File, PartialChannel, SystemMessage, User, AMQP};
 use revolt_models::v0;
 use revolt_result::{create_error, Result};
@@ -17,7 +15,6 @@ pub async fn admin_channel_edit(
     voice_client: &State<VoiceClient>,
     amqp: &State<AMQP>,
     channel_id: Reference<'_>,
-    user: User,
     data: Json<v0::DataEditChannel>,
     case: Option<&str>
 ) -> Result<Json<v0::Channel>> {
@@ -34,6 +31,8 @@ pub async fn admin_channel_edit(
             permission: "ManageChannels".to_string()
         }));
     }
+
+    let user = db.fetch_user(&admin.platform_user_id).await?;
 
     let mut channel = channel_id.as_channel(db).await?;
 
@@ -270,7 +269,7 @@ pub async fn admin_channel_edit(
 
     create_audit_action(
         &db,
-        &user.id,
+        &admin.id,
         v0::AdminAuditItemActions::EditChannel,
         case,
         Some(channel_id.id),
