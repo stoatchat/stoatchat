@@ -43,6 +43,7 @@ pub async fn change_password(
 #[cfg(test)]
 mod tests {
     use crate::{rocket, util::test::TestHarness};
+    use revolt_database::{MFATicket, Totp};
     use rocket::http::{ContentType, Header, Status};
 
     #[rocket::async_test]
@@ -83,5 +84,104 @@ mod tests {
             .await;
 
         assert_eq!(res.status(), Status::NoContent);
+    }
+
+    #[rocket::async_test]
+    async fn success_mfa() {
+        let harness = TestHarness::new().await;
+        let (mut account, session, _) = harness.new_user().await;
+
+        let totp = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+
+        account.mfa.totp_token = totp.clone();
+        account.save(&harness.db).await.unwrap();
+
+        let ticket = MFATicket::new(account.id.to_string(), true);
+        ticket.save(&harness.db).await.unwrap();
+
+        let res = harness
+            .client
+            .patch("/auth/account/change/password")
+            .header(ContentType::JSON)
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .header(Header::new("X-MFA-Ticket", ticket.token))
+            .body(
+                json!({
+                    "password": "new password",
+                    "current_password": "password_insecure"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::NoContent);
+    }
+
+    #[rocket::async_test]
+    async fn fail_mfa_no_ticket() {
+        let harness = TestHarness::new().await;
+        let (mut account, session, _) = harness.new_user().await;
+
+        let totp = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+
+        account.mfa.totp_token = totp.clone();
+        account.save(&harness.db).await.unwrap();
+
+        let res = harness
+            .client
+            .patch("/auth/account/change/password")
+            .header(ContentType::JSON)
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .body(
+                json!({
+                    "password": "new password",
+                    "current_password": "password_insecure"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Unauthorized);
+    }
+
+    #[rocket::async_test]
+    async fn fail_mfa_invalid_password() {
+        let harness = TestHarness::new().await;
+        let (mut account, session, _) = harness.new_user().await;
+
+        let totp = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+
+        account.mfa.totp_token = totp.clone();
+        account.save(&harness.db).await.unwrap();
+
+        let mut ticket = MFATicket::new(account.id.to_string(), true);
+        ticket.last_totp_code = Some("token from earlier".into());
+        ticket.save(&harness.db).await.unwrap();
+
+        let res = harness
+            .client
+            .patch("/auth/account/change/password")
+            .header(ContentType::JSON)
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .header(Header::new("X-MFA-Ticket", ticket.token))
+            .body(
+                json!({
+                    "password": "new password",
+                    "current_password": "incorrect password"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Unauthorized);
     }
 }

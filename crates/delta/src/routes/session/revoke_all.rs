@@ -32,6 +32,7 @@ pub async fn revoke_all(
 #[cfg(test)]
 mod tests {
     use crate::{rocket, util::test::TestHarness};
+    use revolt_database::{MFATicket, Totp};
     use rocket::http::{Header, Status};
 
     #[rocket::async_test]
@@ -46,9 +47,13 @@ mod tests {
                 .unwrap();
         }
 
+        let ticket = MFATicket::new(account.id.to_string(), true);
+        ticket.save(&harness.db).await.unwrap();
+
         let res = harness.client
             .delete("/auth/session/all?revoke_self=true")
             .header(Header::new("X-Session-Token", session.token))
+            .header(Header::new("X-MFA-Ticket", ticket.token))
             .dispatch()
             .await;
 
@@ -72,9 +77,13 @@ mod tests {
                 .unwrap();
         }
 
+        let ticket = MFATicket::new(account.id.to_string(), true);
+        ticket.save(&harness.db).await.unwrap();
+
         let res = harness.client
             .delete("/auth/session/all?revoke_self=false")
             .header(Header::new("X-Session-Token", session.token))
+            .header(Header::new("X-MFA-Ticket", ticket.token))
             .dispatch()
             .await;
 
@@ -86,5 +95,102 @@ mod tests {
 
         assert_eq!(sessions.len(), 1);
         assert_eq!(sessions[0].id, session.id);
+    }
+
+    #[rocket::async_test]
+    async fn success_mfa() {
+        let harness = TestHarness::new().await;
+        let (mut account, session, _) = harness.new_user().await;
+
+        let totp = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+
+        account.mfa.totp_token = totp.clone();
+        account.save(&harness.db).await.unwrap();
+
+        for i in 1..=3 {
+            account
+                .create_session(&harness.db, format!("session{}", i))
+                .await
+                .unwrap();
+        }
+
+        let ticket = MFATicket::new(account.id.to_string(), true);
+        ticket.save(&harness.db).await.unwrap();
+
+        let res = harness.client
+            .delete("/auth/session/all?revoke_self=true")
+            .header(Header::new("X-Session-Token", session.token))
+            .header(Header::new("X-MFA-Ticket", ticket.token))
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::NoContent);
+        assert!(harness.db
+            .fetch_sessions(&session.user_id)
+            .await
+            .unwrap()
+            .is_empty());
+    }
+
+    #[rocket::async_test]
+    async fn success_not_including_self_mfa() {
+        let harness = TestHarness::new().await;
+        let (mut account, session, _) = harness.new_user().await;
+
+        let totp = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+
+        account.mfa.totp_token = totp.clone();
+        account.save(&harness.db).await.unwrap();
+
+        for i in 1..=3 {
+            account
+                .create_session(&harness.db, format!("session{}", i))
+                .await
+                .unwrap();
+        }
+
+        let ticket = MFATicket::new(account.id.to_string(), true);
+        ticket.save(&harness.db).await.unwrap();
+
+        let res = harness.client
+            .delete("/auth/session/all?revoke_self=false")
+            .header(Header::new("X-Session-Token", session.token))
+            .header(Header::new("X-MFA-Ticket", ticket.token))
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::NoContent);
+        let sessions = harness.db
+                .fetch_sessions(&session.user_id)
+                .await
+                .unwrap();
+
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].id, session.id);
+    }
+
+    #[rocket::async_test]
+    async fn fail_mfa() {
+        let harness = TestHarness::new().await;
+        let (mut account, session, _) = harness.new_user().await;
+
+        let totp = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+
+        account.mfa.totp_token = totp.clone();
+        account.save(&harness.db).await.unwrap();
+
+        let res = harness.client
+            .delete("/auth/session/all")
+            .header(Header::new("X-Session-Token", session.token))
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Unauthorized);
     }
 }
