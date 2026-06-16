@@ -7690,6 +7690,7 @@ dependencies = [
  "ulid",
  "unicode-segmentation",
  "url-escape",
+ "utoipa",
  "validator",
 ]
 

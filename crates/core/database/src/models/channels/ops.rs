@@ -1,4 +1,4 @@
-use crate::{revolt_result::Result, Channel, FieldsChannel, PartialChannel};
+use crate::{Channel, FieldsChannel, PartialChannel, revolt_result::Result, util::ChunkedDatabaseGenerator};
 use revolt_permissions::OverrideField;
 
 #[cfg(feature = "mongodb")]
@@ -20,7 +20,7 @@ pub trait AbstractChannels: Sync + Send {
     async fn find_direct_messages(&self, user_id: &str) -> Result<Vec<Channel>>;
 
     // Fetch all group dms for a user
-    async fn find_group_message_channels(&self, user_id: &str) -> Result<Vec<Channel>>;
+    async fn find_group_message_channels(&self, user_id: &str) -> Result<ChunkedDatabaseGenerator<Channel>>;
 
     // Fetch saved messages channel
     async fn find_saved_messages_channel(&self, user_id: &str) -> Result<Channel>;

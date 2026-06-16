@@ -2,6 +2,7 @@ use std::collections::hash_map::Entry;
 
 use super::AbstractChannels;
 use crate::ReferenceDb;
+use crate::util::ChunkedDatabaseGenerator;
 use crate::{Channel, FieldsChannel, PartialChannel};
 use revolt_permissions::OverrideField;
 use revolt_result::Result;
@@ -52,9 +53,9 @@ impl AbstractChannels for ReferenceDb {
     }
 
     // Fetch all group dms for a user
-    async fn find_group_message_channels(&self, user_id: &str) -> Result<Vec<Channel>> {
+    async fn find_group_message_channels(&self, user_id: &str) -> Result<ChunkedDatabaseGenerator<Channel>> {
         let channels = self.channels.lock().await;
-        Ok(channels
+        let groups = channels
             .values()
             .filter(|channel| match channel {
                 Channel::Group { recipients, .. } => {
@@ -63,7 +64,9 @@ impl AbstractChannels for ReferenceDb {
                 _ => false,
             })
             .cloned()
-            .collect())
+            .collect();
+
+        Ok(ChunkedDatabaseGenerator::new_reference(groups))
     }
 
     // Fetch saved messages channel

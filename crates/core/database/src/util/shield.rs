@@ -3,10 +3,11 @@ use revolt_config::config;
 use revolt_result::Result;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::LazyLock};
+use crate::util::ip;
 
 static CLIENT: LazyLock<Client> = LazyLock::new(Client::new);
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 pub struct ShieldValidationInput {
     /// Remote user IP
     pub ip: Option<String>,
@@ -56,28 +57,6 @@ pub async fn validate_shield(input: ShieldValidationInput) -> Result<()> {
 }
 
 #[cfg(feature = "rocket-impl")]
-fn to_ip(request: &'_ rocket::Request<'_>) -> String {
-    request
-        .remote()
-        .map(|x| x.ip().to_string())
-        .unwrap_or_default()
-}
-
-/// Find the actual IP of the client
-#[cfg(feature = "rocket-impl")]
-async fn to_real_ip(request: &'_ rocket::Request<'_>) -> String {
-    if config().await.api.security.trust_cloudflare {
-        request
-            .headers()
-            .get_one("CF-Connecting-IP")
-            .map(|x| x.to_string())
-            .unwrap_or_else(|| to_ip(request))
-    } else {
-        to_ip(request)
-    }
-}
-
-#[cfg(feature = "rocket-impl")]
 #[async_trait]
 impl<'r> rocket::request::FromRequest<'r> for ShieldValidationInput {
     type Error = revolt_result::Error;
@@ -87,7 +66,7 @@ impl<'r> rocket::request::FromRequest<'r> for ShieldValidationInput {
         request: &'r rocket::Request<'_>,
     ) -> rocket::request::Outcome<Self, Self::Error> {
         rocket::request::Outcome::Success(ShieldValidationInput {
-            ip: Some(to_real_ip(request).await),
+            ip: Some(ip::rocket::to_real_ip(request).await),
             headers: Some(
                 request
                     .headers()
@@ -108,5 +87,32 @@ impl<'r> revolt_rocket_okapi::request::OpenApiFromRequest<'r> for ShieldValidati
         _required: bool,
     ) -> revolt_rocket_okapi::Result<revolt_rocket_okapi::request::RequestHeaderInput> {
         Ok(revolt_rocket_okapi::request::RequestHeaderInput::None)
+    }
+}
+#[cfg(feature = "axum-impl")]
+#[async_trait]
+impl<S> axum::extract::FromRequestParts<S> for ShieldValidationInput {
+    type Rejection = axum::Json<revolt_result::Error> ;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        _state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        Ok(ShieldValidationInput {
+            ip: Some(ip::axum::to_real_ip(parts).await),
+            headers: Some(
+                parts
+                    .headers
+                    .iter()
+                    .map(|(name, value)| {
+                        (
+                            name.to_string(),
+                            value.to_str().map(|s| s.to_string()).unwrap_or_default(),
+                        )
+                    })
+                    .collect(),
+            ),
+            ..Default::default()
+        })
     }
 }

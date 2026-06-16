@@ -1,5 +1,6 @@
 production = false
 disable_events_dont_use = false
+environment = "dev"
 
 [database]
 # MongoDB connection URL

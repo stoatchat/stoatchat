@@ -843,11 +843,16 @@ impl User {
 
     /// Removes user from all joined groups
     pub async fn remove_from_all_groups(&self, db: &Database) -> Result<()> {
-        let groups = db.find_group_message_channels(&self.id).await?
-            .into_iter().map(|channel| channel.id().to_string())
-            .collect();
+        let mut generator = db.find_group_message_channels(&self.id).await?;
 
-        db.remove_user_from_groups(groups, &self.id).await?;
+        while let Some(groups) = generator.next_n(100).await? {
+            let ids = groups
+                .into_iter()
+                .map(|channel| channel.id().to_string())
+                .collect();
+
+            db.remove_user_from_groups(ids, &self.id).await?;
+        }
 
         Ok(())
     }

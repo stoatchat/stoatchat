@@ -15,7 +15,7 @@ pub async fn cron_task_wrapper<Fut: Future<Output = Result<()>>>(
     amqp: AMQP,
 ) {
     loop {
-        let wrapper = AssertUnwindSafe(func(db.clone(), amqp));
+        let wrapper = AssertUnwindSafe(func(db.clone(), amqp.clone()));
 
         match wrapper.catch_unwind().await {
             Ok(Ok(())) => {

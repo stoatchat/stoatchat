@@ -31,12 +31,14 @@ pub async fn send_password_reset(
     let email_normalised = normalise_email(data.email);
 
     // Try to find the relevant account
-    if let Some(mut account) = db
+    if let Ok(Some(mut account)) = db
         .fetch_account_by_normalised_email(&email_normalised)
-        .await?
+        .await
     {
         if !matches!(account.verification, EmailVerification::Pending { .. }) {
-            account.start_password_reset(db, false).await?;
+            if let Err(e) = account.start_password_reset(db, false).await {
+                revolt_config::capture_error(&e);
+            }
         }
     }
 

@@ -245,6 +245,8 @@ pub fn send_email(
                 address, error
             );
 
+            revolt_config::capture_error(&error);
+
             Err(create_error!(EmailFailed))
         }
     }

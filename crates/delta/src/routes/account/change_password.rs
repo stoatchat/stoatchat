@@ -1,11 +1,14 @@
 //! Change account password.
 //! PATCH /account/change/password
+use revolt_database::{
+    util::password::{assert_safe, hash_password},
+    Account, Database, ValidatedTicket,
+};
 use revolt_models::v0;
+use revolt_result::{create_error, Result};
 use rocket::serde::json::Json;
 use rocket::State;
 use rocket_empty::EmptyResponse;
-use revolt_database::{Account, Database, util::password::{assert_safe, hash_password}};
-use revolt_result::Result;
 
 /// # Change Password
 ///
@@ -14,14 +17,18 @@ use revolt_result::Result;
 #[patch("/change/password", data = "<data>")]
 pub async fn change_password(
     db: &State<Database>,
+    validated_ticket: Option<ValidatedTicket>,
     mut account: Account,
     data: Json<v0::DataChangePassword>,
 ) -> Result<EmptyResponse> {
     let data = data.into_inner();
 
+    if account.mfa.is_active() && validated_ticket.is_none() {
+        return Err(create_error!(InvalidCredentials));
+    }
+
     // Verify password can be used
-    assert_safe(&data.password)
-        .await?;
+    assert_safe(&data.password).await?;
 
     // Ensure given password is correct
     account.verify_password(&data.current_password)?;
@@ -43,7 +50,8 @@ mod tests {
         let harness = TestHarness::new().await;
         let (_, session, _) = harness.new_user().await;
 
-        let res = harness.client
+        let res = harness
+            .client
             .patch("/auth/account/change/password")
             .header(ContentType::JSON)
             .header(Header::new("X-Session-Token", session.token.clone()))
@@ -59,7 +67,8 @@ mod tests {
 
         assert_eq!(res.status(), Status::NoContent);
 
-        let res = harness.client
+        let res = harness
+            .client
             .patch("/auth/account/change/password")
             .header(ContentType::JSON)
             .header(Header::new("X-Session-Token", session.token))

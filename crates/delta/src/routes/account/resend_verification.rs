@@ -30,9 +30,9 @@ pub async fn resend_verification(
     let email_normalised = normalise_email(data.email);
 
     // Try to find the relevant account
-    if let Some(mut account) = db
+    if let Ok(Some(mut account)) = db
         .fetch_account_by_normalised_email(&email_normalised)
-        .await?
+        .await
     {
         match account.verification {
             EmailVerification::Verified => {

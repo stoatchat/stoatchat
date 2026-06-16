@@ -1,6 +1,6 @@
 //! Revoke all sessions
 //! DELETE /session/all
-use revolt_database::{Database, Session, Account};
+use revolt_database::{Account, Database, Session, ValidatedTicket};
 use revolt_result::Result;
 use rocket::State;
 use rocket_empty::EmptyResponse;
@@ -12,6 +12,7 @@ use rocket_empty::EmptyResponse;
 #[delete("/all?<revoke_self>")]
 pub async fn revoke_all(
     db: &State<Database>,
+    _ticket: ValidatedTicket,
     session: Session,
     account: Account,
     revoke_self: Option<bool>,

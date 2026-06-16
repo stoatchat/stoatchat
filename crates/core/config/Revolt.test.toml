@@ -1,3 +1,5 @@
+environment = "test"
+
 [database]
 mongodb = "mongodb://localhost"
 redis = "redis://localhost/"

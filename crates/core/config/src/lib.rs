@@ -468,6 +468,7 @@ pub struct Settings {
     pub features: Features,
     pub sentry: Sentry,
     pub production: bool,
+    pub environment: String,
     pub disable_events_dont_use: bool,
 }
 

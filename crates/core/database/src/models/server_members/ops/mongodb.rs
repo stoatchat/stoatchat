@@ -328,6 +328,8 @@ impl AbstractServerMembers for MongoDb {
     }
 
     /// Removes a user from every server they are in
+    ///
+    /// **This should only be used for account deletion.**
     async fn clear_memberships(&self, user_id: &str) -> Result<()> {
         self.col::<Member>(COL)
             .delete_many(doc! { "_id.user": user_id })

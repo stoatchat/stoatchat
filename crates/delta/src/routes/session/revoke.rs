@@ -1,6 +1,6 @@
 //! Revoke an active session
 //! DELETE /session/:id
-use revolt_database::{Database, Session};
+use revolt_database::{Database, Session, ValidatedTicket};
 use revolt_result::{Result, create_error};
 use rocket::State;
 use rocket_empty::EmptyResponse;
@@ -12,6 +12,7 @@ use rocket_empty::EmptyResponse;
 #[delete("/<id>")]
 pub async fn revoke(
     db: &State<Database>,
+    _ticket: ValidatedTicket,
     user: Session,
     id: String,
 ) -> Result<EmptyResponse> {

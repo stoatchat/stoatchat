@@ -1,17 +1,14 @@
-use std::net::SocketAddr;
-
 use async_trait::async_trait;
 use axum::{
     Json, RequestPartsExt, Router,
     body::Body,
-    extract::{ConnectInfo, FromRef, FromRequestParts, State},
+    extract::{FromRef, FromRequestParts, State},
     http::{HeaderValue, Request, StatusCode, request::Parts},
     middleware::Next,
     response::{IntoResponse, Response},
     routing::get,
 };
-use revolt_database::{Database, User};
-use revolt_config::config;
+use revolt_database::{Database, User, util::ip::axum::to_real_ip};
 
 use crate::ratelimiter::{RatelimitInformation, Ratelimiter, RequestKind};
 
@@ -23,26 +20,6 @@ impl RequestKind for AxumRequestKind {
 }
 
 pub type RatelimitStorage = crate::ratelimiter::RatelimitStorage<AxumRequestKind>;
-
-fn to_ip(parts: &Parts) -> String {
-    parts
-        .extensions
-        .get::<ConnectInfo<SocketAddr>>()
-        .map(|info| info.ip().to_string())
-        .unwrap_or_default()
-}
-
-async fn to_real_ip(parts: &Parts) -> String {
-    if config().await.api.security.trust_cloudflare {
-        parts
-            .headers
-            .get("CF-Connecting-IP")
-            .map(|x| x.to_str().unwrap().to_string())
-            .unwrap_or_else(|| to_ip(parts))
-    } else {
-        to_ip(parts)
-    }
-}
 
 #[async_trait]
 impl<S: Send + Sync> FromRequestParts<S> for Ratelimiter

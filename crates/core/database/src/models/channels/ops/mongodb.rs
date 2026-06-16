@@ -1,7 +1,8 @@
 use super::AbstractChannels;
-use crate::{AbstractServers, Channel, FieldsChannel, IntoDocumentPath, MongoDb, PartialChannel};
+use crate::{AbstractServers, Channel, FieldsChannel, IntoDocumentPath, MongoDb, PartialChannel, util::ChunkedDatabaseGenerator};
 use bson::{Bson, Document};
 use futures::StreamExt;
+use mongodb::options::ReadConcern;
 use revolt_permissions::OverrideField;
 use revolt_result::Result;
 
@@ -70,16 +71,29 @@ impl AbstractChannels for MongoDb {
     }
 
     // Fetch all group dms for a user
-    async fn find_group_message_channels(&self, user_id: &str) -> Result<Vec<Channel>> {
-        query!(
-            self,
-            find,
-            COL,
-            doc! {
+    async fn find_group_message_channels(&self, user_id: &str) -> Result<ChunkedDatabaseGenerator<Channel>> {
+        let mut session = self
+            .start_session()
+            .await
+            .map_err(|_| create_database_error!("start_session", COL))?;
+
+        session
+            .start_transaction()
+            .read_concern(ReadConcern::snapshot())
+            .await
+            .map_err(|_| create_database_error!("start_transaction", COL))?;
+
+        let cursor = self.col(COL)
+            .find(doc! {
                 "channel_type": "Group",
                 "recipients": user_id
-            }
-        )
+            })
+            .session(&mut session)
+            .batch_size(100)
+            .await
+            .map_err(|_| create_database_error!("find", COL))?;
+
+        Ok(ChunkedDatabaseGenerator::new_mongo(session, cursor))
     }
 
     // Fetch saved messages channel

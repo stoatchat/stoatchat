@@ -1,6 +1,5 @@
 use crate::{AbstractSessions, MongoDb, Session};
 use bson::{to_bson, to_document};
-use futures::TryStreamExt;
 use iso8601_timestamp::Timestamp;
 use mongodb::options::UpdateOptions;
 use revolt_result::Result;

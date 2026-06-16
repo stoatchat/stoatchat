@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use log::info;
-use revolt_config::config;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::uri::Origin;
 use rocket::http::{Method, Status};
@@ -10,7 +9,7 @@ use rocket::{Data, Request, Response, State};
 
 use revolt_rocket_okapi::r#gen::OpenApiGenerator;
 use revolt_rocket_okapi::request::{OpenApiFromRequest, RequestHeaderInput};
-use revolt_database::Session;
+use revolt_database::{Session, util::ip::rocket::to_real_ip};
 
 use crate::ratelimiter::RequestKind;
 use crate::ratelimiter::{RatelimitInformation, Ratelimiter};
@@ -23,27 +22,6 @@ impl RequestKind for RocketRequestKind {
 }
 
 pub type RatelimitStorage = crate::ratelimiter::RatelimitStorage<RocketRequestKind>;
-
-/// Find the remote IP of the client
-fn to_ip(request: &'_ rocket::Request<'_>) -> String {
-    request
-        .client_ip()
-        .map(|r| r.to_string())
-        .unwrap_or_default()
-}
-
-/// Find the actual IP of the client
-async fn to_real_ip(request: &'_ rocket::Request<'_>) -> String {
-    if config().await.api.security.trust_cloudflare {
-        request
-            .headers()
-            .get_one("CF-Connecting-IP")
-            .map(|x| x.to_string())
-            .unwrap_or_else(|| to_ip(request))
-    } else {
-        to_ip(request)
-    }
-}
 
 #[async_trait]
 impl<'r> FromRequest<'r> for Ratelimiter {

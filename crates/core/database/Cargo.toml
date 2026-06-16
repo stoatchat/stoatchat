@@ -22,7 +22,7 @@ rocket-impl = [
     "revolt_okapi",
     "revolt_rocket_okapi",
 ]
-axum-impl = ["axum", "revolt-result/axum"]
+axum-impl = ["axum", "revolt-result/axum", "utoipa"]
 redis-is-patched = ["revolt-presence/redis-is-patched"]
 voice = ["livekit-api", "livekit-protocol", "livekit-runtime"]
 
@@ -85,6 +85,7 @@ async-std = { workspace = true, features = ["attributes"], optional = true }
 
 # Axum Impl
 axum = { workspace = true, optional = true }
+utoipa = { workspace = true, features = ["axum_extras"], optional = true }
 
 # Rocket Impl
 schemars = { workspace = true, optional = true }

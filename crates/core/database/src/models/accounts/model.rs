@@ -283,9 +283,6 @@ impl Account {
         plaintext_password: String,
         verify_email: bool,
     ) -> Result<Account> {
-        // Hash the user's password
-        let password = hash_password(plaintext_password)?;
-
         // Get a normalised representation of the user's email
         let email_normalised = normalise_email(email.clone());
 
@@ -303,6 +300,9 @@ impl Account {
 
             Ok(account)
         } else {
+            // Hash the user's password
+            let password = hash_password(plaintext_password)?;
+
             // Create a new account
             let mut account = Account {
                 id: ulid::Ulid::new().to_string(),
@@ -340,6 +340,8 @@ impl Account {
 
     /// Create a new session
     pub async fn create_session(&self, db: &Database, name: String) -> Result<Session> {
+        let config = config().await;
+
         let session = Session {
             id: ulid::Ulid::new().to_string(),
             token: nanoid!(64),
@@ -349,7 +351,7 @@ impl Account {
 
             last_seen: Timestamp::now_utc(),
 
-            origin: None,
+            origin: Some(config.environment),
             subscription: None,
         };
 
