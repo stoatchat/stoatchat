@@ -7521,7 +7521,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-autumn"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "axum",
  "axum-macros",
@@ -7562,7 +7562,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-bonfire"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "async-channel 2.5.0",
  "async-std",
@@ -7592,7 +7592,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-coalesced"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "indexmap 2.14.0",
  "lru",
@@ -7601,7 +7601,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-config"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "async-std",
  "cached",
@@ -7617,7 +7617,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-crond"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "futures",
  "futures-lite",
@@ -7638,7 +7638,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-database"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "async-lock 2.8.0",
  "async-recursion",
@@ -7696,7 +7696,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-delta"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "async-channel 2.5.0",
  "async-std",
@@ -7743,7 +7743,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-files"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -7771,7 +7771,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-gifbox"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "axum",
  "axum-extra",
@@ -7794,7 +7794,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-january"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "async-recursion",
  "axum",
@@ -7824,7 +7824,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-models"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "indexmap 2.14.0",
  "iso8601-timestamp",
@@ -7844,14 +7844,14 @@ dependencies = [
 
 [[package]]
 name = "revolt-parser"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "logos",
 ]
 
 [[package]]
 name = "revolt-permissions"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "async-std",
  "async-trait",
@@ -7866,7 +7866,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-presence"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "async-std",
  "log",
@@ -7878,7 +7878,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-pushd"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7908,7 +7908,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-ratelimits"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "async-trait",
  "axum",
@@ -7924,7 +7924,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-result"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "axum",
  "log",
@@ -7940,7 +7940,7 @@ dependencies = [
 
 [[package]]
 name = "revolt-voice-ingress"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "async-std",
  "chrono",

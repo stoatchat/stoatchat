@@ -12,7 +12,7 @@ use crate::Database;
 static PERMISSIBLE_EMOJIS: Lazy<HashSet<String>> = Lazy::new(|| {
     include_str!("unicode_emoji.txt")
         .split('\n')
-        .map(|x| x.into())
+        .map(|x| x.replace('\u{FE0F}', ""))
         .collect()
 });
 
@@ -108,7 +108,8 @@ impl Emoji {
             db.fetch_emoji(emoji).await?;
             Ok(true)
         } else {
-            Ok(PERMISSIBLE_EMOJIS.contains(emoji))
+            let sanitized_emoji = emoji.replace('\u{FE0F}', "");
+            Ok(PERMISSIBLE_EMOJIS.contains(&sanitized_emoji))
         }
     }
 }

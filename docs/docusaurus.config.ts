@@ -6,7 +6,7 @@ import type { ScalarOptions } from '@scalar/docusaurus';
 const config: Config = {
   title: 'Stoat Developers',
   tagline: 'Developer documentation for Stoat',
-  favicon: 'https://stoat.chat/favicon.svg',
+  favicon: 'https://stoat.chat/favicon-stoat.svg',
 
   future: {
     v4: true,
@@ -80,10 +80,10 @@ const config: Config = {
       respectPrefersColorScheme: true,
     },
     navbar: {
-      title: 'Stoat Developers',
       logo: {
-        alt: 'Stoat',
-        src: 'https://stoat.chat/favicon.svg',
+        alt: 'Stoat for Developers',
+        src: '/img/navbar.light.svg',
+        srcDark: '/img/navbar.dark.svg'
       },
       items: [
         {

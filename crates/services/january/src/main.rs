@@ -21,32 +21,26 @@ async fn main() -> Result<(), std::io::Error> {
     // Configure API schema
     #[derive(OpenApi)]
     #[openapi(
-        modifiers(&SecurityAddon),
-        paths(
-            api::root,
-            api::proxy,
-            api::embed
-        ),
-        components(
-            schemas(
-                api::RootResponse,
-                revolt_result::Error,
-                revolt_result::ErrorType,
-                revolt_models::v0::ImageSize,
-                revolt_models::v0::Image,
-                revolt_models::v0::Video,
-                revolt_models::v0::TwitchType,
-                revolt_models::v0::LightspeedType,
-                revolt_models::v0::BandcampType,
-                revolt_models::v0::Special,
-                revolt_models::v0::WebsiteMetadata,
-                revolt_models::v0::Text,
-                revolt_models::v0::Embed
-            )
-        )
+        paths(api::root, api::proxy, api::embed),
+        components(schemas(
+            api::RootResponse,
+            revolt_result::Error,
+            revolt_result::ErrorType,
+            revolt_models::v0::ImageSize,
+            revolt_models::v0::Image,
+            revolt_models::v0::Video,
+            revolt_models::v0::TwitchType,
+            revolt_models::v0::LightspeedType,
+            revolt_models::v0::BandcampType,
+            revolt_models::v0::Special,
+            revolt_models::v0::WebsiteMetadata,
+            revolt_models::v0::Text,
+            revolt_models::v0::Embed
+        ))
     )]
     struct ApiDoc;
 
+    #[allow(dead_code)]
     struct SecurityAddon;
 
     impl Modify for SecurityAddon {
