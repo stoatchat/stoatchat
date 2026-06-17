@@ -3,6 +3,7 @@
 use std::ops::Add;
 use std::time::Duration;
 
+use async_std::task::sleep;
 use iso8601_timestamp::Timestamp;
 use revolt_database::{
     util::{email::normalise_email, password::assert_safe},
@@ -22,6 +23,9 @@ pub async fn login(
     db: &State<Database>,
     data: Json<v0::DataLogin>,
 ) -> Result<Json<v0::ResponseLogin>> {
+    // Random jitter from 0-1000ms
+    sleep(Duration::from_millis((rand::random::<f32>() * 1000.) as u64)).await;
+
     let (account, name) = match data.into_inner() {
         v0::DataLogin::Email {
             email,

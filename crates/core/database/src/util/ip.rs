@@ -5,8 +5,8 @@ pub mod rocket {
 
     pub fn to_ip(request: &'_ Request<'_>) -> String {
         request
-            .remote()
-            .map(|x| x.ip().to_string())
+            .client_ip()
+            .map(|x| x.to_string())
             .unwrap_or_default()
     }
 

@@ -1,5 +1,8 @@
 //! Resend account verification email
 //! POST /account/reverify
+use std::time::Duration;
+
+use async_std::task::sleep;
 use rocket::{serde::json::Json, State};
 use rocket_empty::EmptyResponse;
 use revolt_result::Result;
@@ -16,6 +19,9 @@ pub async fn resend_verification(
     data: Json<v0::DataResendVerification>,
 ) -> Result<EmptyResponse> {
     let data = data.into_inner();
+
+    // Random jitter from 0-1000ms
+    sleep(Duration::from_millis((rand::random::<f32>() * 1000.) as u64)).await;
 
     // Check Captcha token
     check_captcha(data.captcha.as_deref()).await?;

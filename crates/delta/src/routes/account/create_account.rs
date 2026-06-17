@@ -1,5 +1,8 @@
 //! Create a new account
 //! POST /account/create
+use std::time::Duration;
+
+use async_std::task::sleep;
 use revolt_config::config;
 use revolt_database::{
     util::{
@@ -27,6 +30,9 @@ pub async fn create_account(
     mut shield: ShieldValidationInput,
 ) -> Result<EmptyResponse> {
     let data = data.into_inner();
+
+    // Random jitter from 0-1000ms
+    sleep(Duration::from_millis((rand::random::<f32>() * 1000.) as u64)).await;
 
     // Check Captcha token
     check_captcha(data.captcha.as_deref()).await?;

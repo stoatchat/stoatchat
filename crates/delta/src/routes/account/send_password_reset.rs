@@ -1,5 +1,8 @@
 //! Send a password reset email
 //! POST /account/reset_password
+use std::time::Duration;
+
+use async_std::task::sleep;
 use rocket::serde::json::Json;
 use rocket::State;
 use rocket_empty::EmptyResponse;
@@ -17,6 +20,9 @@ pub async fn send_password_reset(
     data: Json<v0::DataSendPasswordReset>,
 ) -> Result<EmptyResponse> {
     let data = data.into_inner();
+
+    // Random jitter from 0-1000ms
+    sleep(Duration::from_millis((rand::random::<f32>() * 1000.) as u64)).await;
 
     // Check Captcha token
     check_captcha(data.captcha.as_deref()).await?;
