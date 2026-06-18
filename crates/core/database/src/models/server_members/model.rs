@@ -368,12 +368,22 @@ mod tests {
                 .await
                 .unwrap();
 
+            let before_rejoin = Timestamp::now_utc() - Duration::seconds(1);
             let kickable_member = Member::create(&db, &server, &kickable_user, None)
                 .await
                 .unwrap()
                 .0;
 
-            assert!(kickable_member.in_timeout())
+            assert!(kickable_member.in_timeout());
+            assert!(
+                kickable_member
+                    .joined_at
+                    .duration_since(Timestamp::UNIX_EPOCH)
+                    .whole_milliseconds()
+                    >= before_rejoin
+                        .duration_since(Timestamp::UNIX_EPOCH)
+                        .whole_milliseconds()
+            );
         });
     }
 }

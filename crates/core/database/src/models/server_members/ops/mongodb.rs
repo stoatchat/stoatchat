@@ -35,7 +35,10 @@ impl AbstractServerMembers for MongoDb {
                     },
                     doc! {
                         "$set": {
-                            "joined_at": member.joined_at.duration_since(Timestamp::UNIX_EPOCH).whole_seconds(),
+                            "joined_at": member
+                                .joined_at
+                                .duration_since(Timestamp::UNIX_EPOCH)
+                                .whole_milliseconds() as i64,
                         },
                         "$unset": {
                             "pending_deletion_at": ""
