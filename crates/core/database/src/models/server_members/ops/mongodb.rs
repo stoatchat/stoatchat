@@ -334,6 +334,7 @@ impl IntoDocumentPath for FieldsMember {
             FieldsMember::JoinedAt => Some("joined_at"),
             FieldsMember::Avatar => Some("avatar"),
             FieldsMember::Nickname => Some("nickname"),
+            FieldsMember::Pronouns => Some("pronouns"),
             FieldsMember::Roles => Some("roles"),
             FieldsMember::Timeout => Some("timeout"),
             FieldsMember::CanPublish => Some("can_publish"),

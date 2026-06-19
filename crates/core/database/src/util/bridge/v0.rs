@@ -631,6 +631,7 @@ impl From<crate::Member> for Member {
             id: value.id.into(),
             joined_at: value.joined_at,
             nickname: value.nickname,
+            pronouns: value.pronouns,
             avatar: value.avatar.map(|f| f.into()),
             roles: value.roles,
             timeout: value.timeout,
@@ -646,6 +647,7 @@ impl From<Member> for crate::Member {
             id: value.id.into(),
             joined_at: value.joined_at,
             nickname: value.nickname,
+            pronouns: value.pronouns,
             avatar: value.avatar.map(|f| f.into()),
             roles: value.roles,
             timeout: value.timeout,
@@ -661,6 +663,7 @@ impl From<crate::PartialMember> for PartialMember {
             id: value.id.map(|id| id.into()),
             joined_at: value.joined_at,
             nickname: value.nickname,
+            pronouns: value.pronouns,
             avatar: value.avatar.map(|f| f.into()),
             roles: value.roles,
             timeout: value.timeout,
@@ -676,6 +679,7 @@ impl From<PartialMember> for crate::PartialMember {
             id: value.id.map(|id| id.into()),
             joined_at: value.joined_at,
             nickname: value.nickname,
+            pronouns: value.pronouns,
             avatar: value.avatar.map(|f| f.into()),
             roles: value.roles,
             timeout: value.timeout,
@@ -708,6 +712,7 @@ impl From<crate::FieldsMember> for FieldsMember {
         match value {
             crate::FieldsMember::Avatar => FieldsMember::Avatar,
             crate::FieldsMember::Nickname => FieldsMember::Nickname,
+            crate::FieldsMember::Pronouns => FieldsMember::Pronouns,
             crate::FieldsMember::Roles => FieldsMember::Roles,
             crate::FieldsMember::Timeout => FieldsMember::Timeout,
             crate::FieldsMember::CanReceive => FieldsMember::CanReceive,
@@ -723,6 +728,7 @@ impl From<FieldsMember> for crate::FieldsMember {
         match value {
             FieldsMember::Avatar => crate::FieldsMember::Avatar,
             FieldsMember::Nickname => crate::FieldsMember::Nickname,
+            FieldsMember::Pronouns => crate::FieldsMember::Pronouns,
             FieldsMember::Roles => crate::FieldsMember::Roles,
             FieldsMember::Timeout => crate::FieldsMember::Timeout,
             FieldsMember::CanReceive => crate::FieldsMember::CanReceive,
@@ -1032,6 +1038,7 @@ impl crate::User {
             username: self.username,
             discriminator: self.discriminator,
             display_name: self.display_name,
+            pronouns: self.pronouns,
             avatar: self.avatar.map(|file| file.into()),
             relations: if let Some(crate::User { id, .. }) = perspective {
                 if id == &self.id {
@@ -1108,6 +1115,7 @@ impl crate::User {
             username: self.username,
             discriminator: self.discriminator,
             display_name: self.display_name,
+            pronouns: self.pronouns,
             avatar: self.avatar.map(|file| file.into()),
             relations: vec![],
             badges,
@@ -1141,6 +1149,7 @@ impl crate::User {
             username: self.username,
             discriminator: self.discriminator,
             display_name: self.display_name,
+            pronouns: self.pronouns,
             avatar: self.avatar.map(|file| file.into()),
             relations: vec![],
             badges,
@@ -1168,6 +1177,7 @@ impl crate::User {
             username: self.username,
             discriminator: self.discriminator,
             display_name: self.display_name,
+            pronouns: self.pronouns,
             avatar: self.avatar.map(|file| file.into()),
             relations: self
                 .relations
@@ -1211,6 +1221,7 @@ impl From<User> for crate::User {
             username: value.username,
             discriminator: value.discriminator,
             display_name: value.display_name,
+            pronouns: value.pronouns,
             avatar: value.avatar.map(Into::into),
             relations: None,
             badges: Some(value.badges as i32),
@@ -1231,6 +1242,7 @@ impl From<crate::PartialUser> for PartialUser {
             username: value.username,
             discriminator: value.discriminator,
             display_name: value.display_name,
+            pronouns: value.pronouns,
             avatar: value.avatar.map(|file| file.into()),
             relations: value.relations.map(|relationships| {
                 relationships
@@ -1259,6 +1271,7 @@ impl From<FieldsUser> for crate::FieldsUser {
             FieldsUser::StatusPresence => crate::FieldsUser::StatusPresence,
             FieldsUser::StatusText => crate::FieldsUser::StatusText,
             FieldsUser::DisplayName => crate::FieldsUser::DisplayName,
+            FieldsUser::Pronouns => crate::FieldsUser::Pronouns,
 
             FieldsUser::Internal => crate::FieldsUser::None,
         }
@@ -1274,6 +1287,7 @@ impl From<crate::FieldsUser> for FieldsUser {
             crate::FieldsUser::StatusPresence => FieldsUser::StatusPresence,
             crate::FieldsUser::StatusText => FieldsUser::StatusText,
             crate::FieldsUser::DisplayName => FieldsUser::DisplayName,
+            crate::FieldsUser::Pronouns => FieldsUser::Pronouns,
 
             crate::FieldsUser::Suspension => FieldsUser::Internal,
             crate::FieldsUser::None => FieldsUser::Internal,
