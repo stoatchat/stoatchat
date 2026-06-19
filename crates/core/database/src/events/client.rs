@@ -11,7 +11,7 @@ use revolt_models::v0::{
     UserVoiceState, Webhook,
 };
 
-use crate::Database;
+use crate::{Database, amqp::get_amqp};
 
 /// Ping Packet
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -372,8 +372,16 @@ impl EventV1 {
         #[cfg(debug_assertions)]
         info!("Publishing event to {channel}: {self:?}");
 
-        #[cfg(debug_assertions)]
-        redis_kiss::publish(channel, self).await.unwrap();
+        // #[cfg(debug_assertions)]
+        // redis_kiss::publish(channel, self).await.unwrap();
+
+        if let Err(e) = get_amqp().publish_event(channel, &self).await {
+            if cfg!(debug_assertions) {
+                panic!("{e:?}");
+            } else {
+                log::error!("{e:?}");
+            };
+        };
     }
 
     /// Publish user event

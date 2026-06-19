@@ -1,19 +1,28 @@
-use std::collections::HashSet;
-use std::sync::Arc;
+use std::{
+    collections::HashSet,
+    sync::{Arc, OnceLock},
+};
 
-use crate::events::rabbit::*;
+use crate::events::{client::EventV1, rabbit::*};
 use crate::User;
 use lapin::{
     options::BasicPublishOptions,
     protocol::basic::AMQPProperties,
     types::{AMQPValue, FieldTable},
-    Channel, Connection, ConnectionProperties, Error as AMQPError,
+    BasicProperties, Channel, Connection, ConnectionProperties, Error as AMQPError,
 };
+use revolt_config::config;
 use revolt_models::v0::PushNotification;
 use revolt_presence::filter_online;
 use revolt_result::Result;
 
 use serde_json::to_string;
+
+static AMQP_INSTANCE: OnceLock<AMQP> = OnceLock::new();
+
+pub fn get_amqp() -> &'static AMQP {
+    AMQP_INSTANCE.get().expect("No AMQP instance set.")
+}
 
 #[derive(Clone)]
 pub struct AMQP {
@@ -25,13 +34,14 @@ pub struct AMQP {
     ack_notification_message: Arc<Channel>,
     dm_call_updated: Arc<Channel>,
     process_ack: Arc<Channel>,
+    publish_event: Arc<Channel>,
     #[allow(unused)]
     connection: Arc<Connection>,
 }
 
 impl AMQP {
     pub async fn new(connection: Arc<Connection>) -> Self {
-        Self {
+        let this = Self {
             friend_request_accepted: Self::create_channel(&connection).await,
             friend_request_received: Self::create_channel(&connection).await,
             generic_message: Self::create_channel(&connection).await,
@@ -40,8 +50,13 @@ impl AMQP {
             ack_notification_message: Self::create_channel(&connection).await,
             dm_call_updated: Self::create_channel(&connection).await,
             process_ack: Self::create_channel(&connection).await,
+            publish_event: Self::create_channel(&connection).await,
             connection,
-        }
+        };
+
+        let _ = AMQP_INSTANCE.set(this.clone());
+
+        this
     }
 
     pub async fn new_auto() -> Self {
@@ -374,6 +389,25 @@ impl AMQP {
                 AMQPProperties::default()
                     .with_content_type("application/json".into())
                     .with_delivery_mode(2),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn publish_event(&self, channel: String, event: &EventV1) -> Result<(), AMQPError> {
+        let mut headers = FieldTable::default();
+        headers.insert("c".into(), AMQPValue::LongString(channel.into()));
+
+        let config = config().await;
+
+        self.publish_event
+            .basic_publish(
+                config.rabbit.default_exchange.clone().into(),
+                config.rabbit.queues.events.into(),
+                BasicPublishOptions::default(),
+                &serde_json::to_vec(event).unwrap(),
+                BasicProperties::default().with_headers(headers),
             )
             .await?;
 

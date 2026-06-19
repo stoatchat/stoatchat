@@ -34,6 +34,7 @@ default_exchange = "revolt.default"
 
 [rabbit.queues]
 acks = "internal.ack"
+events = "internal.event"
 
 [api]
 
