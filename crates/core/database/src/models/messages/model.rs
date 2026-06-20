@@ -190,6 +190,8 @@ auto_derived!(
         pub query: Option<String>,
         /// Search for pinned
         pub pinned: Option<bool>,
+        /// Search for mentions
+        pub mentioned: Option<String>,
     }
 
     /// Message Query

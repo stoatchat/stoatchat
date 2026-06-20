@@ -140,6 +140,12 @@ pub async fn create_database(db: &MongoDb) {
             },
             {
                 "key": {
+                    "mentions": 1_i32
+                },
+                "name": "mentions"
+            },
+            {
+                "key": {
                     "channel": 1_i32,
                     "_id": 1_i32
                 },

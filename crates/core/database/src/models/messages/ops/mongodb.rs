@@ -59,6 +59,10 @@ impl AbstractMessages for MongoDb {
             filter.insert("pinned", pinned);
         };
 
+        if let Some(mentioned) = query.filter.mentioned {
+            filter.insert("mentions", mentioned);
+        }
+
         // 2. Find query limit
         let limit = query.limit.unwrap_or(50);
 
