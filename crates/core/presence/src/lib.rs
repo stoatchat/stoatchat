@@ -30,7 +30,7 @@ pub async fn create_session(user_id: &str, flags: u8) -> (bool, u32) {
 
     if let Ok(mut conn) = get_connection().await {
         // Check whether this is the first session
-        let was_empty = __get_set_size(&mut conn, user_id).await == 0;
+        let was_empty = __get_set_size(&mut conn, &format!("sessions:{user_id}")).await == 0;
 
         // A session ID is comprised of random data and any flags ORed to the end
         let session_id = {
@@ -39,7 +39,7 @@ pub async fn create_session(user_id: &str, flags: u8) -> (bool, u32) {
         };
 
         // Add session to user's sessions and to the region
-        __add_to_set_u32(&mut conn, user_id, session_id).await;
+        __add_to_set_u32(&mut conn, &format!("sessions:{user_id}"), session_id).await;
         __add_to_set_string(&mut conn, ONLINE_SET, user_id).await;
         __add_to_set_string(&mut conn, &REGION_KEY, &format!("{user_id}:{session_id}")).await;
         info!("Created session for {user_id}, assigned them a session ID of {session_id}.");
@@ -62,7 +62,7 @@ async fn delete_session_internal(user_id: &str, session_id: u32, skip_region: bo
 
     if let Ok(mut conn) = get_connection().await {
         // Remove the session
-        __remove_from_set_u32(&mut conn, user_id, session_id).await;
+        __remove_from_set_u32(&mut conn, &format!("sessions:{user_id}"), session_id).await;
 
         // Remove from the region
         if !skip_region {
