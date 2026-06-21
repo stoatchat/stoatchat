@@ -2,7 +2,7 @@
 //! POST /account/reset_password
 use std::time::Duration;
 
-use async_std::task::sleep;
+use tokio::time::sleep;
 use rocket::serde::json::Json;
 use rocket::State;
 use rocket_empty::EmptyResponse;

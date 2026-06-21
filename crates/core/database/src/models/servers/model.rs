@@ -420,7 +420,7 @@ mod tests {
 
     use crate::{fixture, util::permissions::DatabasePermissionQuery};
 
-    #[async_std::test]
+    #[tokio::test]
     async fn permissions() {
         database_test!(|db| async move {
             fixture!(db, "server_with_roles",

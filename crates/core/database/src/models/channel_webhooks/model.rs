@@ -128,7 +128,7 @@ impl Webhook {
 mod tests {
     use crate::{FieldsWebhook, PartialWebhook, Webhook};
 
-    #[async_std::test]
+    #[tokio::test]
     async fn crud() {
         database_test!(|db| async move {
             let webhook_id = "webhook";

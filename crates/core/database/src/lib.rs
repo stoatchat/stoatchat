@@ -25,8 +25,8 @@ pub use mongodb;
 #[macro_use]
 extern crate bson;
 
-#[cfg(not(feature = "async-std-runtime"))]
-compile_error!("async-std-runtime feature must be enabled.");
+#[cfg(not(feature = "tokio-runtime"))]
+compile_error!("tokio-runtime feature must be enabled.");
 
 #[macro_export]
 #[cfg(debug_assertions)]

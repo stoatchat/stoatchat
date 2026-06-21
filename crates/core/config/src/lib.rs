@@ -586,7 +586,7 @@ macro_rules! configure {
 mod tests {
     use crate::init;
 
-    #[async_std::test]
+    #[tokio::test]
     async fn it_works() {
         init().await;
     }

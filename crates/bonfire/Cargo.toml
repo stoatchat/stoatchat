@@ -14,7 +14,7 @@ sentry = { workspace = true }
 lru = { workspace = true }
 ulid = { workspace = true }
 once_cell = { workspace = true }
-redis-kiss = { workspace = true }
+redis-kiss = { workspace = true, default-features = false, features = ["tokio-runtime"] }
 lru_time_cache = { workspace = true }
 async-channel = { workspace = true }
 
@@ -30,8 +30,9 @@ serde = { workspace = true }
 
 # async
 futures = { workspace = true }
-async-tungstenite = { workspace = true, features = ["async-std-runtime"] }
-async-std = { workspace = true }
+async-tungstenite = { workspace = true, features = ["tokio-runtime"] }
+tokio = { workspace = true }
+tokio-util = { workspace = true, features = ["compat"] }
 
 # core
 revolt-result = { workspace = true }

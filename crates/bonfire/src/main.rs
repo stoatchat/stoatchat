@@ -1,6 +1,6 @@
 use std::env;
 
-use async_std::net::TcpListener;
+use tokio::net::TcpListener;
 use revolt_presence::clear_region;
 
 #[macro_use]
@@ -12,7 +12,7 @@ pub mod events;
 mod database;
 mod websocket;
 
-#[async_std::main]
+#[tokio::main]
 async fn main() {
     // Configure requirements for Bonfire.
     revolt_config::configure!(events);
@@ -33,7 +33,7 @@ async fn main() {
 
     // Start accepting new connections and spawn a client for each connection.
     while let Ok((stream, addr)) = listener.accept().await {
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             info!("User connected from {addr:?}");
             websocket::client(database::get_db(), stream, addr).await;
             info!("User disconnected from {addr:?}");

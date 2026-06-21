@@ -452,7 +452,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
         warn!("This is a destructive operation and will wipe existing permission data (excl. defaults for SendMessage).");
         warn!("Taking a backup is advised.");
         warn!("Continuing in 10 seconds...");
-        async_std::task::sleep(Duration::from_secs(10)).await;
+        tokio::time::sleep(Duration::from_secs(10)).await;
 
         let servers = db.col::<Document>("servers");
         let mut cursor = servers.find(doc! {}).await.unwrap();
