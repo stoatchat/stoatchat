@@ -1,6 +1,6 @@
 # Build Stage
 FROM ghcr.io/stoatchat/base:latest AS builder
-FROM debian:12 AS debian
+FROM debian:bookworm-20260610 AS debian
 
 # Bundle Stage
 FROM gcr.io/distroless/cc-debian12:nonroot
