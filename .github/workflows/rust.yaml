@@ -11,15 +11,47 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  # nextest runs each test on its own thread with Rust's default 2MiB stack.
+  # On this runner, models::bots::model::tests::crud and
+  # models::users::model::tests::create_user overflow that and abort with
+  # SIGABRT -- unrelated to any app code, first time this workflow has ever
+  # actually run tests in this org (no runner previously existed for it).
+  # Raised to 8MiB, matching a typical main-thread default.
+  RUST_MIN_STACK: 8388608
 
 jobs:
   check:
     name: Rust project
-    runs-on: arc-runner-set
+    # Was arc-runner-set, which no runner in this org actually serves (see
+    # nac-server#8 / PR #3 commit history) -- now served by a dedicated
+    # self-hosted runner registered with this specific label, deliberately
+    # NOT "arc-runner-set", so it can never be matched to docker.yaml's much
+    # heavier multi-arch base-image build job. That job OOM-killed this same
+    # box (8GB RAM) once already when the runner briefly shared the
+    # arc-runner-set label with it.
+    runs-on: bluecords-stoatchat-rust
     steps:
+      # MongoDB's (and RabbitMQ's) containers run as root and write into
+      # bind-mounted ./.data/* on the host, owned by root. Fix ownership so
+      # checkout doesn't hard-fail on permission-denied -- but the deeper
+      # issue is `clean: true` (checkout's default): it runs `git clean
+      # -ffdx`, which deletes *all* untracked/gitignored files, including
+      # .data (it's in .gitignore). Docker compose containers (MinIO,
+      # Mongo, Rabbit) persist across job runs on this runner and are NOT
+      # stopped between them, so the default clean checkout deletes a
+      # *live* container's bind-mounted volume out from under it on every
+      # single run -- confirmed tonight: chowning .data made it deletable,
+      # which let checkout's clean step actually succeed at wiping MinIO's
+      # volume each time, repeatedly breaking it (drives-online: 0) even
+      # after manually recovering it in between. `clean: false` stops
+      # checkout from touching anything outside what git itself tracks.
+      - name: Fix ownership of root-owned docker data from previous run
+        run: sudo chown -R "$(id -u):$(id -g)" ./.data 2>/dev/null || true
+
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
+          clean: false
 
       # Using our own runners for now:
       # - name: Free up disk space
