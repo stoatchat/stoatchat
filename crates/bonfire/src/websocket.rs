@@ -1,7 +1,6 @@
 use std::{collections::HashSet, net::SocketAddr, sync::Arc};
 
 use async_tungstenite::WebSocketStream;
-use authifier::AuthifierEvent;
 use fred::{
     error::RedisErrorKind,
     interfaces::{ClientLike, EventInterface, PubsubInterface},
@@ -13,7 +12,7 @@ use futures::{
     stream::{SplitSink, SplitStream},
     FutureExt, SinkExt, StreamExt, TryStreamExt,
 };
-use redis_kiss::{PayloadType, REDIS_PAYLOAD_TYPE, REDIS_URI};
+use redis_kiss::{get_connection, AsyncCommands, PayloadType, REDIS_PAYLOAD_TYPE, REDIS_URI};
 use revolt_config::report_internal_error;
 use revolt_database::{
     events::{client::EventV1, server::ClientMessage},
@@ -32,6 +31,7 @@ use sentry::Level;
 
 use crate::config::{ProtocolConfiguration, WebsocketHandshakeCallback};
 use crate::events::state::{State, SubscriptionStateChange};
+use revolt_models::v0;
 
 type WsReader = SplitStream<WebSocketStream<TcpStream>>;
 type WsWriter = SplitSink<WebSocketStream<TcpStream>, async_tungstenite::tungstenite::Message>;
@@ -126,6 +126,14 @@ pub async fn client(db: &'static Database, stream: TcpStream, addr: SocketAddr) 
 
     if report_internal_error!(write.send(config.encode(&ready_payload)).await).is_err() {
         return;
+    }
+
+    let slowmodes = fetch_user_slowmodes(&user_id).await.unwrap_or_default();
+    if !slowmodes.is_empty() {
+        let event = EventV1::UserSlowmodes { slowmodes };
+        if report_internal_error!(write.send(config.encode(&event)).await).is_err() {
+            return;
+        }
     }
 
     // Create presence session.
@@ -346,22 +354,20 @@ async fn listener(
                     break 'out;
                 };
 
-                if let EventV1::Auth(auth) = &event {
-                    if let AuthifierEvent::DeleteSession { session_id, .. } = auth {
-                        if &state.session_id == session_id {
+                if let EventV1::DeleteSession { session_id, .. } = &event {
+                    if &state.session_id == session_id {
+                        event = EventV1::Logout;
+                    }
+                } else if let EventV1::DeleteAllSessions {
+                    exclude_session_id, ..
+                } = &event
+                {
+                    if let Some(excluded) = exclude_session_id {
+                        if &state.session_id != excluded {
                             event = EventV1::Logout;
                         }
-                    } else if let AuthifierEvent::DeleteAllSessions {
-                        exclude_session_id, ..
-                    } = auth
-                    {
-                        if let Some(excluded) = exclude_session_id {
-                            if &state.session_id != excluded {
-                                event = EventV1::Logout;
-                            }
-                        } else {
-                            event = EventV1::Logout;
-                        }
+                    } else {
+                        event = EventV1::Logout;
                     }
                 } else {
                     let should_send = state.handle_incoming_event_v1(db, &mut event).await;
@@ -527,4 +533,43 @@ async fn worker(
             }
         }
     }
+}
+
+async fn fetch_user_slowmodes(user_id: &str) -> Option<Vec<v0::ChannelSlowmode>> {
+    let mut conn = get_connection().await.ok()?.into_inner();
+    let idx_key = format!("slowmode_idx:{}", user_id);
+
+    let channel_ids: Vec<String> = conn.smembers(&idx_key).await.unwrap_or_default();
+    if channel_ids.is_empty() {
+        return Some(vec![]);
+    }
+
+    // Bulk fetch all TTLs in one round trip
+    let mut pipe = redis_kiss::redis::pipe();
+    for channel_id in &channel_ids {
+        pipe.ttl(format!("slowmode:{}:{}", user_id, channel_id));
+    }
+    let ttls: Vec<i64> = pipe.query_async(&mut conn).await.unwrap_or_default();
+
+    // Partition into alive/expired in one pass
+    let mut slowmodes = vec![];
+    let mut expired = vec![];
+    for (channel_id, ttl) in channel_ids.iter().zip(ttls.iter()) {
+        if *ttl > 0 {
+            slowmodes.push(v0::ChannelSlowmode {
+                channel_id: channel_id.clone(),
+                duration: *ttl as u64,
+                retry_after: *ttl as u64,
+            });
+        } else {
+            expired.push(channel_id.as_str());
+        }
+    }
+
+    // Bulk remove all expired members in one SREM call
+    if !expired.is_empty() {
+        conn.srem::<_, _, ()>(&idx_key, expired).await.ok();
+    }
+
+    Some(slowmodes)
 }

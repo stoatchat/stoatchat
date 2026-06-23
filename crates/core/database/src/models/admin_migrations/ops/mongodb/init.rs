@@ -101,6 +101,17 @@ pub async fn create_database(db: &MongoDb) {
     db.create_collection("audit_logs")
         .await
         .expect("Failed to create audit_logs collection");
+    db.create_collection("sessions")
+        .await
+        .expect("Failed to create sessions collection.");
+
+    db.create_collection("account_invites")
+        .await
+        .expect("Failed to create account_invites collection.");
+
+    db.create_collection("mfa_tickets")
+        .await
+        .expect("Failed to create mfa_tickets collection.");
 
     db.run_command(doc! {
         "createIndexes": "users",
@@ -292,6 +303,116 @@ pub async fn create_database(db: &MongoDb) {
     })
     .await
     .expect("Failed to create audit_logs index");
+
+    db.run_command(doc! {
+        "createIndexes": "audit_logs",
+        "indexes": [
+            {
+                "key": {
+                    "expires_at": 1_i32,
+                },
+                "name": "expires_at_ttl",
+                // We set the expire after to 0 because we store when it expires instead of when the document was inserted,
+                // this is because mongo cant read the timestamp from the ulid so we need to do this workaround.
+                // relevant docs: https://www.mongodb.com/docs/manual/tutorial/expire-data/#expire-documents-at-a-specific-clock-time
+                "expireAfterSeconds": 0
+            },
+            {
+                "key": {
+                    "server": 1_i32,
+                    "user": 1_i32,
+                    "action.type": 1_i32,
+                },
+                "name": "audit_log_filters",
+            },
+        ]
+    })
+    .await
+    .expect("Failed to create audit_logs index");
+
+    db.run_command(doc! {
+        "createIndexes": "accounts",
+        "indexes": [
+            {
+                "key": {
+                    "email": 1
+                },
+                "name": "email",
+                "unique": true,
+                "collation": {
+                    "locale": "en",
+                    "strength": 2
+                }
+            },
+            {
+                "key": {
+                    "email_normalised": 1
+                },
+                "name": "email_normalised",
+                "unique": true,
+                "collation": {
+                    "locale": "en",
+                    "strength": 2
+                }
+            },
+            {
+                "key": {
+                    "verification.token": 1
+                },
+                "name": "email_verification"
+            },
+            {
+                "key": {
+                    "password_reset.token": 1
+                },
+                "name": "password_reset"
+            },
+            {
+                "key": {
+                    "deletion.token": 1
+                },
+                "name": "account_deletion"
+            }
+        ]
+    })
+    .await
+    .unwrap();
+
+    db.run_command(doc! {
+        "createIndexes": "sessions",
+        "indexes": [
+            {
+                "key": {
+                    "token": 1
+                },
+                "name": "token",
+                "unique": true
+            },
+            {
+                "key": {
+                    "user_id": 1
+                },
+                "name": "user_id"
+            }
+        ]
+    })
+    .await
+    .unwrap();
+
+    db.run_command(doc! {
+        "createIndexes": "mfa_tickets",
+        "indexes": [
+            {
+                "key": {
+                    "token": 1
+                },
+                "name": "token",
+                "unique": true
+            }
+        ]
+    })
+    .await
+    .unwrap();
 
     info!("Created database.");
 }

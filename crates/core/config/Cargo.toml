@@ -1,6 +1,6 @@
 [package]
 name = "revolt-config"
-version = "0.12.1"
+version = "0.13.7"
 edition = "2021"
 license = "MIT"
 authors = ["Paul Makles <me@insrt.uk>"]
@@ -14,13 +14,12 @@ anyhow = ["dep:sentry-anyhow"]
 report-macros = ["revolt-result"]
 sentry = ["dep:sentry"]
 test = ["async-std"]
-default = ["test", "sentry"]
+default = ["sentry"]
 
 [dependencies]
 # Utility
 config = { workspace = true }
 cached = { workspace = true }
-once_cell = { workspace = true }
 
 # Serde
 serde = { workspace = true }

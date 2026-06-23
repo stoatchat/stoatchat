@@ -8,10 +8,20 @@ services:
   # MongoDB
   database:
     image: mongo
+    command: mongod --replSet rs0
     ports:
       - "27017:27017"
     volumes:
       - ./.data/db:/data/db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'127.0.0.1:27017'}]}) }" | mongosh --port 27017 --quiet
+      interval: 5s
+      timeout: 30s
+      start_period: 0s
+      start_interval: 1s
+      retries: 30
     ulimits:
       nofile:
         soft: 65536
@@ -19,11 +29,12 @@ services:
 
   # MinIO
   minio:
-    image: minio/minio
-    command: server /data
+    image: firstfinger/minio:latest
+    #command: server /data
     environment:
       MINIO_ROOT_USER: minioautumn
       MINIO_ROOT_PASSWORD: minioautumn
+      MINIO_REGION: minio
     volumes:
       - ./.data/minio:/data
     ports:

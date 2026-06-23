@@ -1,12 +1,16 @@
-use authifier::AuthifierEvent;
 use revolt_result::Error;
 use serde::{Deserialize, Serialize};
 
 use revolt_models::v0::{
-    AppendMessage, Channel, ChannelUnread, ChannelVoiceState, Emoji, FieldsChannel, FieldsMember, FieldsMessage, FieldsRole, FieldsServer, FieldsUser, FieldsWebhook, Member, MemberCompositeKey, Message, PartialChannel, PartialMember, PartialMessage, PartialRole, PartialServer, PartialUser, PartialUserVoiceState, PartialWebhook, PolicyChange, RemovalIntention, Report, Server, User, UserSettings, UserVoiceState, Webhook
+    AppendMessage, Channel, ChannelSlowmode, ChannelUnread, ChannelVoiceState, Emoji,
+    FieldsChannel, FieldsMember, FieldsMessage, FieldsRole, FieldsServer, FieldsUser,
+    FieldsWebhook, Member, MemberCompositeKey, Message, PartialChannel, PartialEmoji,
+    PartialMember, PartialMessage, PartialRole, PartialServer, PartialUser, PartialUserVoiceState,
+    PartialWebhook, PolicyChange, RemovalIntention, Report, Server, User, UserSettings,
+    UserVoiceState, Webhook,
 };
 
-use crate::Database;
+use crate::{Account, Database, Session};
 
 /// Ping Packet
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -51,9 +55,13 @@ impl Default for ReadyPayloadFields {
 #[serde(tag = "type")]
 pub enum EventV1 {
     /// Multiple events
-    Bulk { v: Vec<EventV1> },
+    Bulk {
+        v: Vec<EventV1>,
+    },
     /// Error event
-    Error { data: Error },
+    Error {
+        data: Error,
+    },
 
     /// Successfully authenticated
     Authenticated,
@@ -84,7 +92,9 @@ pub enum EventV1 {
     },
 
     /// Ping response
-    Pong { data: Ping },
+    Pong {
+        data: Ping,
+    },
     /// New message
     Message(Message),
 
@@ -105,7 +115,10 @@ pub enum EventV1 {
     },
 
     /// Delete message
-    MessageDelete { id: String, channel: String },
+    MessageDelete {
+        id: String,
+        channel: String,
+    },
 
     /// New reaction to a message
     MessageReact {
@@ -131,7 +144,10 @@ pub enum EventV1 {
     },
 
     /// Bulk delete messages
-    BulkMessageDelete { channel: String, ids: Vec<String> },
+    BulkMessageDelete {
+        channel: String,
+        ids: Vec<String>,
+    },
 
     /// New server
     ServerCreate {
@@ -139,7 +155,7 @@ pub enum EventV1 {
         server: Server,
         channels: Vec<Channel>,
         emojis: Vec<Emoji>,
-        voice_states: Vec<ChannelVoiceState>
+        voice_states: Vec<ChannelVoiceState>,
     },
 
     /// Update existing server
@@ -151,7 +167,9 @@ pub enum EventV1 {
     },
 
     /// Delete server
-    ServerDelete { id: String },
+    ServerDelete {
+        id: String,
+    },
 
     /// Update existing server member
     ServerMemberUpdate {
@@ -187,10 +205,16 @@ pub enum EventV1 {
     },
 
     /// Server role deleted
-    ServerRoleDelete { id: String, role_id: String },
+    ServerRoleDelete {
+        id: String,
+        role_id: String,
+    },
 
     /// Server roles ranks updated
-    ServerRoleRanksUpdate { id: String, ranks: Vec<String> },
+    ServerRoleRanksUpdate {
+        id: String,
+        ranks: Vec<String>,
+    },
 
     /// Update existing user
     UserUpdate {
@@ -202,9 +226,15 @@ pub enum EventV1 {
     },
 
     /// Relationship with another user changed
-    UserRelationship { id: String, user: User },
+    UserRelationship {
+        id: String,
+        user: User,
+    },
     /// Settings updated remotely
-    UserSettingsUpdate { id: String, update: UserSettings },
+    UserSettingsUpdate {
+        id: String,
+        update: UserSettings,
+    },
 
     /// User has been platform banned or deleted their account
     ///
@@ -215,12 +245,23 @@ pub enum EventV1 {
     /// - Server Memberships
     ///
     /// User flags are specified to explain why a wipe is occurring though not all reasons will necessarily ever appear.
-    UserPlatformWipe { user_id: String, flags: i32 },
+    UserPlatformWipe {
+        user_id: String,
+        flags: i32,
+    },
     /// New emoji
     EmojiCreate(Emoji),
 
+    /// Update existing emoji
+    EmojiUpdate {
+        id: String,
+        data: PartialEmoji,
+    },
+
     /// Delete emoji
-    EmojiDelete { id: String },
+    EmojiDelete {
+        id: String,
+    },
 
     /// New report
     ReportCreate(Report),
@@ -236,19 +277,33 @@ pub enum EventV1 {
     },
 
     /// Delete channel
-    ChannelDelete { id: String },
+    ChannelDelete {
+        id: String,
+    },
 
     /// User joins a group
-    ChannelGroupJoin { id: String, user: String },
+    ChannelGroupJoin {
+        id: String,
+        user: String,
+    },
 
     /// User leaves a group
-    ChannelGroupLeave { id: String, user: String },
+    ChannelGroupLeave {
+        id: String,
+        user: String,
+    },
 
     /// User started typing in a channel
-    ChannelStartTyping { id: String, user: String },
+    ChannelStartTyping {
+        id: String,
+        user: String,
+    },
 
     /// User stopped typing in a channel
-    ChannelStopTyping { id: String, user: String },
+    ChannelStopTyping {
+        id: String,
+        user: String,
+    },
 
     /// User acknowledged message in channel
     ChannelAck {
@@ -268,10 +323,25 @@ pub enum EventV1 {
     },
 
     /// Delete webhook
-    WebhookDelete { id: String },
+    WebhookDelete {
+        id: String,
+    },
 
     /// Auth events
-    Auth(AuthifierEvent),
+    CreateAccount {
+        account: Account,
+    },
+    CreateSession {
+        session: Session,
+    },
+    DeleteSession {
+        user_id: String,
+        session_id: String,
+    },
+    DeleteAllSessions {
+        user_id: String,
+        exclude_session_id: Option<String>,
+    },
 
     /// Voice events
     VoiceChannelJoin {
@@ -286,7 +356,7 @@ pub enum EventV1 {
         user: String,
         from: String,
         to: String,
-        state: UserVoiceState
+        state: UserVoiceState,
     },
     UserVoiceStateUpdate {
         id: String,
@@ -298,7 +368,11 @@ pub enum EventV1 {
         from: String,
         to: String,
         token: String,
-    }
+    },
+    /// User's active slowmodes
+    UserSlowmodes {
+        slowmodes: Vec<ChannelSlowmode>,
+    },
 }
 
 impl EventV1 {

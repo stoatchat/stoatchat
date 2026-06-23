@@ -539,6 +539,22 @@ Emoji created, the event object has the same schema as the Emoji object in the A
 }
 ```
 
+### EmojiUpdate
+
+Emoji has been updated.
+
+```json
+{
+  "type": "EmojiUpdate",
+  "id": "{emoji_id}",
+  "data": {
+    "name"?: "{emoji_name}"
+  }
+}
+```
+
+- `data` field contains a partial Emoji object.
+
 ### EmojiDelete
 
 Emoji has been deleted.

@@ -1,17 +1,16 @@
 #[macro_use]
 extern crate log;
 
-use amqprs::{
-    channel::{
-        BasicConsumeArguments, Channel, ExchangeDeclareArguments, QueueBindArguments,
-        QueueDeclareArguments,
-    },
-    connection::{Connection, OpenConnectionArguments},
-    consumer::AsyncConsumer,
-    FieldTable,
+use std::sync::Arc;
+
+use lapin::{
+    options::{BasicConsumeOptions, ExchangeDeclareOptions, QueueBindOptions, QueueDeclareOptions},
+    types::{AMQPValue, FieldTable},
+    Channel, Connection, ConnectionProperties,
 };
 use revolt_config::{config, Settings};
-use tokio::sync::Notify;
+use revolt_database::Database;
+use tokio::signal::ctrl_c;
 
 mod consumers;
 mod utils;
@@ -24,6 +23,8 @@ use consumers::{
     outbound::{apn::ApnsOutboundConsumer, fcm::FcmOutboundConsumer, vapid::VapidOutboundConsumer},
 };
 
+use crate::utils::{Consumer, Delegate};
+
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() {
     // Configure logging and environment
@@ -31,19 +32,25 @@ async fn main() {
 
     // Setup database
     let db = revolt_database::DatabaseInfo::Auto.connect().await.unwrap();
-    let authifier: authifier::Database;
 
-    if let Some(client) = match &db {
-        revolt_database::Database::Reference(_) => None,
-        revolt_database::Database::MongoDb(mongo) => Some(mongo),
-    } {
-        authifier =
-            authifier::Database::MongoDb(authifier::database::MongoDb(client.database("revolt")));
-    } else {
-        panic!("Mongo is not in use, can't connect via authifier!")
-    }
+    let config = config().await;
 
-    let mut connections: Vec<(Channel, Connection)> = Vec::new();
+    let connection = Arc::new(
+        Connection::connect(
+            &format!(
+                "amqp://{}:{}@{}:{}",
+                &config.rabbit.username,
+                &config.rabbit.password,
+                &config.rabbit.host,
+                &config.rabbit.port,
+            ),
+            ConnectionProperties::default(),
+        )
+        .await
+        .expect("Failed to connect to RabbitMQ"),
+    );
+
+    let mut channels = Vec::new();
 
     // An explainer of how this works:
     // The inbound connections are on separate routing keys, such that they only receive the proper payload
@@ -54,171 +61,167 @@ async fn main() {
     // This'll require some interesting shimming if we need to add more events once this is in prod (different payloads between prod and test),
     // but that sounds like a problem for future us.
 
-    let config = config().await;
-
-    // inbound: generic
-    connections.push(
-        make_queue_and_consume(
+    channels.push(
+        make_queue_and_consume::<GenericConsumer>(
+            &db,
+            &connection,
             &config,
             &config.pushd.generic_queue,
-            config.pushd.get_generic_routing_key().as_str(),
+            &config.pushd.get_generic_routing_key(),
             None,
-            GenericConsumer::new(db.clone(), authifier.clone()),
         )
         .await,
     );
 
-    // inbound: messages
-    connections.push(
-        make_queue_and_consume(
+    channels.push(
+        make_queue_and_consume::<MessageConsumer>(
+            &db,
+            &connection,
             &config,
             &config.pushd.message_queue,
-            config.pushd.get_message_routing_key().as_str(),
+            &config.pushd.get_message_routing_key(),
             None,
-            MessageConsumer::new(db.clone(), authifier.clone()),
         )
         .await,
     );
 
-    // inbound: FR received
-    connections.push(
-        make_queue_and_consume(
+    channels.push(
+        make_queue_and_consume::<FRReceivedConsumer>(
+            &db,
+            &connection,
             &config,
             &config.pushd.fr_received_queue,
-            config.pushd.get_fr_received_routing_key().as_str(),
+            &config.pushd.get_fr_received_routing_key(),
             None,
-            FRReceivedConsumer::new(db.clone(), authifier.clone()),
         )
         .await,
     );
 
-    // inbound: FR accepted
-    connections.push(
-        make_queue_and_consume(
+    channels.push(
+        make_queue_and_consume::<FRAcceptedConsumer>(
+            &db,
+            &connection,
             &config,
             &config.pushd.fr_accepted_queue,
-            config.pushd.get_fr_accepted_routing_key().as_str(),
+            &config.pushd.get_fr_accepted_routing_key(),
             None,
-            FRAcceptedConsumer::new(db.clone(), authifier.clone()),
         )
         .await,
     );
 
-    // inbound: Mass Mentions
-    connections.push(
-        make_queue_and_consume(
+    channels.push(
+        make_queue_and_consume::<MassMessageConsumer>(
+            &db,
+            &connection,
             &config,
             &config.pushd.mass_mention_queue,
-            config.pushd.get_mass_mention_routing_key().as_str(),
+            &config.pushd.get_mass_mention_routing_key(),
             None,
-            MassMessageConsumer::new(db.clone(), authifier.clone()),
         )
         .await,
     );
 
-    // inbound: Dm Calls
-    connections.push(
-        make_queue_and_consume(
+    channels.push(
+        make_queue_and_consume::<DmCallConsumer>(
+            &db,
+            &connection,
             &config,
             &config.pushd.dm_call_queue,
-            config.pushd.get_dm_call_routing_key().as_str(),
+            &config.pushd.get_dm_call_routing_key(),
             None,
-            DmCallConsumer::new(db.clone(), authifier.clone()),
         )
         .await,
     );
 
     if !config.pushd.apn.pkcs8.is_empty() {
-        connections.push(
-            make_queue_and_consume(
+        channels.push(
+            make_queue_and_consume::<ApnsOutboundConsumer>(
+                &db,
+                &connection,
                 &config,
                 &config.pushd.apn.queue,
                 &config.pushd.apn.queue,
                 None,
-                ApnsOutboundConsumer::new(db.clone()).await.unwrap(),
             )
             .await,
         );
 
-        let mut table = FieldTable::new();
-        table.insert("x-message-deduplication".try_into().unwrap(), "true".into());
+        let mut table = FieldTable::default();
+        table.insert("x-message-deduplication".into(), AMQPValue::Boolean(true));
 
-        connections.push(
-            make_queue_and_consume(
+        channels.push(
+            make_queue_and_consume::<AckConsumer>(
+                &db,
+                &connection,
                 &config,
                 &config.pushd.ack_queue,
                 &config.pushd.ack_queue,
                 Some(table),
-                AckConsumer::new(db.clone(), authifier.clone()),
             )
             .await,
         );
     }
 
     if !config.pushd.fcm.auth_uri.is_empty() {
-        connections.push(
-            make_queue_and_consume(
+        channels.push(
+            make_queue_and_consume::<FcmOutboundConsumer>(
+                &db,
+                &connection,
                 &config,
                 &config.pushd.fcm.queue,
                 &config.pushd.fcm.queue,
                 None,
-                FcmOutboundConsumer::new(db.clone()).await.unwrap(),
             )
             .await,
-        )
+        );
     }
 
     if !config.pushd.vapid.public_key.is_empty() {
-        connections.push(
-            make_queue_and_consume(
+        channels.push(
+            make_queue_and_consume::<VapidOutboundConsumer>(
+                &db,
+                &connection,
                 &config,
                 &config.pushd.vapid.queue,
                 &config.pushd.vapid.queue,
                 None,
-                VapidOutboundConsumer::new(db.clone()).await.unwrap(),
             )
             .await,
-        )
+        );
     }
 
-    let guard = Notify::new();
-    guard.notified().await;
+    ctrl_c().await.unwrap();
 
-    for (channel, conn) in connections {
-        channel.close().await.expect("Unable to close channel");
-        conn.close().await.expect("Unable to close connection");
+    for channel in channels {
+        let _ = channel.close(0, "close".into()).await;
     }
 }
 
 async fn make_queue_and_consume<F>(
+    db: &Database,
+    connection: &Arc<Connection>,
     config: &Settings,
     queue_name: &str,
     routing_key: &str,
     queue_args: Option<FieldTable>,
-    consumer: F,
-) -> (Channel, Connection)
+) -> Arc<Channel>
 where
-    F: AsyncConsumer + Send + 'static,
+    F: Consumer,
 {
-    let connection = Connection::open(&OpenConnectionArguments::new(
-        &config.rabbit.host,
-        config.rabbit.port,
-        &config.rabbit.username,
-        &config.rabbit.password,
-    ))
-    .await
-    .unwrap();
-
-    let channel = connection.open_channel(None).await.unwrap();
+    let channel = Arc::new(connection.create_channel().await.unwrap());
 
     channel
         .exchange_declare(
-            ExchangeDeclareArguments::new(&config.pushd.exchange, "direct")
-                .durable(true)
-                .finish(),
+            config.pushd.exchange.clone().into(),
+            lapin::ExchangeKind::Direct,
+            ExchangeDeclareOptions {
+                durable: true,
+                ..Default::default()
+            },
+            FieldTable::default(),
         )
         .await
-        .expect("Failed to declare pushd exchange");
+        .expect("Failed to declare exchange");
 
     let mut queue_name = queue_name.to_string();
 
@@ -230,35 +233,58 @@ where
 
     let queue_name = queue_name.as_str();
 
-    let mut args = QueueDeclareArguments::new(queue_name);
-    args.durable(true);
-
-    if let Some(arg) = queue_args {
-        args.arguments(arg);
-    }
-
-    let args = args.finish();
-    _ = channel.queue_declare(args).await.unwrap().unwrap();
+    let args = QueueDeclareOptions {
+        durable: true,
+        ..Default::default()
+    };
 
     channel
-        .queue_bind(QueueBindArguments::new(
-            queue_name,
-            &config.pushd.exchange,
-            routing_key,
-        ))
+        .queue_declare(queue_name.into(), args, queue_args.unwrap_or_default())
+        .await
+        .unwrap();
+
+    channel
+        .queue_bind(
+            queue_name.into(),
+            config.pushd.exchange.clone().into(),
+            routing_key.into(),
+            QueueBindOptions::default(),
+            FieldTable::default(),
+        )
         .await
         .expect(
             "This probably means the revolt.notifications exchange does not exist in rabbitmq!",
         );
 
-    let args = BasicConsumeArguments::new(queue_name, "")
-        .manual_ack(false)
-        .finish();
-
-    let routing_key = channel.basic_consume(consumer, args).await.unwrap();
+    let consumer = channel
+        .basic_consume(
+            queue_name.into(),
+            "".into(),
+            BasicConsumeOptions {
+                no_ack: true,
+                ..Default::default()
+            },
+            FieldTable::default(),
+        )
+        .await
+        .unwrap();
     info!(
         "Consuming routing key {} as queue {}, tag {}",
-        routing_key, queue_name, routing_key
+        routing_key,
+        queue_name,
+        consumer.tag()
     );
-    (channel, connection)
+
+    let delegate = Delegate(
+        F::create(
+            db.clone(),
+            connection.clone(),
+            channel.clone(),
+        )
+        .await,
+    );
+
+    consumer.set_delegate(delegate);
+
+    channel
 }

@@ -1,6 +1,6 @@
 [package]
 name = "revolt-delta"
-version = "0.12.1"
+version = "0.13.7"
 license = "AGPL-3.0-or-later"
 authors = ["Paul Makles <paulmakles@gmail.com>"]
 edition = "2018"
@@ -56,7 +56,6 @@ lettre = { workspace = true }
 rocket = { workspace = true, features = ["json"] }
 rocket_cors = { workspace = true }
 rocket_empty = { workspace = true, features = ["schema"] }
-rocket_authifier = { workspace = true }
 rocket_prometheus = { workspace = true }
 
 # spec generation
@@ -64,10 +63,9 @@ schemars = { workspace = true }
 revolt_rocket_okapi = { workspace = true, features = ["swagger"] }
 
 # rabbit
-amqprs = { workspace = true }
+lapin = { workspace = true, features = ["tokio"] }
 
 # core
-authifier = { workspace = true }
 revolt-config = { workspace = true }
 revolt-database = { workspace = true, features = [
     "rocket-impl",
@@ -87,6 +85,9 @@ revolt-ratelimits = { workspace = true, features = ["rocket"] }
 # voice
 livekit-api = { workspace = true }
 livekit-protocol = { workspace = true }
+
+[dev-dependencies]
+revolt-config = { workspace = true, features = ["test"] }
 
 [build-dependencies]
 vergen = { workspace = true }

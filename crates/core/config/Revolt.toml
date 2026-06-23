@@ -1,5 +1,6 @@
 production = false
 disable_events_dont_use = false
+environment = "dev"
 
 [database]
 # MongoDB connection URL
@@ -30,6 +31,10 @@ host = "rabbit"
 port = 5672
 username = "rabbituser"
 password = "rabbitpass"
+default_exchange = "revolt.default"
+
+[rabbit.queues]
+acks = "internal.ack"
 
 [api]
 
@@ -49,6 +54,10 @@ from_address = "noreply@example.com"
 # port = 587
 # use_tls = true
 
+[api.smtp.expiry]
+expire_verification = 604800  # 3600 * 24 * 7
+expire_password_reset = 86400  # 3600 * 24
+expire_account_deletion = 86400  # 3600 * 24
 
 [api.security]
 # Authifier Shield API key
@@ -67,6 +76,10 @@ tenor_key = ""
 hcaptcha_key = ""
 hcaptcha_sitekey = ""
 
+[api.security.shield]
+host = ""
+key = ""
+
 [api.workers]
 # Maximum concurrent connections (to proxy server)
 max_concurrent_connections = 50
@@ -82,6 +95,8 @@ expires_after = 2592000  # 30d
 [api.livekit.nodes]
 
 [api.users]
+# Minimum allowed length of usernames
+min_username_length = 2
 
 [pushd]
 # this changes the names of the queues to not overlap 
@@ -134,6 +149,8 @@ pkcs8 = ""
 key_id = ""
 team_id = ""
 
+[january]
+blocked_domains = []
 
 [files]
 # Encryption key for stored files
@@ -316,6 +333,12 @@ emojis = 500_000
 # The max amount of messages the rabbitmq provider/db mention adder job will delay for before forcing handling of a channel.
 # default: 5
 process_message_delay_limit = 5
+
+[features.legal_links]
+# URLs for legal documents
+terms_of_service = ""
+privacy_policy = ""
+guidelines = ""
 
 [sentry]
 # Configuration for Sentry error reporting

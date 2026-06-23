@@ -65,6 +65,7 @@ encoding_rs = "0.8.34"
 
 # Mail
 lettre = "0.10.0-alpha.4"
+handlebars = "4.3.0"
 
 # HTTP Requests
 reqwest = "0.13.2"
@@ -134,6 +135,7 @@ kamadak-exif = "0.5.4"
 webp = "0.3.0"
 image = "0.25.2"  # avif encode requires dav1d system library: features = ["avif-native"]
 thumbhash = "0.1.0"
+lcms2 = "6.1.1" # for color profile processing
 
 # File processing
 revolt_clamav-client = "0.1.5"
@@ -154,11 +156,8 @@ opentelemetry_sdk = { version = "0.31.0", features = ["logs"] }
 opentelemetry-otlp = { version = "0.31.0", features = ["logs"] }
 opentelemetry-appender-tracing = "0.31.1"
 
-# Authifier
-authifier = "1.0.16"
-
 # RabbitMQ
-amqprs = "1.7.0"
+lapin = "4.7.1"
 
 # Voice
 livekit-api = "0.4.4"
@@ -171,7 +170,7 @@ config = "0.13.3"
 cached = "0.44.0"
 rand = "0.8.5"
 base64 = "0.21.3"
-decancer = "1.6.2"
+decancer = "3.3.3"
 linkify = "0.8.1"
 url-escape = "0.1.1"
 revolt_optional_struct = "0.2.0"
@@ -184,18 +183,23 @@ url = "2.2.2"
 impl_ops = "0.1.1"
 lazy_static = "1.5.0"
 mime = "0.3.17"
+totp-lite = "2.0.0"
+rust-argon2 = "1.0.0"
+base32 = "0.4.0"
+sha1 = "0.10.6"
+futures-lite = "2.6.1"
 
 # Build Dependencies
 vergen = "7.5.0"
 
 # Local packages
-revolt-coalesced = { version = "0.12.0", path = "crates/core/coalesced" }
-revolt-config = { version = "0.12.0", path = "crates/core/config" }
-revolt-database = { version = "0.12.0", path = "crates/core/database" }
-revolt-files = { version = "0.12.0", path = "crates/core/files" }
-revolt-models = { version = "0.12.0", path = "crates/core/models" }
-revolt-parser = { version = "0.12.0", path = "crates/core/parser" }
-revolt-permissions = { version = "0.12.0", path = "crates/core/permissions" }
-revolt-presence = { version = "0.12.0", path = "crates/core/presence" }
-revolt-ratelimits = { version = "0.12.0", path = "crates/core/ratelimits" }
-revolt-result = { version = "0.12.0", path = "crates/core/result" }
+revolt-coalesced = { version = "0.13.7", path = "crates/core/coalesced" }
+revolt-config = { version = "0.13.7", path = "crates/core/config" }
+revolt-database = { version = "0.13.7", path = "crates/core/database" }
+revolt-files = { version = "0.13.7", path = "crates/core/files" }
+revolt-models = { version = "0.13.7", path = "crates/core/models" }
+revolt-parser = { version = "0.13.7", path = "crates/core/parser" }
+revolt-permissions = { version = "0.13.7", path = "crates/core/permissions" }
+revolt-presence = { version = "0.13.7", path = "crates/core/presence" }
+revolt-ratelimits = { version = "0.13.7", path = "crates/core/ratelimits" }
+revolt-result = { version = "0.13.7", path = "crates/core/result" }

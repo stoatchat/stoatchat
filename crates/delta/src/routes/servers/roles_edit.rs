@@ -1,7 +1,7 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     voice::{sync_voice_permissions, VoiceClient},
-    AuditLogEntryAction, Database, FieldsRole, PartialRole, User,
+    AuditLogEntryAction, Database, FieldsRole, PartialRole, User, File
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
@@ -50,14 +50,27 @@ pub async fn edit(
             name,
             colour,
             hoist,
+            icon,
             remove,
             ..
         } = data;
+
+        if remove.contains(&v0::FieldsRole::Icon) {
+            if let Some(existing_icon) = &role.icon {
+                db.mark_attachment_as_deleted(&existing_icon.id).await?;
+            }
+        }
+
+        let mut final_icon = None;
+        if let Some(icon_id) = icon {
+            final_icon = Some(File::use_role_icon(db, &icon_id, &role_id, &user.id).await?);
+        }
 
         let partial = PartialRole {
             name,
             colour,
             hoist,
+            icon: final_icon,
             ..Default::default()
         };
 

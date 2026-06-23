@@ -261,7 +261,7 @@ auto_derived!(
         pub nonce: Option<String>,
 
         /// Message content to send
-        #[cfg_attr(feature = "validator", validate(length(min = 0, max = 2000)))]
+        #[cfg_attr(feature = "validator", validate(length(min = 0)))]
         pub content: Option<String>,
         /// Attachments to include in message
         pub attachments: Option<Vec<String>>,
@@ -345,7 +345,7 @@ auto_derived!(
     #[cfg_attr(feature = "validator", derive(Validate))]
     pub struct DataEditMessage {
         /// New message content
-        #[cfg_attr(feature = "validator", validate(length(min = 1, max = 2000)))]
+        #[cfg_attr(feature = "validator", validate(length(min = 1)))]
         pub content: Option<String>,
         /// Embeds to include in the message
         #[cfg_attr(feature = "validator", validate(length(min = 0, max = 10)))]

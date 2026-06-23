@@ -9,7 +9,6 @@ pub mod routes;
 pub mod util;
 
 use revolt_config::config;
-use revolt_database::events::client::EventV1;
 use revolt_database::AMQP;
 use revolt_ratelimits::rocket as ratelimiter;
 use rocket::{Build, Rocket};
@@ -18,14 +17,8 @@ use rocket_prometheus::PrometheusMetrics;
 use std::net::Ipv4Addr;
 use std::str::FromStr;
 
-use amqprs::{
-    channel::ExchangeDeclareArguments,
-    connection::{Connection, OpenConnectionArguments},
-};
-use async_std::channel::unbounded;
-use authifier::AuthifierEvent;
-use rocket::data::ToByteUnit;
 use revolt_database::voice::VoiceClient;
+use rocket::data::ToByteUnit;
 
 pub async fn web() -> Rocket<Build> {
     // Get settings
@@ -36,30 +29,7 @@ pub async fn web() -> Rocket<Build> {
 
     // Setup database
     let db = revolt_database::DatabaseInfo::Auto.connect().await.unwrap();
-    log::info!("database_here {db:?}");
     db.migrate_database().await.unwrap();
-
-    // Setup Authifier event channel
-    let (_, receiver) = unbounded();
-
-    // Setup Authifier
-    let authifier = db.clone().to_authifier().await;
-
-    // Launch a listener for Authifier events
-    async_std::task::spawn(async move {
-        while let Ok(event) = receiver.recv().await {
-            match &event {
-                AuthifierEvent::CreateSession { .. } | AuthifierEvent::CreateAccount { .. } => {
-                    EventV1::Auth(event).global().await
-                }
-                AuthifierEvent::DeleteSession { user_id, .. }
-                | AuthifierEvent::DeleteAllSessions { user_id, .. } => {
-                    let id = user_id.to_string();
-                    EventV1::Auth(event).private(id).await
-                }
-            }
-        }
-    });
 
     // Configure CORS
     let cors = CorsOptions {
@@ -93,41 +63,11 @@ pub async fn web() -> Rocket<Build> {
     )
     .into();
 
-    let swagger_0_8 = revolt_rocket_okapi::swagger_ui::make_swagger_ui(
-        &revolt_rocket_okapi::swagger_ui::SwaggerUIConfig {
-            url: "/0.8/openapi.json".to_owned(),
-            ..Default::default()
-        },
-    )
-    .into();
-
     // Voice handler
     let voice_client = VoiceClient::new(config.api.livekit.nodes.clone());
     // Configure Rabbit
-    let connection = Connection::open(&OpenConnectionArguments::new(
-        &config.rabbit.host,
-        config.rabbit.port,
-        &config.rabbit.username,
-        &config.rabbit.password,
-    ))
-    .await
-    .expect("Failed to connect to RabbitMQ");
 
-    let channel = connection
-        .open_channel(None)
-        .await
-        .expect("Failed to open RabbitMQ channel");
-
-    channel
-        .exchange_declare(
-            ExchangeDeclareArguments::new(&config.pushd.exchange, "direct")
-                .durable(true)
-                .finish(),
-        )
-        .await
-        .expect("Failed to declare exchange");
-
-    let amqp = AMQP::new(connection, channel);
+    let amqp = AMQP::new_auto().await;
 
     // Launch background task workers
     revolt_database::tasks::start_workers(db.clone(), amqp.clone());
@@ -145,8 +85,6 @@ pub async fn web() -> Rocket<Build> {
         .mount("/", rocket_cors::catch_all_options_routes())
         .mount("/", ratelimiter::routes())
         .mount("/swagger/", swagger)
-        .mount("/0.8/swagger/", swagger_0_8)
-        .manage(authifier)
         .manage(db)
         .manage(amqp)
         .manage(cors.clone())
@@ -158,6 +96,7 @@ pub async fn web() -> Rocket<Build> {
             limits: rocket::data::Limits::default().limit("string", 5.megabytes()),
             address: Ipv4Addr::new(0, 0, 0, 0).into(),
             port: 14702,
+            ip_header: Some("X-Forwarded-For".into()),
             ..Default::default()
         })
 }

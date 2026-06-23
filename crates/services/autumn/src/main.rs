@@ -18,6 +18,7 @@ pub mod exif;
 pub mod metadata;
 pub mod mime_type;
 mod ratelimits;
+mod utils;
 
 #[derive(FromRef, Clone)]
 struct AppState {

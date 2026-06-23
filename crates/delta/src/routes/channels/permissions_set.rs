@@ -4,9 +4,7 @@ use revolt_database::{
     AuditLogEntryAction, Database, User,
 };
 use revolt_models::v0;
-use revolt_permissions::{
-    calculate_channel_permissions, ChannelPermission, Override, OverrideField,
-};
+use revolt_permissions::{ChannelPermission, Override, OverrideField, PermissionQuery, calculate_channel_permissions};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 
@@ -33,11 +31,15 @@ pub async fn set_role_permissions(
     let permissions: revolt_permissions::PermissionValue =
         calculate_channel_permissions(&mut query).await;
 
+    query.set_server_from_channel().await;
+
     permissions.throw_if_lacking_channel_permission(ChannelPermission::ManagePermissions)?;
 
     if let Some(server) = query.server_ref() {
         if let Some(role) = server.roles.get(&role_id) {
-            if role.rank <= query.get_member_rank().unwrap_or(i64::MIN) {
+            if server.owner != user.id
+                && role.rank <= query.get_member_rank().unwrap_or(i64::MIN)
+            {
                 return Err(create_error!(NotElevated));
             }
 

@@ -1,5 +1,4 @@
-use authifier::models::Session;
-use revolt_database::User;
+use revolt_database::{Session, User};
 
 use rocket::serde::json::Json;
 use serde::Serialize;

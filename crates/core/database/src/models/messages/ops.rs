@@ -50,4 +50,6 @@ pub trait AbstractMessages: Sync + Send {
         author: &str,
         since: SystemTime
     ) -> Result<HashMap<String, Vec<String>>>;
+
+    async fn delete_messages_by_user(&self, user_id: &str) -> Result<()>;
 }

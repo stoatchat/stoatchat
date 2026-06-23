@@ -43,6 +43,17 @@ impl AbstractServers for MongoDb {
             .await)
     }
 
+    async fn fetch_owned_servers(&self, user_id: &str) -> Result<Vec<Server>> {
+        query!(
+            self,
+            find,
+            COL,
+            doc! {
+                "owner": user_id
+            }
+        )
+    }
+
     /// Update a server with new information
     async fn update_server(
         &self,
@@ -77,7 +88,7 @@ impl AbstractServers for MongoDb {
                 },
                 doc! {
                     "$set": {
-                        "roles.".to_owned() + &role.id: to_document(role)
+                        "roles.".to_owned() + role.id.as_str(): to_document(role)
                             .map_err(|_| create_database_error!("to_document", "role"))?
                     }
                 },
@@ -172,6 +183,7 @@ impl IntoDocumentPath for FieldsRole {
     fn as_path(&self) -> Option<&'static str> {
         Some(match self {
             FieldsRole::Colour => "colour",
+            FieldsRole::Icon => "icon",
         })
     }
 }

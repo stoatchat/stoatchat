@@ -1,6 +1,6 @@
 [package]
 name = "revolt-crond"
-version = "0.12.1"
+version = "0.13.7"
 license = "AGPL-3.0-or-later"
 authors = ["Paul Makles <me@insrt.uk>"]
 edition = "2021"
@@ -15,9 +15,24 @@ log = { workspace = true }
 
 # Async
 tokio = { workspace = true }
+futures = { workspace = true }
+
+# Redis
+redis-kiss = { workspace = true }
+
+# RabbitMQ
+lapin = { workspace = true }
+futures-lite = { workspace = true }
+
+# Processing
+serde_json = { workspace = true }
+revolt_optional_struct = { workspace = true }
+serde = { workspace = true }
+iso8601-timestamp = { workspace = true, features = ["serde", "bson"] }
 
 # Core
 revolt-database = { workspace = true }
 revolt-result = { workspace = true }
 revolt-config = { workspace = true }
 revolt-files = { workspace = true }
+revolt-permissions = { workspace = true }
