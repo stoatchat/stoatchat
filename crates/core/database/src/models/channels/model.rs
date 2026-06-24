@@ -718,6 +718,7 @@ impl Channel {
                 role_permissions,
                 nsfw,
                 voice,
+                slowmode,
                 ..
             } => {
                 if partial.name.is_some() {
@@ -753,6 +754,10 @@ impl Channel {
                 if partial.voice.is_some() || remove.contains(&FieldsChannel::Voice) {
                     before.voice = voice.clone();
                 };
+
+                if partial.slowmode.is_some() {
+                    before.slowmode = *slowmode;
+                }
             }
         }
 
