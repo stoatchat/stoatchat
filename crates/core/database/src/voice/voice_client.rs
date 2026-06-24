@@ -83,7 +83,14 @@ impl VoiceClient {
             .with_metadata(
                 &serde_json::to_string(&user.clone().into(db, None).await).to_internal_error()?,
             )
-            .with_ttl(Duration::from_secs(10))
+            // NAC: upstream 10s, then bumped to 30s on 2026-06-12 -- still too
+            // short. Confirmed live 2026-06-21: a real call failed to connect,
+            // logcat showed zero LiveKit/WebRTC engine init in the ~19s before
+            // the client gave up, consistent with the token expiring mid-
+            // handshake. 5 minutes gives ample buffer for a mobile client to
+            // complete the join; this token only grants room-join permission,
+            // not an ongoing session lifetime.
+            .with_ttl(Duration::from_secs(300))
             .with_grants(VideoGrants {
                 room_join: true,
                 can_publish: true,

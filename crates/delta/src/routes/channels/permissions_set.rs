@@ -44,7 +44,13 @@ pub async fn set_role_permissions(
     let server = Reference::from_unchecked(&server_id).as_server(db).await?;
 
     if let Some(role) = server.roles.get(&role_id) {
-        if role.rank <= query.get_member_rank().unwrap_or(i64::MIN) {
+        // Server owners bypass the rank check -- they may not have a
+        // Member.rank entry the same way a regular role-holder does, so the
+        // bare rank comparison incorrectly blocked the owner from editing
+        // any role's permissions.
+        if server.owner != user.id
+            && role.rank <= query.get_member_rank().unwrap_or(i64::MIN)
+        {
             return Err(create_error!(NotElevated));
         }
 
