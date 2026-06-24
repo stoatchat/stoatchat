@@ -191,7 +191,7 @@ impl AuditLogEntryAction {
         // running the insert inside a task can cause race conditions in the test so for now just dont use a task for tests for now
         // this will need to be redone for when we migrate to using rabbitmq here anyway.
         #[cfg(not(test))]
-        async_std::task::spawn({
+        tokio::task::spawn({
             let db = db.clone();
             let entry = entry.clone();
 
