@@ -161,7 +161,7 @@ lapin = "4.7.1"
 
 # Voice
 livekit-api = "=0.4.23"
-livekit-protocol = "=0.7.7"
+livekit-protocol = "=0.7.9"
 livekit-runtime = "0.4.0"
 
 # Other Utilities
