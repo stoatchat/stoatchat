@@ -2,7 +2,7 @@
 
 use crate::{Database, AMQP};
 
-use async_std::task;
+use tokio::task;
 use std::time::Instant;
 
 const WORKER_COUNT: usize = 5;

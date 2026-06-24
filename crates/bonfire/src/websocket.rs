@@ -21,11 +21,12 @@ use revolt_database::{
 };
 use revolt_presence::{create_session, delete_session};
 
-use async_std::{
+use tokio::{
     net::TcpStream,
     sync::{Mutex, RwLock},
     task::spawn,
 };
+use tokio_util::compat::{TokioAsyncReadCompatExt, Compat};
 use revolt_result::create_error;
 use sentry::Level;
 
@@ -33,8 +34,8 @@ use crate::config::{ProtocolConfiguration, WebsocketHandshakeCallback};
 use crate::events::state::{State, SubscriptionStateChange};
 use revolt_models::v0;
 
-type WsReader = SplitStream<WebSocketStream<TcpStream>>;
-type WsWriter = SplitSink<WebSocketStream<TcpStream>, async_tungstenite::tungstenite::Message>;
+type WsReader = SplitStream<WebSocketStream<Compat<TcpStream>>>;
+type WsWriter = SplitSink<WebSocketStream<Compat<TcpStream>>, async_tungstenite::tungstenite::Message>;
 
 /// Start a new WebSocket client worker given access to the database,
 /// the relevant TCP stream and the remote address of the client.
@@ -44,7 +45,7 @@ pub async fn client(db: &'static Database, stream: TcpStream, addr: SocketAddr) 
     // e.g. wss://example.com?format=json&version=1
     let (sender, receiver) = oneshot::channel();
     let Ok(ws) = async_tungstenite::accept_hdr_async_with_config(
-        stream,
+        stream.compat(),
         WebsocketHandshakeCallback::from(sender),
         None,
     )

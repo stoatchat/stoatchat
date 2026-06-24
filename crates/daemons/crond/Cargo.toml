@@ -18,7 +18,7 @@ tokio = { workspace = true }
 futures = { workspace = true }
 
 # Redis
-redis-kiss = { workspace = true }
+redis-kiss = { workspace = true, default-features = false, features = ["tokio-runtime"] }
 
 # RabbitMQ
 lapin = { workspace = true }

@@ -926,7 +926,7 @@ mod tests {
         assert!(User::validate_username(username_https).is_err());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn username_sanitisation_clean() {
         let username_clean = "Test";
 
@@ -936,7 +936,7 @@ mod tests {
         assert_eq!(username_clean, username_clean_sanitised.unwrap());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn username_sanitisation_homoglyphs() {
         let username_homoglyphs = "𝔽𝕌Ňℕｙ";
 
@@ -947,7 +947,7 @@ mod tests {
         assert_eq!("funny", username_homoglyphs_sanitised);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn username_sanitisation_padding() {
         let username_padding = "a";
 
@@ -956,7 +956,7 @@ mod tests {
         assert_eq!("a_", username);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn create_user() {
         use revolt_result::Result;
 

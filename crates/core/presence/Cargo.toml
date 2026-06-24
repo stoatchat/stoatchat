@@ -14,7 +14,7 @@ redis-is-patched = []
 
 [dev-dependencies]
 # Async
-async-std = { workspace = true, features = ["attributes"] }
+tokio = { workspace = true }
 
 # Config for loading Redis URI
 revolt-config = { workspace = true }
@@ -26,4 +26,4 @@ rand = { workspace = true }
 once_cell = { workspace = true }
 
 # Redis
-redis-kiss = { workspace = true }
+redis-kiss = { workspace = true, default-features = false, features = ["tokio-runtime"] }

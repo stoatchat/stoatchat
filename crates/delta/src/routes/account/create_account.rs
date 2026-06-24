@@ -2,7 +2,7 @@
 //! POST /account/create
 use std::time::Duration;
 
-use async_std::task::sleep;
+use tokio::time::sleep;
 use revolt_config::config;
 use revolt_database::{
     util::{

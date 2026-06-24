@@ -340,7 +340,7 @@ mod tests {
 
     use crate::{Member, PartialMember, RemovalIntention, Server, User};
 
-    #[async_std::test]
+    #[tokio::test]
     async fn muted_member_rejoin() {
         database_test!(|db| async move {
             match db {

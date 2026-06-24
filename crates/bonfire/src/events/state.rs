@@ -2,7 +2,7 @@ use std::{
     collections::{HashMap, HashSet}, num::NonZeroUsize, sync::Arc, time::Duration
 };
 
-use async_std::sync::{Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock};
 use lru::LruCache;
 use lru_time_cache::{LruCache as LruTimeCache, TimedEntry};
 use revolt_database::{Channel, Member, Server, User};

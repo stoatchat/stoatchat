@@ -5,7 +5,7 @@ use revolt_result::{create_error, Result};
 #[cfg(feature = "rocket-impl")]
 use revolt_result::Error;
 
-use async_std::sync::Mutex;
+use tokio::sync::Mutex;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 

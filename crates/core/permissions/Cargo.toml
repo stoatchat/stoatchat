@@ -18,7 +18,7 @@ try-from-primitive = ["dep:num_enum"]
 
 [dev-dependencies]
 # Async
-async-std = { workspace = true, features = ["attributes"] }
+tokio = { workspace = true }
 
 [dependencies]
 # Core

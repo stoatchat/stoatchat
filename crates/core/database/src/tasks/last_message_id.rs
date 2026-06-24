@@ -82,6 +82,6 @@ pub async fn worker(db: Database) {
         }
 
         // Sleep for an arbitrary amount of time.
-        async_std::task::sleep(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_secs(1)).await;
     }
 }

@@ -13,7 +13,7 @@ repository = "https://github.com/stoatchat/stoatchat"
 anyhow = ["dep:sentry-anyhow"]
 report-macros = ["revolt-result"]
 sentry = ["dep:sentry"]
-test = ["async-std"]
+test = ["tokio"]
 default = ["sentry"]
 
 [dependencies]
@@ -26,7 +26,7 @@ serde = { workspace = true }
 
 # Async
 futures-locks = { workspace = true }
-async-std = { workspace = true, features = ["attributes"], optional = true }
+tokio = { workspace = true, optional = true }
 
 # Logging
 log = { workspace = true }

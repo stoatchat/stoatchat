@@ -7,11 +7,11 @@ use revolt_config::config;
 use revolt_result::Result;
 
 use async_lock::Semaphore;
-use async_std::task::spawn;
 use deadqueue::limited::Queue;
 use once_cell::sync::Lazy;
 use revolt_models::v0::Embed;
 use std::{collections::HashSet, sync::Arc};
+use tokio::task::spawn;
 
 use isahc::prelude::*;
 
@@ -158,6 +158,7 @@ pub async fn generate(
     let embeds = join_all(tasks)
         .await
         .into_iter()
+        .flatten()
         .flatten()
         .collect::<Vec<Embed>>();
 

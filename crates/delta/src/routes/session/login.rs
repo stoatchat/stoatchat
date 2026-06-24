@@ -3,7 +3,7 @@
 use std::ops::Add;
 use std::time::Duration;
 
-use async_std::task::sleep;
+use tokio::time::sleep;
 use iso8601_timestamp::Timestamp;
 use revolt_database::{
     util::{email::normalise_email, password::assert_safe},

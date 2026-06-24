@@ -15,7 +15,7 @@ mongodb = ["dep:mongodb", "bson"]
 
 # ... Other
 tasks = ["isahc", "linkify", "url-escape"]
-async-std-runtime = ["async-std"]
+tokio-runtime = ["tokio"]
 rocket-impl = [
     "rocket",
     "schemars",
@@ -27,7 +27,7 @@ redis-is-patched = ["revolt-presence/redis-is-patched"]
 voice = ["livekit-api", "livekit-protocol", "livekit-runtime"]
 
 # Default Features
-default = ["mongodb", "async-std-runtime", "tasks"]
+default = ["mongodb", "tokio-runtime", "tasks"]
 
 [dependencies]
 # Core
@@ -64,7 +64,7 @@ serde = { workspace = true }
 iso8601-timestamp = { workspace = true, features = ["serde", "bson"] }
 
 # Events
-redis-kiss = { workspace = true }
+redis-kiss = { workspace = true, default-features = false, features = ["tokio-runtime"] }
 
 # Database
 bson = { workspace = true, optional = true }
@@ -81,7 +81,7 @@ async-trait = { workspace = true }
 async-recursion = { workspace = true }
 
 # Async
-async-std = { workspace = true, features = ["attributes"], optional = true }
+tokio = { workspace = true, optional = true }
 
 # Axum Impl
 axum = { workspace = true, optional = true }
