@@ -111,7 +111,7 @@ aws-sdk-s3 = "1.46.0"
 axum-macros = "0.4.1"
 axum_typed_multipart = "0.12.1"
 axum = "0.7.5"
-axum-extra = "0.9"
+axum-extra = "0.12"
 tower-http = "0.5.2"
 
 # Rocket (HTTP server)
