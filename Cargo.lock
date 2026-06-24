@@ -996,7 +996,7 @@ checksum = "edca88bc138befd0323b20752846e6587272d3b03b0343c8ea28a6f819e6e71f"
 dependencies = [
  "async-trait",
  "axum-core",
- "axum-macros",
+ "axum-macros 0.4.2",
  "bytes",
  "futures-util",
  "http 1.4.2",
@@ -1074,6 +1074,17 @@ name = "axum-macros"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57d123550fa8d071b7255cb0cc04dc302baa6c8c4a79f55701552684d8399bce"
+dependencies = [
+ "proc-macro2",
+ "quote 1.0.46",
+ "syn 2.0.118",
+]
+
+[[package]]
+name = "axum-macros"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7aa268c23bfbbd2c4363b9cd302a4f504fb2a9dfe7e3451d66f35dd392e20aca"
 dependencies = [
  "proc-macro2",
  "quote 1.0.46",
@@ -7167,7 +7178,7 @@ name = "revolt-autumn"
 version = "0.13.7"
 dependencies = [
  "axum",
- "axum-macros",
+ "axum-macros 0.5.1",
  "axum_typed_multipart",
  "ffprobe",
  "image",
