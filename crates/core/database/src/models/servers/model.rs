@@ -414,6 +414,7 @@ impl Role {
                 (FieldsRole::Colour) colour,
                 hoist,
                 rank,
+                (FieldsRole::Icon) icon,
             )
         );
 

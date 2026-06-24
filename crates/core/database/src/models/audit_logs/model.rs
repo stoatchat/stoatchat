@@ -4,7 +4,7 @@ use iso8601_timestamp::Timestamp;
 use revolt_config::config;
 use ulid::Ulid;
 
-use crate::{Database, PartialChannel, PartialMember, PartialRole, PartialServer, User};
+use crate::{Database, PartialChannel, PartialMember, PartialRole, PartialServer, User, PartialEmoji};
 use revolt_models::v0;
 use revolt_permissions::OverrideField;
 use revolt_result::Result;
@@ -130,6 +130,11 @@ auto_derived!(
             emoji: String,
             name: String,
         },
+        EmojiUpdate {
+            emoji: String,
+            before: PartialEmoji,
+            after: PartialEmoji,
+        },
         EmojiDelete {
             emoji: String,
             name: String,
@@ -250,6 +255,7 @@ impl AuditLogEntry {
                 AuditLogEntryAction::WebhookCreate { .. } => {}
                 AuditLogEntryAction::WebhookDelete { .. } => {}
                 AuditLogEntryAction::EmojiCreate { .. } => {}
+                AuditLogEntryAction::EmojiUpdate { .. } => {}
                 AuditLogEntryAction::EmojiDelete { .. } => {}
             };
         }

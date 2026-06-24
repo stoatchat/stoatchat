@@ -1536,6 +1536,15 @@ impl From<crate::AuditLogEntryAction> for AuditLogEntryAction {
             crate::AuditLogEntryAction::EmojiCreate { emoji, name } => {
                 AuditLogEntryAction::EmojiCreate { emoji, name }
             }
+            crate::AuditLogEntryAction::EmojiUpdate {
+                emoji,
+                before,
+                after,
+            } => AuditLogEntryAction::EmojiUpdate {
+                emoji,
+                before: before.into(),
+                after: after.into(),
+            },
             crate::AuditLogEntryAction::EmojiDelete { emoji, name } => {
                 AuditLogEntryAction::EmojiDelete { emoji, name }
             }
@@ -1663,5 +1672,11 @@ impl From<WebPushSubscription> for crate::WebPushSubscription {
             p256dh: value.p256dh,
             auth: value.auth,
         }
+    }
+}
+
+impl From<crate::PartialEmoji> for PartialEmoji {
+    fn from(value: crate::PartialEmoji) -> Self {
+        PartialEmoji { name: value.name }
     }
 }

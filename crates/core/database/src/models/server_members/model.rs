@@ -255,6 +255,7 @@ impl Member {
                 (FieldsMember::Nickname) nickname,
                 (FieldsMember::Avatar) avatar,
                 (FieldsMember::Timeout) timeout,
+                (FieldsMember::Pronouns) pronouns,
                 ((default) FieldsMember::Roles) roles,
                 ((default) FieldsMember::CanPublish) can_publish,
                 ((default) FieldsMember::CanReceive) can_receive,

@@ -1,4 +1,4 @@
-use crate::v0::{Member, PartialChannel, PartialMember, PartialRole, PartialServer, User};
+use crate::v0::{Member, PartialChannel, PartialEmoji, PartialMember, PartialRole, PartialServer, User};
 use revolt_permissions::Override;
 
 auto_derived!(
@@ -116,6 +116,11 @@ auto_derived!(
         EmojiCreate {
             emoji: String,
             name: String,
+        },
+        EmojiUpdate {
+            emoji: String,
+            before: PartialEmoji,
+            after: PartialEmoji,
         },
         EmojiDelete {
             emoji: String,

@@ -16,7 +16,7 @@ static PERMISSIBLE_EMOJIS: Lazy<HashSet<String>> = Lazy::new(|| {
         .collect()
 });
 
-auto_derived!(
+auto_derived_partial!(
     /// Emoji
     pub struct Emoji {
         /// Unique Id
@@ -34,19 +34,16 @@ auto_derived!(
         /// Whether the emoji is marked as nsfw
         #[serde(skip_serializing_if = "crate::if_false", default)]
         pub nsfw: bool,
-    }
+    },
+    "PartialEmoji"
+);
 
+auto_derived!(
     /// Parent Id of the emoji
     #[serde(tag = "type")]
     pub enum EmojiParent {
         Server { id: String },
         Detached,
-    }
-
-    /// Partial representation of an emoji
-    pub struct PartialEmoji {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub name: Option<String>,
     }
 );
 
@@ -111,5 +108,19 @@ impl Emoji {
             let sanitized_emoji = emoji.replace('\u{FE0F}', "");
             Ok(PERMISSIBLE_EMOJIS.contains(&sanitized_emoji))
         }
+    }
+
+    /// Generates a PartialEmoji containing the data which has changed in an update
+    pub fn generate_diff(&self, partial: &PartialEmoji) -> PartialEmoji {
+        let mut before = PartialEmoji::default();
+
+        generate_diff!(
+            self, before, partial, remove,
+            (
+                name,
+            )
+        );
+
+        before
     }
 }
