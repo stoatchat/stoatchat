@@ -221,6 +221,9 @@ pub async fn edit(
                     v0::FieldsChannel::Voice => {
                         voice.take();
                     }
+                    v0::FieldsChannel::Slowmode => {
+                        slowmode.take();
+                    }
                     _ => {}
                 }
             }
