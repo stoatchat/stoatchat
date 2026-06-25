@@ -6,7 +6,7 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.head_ref || github.ref }}
+  group: rust-build-test-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 env:
