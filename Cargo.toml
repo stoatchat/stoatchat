@@ -151,10 +151,10 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = [
     "env-filter",
 ] } # consider https://crates.io/crates/better-tracing
-opentelemetry = { version = "0.31.0", features = ["logs"] }
-opentelemetry_sdk = { version = "0.31.0", features = ["logs"] }
-opentelemetry-otlp = { version = "0.31.0", features = ["logs"] }
-opentelemetry-appender-tracing = "0.31.1"
+opentelemetry = { version = "0.32.0", features = ["logs"] }
+opentelemetry_sdk = { version = "0.32.0", features = ["logs"] }
+opentelemetry-otlp = { version = "0.32.0", features = ["logs"] }
+opentelemetry-appender-tracing = "0.32.0"
 
 # RabbitMQ
 lapin = "4.7.1"
