@@ -185,7 +185,7 @@ lazy_static = "1.5.0"
 mime = "0.3.17"
 totp-lite = "2.0.0"
 rust-argon2 = "1.0.0"
-base32 = "0.4.0"
+base32 = "0.5.0"
 sha1 = "0.10.6"
 futures-lite = "2.6.1"
 
