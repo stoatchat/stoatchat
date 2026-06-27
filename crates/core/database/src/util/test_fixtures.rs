@@ -39,7 +39,9 @@ pub async fn load_fixture(db: &Database, input: &str) -> HashMap<String, String>
             LoadedFixture::User(user) => db.insert_user(&user).await.unwrap(),
             LoadedFixture::Channel(channel) => db.insert_channel(&channel).await.unwrap(),
             LoadedFixture::Server(server) => db.insert_server(&server).await.unwrap(),
-            LoadedFixture::ServerMember(member) => db.insert_member(&member).await.unwrap(),
+            LoadedFixture::ServerMember(member) => {
+                db.insert_or_merge_member(&member).await.unwrap();
+            }
         }
     }
 

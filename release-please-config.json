@@ -1,0 +1,157 @@
+{
+    "bootstrap-sha": "0cf4a8ecc41c7984ba3ee5664dd979c5f14b59b4",
+    "packages": {
+        ".": {
+            "changelog-path": "CHANGELOG.md",
+            "release-type": "simple",
+            "bump-minor-pre-major": false,
+            "bump-patch-for-minor-pre-major": false,
+            "draft": false,
+            "prerelease": false,
+            "include-component-in-tag": false,
+            "extra-files": [
+                {
+                    "type": "toml",
+                    "path": "crates/delta/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/bonfire/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/coalesced/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/config/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/database/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/files/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/models/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/parser/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/permissions/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/presence/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/ratelimits/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/core/result/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/daemons/crond/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/daemons/pushd/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/daemons/voice-ingress/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/services/autumn/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/services/gifbox/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/services/january/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "Cargo.toml",
+                    "jsonpath": "$.workspace.dependencies['revolt-coalesced'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "Cargo.toml",
+                    "jsonpath": "$.workspace.dependencies['revolt-config'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "Cargo.toml",
+                    "jsonpath": "$.workspace.dependencies['revolt-database'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "Cargo.toml",
+                    "jsonpath": "$.workspace.dependencies['revolt-files'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "Cargo.toml",
+                    "jsonpath": "$.workspace.dependencies['revolt-models'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "Cargo.toml",
+                    "jsonpath": "$.workspace.dependencies['revolt-parser'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "Cargo.toml",
+                    "jsonpath": "$.workspace.dependencies['revolt-permissions'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "Cargo.toml",
+                    "jsonpath": "$.workspace.dependencies['revolt-presence'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "Cargo.toml",
+                    "jsonpath": "$.workspace.dependencies['revolt-ratelimits'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "Cargo.toml",
+                    "jsonpath": "$.workspace.dependencies['revolt-result'].version"
+                }
+            ]
+        }
+    },
+    "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json"
+}

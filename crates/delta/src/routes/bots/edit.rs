@@ -10,11 +10,11 @@ use validator::Validate;
 ///
 /// Edit bot details by its id.
 #[openapi(tag = "Bots")]
-#[patch("/<target>", data = "<data>")]
+#[patch("/<bot_id>", data = "<data>")]
 pub async fn edit_bot(
     db: &State<Database>,
     user: User,
-    target: Reference,
+    bot_id: Reference<'_>,
     data: Json<DataEditBot>,
 ) -> Result<Json<v0::BotWithUserResponse>> {
     let data = data.into_inner();
@@ -24,7 +24,7 @@ pub async fn edit_bot(
         })
     })?;
 
-    let mut bot = target.as_bot(db).await?;
+    let mut bot = bot_id.as_bot(db).await?;
     if bot.owner != user.id {
         return Err(create_error!(NotFound));
     }
@@ -37,7 +37,7 @@ pub async fn edit_bot(
     if data.public.is_none()
         && data.analytics.is_none()
         && data.interactions_url.is_none()
-        && data.remove.is_none()
+        && data.remove.is_empty()
     {
         return Ok(Json(v0::BotWithUserResponse {
             bot: bot.into(),
@@ -64,7 +64,6 @@ pub async fn edit_bot(
         db,
         partial,
         remove
-            .unwrap_or_default()
             .into_iter()
             .map(|v| v.into())
             .collect(),
@@ -100,7 +99,7 @@ mod test {
             .body(
                 json!(v0::DataEditBot {
                     public: Some(true),
-                    remove: Some(vec![FieldsBot::Token]),
+                    remove: vec![FieldsBot::Token],
                     ..Default::default()
                 })
                 .to_string(),

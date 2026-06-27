@@ -17,7 +17,7 @@ use rocket::{serde::json::Json, State};
 pub async fn profile(
     db: &State<Database>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
 ) -> Result<Json<v0::UserProfile>> {
     if user.id == target.id {
         return Ok(Json(user.profile.map(Into::into).unwrap_or_default()));

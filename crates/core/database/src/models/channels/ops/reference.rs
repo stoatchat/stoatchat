@@ -2,6 +2,7 @@ use std::collections::hash_map::Entry;
 
 use super::AbstractChannels;
 use crate::ReferenceDb;
+use crate::util::ChunkedDatabaseGenerator;
 use crate::{Channel, FieldsChannel, PartialChannel};
 use revolt_permissions::OverrideField;
 use revolt_result::Result;
@@ -51,6 +52,23 @@ impl AbstractChannels for ReferenceDb {
             .collect())
     }
 
+    // Fetch all group dms for a user
+    async fn find_group_message_channels(&self, user_id: &str) -> Result<ChunkedDatabaseGenerator<Channel>> {
+        let channels = self.channels.lock().await;
+        let groups = channels
+            .values()
+            .filter(|channel| match channel {
+                Channel::Group { recipients, .. } => {
+                    recipients.iter().any(|recipient| recipient == user_id)
+                }
+                _ => false,
+            })
+            .cloned()
+            .collect();
+
+        Ok(ChunkedDatabaseGenerator::new_reference(groups))
+    }
+
     // Fetch saved messages channel
     async fn find_saved_messages_channel(&self, user_id: &str) -> Result<Channel> {
         let channels = self.channels.lock().await;
@@ -94,9 +112,6 @@ impl AbstractChannels for ReferenceDb {
             match &mut channel {
                 Channel::TextChannel {
                     role_permissions, ..
-                }
-                | Channel::VoiceChannel {
-                    role_permissions, ..
                 } => {
                     if role_permissions.get(role_id).is_some() {
                         role_permissions.remove(role_id);
@@ -134,15 +149,28 @@ impl AbstractChannels for ReferenceDb {
     // Remove a user from a group
     async fn remove_user_from_group(&self, channel: &str, user: &str) -> Result<()> {
         let mut channels = self.channels.lock().await;
-        if let Some(channel_data) = channels.get_mut(channel) {
-            if channel_data.users()?.contains(&String::from(user)) {
-                channel_data.users()?.retain(|x| x != user);
+        if let Some(Channel::Group { recipients, .. }) = channels.get_mut(channel) {
+            if let Some(index) = recipients.iter().position(|recipient| recipient == user) {
+                recipients.remove(index);
                 return Ok(());
             } else {
                 return Err(create_error!(NotFound));
             }
         }
         Err(create_error!(NotFound))
+    }
+
+    // Remove a user from all specified groups
+    async fn remove_user_from_groups(&self, channel_ids: Vec<String>, user_id: &str) -> Result<()> {
+        let mut channels = self.channels.lock().await;
+
+        for channel_id in channel_ids {
+            if let Some(Channel::Group { recipients, .. }) = channels.get_mut(&channel_id) {
+                recipients.retain(|recipient| recipient != user_id);
+            }
+        };
+
+        Ok(())
     }
 
     // Delete a channel

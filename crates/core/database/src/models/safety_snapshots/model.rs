@@ -85,8 +85,8 @@ impl SnapshotContent {
         Ok((
             SnapshotContent::Message {
                 message,
-                prior_context: prior_context.into_iter().map(Into::into).collect(),
-                leading_context: leading_context.into_iter().map(Into::into).collect(),
+                prior_context: prior_context.into_iter().collect(),
+                leading_context: leading_context.into_iter().collect(),
             },
             files,
         ))

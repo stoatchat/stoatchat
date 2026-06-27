@@ -18,9 +18,9 @@ use rocket_empty::EmptyResponse;
 pub async fn unreact_message(
     db: &State<Database>,
     user: User,
-    target: Reference,
-    msg: Reference,
-    emoji: Reference,
+    target: Reference<'_>,
+    msg: Reference<'_>,
+    emoji: Reference<'_>,
     options: v0::OptionsUnreact,
 ) -> Result<EmptyResponse> {
     let channel = target.as_channel(db).await?;
@@ -41,14 +41,14 @@ pub async fn unreact_message(
     // Check if we should wipe all of this reaction
     if remove_all {
         return message
-            .clear_reaction(db, &emoji.id)
+            .clear_reaction(db, emoji.id)
             .await
             .map(|_| EmptyResponse);
     }
 
     // Remove the reaction
     message
-        .remove_reaction(db, options.user_id.as_ref().unwrap_or(&user.id), &emoji.id)
+        .remove_reaction(db, options.user_id.as_ref().unwrap_or(&user.id), emoji.id)
         .await
         .map(|_| EmptyResponse)
 }

@@ -4,36 +4,45 @@ use logos::Logos;
 
 #[derive(Debug, Clone, Logos, PartialEq)]
 #[logos(skip "\n")]
-pub enum MessageToken {
+#[logos(subpattern id="[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}")]
+pub enum MessageToken<'a> {
     #[token("\\")]
     Escape,
-    #[regex("(```[^`\n]*)|(``)|`", |lex| lex.slice().to_owned().chars().filter(|&c| c == '`').count())]
+    #[regex("```[^`\n]*", |_| 3)]
+    #[regex("``", |_| 2)]
+    #[regex("`", |_| 1)]
     CodeblockMarker(usize),
-    #[regex("<@[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}>", |lex| lex.slice()[2..lex.slice().len() - 1].to_owned())]
-    UserMention(String),
-    #[regex("<%[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}>", |lex| lex.slice()[2..lex.slice().len() - 1].to_owned())]
-    RoleMention(String),
+    #[regex("<@(?&id)>", |lex| &lex.slice()[2..lex.slice().len() - 1])]
+    UserMention(&'a str),
+    #[regex("<%(?&id)>", |lex| &lex.slice()[2..lex.slice().len() - 1],)]
+    RoleMention(&'a str),
+    #[regex("<#(?&id)>", |lex| &lex.slice()[2..lex.slice().len() - 1],)]
+    ChannelMention(&'a str),
+    #[regex(":(?&id):", |lex| &lex.slice()[1..lex.slice().len() - 1],)]
+    Emoji(&'a str),
     #[token("@everyone")]
     MentionEveryone,
     #[token("@online")]
-    MentionOnline
+    MentionOnline,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MessageResults {
     pub user_mentions: HashSet<String>,
     pub role_mentions: HashSet<String>,
+    pub channel_mentions: HashSet<String>,
+    pub emojis: HashSet<String>,
     pub mentions_everyone: bool,
-    pub mentions_online: bool
+    pub mentions_online: bool,
 }
 
-struct MessageParserIterator<I> {
+struct MessageParserIterator<'a, I> {
     inner: I,
-    temp: VecDeque<MessageToken>
+    temp: VecDeque<MessageToken<'a>>,
 }
 
-impl<I: Iterator<Item = MessageToken>> Iterator for MessageParserIterator<I> {
-    type Item = MessageToken;
+impl<'a, I: Iterator<Item = MessageToken<'a>>> Iterator for MessageParserIterator<'a, I> {
+    type Item = MessageToken<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if !self.temp.is_empty() {
@@ -52,11 +61,11 @@ impl<I: Iterator<Item = MessageToken>> Iterator for MessageParserIterator<I> {
                     if next_token == Some(MessageToken::CodeblockMarker(ty)) {
                         self.temp.clear();
                         self.temp.push_back(MessageToken::CodeblockMarker(ty));
-                        break next_token
+                        break next_token;
                     } else if let Some(token) = next_token {
                         self.temp.push_back(token);
                     } else {
-                        break Some(MessageToken::CodeblockMarker(ty))
+                        break Some(MessageToken::CodeblockMarker(ty));
                     }
                 }
             } else {
@@ -66,10 +75,10 @@ impl<I: Iterator<Item = MessageToken>> Iterator for MessageParserIterator<I> {
     }
 }
 
-pub fn parse_message_iter(text: &str) -> impl Iterator<Item = MessageToken> + '_ {
+pub fn parse_message_iter(text: &str) -> impl Iterator<Item = MessageToken<'_>> + '_ {
     MessageParserIterator {
         inner: MessageToken::lexer(text).flatten(),
-        temp: VecDeque::new()
+        temp: VecDeque::new(),
     }
 }
 
@@ -79,13 +88,23 @@ pub fn parse_message(text: &str) -> MessageResults {
     for token in parse_message_iter(text) {
         match token {
             MessageToken::Escape => {}
-            MessageToken::CodeblockMarker(_) => {},
-            MessageToken::UserMention(id) => { results.user_mentions.insert(id); },
-            MessageToken::RoleMention(id) => { results.role_mentions.insert(id); },
+            MessageToken::CodeblockMarker(_) => {}
+            MessageToken::UserMention(id) => {
+                results.user_mentions.insert(id.to_string());
+            }
+            MessageToken::RoleMention(id) => {
+                results.role_mentions.insert(id.to_string());
+            }
+            MessageToken::ChannelMention(id) => {
+                results.channel_mentions.insert(id.to_string());
+            }
+            MessageToken::Emoji(id) => {
+                results.emojis.insert(id.to_string());
+            }
             MessageToken::MentionEveryone => results.mentions_everyone = true,
             MessageToken::MentionOnline => results.mentions_online = true,
         };
-    };
+    }
 
     results
 }
@@ -106,7 +125,10 @@ mod tests {
         let output = parse_message_iter("Hello <@01FD58YK5W7QRV5H3D64KTQYX3>.").collect::<Vec<_>>();
 
         assert_eq!(output.len(), 1);
-        assert_eq!(output[0], MessageToken::UserMention("01FD58YK5W7QRV5H3D64KTQYX3".to_string()));
+        assert_eq!(
+            output[0],
+            MessageToken::UserMention("01FD58YK5W7QRV5H3D64KTQYX3")
+        );
     }
 
     #[test]
@@ -114,7 +136,10 @@ mod tests {
         let output = parse_message_iter("Hello <%01FD58YK5W7QRV5H3D64KTQYX3>.").collect::<Vec<_>>();
 
         assert_eq!(output.len(), 1);
-        assert_eq!(output[0], MessageToken::RoleMention("01FD58YK5W7QRV5H3D64KTQYX3".to_string()));
+        assert_eq!(
+            output[0],
+            MessageToken::RoleMention("01FD58YK5W7QRV5H3D64KTQYX3")
+        );
     }
 
     #[test]
@@ -135,29 +160,57 @@ mod tests {
 
     #[test]
     fn test_everything() {
-        let output = parse_message_iter("Hello <@01FD58YK5W7QRV5H3D64KTQYX3>, <%01FD58YK5W7QRV5H3D64KTQYX3>, @everyone and @online.").collect::<Vec<_>>();
+        let output = parse_message_iter("Hello <@01FD58YK5W7QRV5H3D64KTQYX3>, <%01FD58YK5W7QRV5H3D64KTQYX3>, <#01FD58YK5W7QRV5H3D64KTQYX3> @everyone and @online. :01FD58YK5W7QRV5H3D64KTQYX3:").collect::<Vec<_>>();
 
-        assert_eq!(output.len(), 4);
-        assert_eq!(output[0], MessageToken::UserMention("01FD58YK5W7QRV5H3D64KTQYX3".to_string()));
-        assert_eq!(output[1], MessageToken::RoleMention("01FD58YK5W7QRV5H3D64KTQYX3".to_string()));
-        assert_eq!(output[2], MessageToken::MentionEveryone);
-        assert_eq!(output[3], MessageToken::MentionOnline);
+        assert_eq!(output.len(), 6);
+        assert_eq!(
+            output[0],
+            MessageToken::UserMention("01FD58YK5W7QRV5H3D64KTQYX3")
+        );
+        assert_eq!(
+            output[1],
+            MessageToken::RoleMention("01FD58YK5W7QRV5H3D64KTQYX3")
+        );
+        assert_eq!(
+            output[2],
+            MessageToken::ChannelMention("01FD58YK5W7QRV5H3D64KTQYX3")
+        );
+        assert_eq!(output[3], MessageToken::MentionEveryone);
+        assert_eq!(output[4], MessageToken::MentionOnline);
+        assert_eq!(output[5], MessageToken::Emoji("01FD58YK5W7QRV5H3D64KTQYX3"));
     }
 
     #[test]
     fn test_everything_no_spaces() {
-        let output = parse_message_iter("<@01FD58YK5W7QRV5H3D64KTQYX3><%01FD58YK5W7QRV5H3D64KTQYX3>@everyone@online").collect::<Vec<_>>();
+        let output = parse_message_iter(
+            "<@01FD58YK5W7QRV5H3D64KTQYX3><%01FD58YK5W7QRV5H3D64KTQYX3><#01FD58YK5W7QRV5H3D64KTQYX3>@everyone@online:01FD58YK5W7QRV5H3D64KTQYX3:",
+        )
+        .collect::<Vec<_>>();
 
-        assert_eq!(output.len(), 4);
-        assert_eq!(output[0], MessageToken::UserMention("01FD58YK5W7QRV5H3D64KTQYX3".to_string()));
-        assert_eq!(output[1], MessageToken::RoleMention("01FD58YK5W7QRV5H3D64KTQYX3".to_string()));
-        assert_eq!(output[2], MessageToken::MentionEveryone);
-        assert_eq!(output[3], MessageToken::MentionOnline);
+        assert_eq!(output.len(), 6);
+        assert_eq!(
+            output[0],
+            MessageToken::UserMention("01FD58YK5W7QRV5H3D64KTQYX3")
+        );
+        assert_eq!(
+            output[1],
+            MessageToken::RoleMention("01FD58YK5W7QRV5H3D64KTQYX3")
+        );
+        assert_eq!(
+            output[2],
+            MessageToken::ChannelMention("01FD58YK5W7QRV5H3D64KTQYX3")
+        );
+        assert_eq!(output[3], MessageToken::MentionEveryone);
+        assert_eq!(output[4], MessageToken::MentionOnline);
+        assert_eq!(output[5], MessageToken::Emoji("01FD58YK5W7QRV5H3D64KTQYX3"));
     }
 
     #[test]
     fn test_codeblock_no_mentions() {
-        let output = parse_message_iter("```\n<@01FD58YK5W7QRV5H3D64KTQYX3><%01FD58YK5W7QRV5H3D64KTQYX3>@everyone@online\n```").collect::<Vec<_>>();
+        let output = parse_message_iter(
+            "```\n<@01FD58YK5W7QRV5H3D64KTQYX3><%01FD58YK5W7QRV5H3D64KTQYX3><#01FD58YK5W7QRV5H3D64KTQYX3>@everyone@online:01FD58YK5W7QRV5H3D64KTQYX3:\n```",
+        )
+        .collect::<Vec<_>>();
 
         assert_eq!(output.len(), 2);
         assert_eq!(output[0], MessageToken::CodeblockMarker(3));
@@ -166,20 +219,36 @@ mod tests {
 
     #[test]
     fn test_uncontained_codeblock_should_mention() {
-        let output = parse_message_iter("```\n<@01FD58YK5W7QRV5H3D64KTQYX3><%01FD58YK5W7QRV5H3D64KTQYX3>@everyone@online").collect::<Vec<_>>();
+        let output = parse_message_iter(
+            "```\n<@01FD58YK5W7QRV5H3D64KTQYX3><%01FD58YK5W7QRV5H3D64KTQYX3><#01FD58YK5W7QRV5H3D64KTQYX3>@everyone@online:01FD58YK5W7QRV5H3D64KTQYX3:",
+        )
+        .collect::<Vec<_>>();
 
-        assert_eq!(output.len(), 5);
+        assert_eq!(output.len(), 7);
         assert_eq!(output[0], MessageToken::CodeblockMarker(3));
-        assert_eq!(output[1], MessageToken::UserMention("01FD58YK5W7QRV5H3D64KTQYX3".to_string()));
-        assert_eq!(output[2], MessageToken::RoleMention("01FD58YK5W7QRV5H3D64KTQYX3".to_string()));
-        assert_eq!(output[3], MessageToken::MentionEveryone);
-        assert_eq!(output[4], MessageToken::MentionOnline);
+        assert_eq!(
+            output[1],
+            MessageToken::UserMention("01FD58YK5W7QRV5H3D64KTQYX3")
+        );
+        assert_eq!(
+            output[2],
+            MessageToken::RoleMention("01FD58YK5W7QRV5H3D64KTQYX3")
+        );
+        assert_eq!(
+            output[3],
+            MessageToken::ChannelMention("01FD58YK5W7QRV5H3D64KTQYX3")
+        );
+        assert_eq!(output[4], MessageToken::MentionEveryone);
+        assert_eq!(output[5], MessageToken::MentionOnline);
+        assert_eq!(output[6], MessageToken::Emoji("01FD58YK5W7QRV5H3D64KTQYX3"));
     }
 
     #[test]
     fn test_inline_codeblock_no_mentions() {
-
-        let output = parse_message_iter("`<@01FD58YK5W7QRV5H3D64KTQYX3><%01FD58YK5W7QRV5H3D64KTQYX3>@everyone@online`").collect::<Vec<_>>();
+        let output = parse_message_iter(
+            "`<@01FD58YK5W7QRV5H3D64KTQYX3><%01FD58YK5W7QRV5H3D64KTQYX3><#01FD58YK5W7QRV5H3D64KTQYX3>@everyone@online:01FD58YK5W7QRV5H3D64KTQYX3:`",
+        )
+        .collect::<Vec<_>>();
 
         assert_eq!(output.len(), 2);
         assert_eq!(output[0], MessageToken::CodeblockMarker(1));
@@ -188,14 +257,37 @@ mod tests {
 
     #[test]
     fn test_uncontained_inline_codeblock_should_mention() {
-        let output = parse_message_iter("`<@01FD58YK5W7QRV5H3D64KTQYX3><%01FD58YK5W7QRV5H3D64KTQYX3>@everyone@online").collect::<Vec<_>>();
+        let output = parse_message_iter(
+            "`<@01FD58YK5W7QRV5H3D64KTQYX3><%01FD58YK5W7QRV5H3D64KTQYX3><#01FD58YK5W7QRV5H3D64KTQYX3>@everyone@online:01FD58YK5W7QRV5H3D64KTQYX3:",
+        )
+        .collect::<Vec<_>>();
 
-        assert_eq!(output.len(), 5);
+        assert_eq!(output.len(), 7);
         assert_eq!(output[0], MessageToken::CodeblockMarker(1));
-        assert_eq!(output[1], MessageToken::UserMention("01FD58YK5W7QRV5H3D64KTQYX3".to_string()));
-        assert_eq!(output[2], MessageToken::RoleMention("01FD58YK5W7QRV5H3D64KTQYX3".to_string()));
-        assert_eq!(output[3], MessageToken::MentionEveryone);
-        assert_eq!(output[4], MessageToken::MentionOnline);
+        assert_eq!(
+            output[1],
+            MessageToken::UserMention("01FD58YK5W7QRV5H3D64KTQYX3")
+        );
+        assert_eq!(
+            output[2],
+            MessageToken::RoleMention("01FD58YK5W7QRV5H3D64KTQYX3")
+        );
+        assert_eq!(
+            output[3],
+            MessageToken::ChannelMention("01FD58YK5W7QRV5H3D64KTQYX3")
+        );
+        assert_eq!(output[4], MessageToken::MentionEveryone);
+        assert_eq!(output[5], MessageToken::MentionOnline);
+        assert_eq!(output[6], MessageToken::Emoji("01FD58YK5W7QRV5H3D64KTQYX3"));
+    }
+
+    #[test]
+    fn test_codeblock_with_language_no_mentions() {
+        let output = parse_message_iter("```rust\n<@01FD58YK5W7QRV5H3D64KTQYX3><%01FD58YK5W7QRV5H3D64KTQYX3><#01FD58YK5W7QRV5H3D64KTQYX3>@everyone@online:01FD58YK5W7QRV5H3D64KTQYX3:```").collect::<Vec<_>>();
+
+        assert_eq!(output.len(), 2);
+        assert_eq!(output[0], MessageToken::CodeblockMarker(3));
+        assert_eq!(output[1], MessageToken::CodeblockMarker(3));
     }
 
     #[test]
@@ -209,7 +301,8 @@ mod tests {
 
     #[test]
     fn test_double_inline_codeblock_with_backticks_inside() {
-        let output = parse_message_iter("``this `should` not `ping` @everyone``").collect::<Vec<_>>();
+        let output =
+            parse_message_iter("``this `should` not `ping` @everyone``").collect::<Vec<_>>();
 
         assert_eq!(output.len(), 2);
         assert_eq!(output[0], MessageToken::CodeblockMarker(2));
@@ -227,7 +320,8 @@ mod tests {
 
     #[test]
     fn test_escaped_codeblock() {
-        let output = parse_message_iter("i am ~~not~~ pinging \\`@everyone` ok.").collect::<Vec<_>>();
+        let output =
+            parse_message_iter("i am ~~not~~ pinging \\`@everyone` ok.").collect::<Vec<_>>();
 
         assert_eq!(output.len(), 3);
         assert_eq!(output[0], MessageToken::Escape);

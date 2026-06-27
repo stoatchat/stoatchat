@@ -1,15 +1,19 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, RemovalIntention, ServerBan, User,
+    voice::{
+        get_user_voice_channel_in_server, remove_user_from_voice_channel, UserVoiceChannel,
+        VoiceClient,
+    },
+    Database, Message, RemovalIntention, ServerBan, User,
 };
 use revolt_models::v0;
+use std::time::{Duration, SystemTime};
 
-use revolt_permissions::{
-    calculate_channel_permissions, calculate_server_permissions, ChannelPermission,
-};
+use revolt_database::events::client::EventV1;
+use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
-use serde::{Deserialize, Serialize};
+use ulid::Ulid;
 use validator::Validate;
 
 /// # Ban User
@@ -19,9 +23,10 @@ use validator::Validate;
 #[put("/<server>/bans/<target>", data = "<data>")]
 pub async fn ban(
     db: &State<Database>,
+    voice_client: &State<VoiceClient>,
     user: User,
-    server: Reference,
-    target: Reference,
+    server: Reference<'_>,
+    target: Reference<'_>,
     data: Json<v0::DataBanCreate>,
 ) -> Result<Json<v0::ServerBan>> {
     let data = data.into_inner();
@@ -57,9 +62,30 @@ pub async fn ban(
         member
             .remove(db, &server, RemovalIntention::Ban, false)
             .await?;
-    }
 
-    ServerBan::create(db, &server, &target.id, data.reason)
+        // If the member is in a voice channel while banned kick them from the voice channel
+        if let Some(channel_id) = get_user_voice_channel_in_server(target.id, &server.id).await? {
+            remove_user_from_voice_channel(
+                voice_client,
+                &UserVoiceChannel {
+                    id: channel_id,
+                    server_id: Some(server.id.clone()),
+                },
+                target.id,
+            )
+            .await?;
+        }
+    }
+    // We do this outside the member check so we can sweep hit-and-run spammers who already left.
+    if let Some(seconds) = data.delete_message_seconds {
+        if seconds > 0 {
+            let threshold_time = SystemTime::now() - Duration::from_secs(seconds as u64);
+
+            Message::bulk_delete_by_author_since(db, &server.channels, target.id, threshold_time)
+                .await?;
+        }
+    }
+    ServerBan::create(db, &server, target.id, data.reason)
         .await
         .map(Into::into)
         .map(Json)

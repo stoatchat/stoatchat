@@ -17,8 +17,8 @@ pub async fn add_member(
     db: &State<Database>,
     amqp: &State<AMQP>,
     user: User,
-    group_id: Reference,
-    member_id: Reference,
+    group_id: Reference<'_>,
+    member_id: Reference<'_>,
 ) -> Result<EmptyResponse> {
     if user.bot.is_some() {
         return Err(create_error!(IsBot));

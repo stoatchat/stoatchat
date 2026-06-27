@@ -2,6 +2,7 @@ use revolt_result::Result;
 
 use crate::Snapshot;
 
+#[cfg(feature = "mongodb")]
 mod mongodb;
 mod reference;
 

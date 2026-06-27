@@ -8,10 +8,18 @@ pub use server::*;
 pub use user::*;
 
 /// Holds a permission value to manipulate.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PermissionValue(u64);
 
 impl PermissionValue {
+    pub fn from_raw(value: u64) -> Self {
+        Self(value)
+    }
+
+    pub fn into_raw(self) -> u64 {
+        self.0
+    }
+
     /// Apply a given override to this value
     pub fn apply(&mut self, v: Override) {
         self.allow(v.allow);

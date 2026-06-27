@@ -1,0 +1,10 @@
+{
+    "label": "Events",
+    "position": 2,
+    "link": {
+        "type": "generated-index",
+        "description": "Connecting and using the Stoat gateway"
+    },
+    "collapsed": false,
+    "collapsible": true
+}

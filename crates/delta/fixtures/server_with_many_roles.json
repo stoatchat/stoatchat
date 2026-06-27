@@ -1,0 +1,118 @@
+[
+  {
+    "_object_type": "User",
+    "_id": "__ID:0__",
+    "username": "Owner",
+    "last_acknowledged_policy_change": "2025-06-07T04:04:48+0000",
+    "discriminator": "0001"
+  },
+  {
+    "_object_type": "User",
+    "_id": "__ID:1__",
+    "username": "Moderator",
+    "last_acknowledged_policy_change": "2025-06-07T04:04:48+0000",
+    "discriminator": "0001"
+  },
+  {
+    "_object_type": "User",
+    "_id": "__ID:2__",
+    "username": "User",
+    "last_acknowledged_policy_change": "2025-06-07T04:04:48+0000",
+    "discriminator": "0001"
+  },
+  {
+    "_object_type": "Channel",
+    "_id": "__ID:3__",
+    "channel_type": "TextChannel",
+    "name": "General",
+    "server": "__ID:4__",
+    "default_permissions": {
+      "a": 0,
+      "d": 1048576
+    },
+    "role_permissions": {
+      "__ID:5__": {
+        "a": 1048576,
+        "d": 0
+      }
+    }
+  },
+  {
+    "_object_type": "Server",
+    "_id": "__ID:4__",
+    "owner": "__ID:0__",
+    "name": "Server",
+    "channels": [
+      "__ID:3__"
+    ],
+    "roles": {
+      "__ID:5__": {
+        "_id": "__ID:5__",
+        "name": "Moderator",
+        "permissions": {
+          "a": 545270216,
+          "d": 0
+        },
+        "rank": 1
+      },
+      "__ID:6__": {
+        "_id": "__ID:6__",
+        "name": "Owner",
+        "permissions": {
+          "a": 0,
+          "d": 0
+        },
+        "rank": 0
+      },
+      "__ID:7__": {
+        "_id": "__ID:7__",
+        "name": "Lower Rank 1",
+        "permissions": {
+          "a": 0,
+          "d": 0
+        },
+        "rank": 2
+      },
+      "__ID:8__": {
+        "_id": "__ID:8__",
+        "name": "Lower Rank 2",
+        "permissions": {
+          "a": 0,
+          "d": 0
+        },
+        "rank": 2
+      }
+    },
+    "default_permissions": 4000322560
+  },
+  {
+    "_object_type": "ServerMember",
+    "_id": {
+      "user": "__ID:0__",
+      "server": "__ID:4__"
+    },
+    "roles": [
+      "__ID:6__"
+    ],
+    "joined_at": 1698318340195
+  },
+  {
+    "_object_type": "ServerMember",
+    "_id": {
+      "user": "__ID:1__",
+      "server": "__ID:4__"
+    },
+    "roles": [
+      "__ID:5__"
+    ],
+    "joined_at": 1698318340195
+  },
+  {
+    "_object_type": "ServerMember",
+    "_id": {
+      "user": "__ID:2__",
+      "server": "__ID:4__"
+    },
+    "joined_at": 1698318340195
+  }
+]

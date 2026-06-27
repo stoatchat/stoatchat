@@ -2,6 +2,7 @@ use revolt_result::Result;
 
 use crate::{FieldsWebhook, PartialWebhook, Webhook};
 
+#[cfg(feature = "mongodb")]
 mod mongodb;
 mod reference;
 

@@ -1,0 +1,10 @@
+{
+    "label": "Backend",
+    "position": 10,
+    "link": {
+        "type": "generated-index",
+        "description": "Building the Stoat software"
+    },
+    "collapsed": false,
+    "collapsible": true
+}

@@ -15,7 +15,7 @@ use validator::Validate;
 #[patch("/<webhook_id>", data = "<data>")]
 pub async fn webhook_edit(
     db: &State<Database>,
-    webhook_id: Reference,
+    webhook_id: Reference<'_>,
     user: User,
     data: Json<DataEditWebhook>,
 ) -> Result<Json<Webhook>> {

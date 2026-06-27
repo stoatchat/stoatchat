@@ -1,6 +1,6 @@
 use revolt_result::Result;
 
-use crate::Emoji;
+use crate::{Emoji, PartialEmoji};
 use crate::EmojiParent;
 use crate::ReferenceDb;
 
@@ -52,6 +52,19 @@ impl AbstractEmojis for ReferenceDb {
             })
             .cloned()
             .collect())
+    }
+
+    /// Update emoji with new information
+    async fn update_emoji(&self, emoji_id: &str, partial: &PartialEmoji) -> Result<()> {
+        let mut emojis = self.emojis.lock().await;
+        if let Some(emoji) = emojis.get_mut(emoji_id) {
+            if let Some(name) = partial.name.clone() {
+                emoji.name = name;
+            }
+            Ok(())
+        } else {
+            Err(create_error!(NotFound))
+        }
     }
 
     /// Detach an emoji by its id

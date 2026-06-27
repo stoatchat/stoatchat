@@ -5,7 +5,7 @@ use revolt_result::{create_error, Result};
 #[cfg(feature = "rocket-impl")]
 use revolt_result::Error;
 
-use async_std::sync::Mutex;
+use tokio::sync::Mutex;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
@@ -54,7 +54,7 @@ use revolt_rocket_okapi::{
 use schemars::schema::{InstanceType, SchemaObject, SingleOrVec};
 
 #[cfg(feature = "rocket-impl")]
-impl<'r> OpenApiFromRequest<'r> for IdempotencyKey {
+impl OpenApiFromRequest<'_> for IdempotencyKey {
     fn from_request_input(
         _gen: &mut OpenApiGenerator,
         _name: String,

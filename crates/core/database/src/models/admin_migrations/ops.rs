@@ -1,3 +1,4 @@
+#[cfg(feature = "mongodb")]
 mod mongodb;
 mod reference;
 

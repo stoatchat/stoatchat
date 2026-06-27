@@ -132,8 +132,8 @@ auto_derived!(
         #[cfg_attr(feature = "validator", validate(length(min = 1, max = 2048)))]
         pub interactions_url: Option<String>,
         /// Fields to remove from bot object
-        #[cfg_attr(feature = "validator", validate(length(min = 1)))]
-        pub remove: Option<Vec<FieldsBot>>,
+        #[cfg_attr(feature = "serde", serde(default))]
+        pub remove: Vec<FieldsBot>,
     }
 
     /// Where we are inviting a bot to

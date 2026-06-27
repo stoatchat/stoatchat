@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Check project with clippy"
+set -e
+
+cargo clippy

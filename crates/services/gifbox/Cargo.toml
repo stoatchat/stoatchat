@@ -1,0 +1,40 @@
+[package]
+name = "revolt-gifbox"
+version = "0.13.7"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[dependencies]
+# Serialisation
+serde = { workspace = true, features = ["rc"] }
+serde_json = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true, features = [] }
+
+# Web requests
+reqwest = { workspace = true, features = ["json", "query"] }
+
+# Core crates
+revolt-config = { workspace = true }
+revolt-models = { workspace = true }
+revolt-result = { workspace = true, features = ["utoipa", "axum"] }
+revolt-coalesced = { workspace = true, features = ["queue"] }
+revolt-database = { workspace = true, features = ["axum-impl"] }
+revolt-ratelimits = { workspace = true, features = ["axum"] }
+
+# Axum / web server
+axum = { workspace = true }
+axum-extra = { workspace = true, features = ["typed-header"] }
+tower-http = { workspace = true, features = ["cors"] }
+
+# OpenAPI & documentation generation
+utoipa-scalar = { workspace = true, features = ["axum"] }
+utoipa = { workspace = true, features = ["axum_extras", "ulid"] }
+
+# Logging
+tracing = { workspace = true }
+
+# Utils
+lru_time_cache = { workspace = true }

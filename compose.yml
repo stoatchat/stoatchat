@@ -8,18 +8,33 @@ services:
   # MongoDB
   database:
     image: mongo
+    command: mongod --replSet rs0
     ports:
       - "27017:27017"
     volumes:
       - ./.data/db:/data/db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'127.0.0.1:27017'}]}) }" | mongosh --port 27017 --quiet
+      interval: 5s
+      timeout: 30s
+      start_period: 0s
+      start_interval: 1s
+      retries: 30
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   # MinIO
   minio:
-    image: minio/minio
-    command: server /data
+    image: firstfinger/minio:latest
+    #command: server /data
     environment:
       MINIO_ROOT_USER: minioautumn
       MINIO_ROOT_PASSWORD: minioautumn
+      MINIO_REGION: minio
     volumes:
       - ./.data/minio:/data
     ports:
@@ -34,13 +49,13 @@ services:
       - minio
     entrypoint: >
       /bin/sh -c "while ! /usr/bin/mc ready minio; do
-        /usr/bin/mc config host add minio http://minio:9000 minioautumn minioautumn;
+        /usr/bin/mc alias set minio http://minio:9000 minioautumn minioautumn;
         echo 'Waiting minio...' && sleep 1;
       done; /usr/bin/mc mb minio/revolt-uploads; exit 0;"
 
   # Rabbit
   rabbit:
-    image: rabbitmq:3-management
+    image: rabbitmq:4-management
     environment:
       RABBITMQ_DEFAULT_USER: rabbituser
       RABBITMQ_DEFAULT_PASS: rabbitpass
@@ -55,7 +70,7 @@ services:
 
   # Mock SMTP server
   maildev:
-    image: soulteary/maildev
+    image: maildev/maildev
     ports:
       - "14025:25"
       - "14080:8080"
@@ -64,3 +79,10 @@ services:
       MAILDEV_WEB_PORT: 8080
       MAILDEV_INCOMING_USER: smtp
       MAILDEV_INCOMING_PASS: smtp
+
+  livekit:
+    image: ghcr.io/stoatchat/livekit-server:v1.9.13
+    command: --config /etc/livekit.yml
+    network_mode: "host"
+    volumes:
+      - ./livekit.yml:/etc/livekit.yml

@@ -3,18 +3,21 @@
     "_object_type": "User",
     "_id": "__ID:0__",
     "username": "Owner",
+    "last_acknowledged_policy_change": "2025-06-07T04:04:48+0000",
     "discriminator": "0001"
   },
   {
     "_object_type": "User",
     "_id": "__ID:1__",
     "username": "Moderator",
+    "last_acknowledged_policy_change": "2025-06-07T04:04:48+0000",
     "discriminator": "0001"
   },
   {
     "_object_type": "User",
     "_id": "__ID:2__",
     "username": "User",
+    "last_acknowledged_policy_change": "2025-06-07T04:04:48+0000",
     "discriminator": "0001"
   },
   {
@@ -39,17 +42,21 @@
     "_id": "__ID:4__",
     "owner": "__ID:0__",
     "name": "Server",
-    "channels": ["__ID:3__"],
+    "channels": [
+      "__ID:3__"
+    ],
     "roles": {
       "__ID:5__": {
+        "_id": "__ID:5__",
         "name": "Moderator",
         "permissions": {
           "a": 545270208,
           "d": 0
         },
-        "rank": 3
+        "rank": 1
       },
       "__ID:6__": {
+        "_id": "__ID:6__",
         "name": "Owner",
         "permissions": {
           "a": 0,
@@ -66,7 +73,9 @@
       "user": "__ID:0__",
       "server": "__ID:4__"
     },
-    "roles": ["__ID:6__"],
+    "roles": [
+      "__ID:6__"
+    ],
     "joined_at": 1698318340195
   },
   {
@@ -75,7 +84,9 @@
       "user": "__ID:1__",
       "server": "__ID:4__"
     },
-    "roles": ["__ID:5__"],
+    "roles": [
+      "__ID:5__"
+    ],
     "joined_at": 1698318340195
   },
   {

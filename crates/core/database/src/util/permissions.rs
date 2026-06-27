@@ -105,7 +105,7 @@ impl PermissionQuery for DatabasePermissionQuery<'_> {
                 .unwrap_or_default();
 
             self.cached_mutual_connection = Some(value);
-            matches!(value, true)
+            value
         } else {
             false
         }
@@ -186,9 +186,26 @@ impl PermissionQuery for DatabasePermissionQuery<'_> {
         }
     }
 
+    async fn do_we_have_publish_overwrites(&mut self) -> bool {
+        if let Some(member) = &self.member {
+            member.can_publish
+        } else {
+            true
+        }
+    }
+
+    async fn do_we_have_receive_overwrites(&mut self) -> bool {
+        if let Some(member) = &self.member {
+            member.can_receive
+        } else {
+            true
+        }
+    }
+
     // * For calculating channel permission
 
     /// Get the type of the channel
+    #[allow(deprecated)]
     async fn get_channel_type(&mut self) -> ChannelType {
         if let Some(channel) = &self.channel {
             match channel {
@@ -200,9 +217,7 @@ impl PermissionQuery for DatabasePermissionQuery<'_> {
                 Cow::Borrowed(Channel::SavedMessages { .. })
                 | Cow::Owned(Channel::SavedMessages { .. }) => ChannelType::SavedMessages,
                 Cow::Borrowed(Channel::TextChannel { .. })
-                | Cow::Owned(Channel::TextChannel { .. })
-                | Cow::Borrowed(Channel::VoiceChannel { .. })
-                | Cow::Owned(Channel::VoiceChannel { .. }) => ChannelType::ServerChannel,
+                | Cow::Owned(Channel::TextChannel { .. }) => ChannelType::ServerChannel,
             }
         } else {
             ChannelType::Unknown
@@ -226,14 +241,6 @@ impl PermissionQuery for DatabasePermissionQuery<'_> {
                 | Cow::Owned(Channel::TextChannel {
                     default_permissions,
                     ..
-                })
-                | Cow::Borrowed(Channel::VoiceChannel {
-                    default_permissions,
-                    ..
-                })
-                | Cow::Owned(Channel::VoiceChannel {
-                    default_permissions,
-                    ..
                 }) => default_permissions.unwrap_or_default().into(),
                 _ => Default::default(),
             }
@@ -250,12 +257,6 @@ impl PermissionQuery for DatabasePermissionQuery<'_> {
                     role_permissions, ..
                 })
                 | Cow::Owned(Channel::TextChannel {
-                    role_permissions, ..
-                })
-                | Cow::Borrowed(Channel::VoiceChannel {
-                    role_permissions, ..
-                })
-                | Cow::Owned(Channel::VoiceChannel {
                     role_permissions, ..
                 }) => {
                     if let Some(server) = &self.server {
@@ -340,16 +341,14 @@ impl PermissionQuery for DatabasePermissionQuery<'_> {
 
     /// Are we a recipient of this channel?
     async fn are_we_part_of_the_channel(&mut self) -> bool {
-        if let Some(channel) = &self.channel {
-            match channel {
-                Cow::Borrowed(Channel::DirectMessage { recipients, .. })
-                | Cow::Owned(Channel::DirectMessage { recipients, .. })
-                | Cow::Borrowed(Channel::Group { recipients, .. })
-                | Cow::Owned(Channel::Group { recipients, .. }) => {
-                    recipients.contains(&self.perspective.id)
-                }
-                _ => false,
-            }
+        if let Some(
+            Cow::Borrowed(Channel::DirectMessage { recipients, .. })
+            | Cow::Owned(Channel::DirectMessage { recipients, .. })
+            | Cow::Borrowed(Channel::Group { recipients, .. })
+            | Cow::Owned(Channel::Group { recipients, .. }),
+        ) = &self.channel
+        {
+            recipients.contains(&self.perspective.id)
         } else {
             false
         }
@@ -380,11 +379,10 @@ impl PermissionQuery for DatabasePermissionQuery<'_> {
     /// (this will only ever be called for server channels, use unimplemented!() for other code paths)
     async fn set_server_from_channel(&mut self) {
         if let Some(channel) = &self.channel {
+            #[allow(deprecated)]
             match channel {
                 Cow::Borrowed(Channel::TextChannel { server, .. })
-                | Cow::Owned(Channel::TextChannel { server, .. })
-                | Cow::Borrowed(Channel::VoiceChannel { server, .. })
-                | Cow::Owned(Channel::VoiceChannel { server, .. }) => {
+                | Cow::Owned(Channel::TextChannel { server, .. }) => {
                     if let Some(known_server) =
                         // I'm not sure why I can't just pattern match both at once here?
                         // It throws some weird error and the provided fix doesn't work :/
@@ -464,7 +462,7 @@ impl<'a> DatabasePermissionQuery<'a> {
     }
 
     /// Use user
-    pub fn user(self, user: &'a User) -> DatabasePermissionQuery {
+    pub fn user(self, user: &'a User) -> DatabasePermissionQuery<'a> {
         DatabasePermissionQuery {
             user: Some(Cow::Borrowed(user)),
             ..self
@@ -472,7 +470,7 @@ impl<'a> DatabasePermissionQuery<'a> {
     }
 
     /// Use channel
-    pub fn channel(self, channel: &'a Channel) -> DatabasePermissionQuery {
+    pub fn channel(self, channel: &'a Channel) -> DatabasePermissionQuery<'a> {
         DatabasePermissionQuery {
             channel: Some(Cow::Borrowed(channel)),
             ..self
@@ -480,7 +478,7 @@ impl<'a> DatabasePermissionQuery<'a> {
     }
 
     /// Use server
-    pub fn server(self, server: &'a Server) -> DatabasePermissionQuery {
+    pub fn server(self, server: &'a Server) -> DatabasePermissionQuery<'a> {
         DatabasePermissionQuery {
             server: Some(Cow::Borrowed(server)),
             ..self
@@ -495,7 +493,7 @@ impl<'a> DatabasePermissionQuery<'a> {
     }
 
     /// Use member
-    pub fn member(self, member: &'a Member) -> DatabasePermissionQuery {
+    pub fn member(self, member: &'a Member) -> DatabasePermissionQuery<'a> {
         DatabasePermissionQuery {
             member: Some(Cow::Borrowed(member)),
             ..self

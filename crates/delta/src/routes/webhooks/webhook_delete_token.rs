@@ -10,7 +10,7 @@ use rocket_empty::EmptyResponse;
 #[delete("/<webhook_id>/<token>")]
 pub async fn webhook_delete_token(
     db: &State<Database>,
-    webhook_id: Reference,
+    webhook_id: Reference<'_>,
     token: String,
 ) -> Result<EmptyResponse> {
     let webhook = webhook_id.as_webhook(db).await?;

@@ -37,6 +37,20 @@ pub struct GenericPayload {
     pub user: User,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DmCallPayload {
+    pub initiator_id: String,
+    pub channel_id: String,
+    pub started_at: Option<String>,
+    pub ended: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct InternalDmCallPayload {
+    pub payload: DmCallPayload,
+    pub recipients: Option<Vec<String>>,
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
 #[allow(clippy::large_enum_variant)]
@@ -46,6 +60,7 @@ pub enum PayloadKind {
     FRReceived(FRReceivedPayload),
     BadgeUpdate(usize),
     Generic(GenericPayload),
+    DmCallStartEnd(DmCallPayload),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -62,4 +77,12 @@ pub struct AckPayload {
     pub user_id: String,
     pub channel_id: String,
     pub message_id: String,
+}
+
+/// This is not the same as the AckPayload above, as the state for this event is stored in redis to allow for state updates while the event is queued.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AckEventPayload {
+    pub user_id: String,
+    pub channel_id: Option<String>,
+    pub server_id: Option<String>,
 }

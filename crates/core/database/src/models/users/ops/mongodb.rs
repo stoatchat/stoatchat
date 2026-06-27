@@ -1,5 +1,4 @@
 use ::mongodb::options::{Collation, CollationStrength, FindOneOptions, FindOptions};
-use authifier::models::Session;
 use futures::StreamExt;
 use revolt_result::Result;
 
@@ -44,17 +43,6 @@ impl AbstractUsers for MongoDb {
                 .build()
         )?
         .ok_or_else(|| create_error!(NotFound))
-    }
-
-    /// Fetch a session from the database by token
-    async fn fetch_session_by_token(&self, token: &str) -> Result<Session> {
-        self.col::<Session>("sessions")
-            .find_one(doc! {
-                "token": token
-            })
-            .await
-            .map_err(|_| create_database_error!("find_one", "sessions"))?
-            .ok_or_else(|| create_error!(InvalidSession))
     }
 
     /// Fetch multiple users by their ids
@@ -211,16 +199,34 @@ impl AbstractUsers for MongoDb {
         partial: &PartialUser,
         remove: Vec<FieldsUser>,
     ) -> Result<()> {
-        query!(
-            self,
-            update_one_by_id,
-            COL,
-            id,
-            partial,
-            remove.iter().map(|x| x as &dyn IntoDocumentPath).collect(),
-            None
-        )
-        .map(|_| ())
+        if remove.contains(&FieldsUser::StatusText) && partial.status.is_some() {
+            // stupid-ass workaround to fix mongo conflicting the same item
+            let _: Result<()> = query!(
+                self,
+                update_one_by_id,
+                COL,
+                id,
+                PartialUser {
+                    ..Default::default()
+                },
+                remove.iter().map(|x| x as &dyn IntoDocumentPath).collect(),
+                None
+            )
+            .map(|_| ());
+
+            query!(self, update_one_by_id, COL, id, partial, vec![], None).map(|_| ())
+        } else {
+            query!(
+                self,
+                update_one_by_id,
+                COL,
+                id,
+                partial,
+                remove.iter().map(|x| x as &dyn IntoDocumentPath).collect(),
+                None
+            )
+            .map(|_| ())
+        }
     }
 
     /// Set relationship with another user
@@ -302,22 +308,22 @@ impl AbstractUsers for MongoDb {
         query!(self, delete_one_by_id, COL, id).map(|_| ())
     }
 
-    /// Remove push subscription for a session by session id (TODO: remove)
-    async fn remove_push_subscription_by_session_id(&self, session_id: &str) -> Result<()> {
-        self.col::<User>("sessions")
-            .update_one(
+    /// Removes all relationships with the user from the list of users
+    async fn clear_user_relationships(&self, target_id: &str, user_ids: Vec<String>) -> Result<()> {
+        self.col::<User>(COL)
+            .update_many(
+                doc! { "_id": { "$in": user_ids } },
                 doc! {
-                    "_id": session_id
-                },
-                doc! {
-                    "$unset": {
-                        "subscription": 1
+                    "$pull": {
+                        "relations": {
+                            "_id": target_id.to_string()
+                        }
                     }
                 },
             )
             .await
             .map(|_| ())
-            .map_err(|_| create_database_error!("update_one", COL))
+            .map_err(|_| create_database_error!("bulk_write", COL))
     }
 }
 
@@ -330,6 +336,7 @@ impl IntoDocumentPath for FieldsUser {
             FieldsUser::StatusPresence => "status.presence",
             FieldsUser::StatusText => "status.text",
             FieldsUser::DisplayName => "display_name",
+            FieldsUser::Pronouns => "pronouns",
             FieldsUser::Suspension => "suspended_until",
             FieldsUser::None => "none",
         })

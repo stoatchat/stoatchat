@@ -17,7 +17,7 @@ use validator::Validate;
 pub async fn create(
     db: &State<Database>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
     data: Json<v0::DataCreateRole>,
 ) -> Result<Json<v0::NewRoleResponse>> {
     let data = data.into_inner();
@@ -40,27 +40,10 @@ pub async fn create(
         }));
     };
 
-    let member_rank = query.get_member_rank();
-    let rank = if let Some(given_rank) = data.rank {
-        if given_rank <= member_rank.unwrap_or(i64::MIN) {
-            return Err(create_error!(NotElevated));
-        }
-
-        given_rank
-    } else {
-        member_rank.unwrap_or(0).saturating_add(1)
-    };
-
-    let role = Role {
-        name: data.name,
-        rank,
-        colour: None,
-        hoist: false,
-        permissions: Default::default(),
-    };
+    let role = Role::create(db, &server, data.name).await?;
 
     Ok(Json(v0::NewRoleResponse {
-        id: role.create(db, &server.id).await?,
+        id: role.id.clone(),
         role: role.into(),
     }))
 }

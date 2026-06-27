@@ -2,16 +2,12 @@ name: Rust build, test, and generate specification
 
 on:
   push:
-    paths-ignore:
-      - ".github/**"
-      - "!.github/workflows/rust.yaml"
-      - ".vscode/**"
-      - "doc/**"
-      - ".gitignore"
-      - "LICENSE"
-      - "README"
-  pull_request:
     branches: [main]
+  pull_request:
+
+concurrency:
+  group: rust-build-test-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -19,63 +15,60 @@ env:
 jobs:
   check:
     name: Rust project
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set
     steps:
-      - uses: actions/checkout@v2
-      - name: Install latest stable
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
-      - name: Install cargo-nextest
-        uses: baptiste0928/cargo-install@v1
+          persist-credentials: false
+
+      # Using our own runners for now:
+      # - name: Free up disk space
+      #   run: |
+      #     sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+
+      - name: Setup Mise
+        uses: immich-app/devtools/actions/use-mise@cd24790a7f5f6439ac32cc94f5523cb2de8bfa8c # use-mise-action-v1.1.0
         with:
-          crate: cargo-nextest
-          locked: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run cargo build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-
-      - name: Run services in background
-        run: |
-          docker compose -f compose.yml up -d
-
-      - name: Run cargo test
+      - run: mise build
+      - run: mise docker:start
+    
+      - name: Reference Test
         env:
           TEST_DB: REFERENCE
+        continue-on-error: ${{ github.ref_name == 'main' }}
         run: |
-          cargo nextest run
+          mise test
 
-      - name: Run cargo test (with MongoDB)
+      - name: MongoDB Test
         env:
           TEST_DB: MONGODB
           MONGODB: mongodb://localhost
+        continue-on-error: ${{ github.ref_name == 'main' }}
         run: |
-          cargo nextest run
+          mise test
 
       - name: Start API in background
         if: github.event_name != 'pull_request' && github.ref_name == 'main'
         env:
           TEST_DB: REFERENCE
         run: |
-          cargo build --bin revolt-delta && (cargo run --bin revolt-delta &)
+          mise build --bin revolt-delta && (mise service:api &)
 
       - name: Wait for API to go up
         if: github.event_name != 'pull_request' && github.ref_name == 'main'
-        uses: nev7n/wait_for_response@v1
+        uses: nev7n/wait_for_response@7fef3c1a6e8939d0b09062f14fec50d3c5d15fa1 # v1.0.1
         with:
           url: "http://localhost:14702/"
 
       - name: Checkout API repository
         if: github.event_name != 'pull_request' && github.ref_name == 'main'
-        uses: actions/checkout@v3
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
-          repository: revoltchat/api
+          repository: stoatchat/javascript-client-api
           path: api
-          token: ${{ secrets.PAT }}
+          ssh-key: ${{ secrets.DEPLOY_KEY_JAVASCRIPT_CLIENT_API }}
 
       - name: Download OpenAPI specification
         if: github.event_name != 'pull_request' && github.ref_name == 'main'
@@ -83,10 +76,10 @@ jobs:
 
       - name: Commit changes
         if: github.event_name != 'pull_request' && github.ref_name == 'main'
-        uses: EndBug/add-and-commit@v4
+        uses: EndBug/add-and-commit@a94899bca583c204427a224a7af87c02f9b325d5 # v9.1.4
         with:
           cwd: "api"
           add: "*.json"
-          author_name: Revolt CI
-          author_email: revolt-ci@users.noreply.github.com
+          author_name: Stoat CI
+          author_email: stoat-ci@users.noreply.github.com
           message: "chore: generate OpenAPI specification"

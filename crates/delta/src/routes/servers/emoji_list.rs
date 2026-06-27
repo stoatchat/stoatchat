@@ -15,7 +15,7 @@ use rocket::{serde::json::Json, State};
 pub async fn list_emoji(
     db: &State<Database>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
 ) -> Result<Json<Vec<v0::Emoji>>> {
     let server = target.as_server(db).await?;
     let mut query = DatabasePermissionQuery::new(db, &user).server(&server);

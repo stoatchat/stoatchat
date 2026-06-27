@@ -14,7 +14,7 @@ pub async fn add(
     db: &State<Database>,
     amqp: &State<AMQP>,
     mut user: User,
-    target: Reference,
+    target: Reference<'_>,
 ) -> Result<Json<v0::User>> {
     let mut target = target.as_user(db).await?;
 

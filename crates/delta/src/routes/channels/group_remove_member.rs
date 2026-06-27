@@ -1,4 +1,6 @@
-use revolt_database::{util::reference::Reference, Channel, Database, User, AMQP};
+use revolt_database::{
+    AMQP, Channel, Database, User, util::reference::Reference, voice::{UserVoiceChannel, VoiceClient, is_in_voice_channel, remove_user_from_voice_channel}
+};
 use revolt_permissions::ChannelPermission;
 use revolt_result::{create_error, Result};
 
@@ -9,46 +11,54 @@ use rocket_empty::EmptyResponse;
 ///
 /// Removes a user from the group.
 #[openapi(tag = "Groups")]
-#[delete("/<target>/recipients/<member>")]
+#[delete("/<group_id>/recipients/<member_id>")]
 pub async fn remove_member(
     db: &State<Database>,
+    voice_client: &State<VoiceClient>,
     amqp: &State<AMQP>,
     user: User,
-    target: Reference,
-    member: Reference,
+    group_id: Reference<'_>,
+    member_id: Reference<'_>,
 ) -> Result<EmptyResponse> {
     if user.bot.is_some() {
         return Err(create_error!(IsBot));
     }
 
-    let channel = target.as_channel(db).await?;
+    let channel = group_id.as_channel(db).await?;
 
-    match &channel {
-        Channel::Group {
-            owner, recipients, ..
-        } => {
-            if &user.id != owner {
-                return Err(create_error!(MissingPermission {
-                    permission: ChannelPermission::ManageChannel.to_string()
-                }));
-            }
-
-            let member = member.as_user(db).await?;
-            if user.id == member.id {
-                return Err(create_error!(CannotRemoveYourself));
-            }
-
-            if !recipients.iter().any(|x| *x == member.id) {
-                return Err(create_error!(NotInGroup));
-            }
-
-            channel
-                .remove_user_from_group(db, amqp, &member, Some(&user.id), false)
-                .await
-                .map(|_| EmptyResponse)
+    if let Channel::Group {
+        owner, recipients, ..
+    } = &channel
+    {
+        if &user.id != owner {
+            return Err(create_error!(MissingPermission {
+                permission: ChannelPermission::ManageChannel.to_string()
+            }));
         }
-        _ => Err(create_error!(InvalidOperation)),
-    }
+
+        let member = member_id.as_user(db).await?;
+        if user.id == member.id {
+            return Err(create_error!(CannotRemoveYourself));
+        }
+
+        if !recipients.contains(&member.id) {
+            return Err(create_error!(NotInGroup));
+        }
+
+        channel
+            .remove_user_from_group(db, amqp, &member, Some(&user.id), false)
+            .await?;
+    } else {
+        return Err(create_error!(InvalidOperation));
+    };
+
+    let user_voice_channel = UserVoiceChannel::from_channel(&channel);
+
+    if is_in_voice_channel(member_id.id, &user_voice_channel).await? {
+        remove_user_from_voice_channel(voice_client, &user_voice_channel, member_id.id).await?;
+    };
+
+    Ok(EmptyResponse)
 }
 
 #[cfg(test)]

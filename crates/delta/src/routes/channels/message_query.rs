@@ -1,6 +1,6 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Channel, Database, Message, MessageFilter, MessageQuery, MessageTimePeriod, User,
+    Database, Message, MessageFilter, MessageQuery, MessageTimePeriod, User,
 };
 use revolt_models::v0::{self, MessageSort};
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
@@ -16,7 +16,7 @@ use validator::Validate;
 pub async fn query(
     db: &State<Database>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
     options: v0::OptionsQueryMessages,
 ) -> Result<Json<v0::BulkMessageResponse>> {
     options.validate().map_err(|error| {
@@ -65,12 +65,7 @@ pub async fn query(
         },
         &user,
         include_users,
-        match channel {
-            Channel::TextChannel { server, .. } | Channel::VoiceChannel { server, .. } => {
-                Some(server)
-            }
-            _ => None,
-        },
+        channel.server(),
     )
     .await
     .map(Json)

@@ -1,0 +1,23 @@
+name: Documentation (test)
+
+on:
+  pull_request:
+
+jobs:
+  test-deploy:
+    name: Test deployment
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./docs
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Mise
+        uses: immich-app/devtools/actions/use-mise@cd24790a7f5f6439ac32cc94f5523cb2de8bfa8c # use-mise-action-v1.1.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        
+      - run: mise docs:build

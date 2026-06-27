@@ -1,0 +1,10 @@
+{
+    "label": "API",
+    "position": 2,
+    "link": {
+        "type": "generated-index",
+        "description": "Connecting and consuming the Stoat API"
+    },
+    "collapsed": false,
+    "collapsible": true
+}

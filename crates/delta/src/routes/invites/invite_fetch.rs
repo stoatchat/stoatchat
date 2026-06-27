@@ -8,7 +8,7 @@ use rocket::{serde::json::Json, State};
 /// Fetch an invite by its id.
 #[openapi(tag = "Invites")]
 #[get("/<target>")]
-pub async fn fetch(db: &State<Database>, target: Reference) -> Result<Json<v0::InviteResponse>> {
+pub async fn fetch(db: &State<Database>, target: Reference<'_>) -> Result<Json<v0::InviteResponse>> {
     Ok(Json(match target.as_invite(db).await? {
         Invite::Server {
             channel, creator, ..
@@ -23,18 +23,11 @@ pub async fn fetch(db: &State<Database>, target: Reference) -> Result<Json<v0::I
                     name,
                     description,
                     ..
-                }
-                | Channel::VoiceChannel {
-                    id,
-                    server,
-                    name,
-                    description,
-                    ..
                 } => {
                     let server = db.fetch_server(&server).await?;
 
                     v0::InviteResponse::Server {
-                        code: target.id,
+                        code: target.id.to_string(),
                         member_count: db.fetch_member_count(&server.id).await? as i64,
                         server_id: server.id,
                         server_name: server.name,
@@ -64,7 +57,7 @@ pub async fn fetch(db: &State<Database>, target: Reference) -> Result<Json<v0::I
                     description,
                     ..
                 } => v0::InviteResponse::Group {
-                    code: target.id,
+                    code: target.id.to_string(),
                     channel_id: id,
                     channel_name: name,
                     channel_description: description,
@@ -202,6 +195,7 @@ mod test {
                 name: "Voice Channel".to_string(),
                 description: None,
                 nsfw: Some(false),
+                voice: None
             },
             true,
         )

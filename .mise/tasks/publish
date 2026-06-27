@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Publish project"
+set -e
+
+cargo publish "$@"

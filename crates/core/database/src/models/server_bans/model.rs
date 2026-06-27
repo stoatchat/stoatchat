@@ -13,6 +13,7 @@ auto_derived!(
     }
 );
 
+#[allow(clippy::disallowed_methods)]
 impl ServerBan {
     /// Create ban
     pub async fn create(

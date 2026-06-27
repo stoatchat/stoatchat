@@ -1,6 +1,7 @@
 use revolt_database::{events::client::EventV1, Database, Report, Snapshot, SnapshotContent, User};
 use revolt_models::v0::{ReportStatus, ReportedContent};
 use revolt_result::{create_error, Result};
+use rocket_empty::EmptyResponse;
 use serde::Deserialize;
 use ulid::Ulid;
 use validator::Validate;
@@ -27,7 +28,7 @@ pub async fn report_content(
     db: &State<Database>,
     user: User,
     data: Json<DataReportContent>,
-) -> Result<()> {
+) -> Result<EmptyResponse> {
     let data = data.into_inner();
     data.validate().map_err(|error| {
         create_error!(FailedValidation {
@@ -129,5 +130,5 @@ pub async fn report_content(
 
     EventV1::ReportCreate(report.into()).global().await;
 
-    Ok(())
+    Ok(EmptyResponse)
 }

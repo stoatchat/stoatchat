@@ -1,70 +1,37 @@
 use std::{
     collections::{HashMap, HashSet},
     hash::RandomState,
+    sync::Arc,
 };
 
-use crate::consumers::inbound::internal::*;
-use amqprs::{
-    channel::{BasicPublishArguments, Channel},
-    connection::Connection,
-    consumer::AsyncConsumer,
-    BasicProperties, Deliver,
-};
+use crate::utils::{render_notification_content, Consumer};
+use anyhow::Result;
 use async_trait::async_trait;
+use lapin::{message::Delivery, Channel, Connection};
 use revolt_database::{
     events::rabbit::*, util::bulk_permissions::BulkDatabasePermissionQuery, Database, Member,
     MessageFlagsValue,
 };
 use revolt_models::v0::{MessageFlags, PushNotification};
+use revolt_result::ToRevoltError;
 
+#[derive(Clone)]
+#[allow(unused)]
 pub struct MassMessageConsumer {
-    #[allow(dead_code)]
     db: Database,
-    authifier_db: authifier::Database,
-    conn: Option<Connection>,
-    channel: Option<Channel>,
-}
-
-impl Channeled for MassMessageConsumer {
-    fn get_connection(&self) -> Option<&Connection> {
-        if self.conn.is_none() {
-            None
-        } else {
-            Some(self.conn.as_ref().unwrap())
-        }
-    }
-
-    fn get_channel(&self) -> Option<&Channel> {
-        if self.channel.is_none() {
-            None
-        } else {
-            Some(self.channel.as_ref().unwrap())
-        }
-    }
-
-    fn set_connection(&mut self, conn: Connection) {
-        self.conn = Some(conn);
-    }
-
-    fn set_channel(&mut self, channel: Channel) {
-        self.channel = Some(channel)
-    }
+    connection: Arc<Connection>,
+    channel: Arc<Channel>,
 }
 
 impl MassMessageConsumer {
-    pub fn new(db: Database, authifier_db: authifier::Database) -> MassMessageConsumer {
-        MassMessageConsumer {
-            db,
-            authifier_db,
-            conn: None,
-            channel: None,
-        }
-    }
-
-    async fn fire_notification_for_users(&mut self, push: &PushNotification, users: &[String]) {
+    async fn fire_notification_for_users(
+        &self,
+        push: &PushNotification,
+        users: &[String],
+    ) -> Result<()> {
         if let Ok(sessions) = self
-            .authifier_db
-            .find_sessions_with_subscription(users)
+            .db
+            .fetch_sessions_with_subscription(users)
             .await
         {
             let config = revolt_config::config().await;
@@ -78,56 +45,63 @@ impl MassMessageConsumer {
                         extras: HashMap::new(),
                     };
 
-                    let args: BasicPublishArguments;
+                    let routing_key = match sub.endpoint.as_str() {
+                        "apn" => &config.pushd.apn.queue,
+                        "fcm" => &config.pushd.fcm.queue,
+                        endpoint => {
+                            sendable.extras.insert("p256dh".to_string(), sub.p256dh);
+                            sendable
+                                .extras
+                                .insert("endpoint".to_string(), endpoint.to_string());
 
-                    if sub.endpoint == "apn" {
-                        args = BasicPublishArguments::new(
-                            config.pushd.exchange.as_str(),
-                            config.pushd.apn.queue.as_str(),
-                        )
-                        .finish();
-                    } else if sub.endpoint == "fcm" {
-                        args = BasicPublishArguments::new(
-                            config.pushd.exchange.as_str(),
-                            config.pushd.fcm.queue.as_str(),
-                        )
-                        .finish();
-                    } else {
-                        // web push (vapid)
-                        args = BasicPublishArguments::new(
-                            config.pushd.exchange.as_str(),
-                            config.pushd.vapid.queue.as_str(),
-                        )
-                        .finish();
-                        sendable.extras.insert("p265dh".to_string(), sub.p256dh);
-                        sendable
-                            .extras
-                            .insert("endpoint".to_string(), sub.endpoint.clone());
-                    }
+                            &config.pushd.vapid.queue
+                        }
+                    };
 
-                    let payload = serde_json::to_string(&sendable).unwrap();
+                    let payload = serde_json::to_string(&sendable)?;
 
-                    publish_message(self, payload.into(), args).await;
+                    self.publish_message(payload.as_bytes(), &config.pushd.exchange, routing_key)
+                        .await?;
                 }
             }
         }
+
+        Ok(())
     }
 }
 
-#[allow(unused_variables)]
 #[async_trait]
-impl AsyncConsumer for MassMessageConsumer {
-    /// This consumer handles adding mentions for all the users affected by a mass mention ping, and then sends out push notifications
-    async fn consume(
-        &mut self,
-        channel: &Channel,
-        deliver: Deliver,
-        basic_properties: BasicProperties,
-        content: Vec<u8>,
-    ) {
+impl Consumer for MassMessageConsumer {
+    async fn create(
+        db: Database,
+        connection: Arc<Connection>,
+        channel: Arc<Channel>,
+    ) -> Self {
+        Self {
+            db,
+            connection,
+            channel,
+        }
+    }
+
+    fn channel(&self) -> &Arc<Channel> {
+        &self.channel
+    }
+
+    /// This consumer handles adding mentions for all the users affected by a mass mention ping, and then sends out push notifications.
+    async fn consume(&self, delivery: Delivery) -> Result<()> {
+        let mut payload: MassMessageSentPayload = serde_json::from_slice(&delivery.data)?;
         let config = revolt_config::config().await;
-        let content = String::from_utf8(content).unwrap();
-        let payload: MassMessageSentPayload = serde_json::from_str(content.as_str()).unwrap();
+
+        for push in payload.notifications.iter_mut() {
+            if let Ok(body) = render_notification_content(push, &self.db)
+                .await
+                .to_internal_error()
+            {
+                push.raw_body = Some(push.body.clone());
+                push.body = body;
+            }
+        }
 
         debug!("Received mass message event");
 
@@ -159,8 +133,7 @@ impl AsyncConsumer for MassMessageConsumer {
                     let mut db_query = self
                         .db
                         .fetch_all_members_chunked(&payload.server_id)
-                        .await
-                        .expect("Failed to fetch members from database");
+                        .await?;
 
                     let mut exhausted = false;
                     let ack_chnl = vec![push.channel.id().to_string()];
@@ -203,7 +176,8 @@ impl AsyncConsumer for MassMessageConsumer {
                             target_users, online_users
                         );
 
-                        self.fire_notification_for_users(&push, &target_users).await;
+                        self.fire_notification_for_users(&push, &target_users)
+                            .await?;
 
                         if exhausted {
                             break;
@@ -211,19 +185,11 @@ impl AsyncConsumer for MassMessageConsumer {
                     }
                 } else if let Some(roles) = &push.message.role_mentions {
                     // role mentions
-                    let _role_members = self
+                    let mut role_members = self
                         .db
                         .fetch_all_members_with_roles_chunked(&payload.server_id, roles)
-                        .await;
+                        .await?;
 
-                    debug!("role members: {:?}", _role_members);
-
-                    if _role_members.is_err() {
-                        revolt_config::capture_error(&_role_members.err().unwrap());
-                        return;
-                    }
-
-                    let mut role_members = _role_members.unwrap();
                     let mut chunk = vec![];
                     let mut exhausted = false;
 
@@ -266,10 +232,12 @@ impl AsyncConsumer for MassMessageConsumer {
 
                         debug!("targets: {:?}", targets);
 
-                        self.fire_notification_for_users(&push, &targets).await;
+                        self.fire_notification_for_users(&push, &targets).await?;
                     }
                 }
             }
         }
+
+        Ok(())
     }
 }

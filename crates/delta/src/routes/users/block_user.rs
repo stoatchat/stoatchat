@@ -13,7 +13,7 @@ use rocket::State;
 pub async fn block(
     db: &State<Database>,
     mut user: User,
-    target: Reference,
+    target: Reference<'_>,
 ) -> Result<Json<v0::User>> {
     let mut target = target.as_user(db).await?;
 

@@ -20,7 +20,7 @@ pub async fn invite_bot(
     db: &State<Database>,
     amqp: &State<AMQP>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
     dest: Json<v0::InviteBotDestination>,
 ) -> Result<EmptyResponse> {
     if user.bot.is_some() {
@@ -168,8 +168,8 @@ mod test {
             .await;
 
         match event {
-            EventV1::ServerMemberJoin { user, .. } => {
-                assert_eq!(bot.id, user);
+            EventV1::ServerMemberJoin { member, .. } => {
+                assert_eq!(bot.id, member.id.user);
             }
             _ => unreachable!(),
         }

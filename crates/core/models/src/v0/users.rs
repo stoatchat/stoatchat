@@ -1,3 +1,4 @@
+use iso8601_timestamp::Timestamp;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
@@ -31,6 +32,9 @@ auto_derived_partial!(
         /// Display name
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
         pub display_name: Option<String>,
+         /// User's pronouns
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+        pub pronouns: Option<String>,
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
         /// Avatar attachment
         pub avatar: Option<File>,
@@ -88,6 +92,7 @@ auto_derived!(
         ProfileContent,
         ProfileBackground,
         DisplayName,
+        Pronouns,
 
         /// Internal field, ignore this.
         Internal,
@@ -224,6 +229,9 @@ auto_derived!(
             validate(length(min = 2, max = 32), regex = "RE_DISPLAY_NAME")
         )]
         pub display_name: Option<String>,
+        /// New pronouns
+        #[cfg_attr(feature = "validator", validate(length(min = 1, max = 24)))]
+        pub pronouns: Option<String>,
         /// Attachment Id for avatar
         #[cfg_attr(feature = "validator", validate(length(min = 1, max = 128)))]
         pub avatar: Option<String>,
@@ -245,8 +253,8 @@ auto_derived!(
         pub flags: Option<i32>,
 
         /// Fields to remove from user object
-        #[cfg_attr(feature = "validator", validate(length(min = 1)))]
-        pub remove: Option<Vec<FieldsUser>>,
+        #[cfg_attr(feature = "serde", serde(default))]
+        pub remove: Vec<FieldsUser>,
     }
 
     /// User flag reponse
@@ -255,12 +263,14 @@ auto_derived!(
         pub flags: i32,
     }
 
-    /// Mutual friends and servers response
+    /// Mutual friends, servers, groups and DMs response
     pub struct MutualResponse {
         /// Array of mutual user IDs that both users are friends with
         pub users: Vec<String>,
         /// Array of mutual server IDs that both users are in
         pub servers: Vec<String>,
+        /// Array of mutual group and dm IDs that both users are in
+        pub channels: Vec<String>,
     }
 
     /// Bot information for if the user is a bot
@@ -275,6 +285,19 @@ auto_derived!(
         /// Username and discriminator combo separated by #
         pub username: String,
     }
+);
+
+auto_derived_partial!(
+    /// Voice State information for a user
+    pub struct UserVoiceState {
+        pub id: String,
+        pub joined_at: Timestamp,
+        pub is_receiving: bool,
+        pub is_publishing: bool,
+        pub screensharing: bool,
+        pub camera: bool,
+    },
+    "PartialUserVoiceState"
 );
 
 pub trait CheckRelationship {

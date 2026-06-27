@@ -1,0 +1,46 @@
+name: Docker PR Image Cleanup
+
+on:
+  pull_request:
+    types:
+      - closed
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-cleanup-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.head.repo.fork }}
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - base
+          - api
+          - events
+          - file-server
+          - proxy
+          - gifbox
+          - crond
+          - pushd
+          - voice-ingress
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG: stoatchat
+          PACKAGE: ${{ matrix.package }}
+          TAG: pr-${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          gh api --paginate \
+            "/orgs/${ORG}/packages/container/${PACKAGE}/versions" \
+            --jq ".[] | select(.metadata.container.tags | index(\"${TAG}\")) | .id" \
+          | while read -r id; do
+              gh api -X DELETE "/orgs/${ORG}/packages/container/${PACKAGE}/versions/${id}"
+            done

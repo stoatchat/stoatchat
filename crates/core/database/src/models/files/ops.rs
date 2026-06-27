@@ -4,6 +4,7 @@ use crate::File;
 
 use super::FileUsedFor;
 
+#[cfg(feature = "mongodb")]
 mod mongodb;
 mod reference;
 

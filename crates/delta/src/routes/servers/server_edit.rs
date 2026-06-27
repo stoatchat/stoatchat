@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, File, PartialServer, User,
+    Database, File, PartialServer, User, ValidatedTicket,
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
@@ -18,8 +18,9 @@ use validator::Validate;
 pub async fn edit(
     db: &State<Database>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
     data: Json<v0::DataEditServer>,
+    validated_ticket: Option<ValidatedTicket>,
 ) -> Result<Json<v0::Server>> {
     let data = data.into_inner();
     data.validate().map_err(|error| {
@@ -42,7 +43,8 @@ pub async fn edit(
         && data.flags.is_none()
         && data.analytics.is_none()
         && data.discoverable.is_none()
-        && data.remove.is_none()
+        && data.owner.is_none()
+        && data.remove.is_empty()
     {
         return Ok(Json(server.into()));
     } else if data.name.is_some()
@@ -51,9 +53,20 @@ pub async fn edit(
         || data.banner.is_some()
         || data.system_messages.is_some()
         || data.analytics.is_some()
-        || data.remove.is_some()
+        || !data.remove.is_empty()
     {
         permissions.throw_if_lacking_channel_permission(ChannelPermission::ManageServer)?;
+    }
+
+    // Check we are the server owner or privileged if changing sensitive fields
+    if data.owner.is_some() {
+        if user.id != server.owner && !user.privileged {
+            return Err(create_error!(NotOwner));
+        }
+
+        if validated_ticket.is_none() {
+            return Err(create_error!(InvalidCredentials));
+        }
     }
 
     // Check we are privileged if changing sensitive fields
@@ -72,6 +85,7 @@ pub async fn edit(
         // nsfw,
         discoverable,
         analytics,
+        owner,
         remove,
     } = data;
 
@@ -83,21 +97,20 @@ pub async fn edit(
         // nsfw,
         discoverable,
         analytics,
+        owner: owner.clone(),
         ..Default::default()
     };
 
     // 1. Remove fields from object
-    if let Some(fields) = &remove {
-        if fields.contains(&v0::FieldsServer::Banner) {
-            if let Some(banner) = &server.banner {
-                db.mark_attachment_as_deleted(&banner.id).await?;
-            }
+    if remove.contains(&v0::FieldsServer::Banner) {
+        if let Some(banner) = &server.banner {
+            db.mark_attachment_as_deleted(&banner.id).await?;
         }
+    }
 
-        if fields.contains(&v0::FieldsServer::Icon) {
-            if let Some(icon) = &server.icon {
-                db.mark_attachment_as_deleted(&icon.id).await?;
-            }
+    if remove.contains(&v0::FieldsServer::Icon) {
+        if let Some(icon) = &server.icon {
+            db.mark_attachment_as_deleted(&icon.id).await?;
         }
     }
 
@@ -122,14 +135,23 @@ pub async fn edit(
         server.banner = partial.banner.clone();
     }
 
+    // 5. Transfer ownership
+    if let Some(owner) = owner {
+        let owner_reference = Reference::from_unchecked(&owner);
+        // Check if member exists
+        owner_reference.as_member(db, &server.id).await?;
+        let owner_user = owner_reference.as_user(db).await?;
+
+        if owner_user.bot.is_some() {
+            return Err(create_error!(InvalidOperation));
+        }
+
+        server.owner = owner;
+        partial.owner = Some(server.owner.clone());
+    }
+
     server
-        .update(
-            db,
-            partial,
-            remove
-                .map(|v| v.into_iter().map(Into::into).collect())
-                .unwrap_or_default(),
-        )
+        .update(db, partial, remove.into_iter().map(Into::into).collect())
         .await?;
 
     Ok(Json(server.into()))

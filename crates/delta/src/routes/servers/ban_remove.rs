@@ -15,8 +15,8 @@ use rocket_empty::EmptyResponse;
 pub async fn unban(
     db: &State<Database>,
     user: User,
-    server: Reference,
-    target: Reference,
+    server: Reference<'_>,
+    target: Reference<'_>,
 ) -> Result<EmptyResponse> {
     let server = server.as_server(db).await?;
     let mut query = DatabasePermissionQuery::new(db, &user).server(&server);

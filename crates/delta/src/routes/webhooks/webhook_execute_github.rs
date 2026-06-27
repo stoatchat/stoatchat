@@ -217,7 +217,6 @@ pub struct GithubComment {
     position: Option<u32>,
     reactions: Option<GithubReactions>,
     updated_at: Value,
-    url: String,
     user: GithubUser,
 }
 
@@ -588,6 +587,7 @@ pub enum PullRequestEvent {
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum BaseEvent {
+    #[allow(dead_code)]
     Star(StarEvent),
     Ping,
     Push(PushEvent),
@@ -620,7 +620,7 @@ pub struct Event {
 #[derive(Debug, JsonSchema)]
 pub struct EventHeader<'r>(pub &'r str);
 
-impl<'r> std::ops::Deref for EventHeader<'r> {
+impl std::ops::Deref for EventHeader<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -688,11 +688,23 @@ const LIGHT_ORANGE: &str = "#d9916d";
 // for future use
 // const WHITE: &str = "#c3e1c3";
 
-fn shorten_text(text: &str, length: usize) -> String {
-    if text.len() < length {
-        text.to_string()
+fn shorten_single_line_text(text: &str, length: usize) -> String {
+    if text.contains('\n') {
+        let text = text.split('\n').next().unwrap();
+
+        format!("{}...", &text[..text.len().min(length) - 3])
+    } else if text.len() > length {
+        format!("{}...", &text[..length - 3])
     } else {
-        format!("{}...", &text[0..length])
+        text.to_string()
+    }
+}
+
+fn shorten_text(text: &str, length: usize) -> String {
+    if text.len() >= length {
+        format!("{}...", &text[..length - 3])
+    } else {
+        text.to_string()
     }
 }
 
@@ -700,7 +712,7 @@ fn safe_from_str<T: for<'de> Deserialize<'de>>(data: &str) -> Result<T> {
     match serde_json::from_str(data) {
         Ok(output) => Ok(output),
         Err(err) => {
-            log::error!("{err:?}");
+            revolt_config::capture_internal_error!(err);
             Err(create_error!(InvalidOperation))
         }
     }
@@ -751,13 +763,13 @@ fn convert_event(data: &str, event_name: &str) -> Result<Event> {
 pub async fn webhook_execute_github(
     db: &State<Database>,
     amqp: &State<AMQP>,
-    webhook_id: Reference,
-    token: String,
+    webhook_id: Reference<'_>,
+    token: &str,
     event: EventHeader<'_>,
     data: String,
 ) -> Result<()> {
     let webhook = webhook_id.as_webhook(db).await?;
-    webhook.assert_token(&token)?;
+    webhook.assert_token(token)?;
 
     let channel = db.fetch_channel(&webhook.channel_id).await?;
     let event = convert_event(&data, &event)?;
@@ -823,13 +835,13 @@ pub async fn webhook_execute_github(
                                 "[`{}`]({}) {} - {}",
                                 &commit.id[0..=7],
                                 commit.url,
-                                shorten_text(&commit.message, 50),
+                                shorten_single_line_text(&commit.message, 50),
                                 commit.author.name
                             )
                         })
                         .collect::<Vec<String>>()
                         .join("\n"),
-                        1000
+                    1000,
                 );
 
                 SendableEmbed {
@@ -896,10 +908,11 @@ pub async fn webhook_execute_github(
                 url: Some(event.sender.html_url),
                 title: Some(event.sender.login),
                 description: Some(format!(
-                    "#### [{}] New discussion #{}: {}\n{}",
+                    "#### [[{}] New discussion #{}: {}]({})\n{}",
                     event.repository.full_name,
                     discussion.number,
                     discussion.title,
+                    discussion.html_url,
                     shorten_text(&discussion.body, 450)
                 )),
                 colour: Some(LIGHT_ORANGE.to_string()),
@@ -910,10 +923,11 @@ pub async fn webhook_execute_github(
                 url: Some(answer.comment.user.html_url),
                 title: Some(answer.comment.user.login),
                 description: Some(format!(
-                    "#### [{}] discussion #{} marked answered: {}\n{}",
+                    "#### [[{}] Discussion #{} marked answered: {}]({})\n{}",
                     event.repository.full_name,
                     discussion.number,
                     discussion.title,
+                    answer.comment.html_url,
                     shorten_text(&answer.comment.body, 450)
                 )),
                 colour: Some(LIGHT_ORANGE.to_string()),
@@ -929,10 +943,11 @@ pub async fn webhook_execute_github(
                 url: Some(comment.comment.user.html_url),
                 title: Some(comment.comment.user.login),
                 description: Some(format!(
-                    "[{}] New comment on discussion #{}: {}\n{}",
+                    "#### [[{}] New comment on discussion #{}: {}]({})\n{}",
                     event.repository.full_name,
                     discussion.number,
                     discussion.title,
+                    comment.comment.html_url,
                     shorten_text(&comment.comment.body, 450)
                 )),
                 colour: Some(LIGHT_ORANGE.to_string()),
@@ -1001,7 +1016,7 @@ pub async fn webhook_execute_github(
                     event.repository.full_name,
                     issue.number,
                     issue.title,
-                    issue.html_url,
+                    comment.html_url,
                     shorten_text(&comment.body, 450)
                 )),
                 colour: Some(LIGHT_ORANGE.to_string()),

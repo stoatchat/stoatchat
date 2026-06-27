@@ -7,6 +7,14 @@ use crate::{
     Server, SystemMessage, User,
 };
 
+fn default_true() -> bool {
+    true
+}
+
+fn is_true(x: &bool) -> bool {
+    *x
+}
+
 auto_derived_partial!(
     /// Server Member
     pub struct Member {
@@ -20,6 +28,9 @@ auto_derived_partial!(
         /// Member's nickname
         #[serde(skip_serializing_if = "Option::is_none")]
         pub nickname: Option<String>,
+        /// Member's pronouns
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub pronouns: Option<String>,
         /// Avatar attachment
         #[serde(skip_serializing_if = "Option::is_none")]
         pub avatar: Option<File>,
@@ -30,6 +41,16 @@ auto_derived_partial!(
         /// Timestamp this member is timed out until
         #[serde(skip_serializing_if = "Option::is_none")]
         pub timeout: Option<Timestamp>,
+
+        /// Whether the member is server-wide voice muted
+        #[serde(skip_serializing_if = "is_true", default = "default_true")]
+        pub can_publish: bool,
+        /// Whether the member is server-wide voice deafened
+        #[serde(skip_serializing_if = "is_true", default = "default_true")]
+        pub can_receive: bool,
+        // This value only exists in the database, not the models.
+        // If it is not-None, the database layer should return None to member fetching queries.
+        // pub pending_deletion_at: Option<Timestamp>
     },
     "PartialMember"
 );
@@ -47,9 +68,14 @@ auto_derived!(
     /// Optional fields on server member object
     pub enum FieldsMember {
         Nickname,
+        Pronouns,
         Avatar,
         Roles,
         Timeout,
+        CanReceive,
+        CanPublish,
+        JoinedAt,
+        VoiceChannel,
     }
 
     /// Member removal intention
@@ -66,9 +92,12 @@ impl Default for Member {
             id: Default::default(),
             joined_at: Timestamp::now_utc(),
             nickname: None,
+            pronouns: None,
             avatar: None,
             roles: vec![],
             timeout: None,
+            can_publish: true,
+            can_receive: true,
         }
     }
 }
@@ -90,7 +119,7 @@ impl Member {
             return Err(create_error!(AlreadyInServer));
         }
 
-        let member = Member {
+        let mut member = Member {
             id: MemberCompositeKey {
                 server: server.id.to_string(),
                 user: user.id.to_string(),
@@ -98,7 +127,9 @@ impl Member {
             ..Default::default()
         };
 
-        db.insert_member(&member).await?;
+        if let Some(updated) = db.insert_or_merge_member(&member).await? {
+            member = updated;
+        }
 
         let should_fetch = channels.is_none();
         let mut channels = channels.unwrap_or_default();
@@ -121,9 +152,24 @@ impl Member {
 
         let emojis = db.fetch_emoji_by_parent_id(&server.id).await?;
 
+        #[allow(unused_mut)]
+        let mut voice_states = Vec::new();
+
+        #[cfg(feature = "voice")]
+        for channel in &channels {
+            if let Ok(Some(voice_state)) = crate::voice::get_channel_voice_state(
+                &crate::voice::UserVoiceChannel::from_channel(channel),
+            )
+            .await
+            {
+                voice_states.push(voice_state)
+            }
+        }
+
         EventV1::ServerMemberJoin {
             id: server.id.clone(),
             user: user.id.clone(),
+            member: member.clone().into(),
         }
         .p(server.id.clone())
         .await;
@@ -137,6 +183,7 @@ impl Member {
                 .map(|channel| channel.into())
                 .collect(),
             emojis: emojis.into_iter().map(|emoji| emoji.into()).collect(),
+            voice_states,
         }
         .private(user.id.clone())
         .await;
@@ -159,7 +206,7 @@ impl Member {
     }
 
     /// Update member data
-    pub async fn update<'a>(
+    pub async fn update(
         &mut self,
         db: &Database,
         partial: PartialMember,
@@ -186,10 +233,15 @@ impl Member {
 
     pub fn remove_field(&mut self, field: &FieldsMember) {
         match field {
+            FieldsMember::JoinedAt => {}
             FieldsMember::Avatar => self.avatar = None,
             FieldsMember::Nickname => self.nickname = None,
+            FieldsMember::Pronouns => self.pronouns = None,
             FieldsMember::Roles => self.roles.clear(),
             FieldsMember::Timeout => self.timeout = None,
+            FieldsMember::CanReceive => self.can_receive = true,
+            FieldsMember::CanPublish => self.can_publish = true,
+            FieldsMember::VoiceChannel => {}
         }
     }
 
@@ -224,7 +276,7 @@ impl Member {
         intention: RemovalIntention,
         silent: bool,
     ) -> Result<()> {
-        db.delete_member(&self.id).await?;
+        db.soft_delete_member(&self.id).await?;
 
         EventV1::ServerMemberLeave {
             id: self.id.server.to_string(),
@@ -258,5 +310,76 @@ impl Member {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use iso8601_timestamp::{Duration, Timestamp};
+    use revolt_models::v0::DataCreateServer;
+
+    use crate::{Member, PartialMember, RemovalIntention, Server, User};
+
+    #[tokio::test]
+    async fn muted_member_rejoin() {
+        database_test!(|db| async move {
+            match db {
+                crate::Database::Reference(_) => return,
+                crate::Database::MongoDb(_) => (),
+            }
+            let owner = User::create(&db, "Server Owner".to_string(), None, None)
+                .await
+                .unwrap();
+
+            let kickable_user = User::create(&db, "Member".to_string(), None, None)
+                .await
+                .unwrap();
+
+            let server = Server::create(
+                &db,
+                DataCreateServer {
+                    name: "Server".to_string(),
+                    description: None,
+                    nsfw: None,
+                },
+                &owner,
+                false,
+            )
+            .await
+            .unwrap()
+            .0;
+
+            Member::create(&db, &server, &owner, None).await.unwrap();
+            let mut kickable_member = Member::create(&db, &server, &kickable_user, None)
+                .await
+                .unwrap()
+                .0;
+
+            kickable_member
+                .update(
+                    &db,
+                    PartialMember {
+                        timeout: Some(Timestamp::now_utc() + Duration::minutes(5)),
+                        ..Default::default()
+                    },
+                    vec![],
+                )
+                .await
+                .unwrap();
+
+            assert!(kickable_member.in_timeout());
+
+            kickable_member
+                .remove(&db, &server, RemovalIntention::Kick, false)
+                .await
+                .unwrap();
+
+            let kickable_member = Member::create(&db, &server, &kickable_user, None)
+                .await
+                .unwrap()
+                .0;
+
+            assert!(kickable_member.in_timeout())
+        });
     }
 }

@@ -1,22 +1,38 @@
 [package]
 name = "revolt-crond"
-version = "0.8.4"
+version = "0.13.7"
 license = "AGPL-3.0-or-later"
 authors = ["Paul Makles <me@insrt.uk>"]
 edition = "2021"
 description = "Revolt Daemon Service: Timed data clean up tasks"
+publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 # Utility
-log = "0.4"
+log = { workspace = true }
 
 # Async
-tokio = { version = "1" }
+tokio = { workspace = true }
+futures = { workspace = true }
+
+# Redis
+redis-kiss = { workspace = true, default-features = false, features = ["tokio-runtime"] }
+
+# RabbitMQ
+lapin = { workspace = true }
+futures-lite = { workspace = true }
+
+# Processing
+serde_json = { workspace = true }
+revolt_optional_struct = { workspace = true }
+serde = { workspace = true }
+iso8601-timestamp = { workspace = true, features = ["serde", "bson"] }
 
 # Core
-revolt-database = { version = "0.8.4", path = "../../core/database" }
-revolt-result = { version = "0.8.4", path = "../../core/result" }
-revolt-config = { version = "0.8.4", path = "../../core/config" }
-revolt-files = { version = "0.8.4", path = "../../core/files" }
+revolt-database = { workspace = true }
+revolt-result = { workspace = true }
+revolt-config = { workspace = true }
+revolt-files = { workspace = true }
+revolt-permissions = { workspace = true }

@@ -15,7 +15,7 @@ use rocket_empty::EmptyResponse;
 pub async fn webhook_delete(
     db: &State<Database>,
     user: User,
-    webhook_id: Reference,
+    webhook_id: Reference<'_>,
 ) -> Result<EmptyResponse> {
     let webhook = webhook_id.as_webhook(db).await?;
     let channel = db.fetch_channel(&webhook.channel_id).await?;

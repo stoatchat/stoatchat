@@ -14,7 +14,7 @@ use rocket::{serde::json::Json, State};
 #[get("/<webhook_id>")]
 pub async fn webhook_fetch(
     db: &State<Database>,
-    webhook_id: Reference,
+    webhook_id: Reference<'_>,
     user: User,
 ) -> Result<Json<ResponseWebhook>> {
     let webhook = webhook_id.as_webhook(db).await?;

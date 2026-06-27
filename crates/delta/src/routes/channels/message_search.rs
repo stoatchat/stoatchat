@@ -1,6 +1,6 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Channel, Database, Message, MessageFilter, MessageQuery, MessageTimePeriod, User,
+    Database, Message, MessageFilter, MessageQuery, MessageTimePeriod, User,
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
@@ -16,7 +16,7 @@ use validator::Validate;
 pub async fn search(
     db: &State<Database>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
     options: Json<v0::DataMessageSearch>,
 ) -> Result<Json<v0::BulkMessageResponse>> {
     if user.bot.is_some() {
@@ -31,7 +31,7 @@ pub async fn search(
     })?;
 
     if options.query.is_some() && options.pinned.is_some() {
-        return Err(create_error!(InvalidOperation))
+        return Err(create_error!(InvalidOperation));
     }
 
     let channel = target.as_channel(db).await?;
@@ -69,12 +69,7 @@ pub async fn search(
         },
         &user,
         include_users,
-        match channel {
-            Channel::TextChannel { server, .. } | Channel::VoiceChannel { server, .. } => {
-                Some(server)
-            }
-            _ => None,
-        },
+        channel.server(),
     )
     .await
     .map(Json)

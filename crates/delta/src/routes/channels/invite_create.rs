@@ -18,7 +18,7 @@ use rocket::{serde::json::Json, State};
 pub async fn create_invite(
     db: &State<Database>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
 ) -> Result<Json<v0::Invite>> {
     if user.bot.is_some() {
         return Err(create_error!(IsBot));

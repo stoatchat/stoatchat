@@ -190,7 +190,7 @@ pub async fn create_website_embed(original_url: &str, document: &str) -> Option<
 
 pub async fn populate_special(original_url: String, metadata: &mut WebsiteMetadata) {
     lazy_static! {
-        static ref RE_YOUTUBE: Regex = Regex::new("^(?:(?:https?:)?//)?(?:(?:www|m)\\.)?(?:(?:youtube\\.com|youtu.be))(?:/(?:[\\w\\-]+\\?v=|embed/|v/)?)([\\w\\-]+)(?:\\S+)?$").unwrap();
+        static ref RE_YOUTUBE: Regex = Regex::new("^(?:(?:https?:)?//)?(?:(?:www|m)\\.)?(?:(?:youtube\\.com|youtu.be))(?:/(?:[\\w\\-]+\\?v=|embed/|v/|shorts/)?)([\\w\\-]+)(?:\\S+)?$").unwrap();
 
         static ref RE_LIGHTSPEED: Regex = Regex::new("^(?:https?://)?(?:[\\w]+\\.)?lightspeed\\.tv/([a-z0-9_]{4,25})").unwrap();
 
@@ -236,11 +236,12 @@ pub async fn populate_special(original_url: String, metadata: &mut WebsiteMetada
             metadata.site_name.take();
 
             // Verify the video exists
-            if !crate::requests::Request::exists(&format!(
+            if !crate::requests::Request::exists_from_str(&format!(
                 "http://img.youtube.com/vi/{}/sddefault.jpg",
                 id
             ))
             .await
+            .unwrap_or(false)
             {
                 return;
             }
@@ -312,7 +313,7 @@ pub async fn populate_special(original_url: String, metadata: &mut WebsiteMetada
         Some(Special::GIF)
     } else {
         RE_APPLE_MUSIC
-            .captures_iter(url)
+            .captures_iter(&original_url)
             .next()
             .map(|captures| Special::AppleMusic {
                 album_id: captures[1].to_string(),
@@ -327,7 +328,7 @@ pub async fn populate_special(original_url: String, metadata: &mut WebsiteMetada
             Special::Twitch { .. } => metadata.colour = Some("#7B68EE".to_string()),
             Special::Lightspeed { .. } => metadata.colour = Some("#7445D9".to_string()),
             Special::Spotify { .. } => metadata.colour = Some("#1ABC9C".to_string()),
-            Special::Soundcloud { .. } => metadata.colour = Some("#FF7F50".to_string()),
+            Special::Soundcloud => metadata.colour = Some("#FF7F50".to_string()),
             Special::AppleMusic { .. } => metadata.colour = Some("#FA233B".to_string()),
             _ => {}
         }

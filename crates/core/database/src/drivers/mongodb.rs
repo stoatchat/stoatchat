@@ -10,8 +10,8 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 database_derived!(
-    #[cfg(feature = "mongodb")]
     /// MongoDB implementation
+    #[derive(Debug)]
     pub struct MongoDb(pub ::mongodb::Client, pub String);
 );
 

@@ -1,4 +1,3 @@
-use futures::future::join_all;
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     Channel, Database, User,
@@ -18,7 +17,7 @@ use rocket::{serde::json::Json, State};
 pub async fn fetch_members(
     db: &State<Database>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
 ) -> Result<Json<Vec<v0::User>>> {
     let channel = target.as_channel(db).await?;
     let mut query = DatabasePermissionQuery::new(db, &user).channel(&channel);

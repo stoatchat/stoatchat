@@ -15,9 +15,9 @@ use rocket_empty::EmptyResponse;
 pub async fn react_message(
     db: &State<Database>,
     user: User,
-    target: Reference,
-    msg: Reference,
-    emoji: Reference,
+    target: Reference<'_>,
+    msg: Reference<'_>,
+    emoji: Reference<'_>,
 ) -> Result<EmptyResponse> {
     let channel = target.as_channel(db).await?;
     let mut query = DatabasePermissionQuery::new(db, &user).channel(&channel);
@@ -30,7 +30,7 @@ pub async fn react_message(
 
     // Add the reaction
     message
-        .add_reaction(db, &user, &emoji.id)
+        .add_reaction(db, &user, emoji.id)
         .await
         .map(|_| EmptyResponse)
 }

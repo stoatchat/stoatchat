@@ -15,10 +15,10 @@ use rocket_empty::EmptyResponse;
 pub async fn delete(
     db: &State<Database>,
     user: User,
-    target: Reference,
-    msg: Reference,
+    target: Reference<'_>,
+    msg: Reference<'_>,
 ) -> Result<EmptyResponse> {
-    let message = msg.as_message_in_channel(db, &target.id).await?;
+    let message = msg.as_message_in_channel(db, target.id).await?;
 
     if message.author != user.id {
         let channel = target.as_channel(db).await?;

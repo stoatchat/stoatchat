@@ -12,7 +12,7 @@ use rocket::{serde::json::Json, State};
 #[patch("/<webhook_id>/<token>", data = "<data>")]
 pub async fn webhook_edit_token(
     db: &State<Database>,
-    webhook_id: Reference,
+    webhook_id: Reference<'_>,
     token: String,
     data: Json<DataEditWebhook>,
 ) -> Result<Json<Webhook>> {

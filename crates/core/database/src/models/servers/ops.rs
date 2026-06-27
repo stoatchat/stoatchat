@@ -2,6 +2,7 @@ use revolt_result::Result;
 
 use crate::{FieldsRole, FieldsServer, PartialRole, PartialServer, Role, Server};
 
+#[cfg(feature = "mongodb")]
 mod mongodb;
 mod reference;
 
@@ -16,6 +17,8 @@ pub trait AbstractServers: Sync + Send {
     /// Fetch a servers by their ids
     async fn fetch_servers<'a>(&self, ids: &'a [String]) -> Result<Vec<Server>>;
 
+    async fn fetch_owned_servers(&self, user_id: &str) -> Result<Vec<Server>>;
+
     /// Update a server with new information
     async fn update_server(
         &self,
@@ -28,7 +31,7 @@ pub trait AbstractServers: Sync + Send {
     async fn delete_server(&self, id: &str) -> Result<()>;
 
     /// Insert a new role into server object
-    async fn insert_role(&self, server_id: &str, role_id: &str, role: &Role) -> Result<()>;
+    async fn insert_role(&self, server_id: &str, role: &Role) -> Result<()>;
 
     /// Update an existing role on a server
     async fn update_role(

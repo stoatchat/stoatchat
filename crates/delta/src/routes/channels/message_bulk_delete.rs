@@ -1,4 +1,5 @@
-use chrono::Utc;
+use std::time::Duration;
+
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     Database, Message, User,
@@ -8,7 +9,6 @@ use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 use rocket_empty::EmptyResponse;
-use serde::Deserialize;
 use validator::Validate;
 
 /// # Bulk Delete Messages
@@ -23,7 +23,7 @@ use validator::Validate;
 pub async fn bulk_delete_messages(
     db: &State<Database>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
     options: Json<v0::OptionsBulkDelete>,
 ) -> Result<EmptyResponse> {
     let options = options.into_inner();
@@ -37,10 +37,9 @@ pub async fn bulk_delete_messages(
         if ulid::Ulid::from_string(id)
             .map_err(|_| create_error!(InvalidOperation))?
             .datetime()
-            .signed_duration_since(Utc::now())
-            .num_days()
-            .abs()
-            > 7
+            .elapsed()
+            .expect("Time went backwards")
+            > Duration::from_hours(7 * 24)  // 7 days
         {
             return Err(create_error!(InvalidOperation));
         }
@@ -52,7 +51,7 @@ pub async fn bulk_delete_messages(
         .await
         .throw_if_lacking_channel_permission(ChannelPermission::ManageMessages)?;
 
-    Message::bulk_delete(db, &target.id, options.ids)
+    Message::bulk_delete(db, target.id, options.ids)
         .await
         .map(|_| EmptyResponse)
 }

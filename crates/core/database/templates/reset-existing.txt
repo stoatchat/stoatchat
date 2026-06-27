@@ -1,0 +1,19 @@
+You tried to create a new account with or try
+to re-verify this email but there is already
+an existing verified account under this email.
+
+If you wish, you can now proceed to reset the
+password on it, click below to continue.
+
+Please navigate to: {{url}}
+
+This email is intended for {{email}}
+Sent by Stoat
+Made in Europe
+
+Revolt Platforms Ltd. is a company incorporated and registered under the laws of England and Wales.
+
+Registration Number: 16260658
+Registered Office:
+Suite 5703 Unit 3A, 34-35 Hatton Garden,
+Holborn, United Kingdom, EC1N 8DX

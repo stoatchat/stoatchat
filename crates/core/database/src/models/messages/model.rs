@@ -1,26 +1,28 @@
-use std::{collections::HashSet, hash::RandomState};
-
 use indexmap::{IndexMap, IndexSet};
 use iso8601_timestamp::Timestamp;
 use revolt_config::{config, FeaturesLimits};
 use revolt_models::v0::{
     self, BulkMessageResponse, DataMessageSend, Embed, MessageAuthor, MessageFlags, MessageSort,
-    MessageWebhook, PushNotification, ReplyIntent, SendableEmbed, Text
+    MessageWebhook, PushNotification, ReplyIntent, SendableEmbed, Text,
 };
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission, PermissionValue};
 use revolt_result::{ErrorType, Result};
+use std::time::SystemTime;
+use std::{collections::HashSet, hash::RandomState};
 use ulid::Ulid;
 use validator::Validate;
 
 use crate::{
     events::client::EventV1,
-    tasks::{self, ack::AckEvent},
     util::{
         bulk_permissions::BulkDatabasePermissionQuery, idempotency::IdempotencyKey,
         permissions::DatabasePermissionQuery,
     },
     Channel, Database, Emoji, File, User, AMQP,
 };
+
+#[cfg(feature = "tasks")]
+use crate::tasks::{self, ack::AckEvent};
 
 auto_derived_partial!(
     /// Message
@@ -112,6 +114,11 @@ auto_derived!(
         MessagePinned { id: String, by: String },
         #[serde(rename = "message_unpinned")]
         MessageUnpinned { id: String, by: String },
+        #[serde(rename = "call_started")]
+        CallStarted {
+            by: String,
+            finished_at: Option<Timestamp>,
+        },
     }
 
     /// Name and / or avatar override information
@@ -286,9 +293,9 @@ impl Message {
             .map_err(|_| create_error!(InvalidOperation))?;
 
         // Check the message is not empty
-        if (data.content.as_ref().map_or(true, |v| v.is_empty()))
-            && (data.attachments.as_ref().map_or(true, |v| v.is_empty()))
-            && (data.embeds.as_ref().map_or(true, |v| v.is_empty()))
+        if (data.content.as_ref().is_none_or(|v| v.is_empty()))
+            && (data.attachments.as_ref().is_none_or(|v| v.is_empty()))
+            && (data.embeds.as_ref().is_none_or(|v| v.is_empty()))
         {
             return Err(create_error!(EmptyMessage));
         }
@@ -324,9 +331,7 @@ impl Message {
         }
 
         let server_id = match channel {
-            Channel::TextChannel { ref server, .. } | Channel::VoiceChannel { ref server, .. } => {
-                Some(server.clone())
-            }
+            Channel::TextChannel { ref server, .. } => Some(server.clone()),
             _ => None,
         };
 
@@ -382,7 +387,8 @@ impl Message {
             mut user_mentions,
             mut role_mentions,
             mut mentions_everyone,
-            mut mentions_online
+            mut mentions_online,
+            ..
         } = message_mentions;
 
         if allow_mass_mentions && server_id.is_some() && !role_mentions.is_empty() {
@@ -438,13 +444,16 @@ impl Message {
         }
 
         // Verify replies are valid.
-        let mut replies = HashSet::new();
+        let mut replies = Vec::new();
+
         if let Some(entries) = data.replies {
             if entries.len() > config.features.limits.global.message_replies {
                 return Err(create_error!(TooManyReplies {
                     max: config.features.limits.global.message_replies,
                 }));
             }
+
+            replies.reserve(entries.len());
 
             for ReplyIntent {
                 id,
@@ -459,7 +468,12 @@ impl Message {
                             user_mentions.insert(message.author.to_owned());
                         }
 
-                        replies.insert(message.id);
+                        // This is O(n^2), but this is faster than a HashSet
+                        // when n < 20; as long as the message_replies limit
+                        // is reasonable, this will be fast.
+                        if !replies.contains(&message.id) {
+                            replies.push(message.id);
+                        }
                     }
                     // If the referenced message doesn't exist and fail_if_not_exists
                     // is set to false, send the message without the reply.
@@ -476,6 +490,7 @@ impl Message {
 
         // Validate the mentions go to users in the channel/server
         if !user_mentions.is_empty() {
+            #[allow(deprecated)]
             match channel {
                 Channel::DirectMessage { ref recipients, .. }
                 | Channel::Group { ref recipients, .. } => {
@@ -483,13 +498,14 @@ impl Message {
                     user_mentions.retain(|m| recipients_hash.contains(m));
                     role_mentions.clear();
                 }
-                Channel::TextChannel { ref server, .. }
-                | Channel::VoiceChannel { ref server, .. } => {
+                Channel::TextChannel { ref server, .. } => {
                     let mentions_vec = Vec::from_iter(user_mentions.iter().cloned());
 
                     let valid_members = db.fetch_members(server.as_str(), &mentions_vec[..]).await;
                     if let Ok(valid_members) = valid_members {
-                        let valid_mentions = HashSet::<&String, RandomState>::from_iter(valid_members.iter().map(|m| &m.id.user));
+                        let valid_mentions = HashSet::<&String, RandomState>::from_iter(
+                            valid_members.iter().map(|m| &m.id.user),
+                        );
 
                         user_mentions.retain(|m| valid_mentions.contains(m)); // quick pass, validate mentions are in the server
 
@@ -503,7 +519,8 @@ impl Message {
                                     .members_can_see_channel()
                                     .await;
 
-                            user_mentions.retain(|m| *member_channel_view_perms.get(m).unwrap_or(&false));
+                            user_mentions
+                                .retain(|m| *member_channel_view_perms.get(m).unwrap_or(&false));
                         }
                     } else {
                         revolt_config::capture_error(&valid_members.unwrap_err());
@@ -517,7 +534,9 @@ impl Message {
         }
 
         if !user_mentions.is_empty() {
-            message.mentions.replace(user_mentions.into_iter().collect());
+            message
+                .mentions
+                .replace(user_mentions.into_iter().collect());
         }
 
         if !role_mentions.is_empty() {
@@ -527,9 +546,7 @@ impl Message {
         }
 
         if !replies.is_empty() {
-            message
-                .replies
-                .replace(replies.into_iter().collect::<Vec<String>>());
+            message.replies.replace(replies);
         }
 
         // Calculate final message flags
@@ -611,9 +628,11 @@ impl Message {
             .await;
 
         // Update last_message_id
+        #[cfg(feature = "tasks")]
         tasks::last_message_id::queue(self.channel.to_string(), self.id.to_string(), is_dm).await;
 
         // Add mentions for affected users
+        #[cfg(feature = "tasks")]
         if !mentions_elsewhere {
             if let Some(mentions) = &self.mentions {
                 tasks::ack::queue_message(
@@ -632,6 +651,7 @@ impl Message {
         }
 
         // Generate embeds
+        #[cfg(feature = "tasks")]
         if generate_embeds {
             if let Some(content) = &self.content {
                 tasks::process_embeds::queue(
@@ -651,7 +671,7 @@ impl Message {
     pub async fn send(
         &mut self,
         db: &Database,
-        amqp: Option<&AMQP>, // this is optional mostly for tests.
+        _amqp: Option<&AMQP>, // this is optional mostly for tests.
         author: MessageAuthor<'_>,
         user: Option<v0::User>,
         member: Option<v0::Member>,
@@ -668,10 +688,16 @@ impl Message {
         )
         .await?;
 
+        let is_dm_or_group = matches!(
+            channel,
+            Channel::DirectMessage { .. } | Channel::Group { .. }
+        );
+
         if !self.has_suppressed_notifications()
-            && (self.mentions.is_some() || self.contains_mass_push_mention())
+            && (is_dm_or_group || self.mentions.is_some() || self.contains_mass_push_mention())
         {
             // send Push notifications
+            #[cfg(feature = "tasks")]
             tasks::ack::queue_message(
                 self.channel.to_string(),
                 AckEvent::ProcessMessage {
@@ -679,7 +705,7 @@ impl Message {
                         Some(
                             PushNotification::from(
                                 self.clone().into_model(user, member),
-                                Some(author),
+                                Some(author.clone()),
                                 channel.to_owned().into(),
                             )
                             .await,
@@ -687,7 +713,11 @@ impl Message {
                         self.clone(),
                         match channel {
                             Channel::DirectMessage { recipients, .. }
-                            | Channel::Group { recipients, .. } => recipients.clone(),
+                            | Channel::Group { recipients, .. } => recipients
+                                .iter()
+                                .filter(|uid| *uid != author.id())
+                                .cloned()
+                                .collect(),
                             Channel::TextChannel { .. } => {
                                 self.mentions.clone().unwrap_or_default()
                             }
@@ -782,7 +812,7 @@ impl Message {
         query: MessageQuery,
         perspective: &User,
         include_users: Option<bool>,
-        server_id: Option<String>,
+        server_id: Option<&str>,
     ) -> Result<BulkMessageResponse> {
         let messages: Vec<v0::Message> = db
             .fetch_messages(query)
@@ -825,6 +855,7 @@ impl Message {
                             v0::SystemMessage::MessageUnpinned { by, .. } => {
                                 users.push(by.clone());
                             }
+                            v0::SystemMessage::CallStarted { by, .. } => users.push(by.clone()),
                         }
                     }
                     users
@@ -839,7 +870,7 @@ impl Message {
                 users,
                 members: if let Some(server_id) = server_id {
                     Some(
-                        db.fetch_members(&server_id, &user_ids)
+                        db.fetch_members(server_id, &user_ids)
                             .await?
                             .into_iter()
                             .map(Into::into)
@@ -1005,6 +1036,31 @@ impl Message {
         }
         .p(channel.to_string())
         .await;
+        Ok(())
+    }
+
+    /// Bulk delete messages by an author since a given time
+    pub async fn bulk_delete_by_author_since(
+        db: &Database,
+        channels: &[String],
+        author: &str,
+        since: SystemTime,
+    ) -> Result<()> {
+        let deleted_groups = db
+            .delete_messages_by_author_since(channels, author, since)
+            .await?;
+
+        for (channel_id, message_ids) in deleted_groups {
+            if !message_ids.is_empty() {
+                EventV1::BulkMessageDelete {
+                    channel: channel_id.clone(),
+                    ids: message_ids,
+                }
+                .p(channel_id)
+                .await;
+            }
+        }
+
         Ok(())
     }
 

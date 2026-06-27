@@ -1,8 +1,10 @@
 use std::net::{Ipv4Addr, SocketAddr};
 
-use axum::Router;
+use axum::{middleware::from_fn_with_state, Router};
 
-use revolt_database::DatabaseInfo;
+use axum_macros::FromRef;
+use revolt_database::{Database, DatabaseInfo};
+use revolt_ratelimits::axum as ratelimiter;
 use tokio::net::TcpListener;
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
@@ -15,6 +17,14 @@ pub mod clamav;
 pub mod exif;
 pub mod metadata;
 pub mod mime_type;
+mod ratelimits;
+mod utils;
+
+#[derive(FromRef, Clone)]
+struct AppState {
+    database: Database,
+    ratelimit_storage: ratelimiter::RatelimitStorage,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
@@ -69,12 +79,23 @@ async fn main() -> Result<(), std::io::Error> {
 
     // Connect to the database
     let db = DatabaseInfo::Auto.connect().await.unwrap();
+    let ratelimits = ratelimiter::RatelimitStorage::new(ratelimits::AutumnRatelimits);
+
+    let state = AppState {
+        database: db,
+        ratelimit_storage: ratelimits,
+    };
 
     // Configure Axum and router
     let app = Router::new()
         .merge(Scalar::with_url("/scalar", ApiDoc::openapi()))
         .nest("/", api::router().await)
-        .with_state(db);
+        .nest("/", ratelimiter::routes())
+        .layer(from_fn_with_state(
+            state.clone(),
+            ratelimiter::ratelimit_middleware,
+        ))
+        .with_state(state);
 
     // Configure TCP listener and bind
     let address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, 14704));

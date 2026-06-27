@@ -4,7 +4,7 @@ use crate::{
     DEFAULT_PERMISSION_SERVER, DEFAULT_PERMISSION_VIEW_ONLY,
 };
 
-#[async_std::test]
+#[tokio::test]
 async fn validate_user_permissions() {
     /// Scenario in which we are friends with a user
     /// and we have a DM channel open with them
@@ -64,6 +64,14 @@ async fn validate_user_permissions() {
             unreachable!()
         }
 
+        async fn do_we_have_publish_overwrites(&mut self) -> bool {
+            true
+        }
+
+        async fn do_we_have_receive_overwrites(&mut self) -> bool {
+            true
+        }
+
         async fn get_channel_type(&mut self) -> ChannelType {
             ChannelType::DirectMessage
         }
@@ -106,7 +114,7 @@ async fn validate_user_permissions() {
     }
 }
 
-#[async_std::test]
+#[tokio::test]
 async fn validate_group_permissions() {
     /// Scenario in which we are in a group channel with only talking permission
     struct Scenario {}
@@ -165,6 +173,14 @@ async fn validate_group_permissions() {
             unreachable!()
         }
 
+        async fn do_we_have_publish_overwrites(&mut self) -> bool {
+            true
+        }
+
+        async fn do_we_have_receive_overwrites(&mut self) -> bool {
+            true
+        }
+
         async fn get_channel_type(&mut self) -> ChannelType {
             ChannelType::Group
         }
@@ -210,7 +226,7 @@ async fn validate_group_permissions() {
     }
 }
 
-#[async_std::test]
+#[tokio::test]
 async fn validate_server_permissions() {
     /// Scenario in which we are in a server channel where:
     /// - the server grants reading history and sending messages by default
@@ -278,6 +294,14 @@ async fn validate_server_permissions() {
             false
         }
 
+        async fn do_we_have_publish_overwrites(&mut self) -> bool {
+            true
+        }
+
+        async fn do_we_have_receive_overwrites(&mut self) -> bool {
+            true
+        }
+
         async fn get_channel_type(&mut self) -> ChannelType {
             ChannelType::ServerChannel
         }
@@ -326,7 +350,7 @@ async fn validate_server_permissions() {
     }
 }
 
-#[async_std::test]
+#[tokio::test]
 async fn validate_timed_out_member() {
     /// Scenario in which we are in a server that we have been timed out from
     struct Scenario {}
@@ -379,6 +403,14 @@ async fn validate_timed_out_member() {
         }
 
         async fn are_we_timed_out(&mut self) -> bool {
+            true
+        }
+
+        async fn do_we_have_publish_overwrites(&mut self) -> bool {
+            true
+        }
+
+        async fn do_we_have_receive_overwrites(&mut self) -> bool {
             true
         }
 

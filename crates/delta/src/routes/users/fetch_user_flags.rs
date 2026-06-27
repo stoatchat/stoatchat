@@ -2,7 +2,6 @@ use revolt_database::{util::reference::Reference, Database};
 use revolt_models::v0;
 use revolt_result::Result;
 use rocket::{serde::json::Json, State};
-use serde::Serialize;
 
 /// # Fetch User Flags
 ///
@@ -11,7 +10,7 @@ use serde::Serialize;
 #[get("/<target>/flags")]
 pub async fn fetch_user_flags(
     db: &State<Database>,
-    target: Reference,
+    target: Reference<'_>,
 ) -> Result<Json<v0::FlagResponse>> {
     let flags = if let Ok(target) = target.as_user(db).await {
         target.flags.unwrap_or_default()

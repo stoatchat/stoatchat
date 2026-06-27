@@ -1,7 +1,5 @@
-use authifier::{
-    models::{Session, WebPushSubscription},
-    Authifier,
-};
+use revolt_database::{Database, Session};
+use revolt_models::v0;
 use revolt_result::{create_database_error, Result};
 use rocket::{serde::json::Json, State};
 use rocket_empty::EmptyResponse;
@@ -14,13 +12,13 @@ use rocket_empty::EmptyResponse;
 #[openapi(tag = "Web Push")]
 #[post("/subscribe", data = "<data>")]
 pub async fn subscribe(
-    authifier: &State<Authifier>,
+    db: &State<Database>,
     mut session: Session,
-    data: Json<WebPushSubscription>,
+    data: Json<v0::WebPushSubscription>,
 ) -> Result<EmptyResponse> {
-    session.subscription = Some(data.into_inner());
+    session.subscription = Some(data.into_inner().into());
     session
-        .save(authifier)
+        .save(db)
         .await
         .map(|_| EmptyResponse)
         .map_err(|_| create_database_error!("save", "session"))

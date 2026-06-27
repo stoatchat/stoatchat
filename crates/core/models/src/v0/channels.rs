@@ -1,4 +1,5 @@
-use super::File;
+#![allow(deprecated)]
+use super::{File, UserVoiceState};
 
 use revolt_permissions::{Override, OverrideField};
 use std::collections::{HashMap, HashSet};
@@ -111,48 +112,25 @@ auto_derived!(
                 serde(skip_serializing_if = "crate::if_false", default)
             )]
             nsfw: bool,
-        },
-        /// Voice channel belonging to a server
-        VoiceChannel {
-            /// Unique Id
-            #[cfg_attr(feature = "serde", serde(rename = "_id"))]
-            id: String,
-            /// Id of the server this channel belongs to
-            server: String,
 
-            /// Display name of the channel
-            name: String,
+            /// Voice Information for when this channel is also a voice channel
             #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-            /// Channel description
-            description: Option<String>,
-            /// Custom icon attachment
-            #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-            icon: Option<File>,
+            voice: Option<VoiceInformation>,
 
-            /// Default permissions assigned to users in this channel
-            #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-            default_permissions: Option<OverrideField>,
-            /// Permissions assigned based on role to this channel
-            #[cfg_attr(
-                feature = "serde",
-                serde(
-                    default = "HashMap::<String, OverrideField>::new",
-                    skip_serializing_if = "HashMap::<String, OverrideField>::is_empty"
-                )
-            )]
-            role_permissions: HashMap<String, OverrideField>,
-
-            /// Category the channel is in
+            /// The channel's slowmode delay in seconds
             #[serde(skip_serializing_if = "Option::is_none")]
-            parent: Option<String>,
-
-            /// Whether this channel is marked as not safe for work
-            #[cfg_attr(
-                feature = "serde",
-                serde(skip_serializing_if = "crate::if_false", default)
-            )]
-            nsfw: bool,
+            slowmode: Option<u64>,
         },
+    }
+
+    /// Voice information for a channel
+    #[derive(Default)]
+    #[cfg_attr(feature = "validator", derive(validator::Validate))]
+    pub struct VoiceInformation {
+        /// Maximium amount of users allowed in the voice channel at once
+        #[cfg_attr(feature = "validator", validate(range(min = 1)))]
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+        pub max_users: Option<usize>,
     }
 
     /// Partial representation of a channel
@@ -179,7 +157,11 @@ auto_derived!(
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
         pub last_message_id: Option<String>,
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-        pub parent: Option<String>
+        pub parent: Option<String>,
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+        pub voice: Option<VoiceInformation>,
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+        pub slowmode: Option<u64>,
     }
 
     /// Optional fields on channel object
@@ -187,6 +169,7 @@ auto_derived!(
         Description,
         Icon,
         DefaultPermissions,
+        Voice,
     }
 
     /// New webhook information
@@ -215,9 +198,16 @@ auto_derived!(
         /// Whether this channel is archived
         pub archived: Option<bool>,
 
+        /// Voice Information for voice channels
+        pub voice: Option<VoiceInformation>,
+
+        /// The channel's slow mode delay in seconds, up to 6 hours
+        #[cfg_attr(feature = "validator", validate(range(min = 0, max = 21600)))]
+        pub slowmode: Option<u64>,
+
         /// Fields to remove from channel
         #[cfg_attr(feature = "serde", serde(default))]
-        pub remove: Option<Vec<FieldsChannel>>,
+        pub remove: Vec<FieldsChannel>,
     }
 
     /// Create new group
@@ -270,6 +260,10 @@ auto_derived!(
         /// Whether this channel is age restricted
         #[serde(skip_serializing_if = "Option::is_none")]
         pub nsfw: Option<bool>,
+
+        /// Voice Information for when this channel is also a voice channel
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub voice: Option<VoiceInformation>,
     }
 
     /// New default permissions
@@ -280,7 +274,7 @@ auto_derived!(
             permissions: u64,
         },
         Field {
-            /// Allow / deny values to set for members in this `TextChannel` or `VoiceChannel`
+            /// Allow / deny values to set for members in this server channel
             permissions: Override,
         },
     }
@@ -299,9 +293,38 @@ auto_derived!(
     }
 
     /// Voice server token response
-    pub struct LegacyCreateVoiceUserResponse {
+    pub struct CreateVoiceUserResponse {
         /// Token for authenticating with the voice server
-        token: String,
+        pub token: String,
+        /// Url of the livekit server to connect to
+        pub url: String,
+    }
+
+    /// Voice state for a channel
+    pub struct ChannelVoiceState {
+        pub id: String,
+        /// The states of the users who are connected to the channel
+        pub participants: Vec<UserVoiceState>,
+    }
+
+    /// Join a voice channel
+    pub struct DataJoinCall {
+        /// Name of the node to join
+        pub node: Option<String>,
+        /// Whether to force disconnect any other existing voice connections
+        ///
+        /// Useful for disconnecting on another device and joining on a new.
+        pub force_disconnect: Option<bool>,
+        /// Users which should be notified of the call starting
+        ///
+        /// Only used when the user is the first one connected.
+        pub recipients: Option<Vec<String>>,
+    }
+
+    pub struct ChannelSlowmode {
+        pub channel_id: String,
+        pub duration: u64,
+        pub retry_after: u64,
     }
 );
 
@@ -312,22 +335,19 @@ impl Channel {
             Channel::DirectMessage { id, .. }
             | Channel::Group { id, .. }
             | Channel::SavedMessages { id, .. }
-            | Channel::TextChannel { id, .. }
-            | Channel::VoiceChannel { id, .. } => id,
+            | Channel::TextChannel { id, .. } => id,
         }
     }
 
     /// This returns a Result because the recipient name can't be determined here without a db call,
     /// which can't be done since this is models, which can't reference the database crate.
     ///
-    /// If it returns Err, you need to fetch the name from the db.
-    pub fn name(&self) -> Result<&str, ()> {
+    /// If it returns None, you need to fetch the name from the db.
+    pub fn name(&self) -> Option<&str> {
         match self {
-            Channel::DirectMessage { .. } => Err(()),
-            Channel::SavedMessages { .. } => Ok("Saved Messages"),
-            Channel::TextChannel { name, .. }
-            | Channel::Group { name, .. }
-            | Channel::VoiceChannel { name, .. } => Ok(name),
+            Channel::DirectMessage { .. } => None,
+            Channel::SavedMessages { .. } => Some("Saved Messages"),
+            Channel::TextChannel { name, .. } | Channel::Group { name, .. } => Some(name),
         }
     }
 }

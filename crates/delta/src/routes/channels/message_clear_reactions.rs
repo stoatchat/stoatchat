@@ -17,8 +17,8 @@ use rocket_empty::EmptyResponse;
 pub async fn clear_reactions(
     db: &State<Database>,
     user: User,
-    target: Reference,
-    msg: Reference,
+    target: Reference<'_>,
+    msg: Reference<'_>,
 ) -> Result<EmptyResponse> {
     let channel = target.as_channel(db).await?;
     let mut query = DatabasePermissionQuery::new(db, &user).channel(&channel);

@@ -1,4 +1,7 @@
-use revolt_database::{util::{permissions::DatabasePermissionQuery, reference::Reference}, Channel, Database, FieldsMessage, PartialMessage, SystemMessage, User, AMQP};
+use revolt_database::{
+    util::{permissions::DatabasePermissionQuery, reference::Reference},
+    Channel, Database, FieldsMessage, PartialMessage, SystemMessage, User, AMQP,
+};
 use revolt_models::v0::MessageAuthor;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
@@ -14,8 +17,8 @@ pub async fn message_unpin(
     db: &State<Database>,
     amqp: &State<AMQP>,
     user: User,
-    target: Reference,
-    msg: Reference,
+    target: Reference<'_>,
+    msg: Reference<'_>,
 ) -> Result<EmptyResponse> {
     let channel = target.as_channel(db).await?;
 
@@ -91,7 +94,7 @@ mod test {
         Member::create(&harness.db, &server, &user, Some(channels.clone()))
             .await
             .expect("Failed to create member");
-        let member = Reference::from_unchecked(user.id.clone())
+        let member = Reference::from_unchecked(&user.id)
             .as_member(&harness.db, &server.id)
             .await
             .expect("Failed to get member");
@@ -174,7 +177,7 @@ mod test {
             })
             .await;
 
-        let updated_message = Reference::from_unchecked(message.id)
+        let updated_message = Reference::from_unchecked(&message.id)
             .as_message(&harness.db)
             .await
             .expect("Failed to find updated message");

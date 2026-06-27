@@ -3,12 +3,12 @@ Your account has been suspended, for one or more reasons:
 
 You will be able to use your account again in {{duration}} days.
 
-Further violations may result in a permanent ban depending on severity, please abide by the Acceptable Usage Policy (https://revolt.chat/aup).
+Further violations may result in a permanent ban depending on severity, please abide by the Community Guidelines (https://stoat.chat/legal/community-guidelines).
 
 Ban evasion is prohibited and will be dealt with accordingly.
 
 This email is intended for {{email}}
-Sent by Revolt
+Sent by Stoat
 Made in Europe
 
 Revolt Platforms Ltd. is a company incorporated and registered under the laws of England and Wales.

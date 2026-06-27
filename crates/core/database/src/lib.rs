@@ -25,6 +25,9 @@ pub use mongodb;
 #[macro_use]
 extern crate bson;
 
+#[cfg(not(feature = "tokio-runtime"))]
+compile_error!("tokio-runtime feature must be enabled.");
+
 #[macro_export]
 #[cfg(debug_assertions)]
 macro_rules! query {
@@ -103,10 +106,15 @@ pub mod util;
 pub use models::*;
 
 pub mod events;
+#[cfg(feature = "tasks")]
 pub mod tasks;
 
 mod amqp;
 pub use amqp::amqp::AMQP;
+
+#[cfg(feature = "voice")]
+pub mod voice;
+
 
 /// Utility function to check if a boolean value is false
 pub fn if_false(t: &bool) -> bool {

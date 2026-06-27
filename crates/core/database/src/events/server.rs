@@ -1,8 +1,8 @@
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 
 use super::client::Ping;
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub enum ClientMessage {
     Authenticate { token: String },

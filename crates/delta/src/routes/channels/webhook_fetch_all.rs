@@ -15,7 +15,7 @@ use rocket::{serde::json::Json, State};
 pub async fn fetch_webhooks(
     db: &State<Database>,
     user: User,
-    channel_id: Reference,
+    channel_id: Reference<'_>,
 ) -> Result<Json<Vec<Webhook>>> {
     let channel = channel_id.as_channel(db).await?;
 

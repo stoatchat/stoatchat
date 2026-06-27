@@ -17,7 +17,7 @@ use rocket::{serde::json::Json, State};
 pub async fn open_dm(
     db: &State<Database>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
 ) -> Result<Json<v0::Channel>> {
     let target = target.as_user(db).await?;
 

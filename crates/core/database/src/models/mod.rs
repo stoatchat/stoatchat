@@ -8,6 +8,7 @@ mod emojis;
 mod file_hashes;
 mod files;
 mod messages;
+mod policy_changes;
 mod ratelimit_events;
 mod safety_reports;
 mod safety_snapshots;
@@ -16,6 +17,10 @@ mod server_members;
 mod servers;
 mod user_settings;
 mod users;
+mod accounts;
+mod account_invites;
+mod sessions;
+mod mfa_tickets;
 
 pub use admin_migrations::*;
 pub use bots::*;
@@ -27,6 +32,7 @@ pub use emojis::*;
 pub use file_hashes::*;
 pub use files::*;
 pub use messages::*;
+pub use policy_changes::*;
 pub use ratelimit_events::*;
 pub use safety_reports::*;
 pub use safety_snapshots::*;
@@ -35,8 +41,15 @@ pub use server_members::*;
 pub use servers::*;
 pub use user_settings::*;
 pub use users::*;
+pub use accounts::*;
+pub use account_invites::*;
+pub use sessions::*;
+pub use mfa_tickets::*;
 
-use crate::{Database, MongoDb, ReferenceDb};
+use crate::{Database, ReferenceDb};
+
+#[cfg(feature = "mongodb")]
+use crate::MongoDb;
 
 pub trait AbstractDatabase:
     Sync
@@ -51,6 +64,7 @@ pub trait AbstractDatabase:
     + file_hashes::AbstractAttachmentHashes
     + files::AbstractAttachments
     + messages::AbstractMessages
+    + policy_changes::AbstractPolicyChange
     + ratelimit_events::AbstractRatelimitEvents
     + safety_reports::AbstractReport
     + safety_snapshots::AbstractSnapshot
@@ -59,10 +73,16 @@ pub trait AbstractDatabase:
     + servers::AbstractServers
     + user_settings::AbstractUserSettings
     + users::AbstractUsers
+    + accounts::AbstractAccounts
+    + account_invites::AbstractAccountInvites
+    + sessions::AbstractSessions
+    + mfa_tickets::AbstractMFATickets
 {
 }
 
 impl AbstractDatabase for ReferenceDb {}
+
+#[cfg(feature = "mongodb")]
 impl AbstractDatabase for MongoDb {}
 
 impl std::ops::Deref for Database {
@@ -71,6 +91,7 @@ impl std::ops::Deref for Database {
     fn deref(&self) -> &Self::Target {
         match &self {
             Database::Reference(dummy) => dummy,
+            #[cfg(feature = "mongodb")]
             Database::MongoDb(mongo) => mongo,
         }
     }

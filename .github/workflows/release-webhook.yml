@@ -1,0 +1,26 @@
+# DO NOT EDIT DIRECTLY IN REPOSITORY
+# Managed in Terraform templates
+
+name: Release Webhook
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  release-webhook:
+    name: Send Release Webhook
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send release notification webhook
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+          REPOSITORY: ${{ github.repository }}
+          WEBHOOK_URL: ${{ secrets.STOAT_WEBHOOK_UPDATES_URL }}
+        run: |
+          RELEASE_URL="https://github.com/${REPOSITORY}/releases/tag/${TAG_NAME}"
+          curl -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"content\": \"$RELEASE_URL\"}"

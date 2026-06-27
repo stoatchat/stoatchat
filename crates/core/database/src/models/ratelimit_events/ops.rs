@@ -1,6 +1,8 @@
 use std::time::Duration;
 
 use crate::{revolt_result::Result, RatelimitEvent, RatelimitEventType};
+
+#[cfg(feature = "mongodb")]
 mod mongodb;
 mod reference;
 

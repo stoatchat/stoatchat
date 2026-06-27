@@ -1,38 +1,48 @@
 [package]
 name = "revolt-files"
-version = "0.8.4"
+version = "0.13.7"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 authors = ["Paul Makles <me@insrt.uk>"]
 description = "Revolt Backend: S3 and encryption subroutines"
+repository = "https://github.com/stoatchat/stoatchat"
 
 [dependencies]
-tracing = "0.1"
+anyhow = { workspace = true }
+thiserror = { workspace = true }
 
-ffprobe = "0.4.0"
-imagesize = "0.13.0"
-tempfile = "3.12.0"
+tracing = { workspace = true }
 
-base64 = "0.22.1"
-aes-gcm = "0.10.3"
-typenum = "1.17.0"
+tokio = { workspace = true }
+async-trait = { workspace = true }
 
-aws-config = "1.5.5"
-aws-sdk-s3 = { version = "1.46.0", features = ["behavior-version-latest"] }
+ffprobe = { workspace = true }
+imagesize = { workspace = true }
+tempfile = { workspace = true }
 
-revolt-config = { version = "0.8.4", path = "../config", features = [
+base64 = { workspace = true }
+aes-gcm = { workspace = true }
+typenum = { workspace = true }
+
+aws-config = { workspace = true }
+aws-sdk-s3 = { workspace = true, features = ["behavior-version-latest"] }
+
+revolt-config = { workspace = true, features = [
     "report-macros",
 ] }
-revolt-result = { version = "0.8.4", path = "../result" }
+revolt-result = { workspace = true }
 
 # image processing
-jxl-oxide = "0.8.1"
-image = { version = "0.25.2" }
+jxl-oxide = { workspace = true, features = ["image"] }
+image = { workspace = true }
 
 # svg rendering
-usvg = "0.44.0"
-resvg = "0.44.0"
-tiny-skia = "0.11.4"
+usvg = { workspace = true }
+resvg = { workspace = true }
+tiny-skia = { workspace = true }
 
 # encoding
-webp = "0.3.0"
+webp = { workspace = true }
+
+[dev-dependencies]
+uuid = { workspace = true, features = ["v4"] }

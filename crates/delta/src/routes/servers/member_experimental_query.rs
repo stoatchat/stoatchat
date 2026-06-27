@@ -36,7 +36,7 @@ pub struct MemberQueryResponse {
 pub async fn member_experimental_query(
     db: &State<Database>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
     options: OptionsQueryMembers,
 ) -> Result<Json<MemberQueryResponse>> {
     if !options.experimental_api {

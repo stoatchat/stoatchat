@@ -1,8 +1,14 @@
 use async_tungstenite::tungstenite::{handshake, Message};
 use futures::channel::oneshot::Sender;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use revolt_database::events::client::ReadyPayloadFields;
 use revolt_result::{create_error, Result};
 use serde::{Deserialize, Serialize};
+
+/// matches either a single word ie "users" or a key and value ie "settings[notifications]"
+static READY_PAYLOAD_FIELD_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"^(\w+)(?:\[(\S+)\])?$"#).unwrap());
 
 /// Enumeration of supported protocol formats
 #[derive(Debug)]
@@ -17,6 +23,7 @@ pub struct ProtocolConfiguration {
     protocol_version: i32,
     format: ProtocolFormat,
     session_token: Option<String>,
+    ready_payload_fields: ReadyPayloadFields,
 }
 
 impl ProtocolConfiguration {
@@ -25,11 +32,13 @@ impl ProtocolConfiguration {
         protocol_version: i32,
         format: ProtocolFormat,
         session_token: Option<String>,
+        ready_payload_fields: ReadyPayloadFields,
     ) -> Self {
         Self {
             protocol_version,
             format,
             session_token,
+            ready_payload_fields,
         }
     }
 
@@ -86,14 +95,8 @@ impl ProtocolConfiguration {
     }
 
     /// Get ready payload fields
-    pub fn get_ready_payload_fields(&self) -> Vec<ReadyPayloadFields> {
-        vec![
-            ReadyPayloadFields::Users,
-            ReadyPayloadFields::Servers,
-            ReadyPayloadFields::Channels,
-            ReadyPayloadFields::Members,
-            ReadyPayloadFields::Emoji,
-        ]
+    pub fn get_ready_payload_fields(&self) -> &ReadyPayloadFields {
+        &self.ready_payload_fields
     }
 }
 
@@ -124,6 +127,23 @@ impl handshake::server::Callback for WebsocketHandshakeCallback {
         let mut protocol_version = 1;
         let mut format = ProtocolFormat::Json;
         let mut session_token = None;
+        let mut ready_payload_fields = if params.iter().any(|(k, _)| *k == "ready") {
+            // If they pass the ready field, set all fields to false
+
+            ReadyPayloadFields {
+                users: false,
+                servers: false,
+                channels: false,
+                members: false,
+                emojis: false,
+                voice_states: false,
+                user_settings: Vec::new(),
+                channel_unreads: false,
+                policy_changes: false,
+            }
+        } else {
+            ReadyPayloadFields::default()
+        };
 
         // Parse and map parameters from key-value to known variables.
         for (key, value) in params {
@@ -139,6 +159,31 @@ impl handshake::server::Callback for WebsocketHandshakeCallback {
                     _ => {}
                 },
                 "token" => session_token = Some(value.into()),
+                "ready" => {
+                    // Re-enable all the fields the client specifies
+                    if let Some(captures) = READY_PAYLOAD_FIELD_REGEX.captures(value) {
+                        if let Some(field) = captures.get(0) {
+                            match field.as_str() {
+                                "users" => ready_payload_fields.users = true,
+                                "servers" => ready_payload_fields.servers = true,
+                                "channels" => ready_payload_fields.channels = true,
+                                "members" => ready_payload_fields.members = true,
+                                "emojis" => ready_payload_fields.emojis = true,
+                                "voice_states" => ready_payload_fields.voice_states = true,
+                                "channel_unreads" => ready_payload_fields.channel_unreads = true,
+                                "user_settings" => {
+                                    if let Some(subkey) = captures.get(1) {
+                                        ready_payload_fields
+                                            .user_settings
+                                            .push(subkey.as_str().to_string());
+                                    }
+                                }
+                                "policy_changes" => ready_payload_fields.policy_changes = true,
+                                _ => {}
+                            }
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -151,6 +196,7 @@ impl handshake::server::Callback for WebsocketHandshakeCallback {
                 protocol_version,
                 format,
                 session_token,
+                ready_payload_fields,
             })
             .is_ok()
         {

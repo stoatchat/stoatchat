@@ -20,21 +20,25 @@ fi
 
 TAG=$1-debug
 echo "Building images, will tag for ghcr.io with $TAG!"
-docker build -t ghcr.io/revoltchat/base:latest -f Dockerfile.useCurrentArch .
-docker build -t ghcr.io/revoltchat/server:$TAG - < crates/delta/Dockerfile
-docker build -t ghcr.io/revoltchat/bonfire:$TAG - < crates/bonfire/Dockerfile
-docker build -t ghcr.io/revoltchat/autumn:$TAG - < crates/services/autumn/Dockerfile
-docker build -t ghcr.io/revoltchat/january:$TAG - < crates/services/january/Dockerfile
-docker build -t ghcr.io/revoltchat/crond:$TAG - < crates/daemons/crond/Dockerfile
-docker build -t ghcr.io/revoltchat/pushd:$TAG - < crates/daemons/pushd/Dockerfile
+docker build -t ghcr.io/stoatchat/base:latest -f Dockerfile.useCurrentArch .
+docker build -t ghcr.io/stoatchat/server:$TAG - < crates/delta/Dockerfile
+docker build -t ghcr.io/stoatchat/bonfire:$TAG - < crates/bonfire/Dockerfile
+docker build -t ghcr.io/stoatchat/autumn:$TAG - < crates/services/autumn/Dockerfile
+docker build -t ghcr.io/stoatchat/january:$TAG - < crates/services/january/Dockerfile
+docker build -t ghcr.io/stoatchat/gifbox:$TAG - < crates/services/gifbox/Dockerfile
+docker build -t ghcr.io/stoatchat/crond:$TAG - < crates/daemons/crond/Dockerfile
+docker build -t ghcr.io/stoatchat/pushd:$TAG - < crates/daemons/pushd/Dockerfile
+docker build -t ghcr.io/stoatchat/voice-ingress:$TAG - < crates/daemons/voice-ingress/Dockerfile
 
 if [ "$DEBUG" = "true" ]; then
   git restore Cargo.toml
 fi
 
-docker push ghcr.io/revoltchat/server:$TAG
-docker push ghcr.io/revoltchat/bonfire:$TAG
-docker push ghcr.io/revoltchat/autumn:$TAG
-docker push ghcr.io/revoltchat/january:$TAG
-docker push ghcr.io/revoltchat/crond:$TAG
-docker push ghcr.io/revoltchat/pushd:$TAG
+docker push ghcr.io/stoatchat/server:$TAG
+docker push ghcr.io/stoatchat/bonfire:$TAG
+docker push ghcr.io/stoatchat/autumn:$TAG
+docker push ghcr.io/stoatchat/january:$TAG
+docker push ghcr.io/stoatchat/gifbox:$TAG
+docker push ghcr.io/stoatchat/crond:$TAG
+docker push ghcr.io/stoatchat/pushd:$TAG
+docker push ghcr.io/stoatchat/voice-ingress:$TAG

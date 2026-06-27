@@ -1,0 +1,13 @@
+port: 7880
+redis:
+    address: localhost:6379
+    username: ""
+    password: ""
+webhook:
+  api_key: worldwide
+  urls:
+    - 'http://localhost:8500/worldwide'
+logging:
+  level: debug
+keys:
+  worldwide: ZjCofRlfm6GGtjlifmNpCDkcQbEIIVC0

@@ -1,0 +1,41 @@
+[package]
+name = "revolt-voice-ingress"
+version = "0.13.7"
+license = "AGPL-3.0-or-later"
+edition = "2021"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# util
+log = { workspace = true }
+sentry = { workspace = true }
+lru = { workspace = true }
+ulid = { workspace = true }
+redis-kiss = { workspace = true, default-features = false, features = ["tokio-runtime"] }
+chrono = { workspace = true }
+
+# Serde
+serde_json = { workspace = true }
+rmp-serde = { workspace = true }
+serde = { workspace = true }
+
+# Http
+rocket = { workspace = true, features = ["json"] }
+rocket_empty = { workspace = true }
+
+# Async
+futures = { workspace = true }
+
+# Core
+revolt-result = { workspace = true, features = ["rocket"] }
+revolt-models = { workspace = true }
+revolt-config = { workspace = true }
+revolt-database = { workspace = true, features = ["voice"] }
+revolt-permissions = { workspace = true }
+
+# Voice
+livekit-api = { workspace = true }
+livekit-protocol = { workspace = true }
+livekit-runtime = { workspace = true, features = ["tokio"] }

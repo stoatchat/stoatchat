@@ -1,26 +1,36 @@
 use std::collections::HashSet;
 
 use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference},
+    events::client::EventV1,
+    util::{
+        permissions::{perms, DatabasePermissionQuery},
+        reference::Reference,
+    },
+    voice::{
+        get_channel_node, get_user_voice_channel_in_server, set_channel_node,
+        set_user_moved_from_voice, set_user_moved_to_voice, sync_user_voice_permissions,
+        UserVoiceChannel, VoiceClient,
+    },
     Database, File, PartialMember, User,
 };
-use revolt_models::v0;
+use revolt_models::v0::{self, FieldsMember};
 
-use revolt_permissions::{calculate_server_permissions, ChannelPermission};
+use revolt_permissions::{calculate_channel_permissions, calculate_server_permissions, ChannelPermission, UserPermission};
 use revolt_result::{create_error, Result};
-use rocket::{serde::json::Json, State};
+use rocket::{form::validate::Contains, serde::json::Json, State};
 use validator::Validate;
 
 /// # Edit Member
 ///
 /// Edit a member by their id.
 #[openapi(tag = "Server Members")]
-#[patch("/<server>/members/<member>", data = "<data>")]
+#[patch("/<server_id>/members/<member_id>", data = "<data>")]
 pub async fn edit(
     db: &State<Database>,
+    voice_client: &State<VoiceClient>,
     user: User,
-    server: Reference,
-    member: Reference,
+    server_id: Reference<'_>,
+    member_id: Reference<'_>,
     data: Json<v0::DataMemberEdit>,
 ) -> Result<Json<v0::Member>> {
     let data = data.into_inner();
@@ -31,21 +41,22 @@ pub async fn edit(
     })?;
 
     // Fetch server and member
-    let mut server = server.as_server(db).await?;
-    let mut member = member.as_member(db, &server.id).await?;
+    let mut server = server_id.as_server(db).await?;
+    let target_user = member_id.as_user(db).await?;
+    let mut member = member_id.as_member(db, &server.id).await?;
 
     // Fetch our currrent permissions
     let mut query = DatabasePermissionQuery::new(db, &user).server(&server);
     let permissions = calculate_server_permissions(&mut query).await;
 
+    // Fetch target permissions
+    let mut target_query = DatabasePermissionQuery::new(db, &target_user)
+        .server(&server)
+        .member(&member);
+    let target_permissions = calculate_server_permissions(&mut target_query).await;
+
     // Check permissions in server
-    if data.nickname.is_some()
-        || data
-            .remove
-            .as_ref()
-            .map(|x| x.contains(&v0::FieldsMember::Nickname))
-            .unwrap_or_default()
-    {
+    if data.nickname.is_some() || data.remove.contains(&v0::FieldsMember::Nickname) {
         if user.id == member.id.user {
             permissions.throw_if_lacking_channel_permission(ChannelPermission::ChangeNickname)?;
         } else {
@@ -53,43 +64,88 @@ pub async fn edit(
         }
     }
 
-    if data.avatar.is_some()
-        || data
-            .remove
-            .as_ref()
-            .map(|x| x.contains(&v0::FieldsMember::Avatar))
-            .unwrap_or_default()
-    {
-        if user.id == member.id.user {
-            permissions.throw_if_lacking_channel_permission(ChannelPermission::ChangeAvatar)?;
-        } else {
-            return Err(create_error!(InvalidOperation));
+    if data.pronouns.is_some() || data.remove.contains(&v0::FieldsMember::Pronouns) {
+        if user.id != member.id.user {
+            return Err(create_error!(InvalidOperation))
         }
     }
 
-    if data.roles.is_some()
-        || data
-            .remove
-            .as_ref()
-            .map(|x| x.contains(&v0::FieldsMember::Roles))
-            .unwrap_or_default()
-    {
+    if data.avatar.is_some() || data.remove.contains(&v0::FieldsMember::Avatar) {
+        if user.id == member.id.user {
+            permissions.throw_if_lacking_channel_permission(ChannelPermission::ChangeAvatar)?;
+        } else if data.remove.contains(&v0::FieldsMember::Avatar) {
+            permissions.throw_if_lacking_channel_permission(ChannelPermission::RemoveAvatars)?;
+        } else {
+            return Err(create_error!(InvalidOperation))
+        }
+    }
+
+    if data.roles.is_some() || data.remove.contains(&v0::FieldsMember::Roles) {
         permissions.throw_if_lacking_channel_permission(ChannelPermission::AssignRoles)?;
     }
 
-    if data.timeout.is_some()
-        || data
-            .remove
-            .as_ref()
-            .map(|x| x.contains(&v0::FieldsMember::Timeout))
-            .unwrap_or_default()
-    {
-        if data.timeout.is_some() && member.id.user == user.id {
-            return Err(create_error!(CannotTimeoutYourself));
+    if data.timeout.is_some() || data.remove.contains(&v0::FieldsMember::Timeout) {
+        if data.timeout.is_some() {
+            if member.id.user == user.id {
+                return Err(create_error!(CannotTimeoutYourself));
+            }
+
+            if target_permissions.has_channel_permission(ChannelPermission::TimeoutMembers) {
+                return Err(create_error!(IsElevated));
+            }
         }
 
         permissions.throw_if_lacking_channel_permission(ChannelPermission::TimeoutMembers)?;
     }
+
+    if data.can_publish.is_some() {
+        permissions.throw_if_lacking_channel_permission(ChannelPermission::MuteMembers)?;
+    }
+
+    if data.can_receive.is_some() {
+        permissions.throw_if_lacking_channel_permission(ChannelPermission::DeafenMembers)?;
+    }
+
+    if data.voice_channel.is_some() && data.remove.contains(&FieldsMember::VoiceChannel) {
+        return Err(create_error!(InvalidOperation));
+    }
+
+    if data.voice_channel.is_some() || data.remove.contains(&FieldsMember::VoiceChannel) {
+        if !voice_client.is_enabled() {
+            return Err(create_error!(LiveKitUnavailable));
+        };
+
+        if member.id.user != user.id {
+            permissions.throw_if_lacking_channel_permission(ChannelPermission::MoveMembers)?;
+        }
+    }
+
+    let new_voice_channel = if let Some(new_channel) = &data.voice_channel {
+        // ensure the channel we are moving them to is in the server and is a voice channel
+
+        let channel = Reference::from_unchecked(new_channel)
+            .as_channel(db)
+            .await
+            .map_err(|_| create_error!(UnknownChannel))?;
+
+        if channel.server().is_none_or(|v| v != member.id.server) {
+            Err(create_error!(UnknownChannel))?
+        }
+
+        let channel_permissions = calculate_channel_permissions(&mut query.clone().channel(&channel)).await;
+        channel_permissions.throw_if_lacking_channel_permission(ChannelPermission::Connect)?;
+
+        if get_user_voice_channel_in_server(&target_user.id, &server.id)
+            .await?
+            .is_none()
+        {
+            Err(create_error!(NotConnected))?
+        };
+
+        Some(channel)
+    } else {
+        None
+    };
 
     // Resolve our ranking
     let our_ranking = query.get_member_rank().unwrap_or(i64::MIN);
@@ -122,25 +178,30 @@ pub async fn edit(
     // Apply edits to the member object
     let v0::DataMemberEdit {
         nickname,
+        pronouns,
         avatar,
         roles,
         timeout,
         remove,
+        can_publish,
+        can_receive,
+        voice_channel: _,
     } = data;
 
     let mut partial = PartialMember {
         nickname,
+        pronouns,
         roles,
         timeout,
+        can_publish,
+        can_receive,
         ..Default::default()
     };
 
     // 1. Remove fields from object
-    if let Some(fields) = &remove {
-        if fields.contains(&v0::FieldsMember::Avatar) {
-            if let Some(avatar) = &member.avatar {
-                db.mark_attachment_as_deleted(&avatar.id).await?;
-            }
+    if remove.contains(&v0::FieldsMember::Avatar) {
+        if let Some(avatar) = &member.avatar {
+            db.mark_attachment_as_deleted(&avatar.id).await?;
         }
     }
 
@@ -150,14 +211,86 @@ pub async fn edit(
     }
 
     member
-        .update(
-            db,
-            partial,
-            remove
-                .map(|v| v.into_iter().map(Into::into).collect())
-                .unwrap_or_default(),
-        )
+        .update(db, partial, remove.clone().into_iter().map(Into::into).collect())
         .await?;
+
+    if let Some(new_voice_channel) = new_voice_channel {
+        if let Some(channel) = get_user_voice_channel_in_server(&target_user.id, &server.id).await?
+        {
+            let old_node = get_channel_node(&channel).await?.unwrap();
+
+            let new_node = match get_channel_node(new_voice_channel.id()).await? {
+                Some(node) => node,
+                None => {
+                    set_channel_node(new_voice_channel.id(), &old_node).await?;
+                    old_node.clone()
+                }
+            };
+
+            let new_user_voice_channel = UserVoiceChannel::from_channel(&new_voice_channel);
+            let old_user_voice_channel = UserVoiceChannel {
+                id: channel.clone(),
+                server_id: new_user_voice_channel.server_id.clone(),
+            };
+
+            set_user_moved_from_voice(&channel, &new_user_voice_channel, &target_user.id).await?;
+            set_user_moved_to_voice(
+                new_voice_channel.id(),
+                &old_user_voice_channel,
+                &target_user.id,
+            )
+            .await?;
+
+            let mut query = perms(db, &target_user).channel(&new_voice_channel);
+            let permissions = calculate_channel_permissions(&mut query).await;
+
+            voice_client
+                .create_room(&new_node, &new_voice_channel)
+                .await?;
+            let token = voice_client
+                .create_token(&new_node, db, &target_user, permissions, &new_voice_channel)
+                .await?;
+
+            voice_client
+                .remove_user(&old_node, &target_user.id, &channel)
+                .await?;
+
+            EventV1::UserMoveVoiceChannel {
+                node: new_node,
+                from: channel,
+                to: new_voice_channel.id().to_string(),
+                token,
+            }
+            .private(target_user.id.clone())
+            .await;
+        };
+    } else if can_publish.is_some() || can_receive.is_some() || remove.contains(FieldsMember::CanPublish) || remove.contains(FieldsMember::CanReceive) {
+        if let Some(channel) = get_user_voice_channel_in_server(&target_user.id, &server.id).await?
+        {
+            let node = get_channel_node(&channel).await?.unwrap();
+            let channel = Reference::from_unchecked(&channel).as_channel(db).await?;
+
+            sync_user_voice_permissions(
+                db,
+                voice_client,
+                &node,
+                &user,
+                &channel,
+                Some(&server),
+                None,
+            )
+            .await?;
+        };
+    };
+
+    if remove.contains(&FieldsMember::VoiceChannel) {
+        if let Some(channel) = get_user_voice_channel_in_server(&target_user.id, &server.id).await?
+        {
+            let node = get_channel_node(&channel).await?.unwrap();
+
+            voice_client.remove_user(&node, &user.id, &channel).await?;
+        };
+    }
 
     Ok(Json(member.into()))
 }

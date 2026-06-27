@@ -69,7 +69,7 @@ impl Invite {
                 creator: creator.id.clone(),
                 channel: id.clone(),
             }),
-            Channel::TextChannel { id, server, .. } | Channel::VoiceChannel { id, server, .. } => {
+            Channel::TextChannel { id, server, .. } => {
                 Ok(Invite::Server {
                     code,
                     creator: creator.id.clone(),

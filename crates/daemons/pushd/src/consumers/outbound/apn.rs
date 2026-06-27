@@ -1,11 +1,13 @@
-use std::{borrow::Cow, collections::BTreeMap, io::Cursor};
+use std::{borrow::Cow, collections::BTreeMap, io::Cursor, sync::Arc};
 
-use amqprs::{channel::Channel as AmqpChannel, consumer::AsyncConsumer, BasicProperties, Deliver};
+use crate::utils::Consumer;
+use anyhow::Result;
 use async_trait::async_trait;
 use base64::{
     engine::{self},
     Engine as _,
 };
+use lapin::{message::Delivery, Channel as AMQPChannel, Connection};
 use revolt_a2::{
     request::{
         notification::{DefaultAlert, NotificationOptions},
@@ -41,16 +43,45 @@ impl<'a> PayloadLike for MessagePayload<'a> {
     fn get_device_token(&self) -> &'a str {
         self.device_token
     }
-    fn get_options(&self) -> &NotificationOptions {
+    fn get_options(&self) -> &NotificationOptions<'a> {
+        &self.options
+    }
+}
+
+#[derive(Serialize, Debug)]
+struct CallStartStopPayload<'a> {
+    aps: APS<'a>,
+    #[serde(skip_serializing)]
+    options: NotificationOptions<'a>,
+    #[serde(skip_serializing)]
+    device_token: &'a str,
+
+    initiator_id: &'a str,
+    #[serde(rename = "camelCase")]
+    channel_id: &'a str,
+    #[serde(rename = "camelCase")]
+    started_at: &'a str,
+    #[serde(rename = "camelCase")]
+    ended: bool,
+}
+
+impl<'a> PayloadLike for CallStartStopPayload<'a> {
+    fn get_device_token(&self) -> &'a str {
+        self.device_token
+    }
+    fn get_options(&self) -> &NotificationOptions<'a> {
         &self.options
     }
 }
 
 // region: consumer
 
+#[derive(Clone)]
+#[allow(unused)]
 pub struct ApnsOutboundConsumer {
-    #[allow(dead_code)]
     db: Database,
+    connection: Arc<Connection>,
+    channel: Arc<AMQPChannel>,
     client: Client,
 }
 
@@ -62,10 +93,11 @@ impl ApnsOutboundConsumer {
         // in a dm it should just be "Sendername".
         // not sure how feasible all those are given the PushNotification object as it currently stands.
 
+        #[allow(deprecated)]
         match &notification.channel {
             Channel::DirectMessage { .. } => notification.author.clone(),
             Channel::Group { name, .. } => format!("{}, #{}", notification.author, name),
-            Channel::TextChannel { name, .. } | Channel::VoiceChannel { name, .. } => {
+            Channel::TextChannel { name, .. } => {
                 format!("{} in #{}", notification.author, name)
             }
             _ => "Unknown".to_string(),
@@ -89,15 +121,20 @@ impl ApnsOutboundConsumer {
     }
 }
 
-impl ApnsOutboundConsumer {
-    pub async fn new(db: Database) -> Result<ApnsOutboundConsumer, &'static str> {
+#[async_trait]
+impl Consumer for ApnsOutboundConsumer {
+    async fn create(
+        db: Database,
+        connection: Arc<Connection>,
+        channel: Arc<AMQPChannel>,
+    ) -> Self {
         let config = revolt_config::config().await;
 
         if config.pushd.apn.pkcs8.is_empty()
             || config.pushd.apn.key_id.is_empty()
             || config.pushd.apn.team_id.is_empty()
         {
-            return Err("Missing APN keys.");
+            panic!("Missing APN keys.");
         }
 
         let endpoint = if config.pushd.apn.sandbox {
@@ -120,22 +157,20 @@ impl ApnsOutboundConsumer {
         )
         .expect("could not create APN client");
 
-        Ok(ApnsOutboundConsumer { db, client })
+        Self {
+            db,
+            connection,
+            channel,
+            client,
+        }
     }
-}
 
-#[allow(unused_variables)]
-#[async_trait]
-impl AsyncConsumer for ApnsOutboundConsumer {
-    async fn consume(
-        &mut self,
-        channel: &AmqpChannel,
-        deliver: Deliver,
-        basic_properties: BasicProperties,
-        content: Vec<u8>,
-    ) {
-        let content = String::from_utf8(content).unwrap();
-        let payload: PayloadToService = serde_json::from_str(content.as_str()).unwrap();
+    fn channel(&self) -> &Arc<AMQPChannel> {
+        &self.channel
+    }
+
+    async fn consume(&self, delivery: Delivery) -> Result<()> {
+        let payload: PayloadToService = serde_json::from_slice(&delivery.data)?;
 
         let payload_options = NotificationOptions {
             apns_id: None,
@@ -146,20 +181,15 @@ impl AsyncConsumer for ApnsOutboundConsumer {
             apns_collapse_id: None,
         };
 
-        let resp: Result<Response, Error>;
-
-        match payload.notification {
+        let resp = match payload.notification {
             PayloadKind::FRReceived(alert) => {
                 let loc_args = vec![Cow::from(
-                    alert
-                        .from_user
-                        .display_name
-                        .or(Some(format!(
+                    alert.from_user.display_name.clone().unwrap_or_else(|| {
+                        format!(
                             "{}#{}",
                             alert.from_user.username, alert.from_user.discriminator
-                        )))
-                        .clone()
-                        .unwrap(),
+                        )
+                    }),
                 )];
 
                 let apn_payload = Payload {
@@ -192,20 +222,17 @@ impl AsyncConsumer for ApnsOutboundConsumer {
                     "Sending friend request received for user: {:}",
                     &payload.user_id
                 );
-                resp = self.client.send(apn_payload).await;
+                self.client.send(apn_payload).await
             }
 
             PayloadKind::FRAccepted(alert) => {
                 let loc_args = vec![Cow::from(
-                    alert
-                        .accepted_user
-                        .display_name
-                        .or(Some(format!(
+                    alert.accepted_user.display_name.clone().unwrap_or_else(|| {
+                        format!(
                             "{}#{}",
                             alert.accepted_user.username, alert.accepted_user.discriminator
-                        )))
-                        .clone()
-                        .unwrap(),
+                        )
+                    }),
                 )];
 
                 let apn_payload = Payload {
@@ -238,7 +265,7 @@ impl AsyncConsumer for ApnsOutboundConsumer {
                     "Sending friend request accept for user: {:}",
                     &payload.user_id
                 );
-                resp = self.client.send(apn_payload).await;
+                self.client.send(apn_payload).await
             }
             PayloadKind::Generic(alert) => {
                 let apn_payload = Payload {
@@ -271,7 +298,7 @@ impl AsyncConsumer for ApnsOutboundConsumer {
                     "Sending generic notification for user: {:}",
                     &payload.user_id
                 );
-                resp = self.client.send(apn_payload).await;
+                self.client.send(apn_payload).await
             }
 
             PayloadKind::MessageNotification(alert) => {
@@ -310,8 +337,9 @@ impl AsyncConsumer for ApnsOutboundConsumer {
                     "Sending message notification for user: {:}",
                     &payload.user_id
                 );
-                resp = self.client.send(apn_payload).await;
+                self.client.send(apn_payload).await
             }
+
             PayloadKind::BadgeUpdate(badge) => {
                 let apn_payload = Payload {
                     aps: APS {
@@ -324,36 +352,66 @@ impl AsyncConsumer for ApnsOutboundConsumer {
                 };
 
                 debug!("Sending badge update for user: {:}", &payload.user_id);
-                resp = self.client.send(apn_payload).await;
+                self.client.send(apn_payload).await
             }
-        }
 
-        if let Err(err) = resp {
-            match err {
-                Error::ResponseError(Response {
-                    error:
-                        Some(ErrorBody {
-                            reason: ErrorReason::BadDeviceToken | ErrorReason::Unregistered,
-                            ..
-                        }),
-                    ..
-                }) => {
-                    info!(
-                        "Removing APNS subscription id {:} (user: {:}) due to invalid token",
-                        &payload.session_id, &payload.user_id
-                    );
-                    if let Err(err) = self
-                        .db
-                        .remove_push_subscription_by_session_id(&payload.session_id)
-                        .await
-                    {
-                        revolt_config::capture_error(&err);
-                    }
-                }
-                err => {
+            PayloadKind::DmCallStartEnd(alert) => {
+                let started_at = alert.started_at.map_or(String::new(), |f| f.clone());
+
+                let apn_payload = CallStartStopPayload {
+                    aps: APS {
+                        alert: None,
+                        badge: self.get_badge_count(&payload.user_id).await,
+                        sound: None,
+                        thread_id: None,
+                        content_available: None,
+                        category: None,
+                        mutable_content: Some(1),
+                        url_args: None,
+                    },
+                    device_token: &payload.token,
+                    options: payload_options.clone(),
+                    initiator_id: &alert.initiator_id,
+                    channel_id: &alert.channel_id,
+                    started_at: &started_at,
+                    ended: alert.ended,
+                };
+
+                debug!(
+                    "Sending call start/stop notification for user: {:}",
+                    &payload.user_id
+                );
+                self.client.send(apn_payload).await
+            }
+        };
+
+        match resp {
+            Err(Error::ResponseError(Response {
+                error:
+                    Some(ErrorBody {
+                        reason: ErrorReason::BadDeviceToken | ErrorReason::Unregistered,
+                        ..
+                    }),
+                ..
+            })) => {
+                info!(
+                    "Removing APNS subscription id {:} (user: {:}) due to invalid token",
+                    &payload.session_id, &payload.user_id
+                );
+
+                if let Err(err) = self
+                    .db
+                    .remove_push_subscription_by_session_id(&payload.session_id)
+                    .await
+                {
                     revolt_config::capture_error(&err);
                 }
             }
-        }
+            resp => {
+                resp?;
+            }
+        };
+
+        Ok(())
     }
 }

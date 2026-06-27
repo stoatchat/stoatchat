@@ -1,4 +1,3 @@
-use revolt_config::config;
 use revolt_result::Result;
 use ulid::Ulid;
 
@@ -165,7 +164,7 @@ impl Bot {
 mod tests {
     use crate::{Bot, FieldsBot, PartialBot, User};
 
-    #[async_std::test]
+    #[tokio::test]
     async fn crud() {
         database_test!(|db| async move {
             let owner = User::create(&db, "Owner".to_string(), None, None)

@@ -54,4 +54,22 @@ auto_derived!(
         #[serde(default)]
         pub nsfw: bool,
     }
+
+    /// Partial emoji representation
+    #[derive(Default)]
+    pub struct PartialEmoji {
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+        pub name: Option<String>,
+    }
+
+    /// Edit emoji information
+    #[cfg_attr(feature = "validator", derive(Validate))]
+    pub struct DataEditEmoji {
+        /// Emoji name
+        #[cfg_attr(
+            feature = "validator",
+            validate(length(min = 1, max = 32), regex = "RE_EMOJI")
+        )]
+        pub name: Option<String>,
+    }
 );

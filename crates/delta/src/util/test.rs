@@ -1,22 +1,24 @@
-use authifier::{
-    models::{Account, Session},
-    Authifier,
-};
+use std::time::Duration;
+
 use futures::StreamExt;
 use rand::Rng;
 use redis_kiss::redis::aio::PubSub;
+use revolt_database::util::email::normalise_email;
+use revolt_database::util::password::hash_password;
 use revolt_database::{
-    events::client::EventV1, Channel, Database, Member, Message, Server, User, AMQP,
+    events::client::EventV1, Channel, Database, Member, Message, PartialRole, Server, User, AMQP,
 };
 use revolt_database::{util::idempotency::IdempotencyKey, Role};
+use revolt_database::{Account, EmailVerification, Session};
 use revolt_models::v0;
 use revolt_permissions::OverrideField;
 use rocket::http::Header;
 use rocket::local::asynchronous::{Client, LocalRequest, LocalResponse};
+use rocket::tokio;
+use serde::{Deserialize, Serialize};
 
 pub struct TestHarness {
     pub client: Client,
-    authifier: Authifier,
     pub db: Database,
     pub amqp: AMQP,
     sub: PubSub,
@@ -25,8 +27,6 @@ pub struct TestHarness {
 
 impl TestHarness {
     pub async fn new() -> TestHarness {
-        let config = revolt_config::config().await;
-
         let client = Client::tracked(crate::web().await)
             .await
             .expect("valid rocket instance");
@@ -43,29 +43,10 @@ impl TestHarness {
             .expect("`Database`")
             .clone();
 
-        let authifier = client
-            .rocket()
-            .state::<Authifier>()
-            .expect("`Authifier`")
-            .clone();
-
-        let connection = amqprs::connection::Connection::open(
-            &amqprs::connection::OpenConnectionArguments::new(
-                &config.rabbit.host,
-                config.rabbit.port,
-                &config.rabbit.username,
-                &config.rabbit.password,
-            ),
-        )
-        .await
-        .unwrap();
-        let channel = connection.open_channel(None).await.unwrap();
-
-        let amqp = AMQP::new(connection, channel);
+        let amqp = AMQP::new_auto().await;
 
         TestHarness {
             client,
-            authifier,
             db,
             amqp,
             sub,
@@ -83,30 +64,38 @@ impl TestHarness {
     }
 
     pub async fn new_user(&self) -> (Account, Session, User) {
-        let account = Account::new(
-            &self.authifier,
-            format!("{}@revolt.chat", TestHarness::rand_string()),
-            "password".to_string(),
-            false,
-        )
-        .await
-        .expect("`Account`");
+        let user = User::create(&self.db, TestHarness::rand_string(), None, None)
+            .await
+            .expect("`User`");
+
+        let (account, session) = self.account_from_user(user.id.clone()).await;
+
+        (account, session, user)
+    }
+
+    pub async fn account_from_user(&self, id: String) -> (Account, Session) {
+        let email = format!("{}@stoat.chat", TestHarness::rand_string());
+        let account = Account {
+            id,
+            email: email.clone(),
+            password: hash_password("password_insecure".to_string()).unwrap(),
+            email_normalised: normalise_email(email),
+            deletion: None,
+            disabled: false,
+            lockout: None,
+            mfa: Default::default(),
+            password_reset: None,
+            verification: EmailVerification::Verified,
+        };
+
+        self.db.save_account(&account).await.expect("`Account`");
 
         let session = account
-            .create_session(&self.authifier, String::new())
+            .create_session(&self.db, String::new())
             .await
             .expect("`Session`");
 
-        let user = User::create(
-            &self.db,
-            TestHarness::rand_string(),
-            account.id.to_string(),
-            None,
-        )
-        .await
-        .expect("`User`");
-
-        (account, session, user)
+        (account, session)
     }
 
     pub async fn new_server(&self, user: &User) -> (Server, Vec<Channel>) {
@@ -128,21 +117,26 @@ impl TestHarness {
         server: &Server,
         rank: i64,
         overrides: Option<OverrideField>,
-    ) -> (String, Role) {
-        let role = Role {
-            name: TestHarness::rand_string(),
-            permissions: overrides.unwrap_or(OverrideField { a: 0, d: 0 }),
-            rank,
-            colour: None,
-            hoist: false,
-        };
-
-        let id = role
-            .create(&self.db, &server.id)
+    ) -> Role {
+        let mut role = Role::create(&self.db, &server, TestHarness::rand_string())
             .await
             .expect("Failed to create test role");
 
-        (id, role)
+        if let Some(overrides) = overrides {
+            role.update(
+                &self.db,
+                &server.id,
+                PartialRole {
+                    permissions: Some(overrides),
+                    ..Default::default()
+                },
+                Vec::new(),
+            )
+            .await
+            .expect("Failed to set test role overrides");
+        };
+
+        role
     }
 
     pub async fn new_channel(&self, server: &Server) -> Channel {
@@ -154,6 +148,7 @@ impl TestHarness {
                 name: "Test Channel".to_string(),
                 description: None,
                 nsfw: Some(false),
+                voice: None,
             },
             true,
         )
@@ -198,10 +193,7 @@ impl TestHarness {
         (channel.clone(), member, message)
     }
 
-    pub async fn with_session<'c>(
-        session: Session,
-        request: LocalRequest<'c>,
-    ) -> LocalResponse<'c> {
+    pub async fn with_session(session: Session, request: LocalRequest<'_>) -> LocalResponse<'_> {
         request
             .header(Header::new("x-session-token", session.token.to_string()))
             .dispatch()
@@ -237,6 +229,40 @@ impl TestHarness {
         unreachable!()
     }
 
+    pub async fn assert_email(&self, mailbox: &str) -> (Mail, String) {
+        // Wait a moment for maildev to catch the email
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let client = reqwest::Client::new();
+        let results = client
+            .get("http://localhost:14080/email")
+            .send()
+            .await
+            .unwrap()
+            .json::<Vec<Mail>>()
+            .await
+            .unwrap();
+
+        let re = regex::Regex::new(r"\[\[([A-Za-z0-9_-]*)\]\]").unwrap();
+
+        for entry in results.into_iter().rev() {
+            if entry.envelope.to[0].address == mailbox {
+                client
+                    .delete(format!("http://localhost:14080/delete/{}", &entry.id))
+                    .send()
+                    .await
+                    .unwrap();
+
+                let code = re.captures_iter(&entry.text).next().unwrap()[1].to_string();
+
+                return (entry, code);
+            }
+        }
+
+        panic!("Email not found.")
+    }
+
     pub async fn wait_for_message(&mut self, channel_id: &str) -> v0::Message {
         dbg!(&self.event_buffer);
 
@@ -251,4 +277,23 @@ impl TestHarness {
             _ => unreachable!(),
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Mail {
+    pub id: String,
+    pub envelope: MailEnvelope,
+    pub subject: String,
+    pub text: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MailEnvelope {
+    pub from: MailAddress,
+    pub to: Vec<MailAddress>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MailAddress {
+    pub address: String,
 }

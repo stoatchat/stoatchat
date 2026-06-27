@@ -16,7 +16,7 @@ use validator::Validate;
 pub async fn create_server_channel(
     db: &State<Database>,
     user: User,
-    server: Reference,
+    server: Reference<'_>,
     data: Json<v0::DataCreateServerChannel>,
 ) -> Result<Json<v0::Channel>> {
     let data = data.into_inner();

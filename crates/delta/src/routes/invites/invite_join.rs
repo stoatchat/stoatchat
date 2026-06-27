@@ -12,7 +12,7 @@ pub async fn join(
     db: &State<Database>,
     amqp: &State<AMQP>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
 ) -> Result<Json<v0::InviteJoinResponse>> {
     if user.bot.is_some() {
         return Err(create_error!(IsBot));

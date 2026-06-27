@@ -30,6 +30,7 @@ impl<'r> Responder<'r, 'static> for Error {
             ErrorType::UnknownChannel => Status::NotFound,
             ErrorType::UnknownMessage => Status::NotFound,
             ErrorType::UnknownAttachment => Status::BadRequest,
+            ErrorType::CannotDeleteMessage => Status::Forbidden,
             ErrorType::CannotEditMessage => Status::Forbidden,
             ErrorType::CannotJoinCall => Status::BadRequest,
             ErrorType::TooManyAttachments { .. } => Status::BadRequest,
@@ -42,8 +43,10 @@ impl<'r> Responder<'r, 'static> for Error {
             ErrorType::NotInGroup => Status::NotFound,
             ErrorType::AlreadyPinned => Status::BadRequest,
             ErrorType::NotPinned => Status::BadRequest,
+            ErrorType::InSlowmode { retry_after: _ } => Status::TooManyRequests,
             ErrorType::InvalidFlagValue => Status::BadRequest,
 
+            ErrorType::CantCreateServers => Status::Forbidden,
             ErrorType::UnknownServer => Status::NotFound,
             ErrorType::InvalidRole => Status::NotFound,
             ErrorType::Banned => Status::Forbidden,
@@ -71,6 +74,7 @@ impl<'r> Responder<'r, 'static> for Error {
             ErrorType::NotPrivileged => Status::Forbidden,
             ErrorType::CannotGiveMissingPermissions => Status::Forbidden,
             ErrorType::NotOwner => Status::Forbidden,
+            ErrorType::IsElevated => Status::Forbidden,
 
             ErrorType::DatabaseError { .. } => Status::InternalServerError,
             ErrorType::InternalError => Status::InternalServerError,
@@ -80,10 +84,14 @@ impl<'r> Responder<'r, 'static> for Error {
             ErrorType::InvalidSession => Status::Unauthorized,
             ErrorType::NotAuthenticated => Status::Unauthorized,
             ErrorType::DuplicateNonce => Status::Conflict,
-            ErrorType::VosoUnavailable => Status::BadRequest,
             ErrorType::NotFound => Status::NotFound,
-            ErrorType::NoEffect => Status::Ok,
+            ErrorType::NoEffect => Status::BadRequest,
             ErrorType::FailedValidation { .. } => Status::BadRequest,
+            ErrorType::LiveKitUnavailable => Status::BadRequest,
+            ErrorType::NotAVoiceChannel => Status::BadRequest,
+            ErrorType::AlreadyConnected => Status::BadRequest,
+            ErrorType::NotConnected => Status::BadRequest,
+            ErrorType::UnknownNode => Status::BadRequest,
             ErrorType::FeatureDisabled { .. } => Status::BadRequest,
 
             ErrorType::ProxyError => Status::BadRequest,
@@ -92,6 +100,33 @@ impl<'r> Responder<'r, 'static> for Error {
             ErrorType::FileTypeNotAllowed => Status::BadRequest,
             ErrorType::ImageProcessingFailed => Status::InternalServerError,
             ErrorType::NoEmbedData => Status::BadRequest,
+            ErrorType::VosoUnavailable => Status::BadRequest,
+
+            ErrorType::RenderFail => Status::InternalServerError,
+            ErrorType::MissingHeaders => Status::BadRequest,
+            ErrorType::CaptchaFailed => Status::BadRequest,
+            ErrorType::BlockedByShield => Status::BadRequest,
+            ErrorType::UnverifiedAccount => Status::Forbidden,
+            ErrorType::EmailFailed => Status::InternalServerError,
+            ErrorType::InvalidToken => Status::Unauthorized,
+            ErrorType::MissingInvite => Status::BadRequest,
+            ErrorType::InvalidInvite => Status::BadRequest,
+            ErrorType::CompromisedPassword => Status::BadRequest,
+            ErrorType::ShortPassword => Status::BadRequest,
+            ErrorType::Blacklisted => {
+                // Fail blacklisted email addresses.
+                const RESP: &str = "{\"type\":\"DisallowedContactSupport\", \"note\":\"If you see this messages right here, you're probably doing something you shouldn't be.\"}";
+
+                return Response::build()
+                    .status(Status::Unauthorized)
+                    .sized_body(RESP.len(), std::io::Cursor::new(RESP))
+                    .ok();
+            }
+            ErrorType::LockedOut => Status::Forbidden,
+            ErrorType::TotpAlreadyEnabled => Status::BadRequest,
+            ErrorType::DisallowedMFAMethod => Status::BadRequest,
+            ErrorType::OperationFailed => Status::InternalServerError,
+            ErrorType::IncorrectData { .. } => Status::BadRequest,
         };
 
         // Serialize the error data structure into JSON.

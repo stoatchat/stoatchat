@@ -1,5 +1,6 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
+    voice::{sync_voice_permissions, VoiceClient},
     Database, User,
 };
 use revolt_models::v0;
@@ -14,38 +15,47 @@ use rocket::{serde::json::Json, State};
 #[put("/<target>/permissions/<role_id>", data = "<data>", rank = 2)]
 pub async fn set_role_permission(
     db: &State<Database>,
+    voice_client: &State<VoiceClient>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
     role_id: String,
     data: Json<v0::DataSetServerRolePermission>,
 ) -> Result<Json<v0::Server>> {
     let data = data.into_inner();
 
     let mut server = target.as_server(db).await?;
-    if let Some((current_value, rank)) = server.roles.get(&role_id).map(|x| (x.permissions, x.rank))
-    {
-        let mut query = DatabasePermissionQuery::new(db, &user).server(&server);
-        let permissions = calculate_server_permissions(&mut query).await;
 
-        permissions.throw_if_lacking_channel_permission(ChannelPermission::ManagePermissions)?;
+    let (current_value, rank) = server
+        .roles
+        .get(&role_id)
+        .map(|x| (x.permissions, x.rank))
+        .ok_or_else(|| create_error!(NotFound))?;
 
-        // Prevent us from editing roles above us
-        if rank <= query.get_member_rank().unwrap_or(i64::MIN) {
-            return Err(create_error!(NotElevated));
-        }
+    let mut query = DatabasePermissionQuery::new(db, &user).server(&server);
+    let permissions = calculate_server_permissions(&mut query).await;
 
-        // Ensure we have access to grant these permissions forwards
-        let current_value: Override = current_value.into();
-        permissions
-            .throw_permission_override(current_value, &data.permissions)
-            .await?;
+    permissions.throw_if_lacking_channel_permission(ChannelPermission::ManagePermissions)?;
 
-        server
-            .set_role_permission(db, &role_id, data.permissions.into())
-            .await?;
-
-        Ok(Json(server.into()))
-    } else {
-        Err(create_error!(NotFound))
+    // Prevent us from editing roles above us
+    if rank <= query.get_member_rank().unwrap_or(i64::MIN) {
+        return Err(create_error!(NotElevated));
     }
+
+    // Ensure we have access to grant these permissions forwards
+    let current_value: Override = current_value.into();
+    permissions
+        .throw_permission_override(current_value, &data.permissions)
+        .await?;
+
+    server
+        .set_role_permission(db, &role_id, data.permissions.into())
+        .await?;
+
+    for channel_id in &server.channels {
+        let channel = Reference::from_unchecked(channel_id).as_channel(db).await?;
+
+        sync_voice_permissions(db, voice_client, &channel, Some(&server), Some(&role_id)).await?;
+    };
+
+    Ok(Json(server.into()))
 }

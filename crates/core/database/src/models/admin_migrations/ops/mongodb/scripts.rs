@@ -1,18 +1,23 @@
-use std::{collections::HashSet, ops::BitXor, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::BitXor,
+    time::Duration,
+};
 
 use crate::{
     mongodb::{
         bson::{doc, from_bson, from_document, to_document, Bson, DateTime, Document},
         options::FindOptions,
     },
-    AbstractChannels, AbstractServers, Channel, Invite, MongoDb, DISCRIMINATOR_SEARCH_SPACE,
+    AbstractServers, Invite, MongoDb, User, DISCRIMINATOR_SEARCH_SPACE,
 };
-use bson::oid::ObjectId;
+use bson::{oid::ObjectId, to_bson};
 use futures::StreamExt;
+use iso8601_timestamp::Timestamp;
 use rand::seq::SliceRandom;
-use revolt_permissions::DEFAULT_WEBHOOK_PERMISSIONS;
-use revolt_result::{Error, ErrorType};
+use revolt_permissions::{ChannelPermission, DEFAULT_WEBHOOK_PERMISSIONS};
 use serde::{Deserialize, Serialize};
+use ulid::Ulid;
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Serialize, Deserialize)]
@@ -21,7 +26,7 @@ struct MigrationInfo {
     revision: i32,
 }
 
-pub const LATEST_REVISION: i32 = 31;
+pub const LATEST_REVISION: i32 = 51; // MUST BE +1 to last migration
 
 pub async fn migrate_database(db: &MongoDb) {
     let migrations = db.col::<Document>("migrations");
@@ -447,7 +452,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
         warn!("This is a destructive operation and will wipe existing permission data (excl. defaults for SendMessage).");
         warn!("Taking a backup is advised.");
         warn!("Continuing in 10 seconds...");
-        async_std::task::sleep(Duration::from_secs(10)).await;
+        tokio::time::sleep(Duration::from_secs(10)).await;
 
         let servers = db.col::<Document>("servers");
         let mut cursor = servers.find(doc! {}).await.unwrap();
@@ -569,20 +574,145 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     if revision <= 15 {
         info!("Running migration [revision 15 / 04-06-2022]: Migrate Authifier to latest version.");
 
-        let db = authifier::Database::MongoDb(authifier::database::MongoDb(db.db()));
-        db.run_migration(authifier::Migration::M2022_06_03EnsureUpToSpec)
+        if !db
+            .db()
+            .collection::<Document>("mfa_tickets")
+            .list_index_names()
             .await
-            .unwrap();
+            .unwrap_or_default()
+            .contains(&"token".to_owned())
+        {
+            // Make sure all collections exist
+            let list = db.db().list_collection_names().await.unwrap();
+            let collections = ["accounts", "sessions", "invites", "mfa_tickets"];
+
+            for name in collections {
+                if !list.contains(&name.to_string()) {
+                    db.db().create_collection(name).await.unwrap();
+                }
+            }
+
+            // Setup index for `accounts`
+            let col = db.db().collection::<Document>("accounts");
+            col.drop_indexes().await.unwrap();
+
+            db.db()
+                .run_command(doc! {
+                    "createIndexes": "accounts",
+                    "indexes": [
+                        {
+                            "key": {
+                                "email": 1
+                            },
+                            "name": "email",
+                            "unique": true,
+                            "collation": {
+                                "locale": "en",
+                                "strength": 2
+                            }
+                        },
+                        {
+                            "key": {
+                                "email_normalised": 1
+                            },
+                            "name": "email_normalised",
+                            "unique": true,
+                            "collation": {
+                                "locale": "en",
+                                "strength": 2
+                            }
+                        },
+                        {
+                            "key": {
+                                "verification.token": 1
+                            },
+                            "name": "email_verification"
+                        },
+                        {
+                            "key": {
+                                "password_reset.token": 1
+                            },
+                            "name": "password_reset"
+                        }
+                    ]
+                })
+                .await
+                .unwrap();
+
+            // Setup index for `sessions`
+            let col = db.db().collection::<Document>("sessions");
+            col.drop_indexes().await.unwrap();
+
+            db.db()
+                .run_command(doc! {
+                    "createIndexes": "sessions",
+                    "indexes": [
+                        {
+                            "key": {
+                                "token": 1
+                            },
+                            "name": "token",
+                            "unique": true
+                        },
+                        {
+                            "key": {
+                                "user_id": 1
+                            },
+                            "name": "user_id"
+                        }
+                    ]
+                })
+                .await
+                .unwrap();
+
+            // Setup index for `mfa_tickets`
+            let col = db.db().collection::<Document>("mfa_tickets");
+            col.drop_indexes().await.unwrap();
+
+            db.db()
+                .run_command(doc! {
+                    "createIndexes": "mfa_tickets",
+                    "indexes": [
+                        {
+                            "key": {
+                                "token": 1
+                            },
+                            "name": "token",
+                            "unique": true
+                        }
+                    ]
+                })
+                .await
+                .unwrap();
+        }
     }
 
     if revision <= 16 {
         info!("Running migration [revision 16 / 07-07-2022]: Add `emojis` collection and Authifier migration.");
 
-        let authifier_db = authifier::Database::MongoDb(authifier::database::MongoDb(db.db()));
-        authifier_db
-            .run_migration(authifier::Migration::M2022_06_09AddIndexForDeletion)
+        if !db
+            .db()
+            .collection::<Document>("accounts")
+            .list_index_names()
             .await
-            .unwrap();
+            .expect("list of index names")
+            .contains(&"account_deletion".to_owned())
+        {
+            db.db()
+                .run_command(doc! {
+                    "createIndexes": "accounts",
+                    "indexes": [
+                        {
+                            "key": {
+                                "deletion.token": 1
+                            },
+                            "name": "account_deletion"
+                        }
+                    ]
+                })
+                .await
+                .unwrap();
+        }
 
         db.db()
             .create_collection("emojis")
@@ -909,6 +1039,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     }
 
     if revision <= 26 {
+        // Need to migrate fields on attachments, change `user_id`, `object_id`, etc to `parent`.
         info!("Running migration [revision 26 / 15-05-2024]: fix invites being incorrectly serialized with wrong enum tagging.");
 
         auto_derived!(
@@ -1075,6 +1206,14 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             channel_id: String,
         }
 
+        #[allow(clippy::enum_variant_names)]
+        #[derive(serde::Serialize, serde::Deserialize)]
+        enum Channel {
+            Group { owner: String },
+            TextChannel { server: String },
+            VoiceChannel { server: String },
+        }
+
         let webhooks = db
             .db()
             .collection::<WebhookShell>("channel_webhooks")
@@ -1086,8 +1225,13 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             .await;
 
         for webhook in webhooks {
-            match db.fetch_channel(&webhook.channel_id).await {
-                Ok(channel) => {
+            match db
+                .col::<Channel>("channels")
+                .find_one(doc! { "_id": &webhook.channel_id })
+                .await
+                .unwrap()
+            {
+                Some(channel) => {
                     let creator_id = match channel {
                         Channel::Group { owner, .. } => owner,
                         Channel::TextChannel { server, .. }
@@ -1095,7 +1239,6 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
                             let server = db.fetch_server(&server).await.expect("server");
                             server.owner
                         }
-                        _ => unreachable!("not server or group channel!"),
                     };
 
                     db.db()
@@ -1113,19 +1256,238 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
                         .await
                         .expect("update webhook");
                 }
-                Err(Error {
-                    error_type: ErrorType::NotFound,
-                    ..
-                }) => {
+                None => {
                     db.db()
                         .collection::<WebhookShell>("channel_webhooks")
                         .delete_one(doc! { "_id": webhook._id })
                         .await
                         .expect("failed to delete invalid webhook");
                 }
-                Err(err) => panic!("{err:?}"),
             }
         }
+    }
+
+    if revision <= 32 {
+        info!(
+            "Running migration [revision 32 / 12-05-2025]: (Authifier) Add last_seen to sessions."
+        );
+
+        loop {
+            #[derive(Deserialize)]
+            struct SessionId {
+                _id: String,
+            }
+
+            let sessions: Vec<SessionId> = db
+                .db()
+                .collection("sessions")
+                .find(doc! {
+                    "$or": [
+                        { "last_seen": { "$exists": false } },
+                        { "last_seen": "1970-01-01T00:00:00.000Z" }
+                    ]
+                })
+                .limit(50_000) // about 400 batches for 2 million
+                .await
+                .expect("Failed to create cursor for sessions!")
+                .map(|doc| doc.expect("id and username"))
+                .collect()
+                .await;
+
+            if sessions.is_empty() {
+                break;
+            }
+
+            for session in sessions {
+                let timestamp = iso8601_timestamp::Timestamp::from(Ulid::from_string(&session._id).unwrap().datetime());
+
+                db.db()
+                    .collection::<Document>("sessions")
+                    .update_one(
+                        doc! {
+                            "_id": &session._id.to_string(),
+                        },
+                        doc! {
+                            "$set": {
+                                "last_seen": timestamp.format().to_string()
+                            }
+                        },
+                    )
+                    .await
+                    .expect("Failed to update a session.");
+            }
+        }
+    }
+
+    if revision <= 40 {
+        info!(
+            "Running migration [revision |> 40 / 30-05-2025]: Set last policy acknowlegement date to now and create policy changes collection."
+        );
+
+        db.db()
+            .create_collection("policy_changes")
+            .await
+            .expect("Failed to create policy_changes collection.");
+
+        db.db()
+            .collection::<User>("users")
+            .update_many(
+                doc! {},
+                doc! {
+                    "$set": {
+                        "last_acknowledged_policy_change": to_bson(&Timestamp::now_utc())
+                            .expect("failed to serialise timestamp")
+                    }
+                },
+            )
+            .await
+            .expect("failed to update users");
+    }
+
+    if revision <= 43 {
+        info!(
+            "Running migration [revision 43 / 05-06-2025]: convert role ranks to uniform numbers."
+        );
+
+        #[derive(Serialize, Deserialize, Clone)]
+        struct Role {
+            pub rank: i64,
+        }
+
+        #[derive(Serialize, Deserialize, Clone)]
+        struct Server {
+            #[serde(rename = "_id")]
+            pub id: String,
+            #[serde(default = "HashMap::<String, Role>::new")]
+            pub roles: HashMap<String, Role>,
+        }
+
+        let mut servers = db
+            .db()
+            .collection::<Server>("servers")
+            .find(doc! {
+                "roles": {
+                    "$exists": true,
+                    "$ne": []
+                }
+            })
+            .await
+            .unwrap()
+            .filter_map(|s| async { s.ok() })
+            .boxed();
+
+        while let Some(server) = servers.next().await {
+            let mut ordered_roles = server.roles.clone().into_iter().collect::<Vec<_>>();
+            ordered_roles.sort_by(|(_, role_a), (_, role_b)| role_a.rank.cmp(&role_b.rank));
+            let ordered_roles = ordered_roles
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect::<Vec<_>>();
+
+            let mut doc = doc! {};
+
+            for id in server.roles.keys() {
+                doc.insert(
+                    format!("roles.{id}.rank"),
+                    ordered_roles.iter().position(|x| id == x).unwrap() as i64,
+                );
+            }
+
+            db.db()
+                .collection::<Server>("servers")
+                .update_one(doc! { "_id": &server.id }, doc! { "$set": doc })
+                .await
+                .unwrap();
+        }
+    }
+
+    if revision <= 46 {
+        info!("Running migration [revision 46 / 29-04-2025]: Convert all `VoiceChannel`'s into `TextChannel`");
+
+        db.col::<Document>("channels")
+            .update_many(
+                doc! { "channel_type": "VoiceChannel" },
+                doc! {
+                    "$set": {
+                        "channel_type": "TextChannel",
+                        "voice": {}
+                    }
+                },
+            )
+            .await
+            .expect("Failed to update voice channels");
+    };
+
+    if revision <= 48 {
+        info!("Running migration [revision 48 / 22-10-2025]: Add Video + Listen to default permissions");
+
+        db.col::<Document>("servers")
+            .update_many(
+                doc! { },
+                doc! {
+                    "$bit": {
+                        "default_permissions": {
+                            "or": (ChannelPermission::Video + ChannelPermission::Speak + ChannelPermission::Listen) as i64
+                        },
+                    }
+                }
+            )
+            .await
+            .expect("Failed to update default_permissions");
+    };
+
+    if revision <= 49 {
+        info!("Running migration [revision 49 / 12-12-2025]: Add _id key to roles");
+
+        #[derive(Serialize, Deserialize, Clone)]
+        struct Server {
+            #[serde(rename = "_id")]
+            pub id: String,
+            #[serde(default = "HashMap::<String, Document>::new")]
+            pub roles: HashMap<String, Document>,
+        }
+
+        let mut servers = db
+            .db()
+            .collection::<Server>("servers")
+            .find(doc! {
+                "roles": {
+                    "$exists": true,
+                    "$ne": {}
+                }
+            })
+            .await
+            .unwrap()
+            .map(|res| res.expect("Failed to decode Server { id, roles }"));
+
+        while let Some(server) = servers.next().await {
+            let mut doc = doc! {};
+
+            for id in server.roles.keys() {
+                doc.insert(format!("roles.{id}._id"), id);
+            }
+
+            db.db()
+                .collection::<Server>("servers")
+                .update_one(doc! { "_id": &server.id }, doc! { "$set": doc })
+                .await
+                .unwrap();
+        }
+    };
+
+    if revision <= 50 {
+        info!("Running migration [revision 50 / 13-04-2026]: Rename invites collection to account_invites");
+
+        db.db()
+            .client()
+            .database("admin")
+            .run_command(doc! {
+                "renameCollection": "revolt.invites",
+                "to": "revolt.account_invites",
+                "dropTarget": true
+            })
+            .await
+            .unwrap();
     }
 
     // Reminder to update LATEST_REVISION when adding new migrations.

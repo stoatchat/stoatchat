@@ -1,12 +1,12 @@
-use authifier::models::Session;
 use rocket::http::Status;
 use rocket::request::{self, FromRequest, Outcome, Request};
+use revolt_result::Error;
 
-use crate::{Database, User};
+use crate::{Database, Session, User};
 
 #[rocket::async_trait]
 impl<'r> FromRequest<'r> for User {
-    type Error = authifier::Error;
+    type Error = Error;
 
     async fn from_request(request: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
         let user: &Option<User> = request
@@ -38,7 +38,7 @@ impl<'r> FromRequest<'r> for User {
         if let Some(user) = user {
             Outcome::Success(user.clone())
         } else {
-            Outcome::Error((Status::Unauthorized, authifier::Error::InvalidSession))
+            Outcome::Error((Status::Unauthorized, create_error!(InvalidSession)))
         }
     }
 }

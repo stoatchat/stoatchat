@@ -1,0 +1,33 @@
+[package]
+name = "revolt-ratelimits"
+version = "0.13.7"
+edition = "2024"
+license = "MIT"
+authors = ["Zomatree <me@zomatree.live>", "Paul Makles <me@insrt.uk>"]
+description = "Revolt Backend: Ratelimit Handler"
+repository = "https://github.com/stoatchat/stoatchat"
+
+[features]
+rocket = [
+    "dep:rocket",
+    "dep:revolt_rocket_okapi",
+    "revolt-database/rocket-impl",
+]
+axum = ["dep:axum", "revolt-database/axum-impl"]
+
+default = ["rocket", "axum"]
+
+[dependencies]
+revolt-database = { workspace = true }
+revolt-result = { workspace = true }
+revolt-config = { workspace = true }
+
+rocket = { workspace = true, optional = true }
+revolt_rocket_okapi = { workspace = true, optional = true }
+
+axum = { workspace = true, optional = true, features = ["macros"] }
+
+serde = { workspace = true }
+dashmap = { workspace = true }
+async-trait = { workspace = true }
+log = { workspace = true }

@@ -1,14 +1,18 @@
-use std::collections::HashMap;
+#[cfg(feature = "test")]
+use std::sync::OnceLock;
+use std::{collections::HashMap, path::Path, sync::LazyLock};
 
 use cached::proc_macro::cached;
-use config::{Config, File, FileFormat};
+use config::{Config, Environment, File, FileFormat};
 use futures_locks::RwLock;
-use once_cell::sync::Lazy;
 use serde::Deserialize;
 
+#[cfg(feature = "sentry")]
 pub use sentry::{capture_error, capture_message, Level};
+#[cfg(feature = "anyhow")]
+pub use sentry_anyhow::capture_anyhow;
 
-#[cfg(feature = "report-macros")]
+#[cfg(all(feature = "report-macros", feature = "sentry"))]
 #[macro_export]
 macro_rules! report_error {
     ( $expr: expr, $error: ident $( $tt:tt )? ) => {
@@ -23,7 +27,7 @@ macro_rules! report_error {
     };
 }
 
-#[cfg(feature = "report-macros")]
+#[cfg(all(feature = "report-macros", feature = "sentry"))]
 #[macro_export]
 macro_rules! capture_internal_error {
     ( $expr: expr ) => {
@@ -34,7 +38,7 @@ macro_rules! capture_internal_error {
     };
 }
 
-#[cfg(feature = "report-macros")]
+#[cfg(all(feature = "report-macros", feature = "sentry"))]
 #[macro_export]
 macro_rules! report_internal_error {
     ( $expr: expr ) => {
@@ -59,26 +63,54 @@ static CONFIG_SEARCH_PATHS: [&str; 3] = [
     "/Revolt.toml",
 ];
 
+/// Path to search for test overrides
+static TEST_OVERRIDE_PATH: &str = "Revolt.test-overrides.toml";
+
 /// Configuration builder
-static CONFIG_BUILDER: Lazy<RwLock<Config>> = Lazy::new(|| {
+static CONFIG_BUILDER: LazyLock<RwLock<Config>> = LazyLock::new(|| {
     RwLock::new({
         let mut builder = Config::builder().add_source(File::from_str(
             include_str!("../Revolt.toml"),
             FileFormat::Toml,
         ));
 
+        let cwd = std::env::current_dir().unwrap();
+        let mut cwd: Option<&Path> = Some(&cwd);
+
+        while let Some(path) = cwd {
+            for config_path in CONFIG_SEARCH_PATHS {
+                let config_path = path.join(config_path);
+                if config_path.exists() {
+                    builder = builder
+                        .add_source(File::new(config_path.to_str().unwrap(), FileFormat::Toml));
+                }
+            }
+
+            cwd = path.parent();
+        }
+
         if std::env::var("TEST_DB").is_ok() {
             builder = builder.add_source(File::from_str(
                 include_str!("../Revolt.test.toml"),
                 FileFormat::Toml,
             ));
-        }
 
-        for path in CONFIG_SEARCH_PATHS {
-            if std::path::Path::new(path).exists() {
-                builder = builder.add_source(File::new(path, FileFormat::Toml));
+            // recursively search upwards for an overrides file (if there is one)
+            if let Ok(cwd) = std::env::current_dir() {
+                let mut path = Some(cwd.as_path());
+                while let Some(current_path) = path {
+                    let target_path = current_path.join(TEST_OVERRIDE_PATH);
+                    if target_path.exists() {
+                        builder = builder
+                            .add_source(File::new(target_path.to_str().unwrap(), FileFormat::Toml));
+                    }
+
+                    path = current_path.parent();
+                }
             }
         }
+
+        builder = builder.add_source(Environment::with_prefix("REVOLT").separator("__"));
 
         builder.build().unwrap()
     })
@@ -88,6 +120,12 @@ static CONFIG_BUILDER: Lazy<RwLock<Config>> = Lazy::new(|| {
 pub struct Database {
     pub mongodb: String,
     pub redis: String,
+    pub redis_pubsub: Option<String>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct RabbitQueues {
+    pub acks: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -96,6 +134,8 @@ pub struct Rabbit {
     pub port: u16,
     pub username: String,
     pub password: String,
+    pub default_exchange: String,
+    pub queues: RabbitQueues,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -105,8 +145,7 @@ pub struct Hosts {
     pub events: String,
     pub autumn: String,
     pub january: String,
-    pub voso_legacy: String,
-    pub voso_legacy_ws: String,
+    pub livekit: HashMap<String, String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -123,6 +162,19 @@ pub struct ApiSmtp {
     pub reply_to: Option<String>,
     pub port: Option<i32>,
     pub use_tls: Option<bool>,
+    pub use_starttls: Option<bool>,
+    pub expiry: EmailExpiry,
+}
+
+/// Email expiration config
+#[derive(Deserialize, Debug, Clone)]
+pub struct EmailExpiry {
+    /// How long email verification codes should last for (in seconds)
+    pub expire_verification: i64,
+    /// How long password reset codes should last for (in seconds)
+    pub expire_password_reset: i64,
+    /// How long account deletion codes should last for (in seconds)
+    pub expire_account_deletion: i64,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -163,11 +215,19 @@ pub struct ApiSecurityCaptcha {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct ApiSecurityShield {
+    pub host: String,
+    pub key: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct ApiSecurity {
-    pub authifier_shield_key: String,
+    pub shield: ApiSecurityShield,
     pub voso_legacy_token: String,
     pub captcha: ApiSecurityCaptcha,
     pub trust_cloudflare: bool,
+    pub easypwned: String,
+    pub tenor_key: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -176,8 +236,28 @@ pub struct ApiWorkers {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct ApiLiveKit {
+    pub call_ring_duration: usize,
+    pub nodes: HashMap<String, LiveKitNode>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct LiveKitNode {
+    pub url: String,
+    pub lat: f64,
+    pub lon: f64,
+    pub key: String,
+    pub secret: String,
+
+    // whether to hide the node in the nodes list
+    #[serde(default)]
+    pub private: bool,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct ApiUsers {
-    pub early_adopter_cutoff: Option<u64>
+    pub early_adopter_cutoff: Option<u64>,
+    pub min_username_length: usize,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -186,6 +266,7 @@ pub struct Api {
     pub smtp: ApiSmtp,
     pub security: ApiSecurity,
     pub workers: ApiWorkers,
+    pub livekit: ApiLiveKit,
     pub users: ApiUsers,
 }
 
@@ -194,10 +275,12 @@ pub struct Pushd {
     pub production: bool,
     pub exchange: String,
     pub mass_mention_chunk_size: usize,
+    pub render_cache_time: usize,
 
     // Queues
     pub message_queue: String,
     pub mass_mention_queue: String,
+    pub dm_call_queue: String,
     pub fr_accepted_queue: String,
     pub fr_received_queue: String,
     pub generic_queue: String,
@@ -228,6 +311,10 @@ impl Pushd {
         self.get_routing_key(self.mass_mention_queue.clone())
     }
 
+    pub fn get_dm_call_routing_key(&self) -> String {
+        self.get_routing_key(self.dm_call_queue.clone())
+    }
+
     pub fn get_fr_accepted_routing_key(&self) -> String {
         self.get_routing_key(self.fr_accepted_queue.clone())
     }
@@ -239,6 +326,11 @@ impl Pushd {
     pub fn get_generic_routing_key(&self) -> String {
         self.get_routing_key(self.generic_queue.clone())
     }
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct January {
+    pub blocked_domains: Vec<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -286,6 +378,8 @@ pub struct GlobalLimits {
     pub new_user_hours: usize,
 
     pub body_limit_size: usize,
+
+    pub restrict_server_creation: Vec<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -296,6 +390,10 @@ pub struct FeaturesLimits {
     pub message_length: usize,
     pub message_attachments: usize,
     pub servers: usize,
+    pub voice_quality: u32,
+    pub video: bool,
+    pub video_resolution: [u32; 2],
+    pub video_aspect_ratio: [f32; 2],
 
     pub file_upload_size_limit: HashMap<String, usize>,
 }
@@ -309,6 +407,16 @@ pub struct FeaturesLimitsCollection {
 
     #[serde(flatten)]
     pub roles: HashMap<String, FeaturesLimits>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct LegalLinks {
+    /// Terms of Service URL
+    pub terms_of_service: String,
+    /// Privacy Policy URL
+    pub privacy_policy: String,
+    /// Guidelines URL
+    pub guidelines: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -328,6 +436,7 @@ impl Default for FeaturesAdvanced {
 #[derive(Deserialize, Debug, Clone)]
 pub struct Features {
     pub limits: FeaturesLimitsCollection,
+    pub legal_links: LegalLinks,
     pub webhooks_enabled: bool,
     pub mass_mentions_send_notifications: bool,
     pub mass_mentions_enabled: bool,
@@ -340,9 +449,12 @@ pub struct Features {
 pub struct Sentry {
     pub api: String,
     pub events: String,
+    pub voice_ingress: String,
     pub files: String,
     pub proxy: String,
+    pub pushd: String,
     pub crond: String,
+    pub gifbox: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -352,10 +464,13 @@ pub struct Settings {
     pub hosts: Hosts,
     pub api: Api,
     pub pushd: Pushd,
+    pub january: January,
     pub files: Files,
     pub features: Features,
     pub sentry: Sentry,
     pub production: bool,
+    pub environment: String,
+    pub disable_events_dont_use: bool,
 }
 
 impl Settings {
@@ -381,19 +496,54 @@ pub async fn read() -> Config {
     CONFIG_BUILDER.read().await.clone()
 }
 
-#[cached(time = 30)]
-pub async fn config() -> Settings {
+pub async fn config_no_cache() -> Settings {
     let mut config = read().await.try_deserialize::<Settings>().unwrap();
 
+    // inject REDIS_URI for redis-kiss library
+    if std::env::var("REDIS_URI").is_err() {
+        std::env::set_var("REDIS_URI", config.database.redis.clone());
+    }
+
     // auto-detect production nodes
-    if config.hosts.api.contains("https") && config.hosts.api.contains("revolt.chat") {
+    if config.hosts.api.contains("https")
+        && (config.hosts.api.contains("revolt.chat") || config.hosts.api.contains("stoat.chat"))
+    {
         config.production = true;
     }
 
     config
 }
 
+#[cached(time = 30)]
+pub async fn config() -> Settings {
+    #[cfg(feature = "test")]
+    if let Some(overwrites) = CONFIG_OVERWRITES.get() {
+        return overwrites.clone();
+    }
+
+    config_no_cache().await
+}
+
+#[cfg(feature = "test")]
+static CONFIG_OVERWRITES: OnceLock<Settings> = OnceLock::new();
+
+/// Modify the config values for a test, this can only be called once
+///
+/// This will also fail if two or more tests are running in the same process and both try to modify the config,
+/// This could happen if tests where run under `cargo test` instead of `nextest`.
+#[cfg(feature = "test")]
+pub async fn overwrite_config(f: impl FnOnce(&mut Settings)) {
+    let mut config = config_no_cache().await;
+
+    f(&mut config);
+
+    CONFIG_OVERWRITES.set(config).expect(
+        "Cannot overwrite config multiple times, make sure you are running tests through nextest.",
+    );
+}
+
 /// Configure logging and common Rust variables
+#[cfg(feature = "sentry")]
 pub async fn setup_logging(release: &'static str, dsn: String) -> Option<sentry::ClientInitGuard> {
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "info");
@@ -401,12 +551,6 @@ pub async fn setup_logging(release: &'static str, dsn: String) -> Option<sentry:
 
     if std::env::var("ROCKET_ADDRESS").is_err() {
         std::env::set_var("ROCKET_ADDRESS", "0.0.0.0");
-    }
-
-    if std::env::var("REDIS_URL").is_err() {
-        // Configure redis-kiss library
-        let config = config().await;
-        std::env::set_var("REDIS_URI", config.database.redis);
     }
 
     pretty_env_logger::init();
@@ -425,6 +569,7 @@ pub async fn setup_logging(release: &'static str, dsn: String) -> Option<sentry:
     }
 }
 
+#[cfg(feature = "sentry")]
 #[macro_export]
 macro_rules! configure {
     ($application: ident) => {
@@ -442,7 +587,7 @@ macro_rules! configure {
 mod tests {
     use crate::init;
 
-    #[async_std::test]
+    #[tokio::test]
     async fn it_works() {
         init().await;
     }

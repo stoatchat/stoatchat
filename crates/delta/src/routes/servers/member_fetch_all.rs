@@ -15,7 +15,7 @@ use rocket::{serde::json::Json, State};
 pub async fn fetch_all(
     db: &State<Database>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
     options: v0::OptionsFetchAllMembers,
 ) -> Result<Json<v0::AllMemberResponse>> {
     let server = target.as_server(db).await?;

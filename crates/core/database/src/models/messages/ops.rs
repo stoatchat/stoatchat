@@ -1,7 +1,10 @@
+use std::collections::HashMap;
+use std::time::SystemTime;
 use revolt_result::Result;
 
 use crate::{AppendMessage, FieldsMessage, Message, MessageQuery, PartialMessage};
 
+#[cfg(feature = "mongodb")]
 mod mongodb;
 mod reference;
 
@@ -39,4 +42,14 @@ pub trait AbstractMessages: Sync + Send {
 
     /// Delete messages from a channel by their ids and corresponding channel id
     async fn delete_messages(&self, channel: &str, ids: &[String]) -> Result<()>;
+
+    /// Delete all messages from a specific author in a server from a certain ULID onwards
+    async fn delete_messages_by_author_since(
+        &self,
+        channels: &[String],
+        author: &str,
+        since: SystemTime
+    ) -> Result<HashMap<String, Vec<String>>>;
+
+    async fn delete_messages_by_user(&self, user_id: &str) -> Result<()>;
 }

@@ -17,7 +17,7 @@ use rocket::State;
 pub async fn list(
     db: &State<Database>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
 ) -> Result<Json<v0::BanListResult>> {
     let server = target.as_server(db).await?;
     let mut query = DatabasePermissionQuery::new(db, &user).server(&server);

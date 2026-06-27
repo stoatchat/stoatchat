@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+#MISE description="Start Docker containers"
+set -e
+
+docker compose up -d
+
+docker run \
+--network=${DOCKER_NETWORK_NAME} \
+--name wait \
+--rm dokku/wait  -c \
+rabbit:${RABBIT_PORT},\
+database:${DATABASE_PORT},\
+redis:${REDIS_PORT}

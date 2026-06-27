@@ -16,7 +16,7 @@ use rocket::{serde::json::Json, State};
 pub async fn fetch(
     db: &State<Database>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
 ) -> Result<Json<v0::Channel>> {
     let channel = target.as_channel(db).await?;
 

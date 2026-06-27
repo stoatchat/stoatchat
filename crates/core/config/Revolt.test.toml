@@ -1,3 +1,5 @@
+environment = "test"
+
 [database]
 mongodb = "mongodb://localhost"
 redis = "redis://localhost/"
@@ -10,3 +12,12 @@ password = "rabbitpass"
 
 [features]
 webhooks_enabled = true
+
+[api.smtp]
+host = "localhost"
+username = "smtp"
+password = "smtp"
+from_address = "development@stoat.chat"
+reply_to = "support@stoat.chat"
+port = 14025
+use_tls = false

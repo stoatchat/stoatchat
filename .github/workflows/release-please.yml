@@ -1,0 +1,63 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main] # updates/opens the release PR when commits land on main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: release-please
+  cancel-in-progress: true
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GH_STOAT_RELEASE_APP_ID }}
+          private-key: ${{ secrets.GH_STOAT_RELEASE_APP_PRIVATE_KEY }}
+      - id: rp
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+
+      - name: Install latest stable
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: stable
+
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+      - name: Update Cargo.lock
+        if: ${{ steps.rp.outputs.prs_created == 'true' || steps.rp.outputs.prs_updated == 'true' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RP_PR_OUTPUT_JSON: ${{ steps.rp.outputs.prs }}
+        run: |
+          PR_NUMBER=$(echo "$RP_PR_OUTPUT_JSON" | jq -r '.[0].number')
+          gh pr checkout "$PR_NUMBER"
+          
+          cargo update -w
+          
+          if git diff --quiet Cargo.lock; then
+            echo "No changes to Cargo.lock"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add Cargo.lock
+            git commit -s -m "chore: update Cargo.lock"
+            git push
+          fi

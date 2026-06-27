@@ -15,7 +15,7 @@ use rocket::{serde::json::Json, State};
 pub async fn fetch(
     db: &State<Database>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
     options: v0::OptionsFetchServer,
 ) -> Result<Json<v0::FetchServerResponse>> {
     let server = target.as_server(db).await?;

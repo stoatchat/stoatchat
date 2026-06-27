@@ -1,8 +1,13 @@
+use crate::{
+    AppendMessage, FieldsMessage, Message, MessageQuery,
+    PartialMessage, ReferenceDb,
+};
 use futures::future::try_join_all;
 use indexmap::IndexSet;
 use revolt_result::Result;
-
-use crate::{AppendMessage, FieldsMessage, Message, MessageQuery, PartialMessage, ReferenceDb};
+use std::collections::HashMap;
+use std::time::SystemTime;
+use ulid::Ulid;
 
 use super::AbstractMessages;
 
@@ -58,7 +63,7 @@ impl AbstractMessages for ReferenceDb {
 
                 if let Some(pinned) = query.filter.pinned {
                     if message.pinned.unwrap_or_default() == pinned {
-                        return false
+                        return false;
                     }
                 }
 
@@ -189,7 +194,12 @@ impl AbstractMessages for ReferenceDb {
     }
 
     /// Update a given message with new information
-    async fn update_message(&self, id: &str, message: &PartialMessage, remove: Vec<FieldsMessage>) -> Result<()> {
+    async fn update_message(
+        &self,
+        id: &str,
+        message: &PartialMessage,
+        remove: Vec<FieldsMessage>,
+    ) -> Result<()> {
         let mut messages = self.messages.lock().await;
         if let Some(message_data) = messages.get_mut(id) {
             message_data.apply_options(message.to_owned());
@@ -247,7 +257,7 @@ impl AbstractMessages for ReferenceDb {
         let mut messages = self.messages.lock().await;
         if let Some(message) = messages.get_mut(id) {
             if let Some(users) = message.reactions.get_mut(emoji) {
-                users.remove(&user.to_string());
+                users.swap_remove(&user.to_string());
             }
 
             Ok(())
@@ -260,7 +270,7 @@ impl AbstractMessages for ReferenceDb {
     async fn clear_reaction(&self, id: &str, emoji: &str) -> Result<()> {
         let mut messages = self.messages.lock().await;
         if let Some(message) = messages.get_mut(id) {
-            message.reactions.remove(emoji);
+            message.reactions.swap_remove(emoji);
             Ok(())
         } else {
             Err(create_error!(NotFound))
@@ -283,6 +293,72 @@ impl AbstractMessages for ReferenceDb {
             .lock()
             .await
             .retain(|id, message| message.channel != channel && !ids.contains(id));
+
+        Ok(())
+    }
+
+    /// Delete all messages from a specific author in a list of channels from a certain ULID onwards
+    async fn delete_messages_by_author_since(
+        &self,
+        channels: &[String],
+        author: &str,
+        since: SystemTime,
+    ) -> Result<HashMap<String, Vec<String>>> {
+        let threshold_ulid = Ulid::from_datetime(since).to_string();
+        let mut deleted_messages: HashMap<String, Vec<String>> = HashMap::new();
+        let mut attachment_ids: Vec<String> = Vec::new();
+
+        let messages = self.messages.lock().await;
+
+        // First pass: collect attachment IDs and message IDs to delete
+        for (id, message) in messages.iter() {
+            let should_delete = message.author == author
+                && channels.contains(&message.channel)
+                && id.as_str() >= threshold_ulid.as_str();
+
+            if should_delete {
+                // Collect attachment IDs
+                if let Some(attachments) = &message.attachments {
+                    for attachment in attachments {
+                        attachment_ids.push(attachment.id.clone());
+                    }
+                }
+
+                deleted_messages
+                    .entry(message.channel.clone())
+                    .or_default()
+                    .push(id.clone());
+            }
+        }
+        drop(messages);
+
+        // Mark attachments as deleted
+        if !attachment_ids.is_empty() {
+            let mut files = self.files.lock().await;
+            for attachment_id in attachment_ids {
+                if let Some(file) = files.get_mut(&attachment_id) {
+                    file.deleted = Some(true);
+                }
+            }
+        }
+
+        // Delete the messages
+        self.messages.lock().await.retain(|id, message| {
+            let should_keep = !(message.author == author
+                && channels.contains(&message.channel)
+                && id.as_str() >= threshold_ulid.as_str());
+            should_keep
+        });
+
+        Ok(deleted_messages)
+    }
+
+    async fn delete_messages_by_user(&self, user_id: &str) -> Result<()> {
+        let mut messages = self.messages.lock().await;
+
+        messages.retain(|_, message| message.author != user_id);
+
+        // TODO: remove attachments as well
 
         Ok(())
     }
