@@ -319,6 +319,7 @@ impl From<FieldsChannel> for crate::FieldsChannel {
             FieldsChannel::Icon => crate::FieldsChannel::Icon,
             FieldsChannel::DefaultPermissions => crate::FieldsChannel::DefaultPermissions,
             FieldsChannel::Voice => crate::FieldsChannel::Voice,
+            FieldsChannel::Slowmode => crate::FieldsChannel::Slowmode,
         }
     }
 }
@@ -330,6 +331,7 @@ impl From<crate::FieldsChannel> for FieldsChannel {
             crate::FieldsChannel::Icon => FieldsChannel::Icon,
             crate::FieldsChannel::DefaultPermissions => FieldsChannel::DefaultPermissions,
             crate::FieldsChannel::Voice => FieldsChannel::Voice,
+            crate::FieldsChannel::Slowmode => FieldsChannel::Slowmode,
         }
     }
 }
