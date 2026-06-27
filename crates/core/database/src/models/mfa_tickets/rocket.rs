@@ -51,7 +51,7 @@ impl<'r> FromRequest<'r> for ValidatedTicket {
                         Outcome::Error((Status::Forbidden, create_error!(InvalidToken)))
                     }
                 } else {
-                    Outcome::Error((Status::Forbidden, create_error!(InvalidToken)))
+                    Outcome::Forward(Status::Unauthorized)
                 }
             }
             Outcome::Forward(f) => Outcome::Forward(f),
