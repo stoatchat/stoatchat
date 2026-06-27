@@ -11,6 +11,7 @@ pub mod util;
 use revolt_config::config;
 use revolt_database::AMQP;
 use revolt_ratelimits::rocket as ratelimiter;
+use revolt_search::ElasticsearchClient;
 use rocket::{Build, Rocket};
 use rocket_cors::{AllowedOrigins, CorsOptions};
 use rocket_prometheus::PrometheusMetrics;
@@ -79,6 +80,13 @@ pub async fn web() -> Rocket<Build> {
     // Ratelimits
     let ratelimits = ratelimiter::RatelimitStorage::new(util::ratelimits::DeltaRatelimits);
 
+    // Search
+    let elasticsearch = ElasticsearchClient::new(
+        &config.elasticsearch.host,
+        config.elasticsearch.port,
+        config.elasticsearch.api_key.clone(),
+    );
+
     routes::mount(config, rocket)
         .attach(prometheus.clone())
         .mount("/metrics", prometheus)
@@ -90,6 +98,7 @@ pub async fn web() -> Rocket<Build> {
         .manage(cors.clone())
         .manage(voice_client)
         .manage(ratelimits)
+        .manage(elasticsearch)
         .attach(ratelimiter::RatelimitFairing)
         .attach(cors)
         .configure(rocket::Config {

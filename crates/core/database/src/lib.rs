@@ -109,7 +109,7 @@ pub mod events;
 #[cfg(feature = "tasks")]
 pub mod tasks;
 
-mod amqp;
+pub mod amqp;
 pub use amqp::amqp::AMQP;
 
 #[cfg(feature = "voice")]

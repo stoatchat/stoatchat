@@ -9,7 +9,7 @@ use lapin::{
     Channel, Connection, ConnectionProperties,
 };
 use revolt_config::{config, Settings};
-use revolt_database::Database;
+use revolt_database::{Database, amqp::consumer::{Consumer, Delegate}};
 use tokio::signal::ctrl_c;
 
 mod consumers;
@@ -22,8 +22,6 @@ use consumers::{
     },
     outbound::{apn::ApnsOutboundConsumer, fcm::FcmOutboundConsumer, vapid::VapidOutboundConsumer},
 };
-
-use crate::utils::{Consumer, Delegate};
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() {
@@ -275,11 +273,12 @@ where
         consumer.tag()
     );
 
-    let delegate = Delegate(
+    let delegate = Delegate::new(
         F::create(
             db.clone(),
             connection.clone(),
             channel.clone(),
+            ()
         )
         .await,
     );

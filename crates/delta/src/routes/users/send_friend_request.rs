@@ -23,7 +23,7 @@ pub async fn send_friend_request(
             return Err(create_error!(IsBot));
         }
 
-        user.add_friend(db, amqp, &mut target).await?;
+        user.add_friend(db, Some(amqp), &mut target).await?;
         Ok(Json(target.into(db, &user).await))
     } else {
         Err(create_error!(InvalidProperty))

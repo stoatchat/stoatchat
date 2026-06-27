@@ -22,6 +22,6 @@ pub async fn add(
         return Err(create_error!(IsBot));
     }
 
-    user.add_friend(db, amqp, &mut target).await?;
+    user.add_friend(db, Some(amqp), &mut target).await?;
     Ok(Json(target.into(db, &user).await))
 }

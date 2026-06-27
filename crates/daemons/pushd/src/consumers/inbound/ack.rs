@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
-use crate::utils::Consumer;
 use anyhow::Result;
 use async_trait::async_trait;
 use lapin::{message::Delivery, Channel, Connection};
-use revolt_database::{events::rabbit::*, Database};
+use revolt_database::{amqp::consumer::Consumer, events::rabbit::*, Database};
 
 #[derive(Clone)]
 #[allow(unused)]
@@ -16,11 +15,7 @@ pub struct AckConsumer {
 
 #[async_trait]
 impl Consumer for AckConsumer {
-    async fn create(
-        db: Database,
-        connection: Arc<Connection>,
-        channel: Arc<Channel>,
-    ) -> Self {
+    async fn create(db: Database, connection: Arc<Connection>, channel: Arc<Channel>, _: ()) -> Self {
         Self {
             db,
             connection,

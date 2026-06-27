@@ -381,6 +381,17 @@ impl User {
         )
     }
 
+    pub async fn into_mutuals(perspective: &User, users: Vec<User>) -> Vec<v0::User> {
+        let online_ids =
+            filter_online(&users.iter().map(|user| user.id.clone()).collect::<Vec<_>>()).await;
+
+        join_all(users.into_iter().map(|user| async {
+            let is_online = online_ids.contains(&user.id);
+            user.into_known(perspective, is_online).await
+        }))
+        .await
+    }
+
     /// Find a free discriminator for a given username
     pub async fn find_discriminator(
         db: &Database,
@@ -531,7 +542,7 @@ impl User {
     pub async fn add_friend(
         &mut self,
         db: &Database,
-        amqp: &AMQP,
+        amqp: Option<&AMQP>,
         target: &mut User,
     ) -> Result<()> {
         match self.relationship_with(&target.id) {
@@ -541,8 +552,10 @@ impl User {
             RelationshipStatus::Blocked => Err(create_error!(Blocked)),
             RelationshipStatus::BlockedOther => Err(create_error!(BlockedByOther)),
             RelationshipStatus::Incoming => {
-                // Accept incoming friend request
-                _ = amqp.friend_request_accepted(self, target).await;
+                if let Some(amqp) = amqp {
+                    // Accept incoming friend request
+                    _ = amqp.friend_request_accepted(self, target).await;
+                };
 
                 self.apply_relationship(
                     db,
@@ -572,7 +585,9 @@ impl User {
                     }));
                 }
 
-                _ = amqp.friend_request_received(target, self).await;
+                if let Some(amqp) = amqp {
+                    _ = amqp.friend_request_received(target, self).await;
+                };
 
                 // Send the friend request
                 self.apply_relationship(
@@ -867,13 +882,13 @@ impl User {
     /// - deletes owned bots, servers and messages
     /// - removes user from all groups
     /// - clears relationships
-    pub async fn delete(&mut self, db: &Database) -> Result<()> {
+    pub async fn delete(&mut self, db: &Database, amqp: Option<&AMQP>) -> Result<()> {
         for bot in db.fetch_bots_by_user(&self.id).await? {
             bot.delete(db).await?;
         }
 
         for server in db.fetch_owned_servers(&self.id).await? {
-            server.delete(db).await?;
+            server.delete(db, amqp).await?;
         }
 
         self.remove_from_all_groups(db).await?;

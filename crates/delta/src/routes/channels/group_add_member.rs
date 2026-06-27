@@ -39,7 +39,7 @@ pub async fn add_member(
             }
 
             channel
-                .add_user_to_group(db, amqp, &member, &user.id)
+                .add_user_to_group(db, Some(amqp), &member, &user.id)
                 .await
                 .map(|_| EmptyResponse)
         }
