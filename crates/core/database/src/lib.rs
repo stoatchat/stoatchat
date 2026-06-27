@@ -77,6 +77,78 @@ macro_rules! auto_derived_partial {
     };
 }
 
+/// Internal macro for `generate_diff!`, you should not need to use this yourself.
+macro_rules! generate_field_diff {
+    (optional, $remove:ident, $fieldsmember:path, $self:ident, $before:ident, $partial:ident, $field:ident) => {
+        if $partial.$field.is_some() || $remove.contains(&$fieldsmember) {
+            $before.$field = $self.$field.clone();
+        };
+    };
+
+    (optional, default, $remove:ident, $fieldsmember:path, $self:ident, $before:ident, $partial:ident, $field:ident) => {
+        if $partial.$field.is_some() || $remove.contains(&$fieldsmember) {
+            $before.$field = Some($self.$field.clone());
+        };
+    };
+
+    ($self:ident, $before:ident, $partial:ident, $field:ident) => {
+        if $partial.$field.is_some() {
+            $before.$field = Some($self.$field.clone());
+        };
+    };
+}
+
+/// Generates a partial model containing the data which has changed in an update
+///
+/// ## Usage:
+/// `before` is the "output" containing what the model had before being updated,
+/// this will corraspond to `partial` which is what the data is being changed too.
+///
+/// ```rs
+/// let mut before = PartialModel::default();
+///
+/// generate_diff!(
+///     self,  // database model
+///     before,  // mutable empty partial corrasponding to the current model
+///     partial,  // partial containing what is being updated
+///     remove,  // slice of fields being removed
+///     (
+///         name,  // regular non-nullable non-removable field
+///         (FieldsEnum::Nickname) nickname,  // optional removable field
+///         ((default) FieldsEnum::Roles) roles,  // optional removable field with custom default
+///     )
+/// );
+/// ```
+///
+/// See `Member::generate_diff` `Server::generate_diff` `Role::generate_diff` for full examples
+macro_rules! generate_diff {
+    (
+        $self:ident,
+        $before:ident,
+        $partial:ident,
+        $remove:ident,
+        (
+            $(
+                $(
+                    $(@$optional:tt)? (
+                        $($(@$default:tt)? (default))?
+                        $fieldsmember:path
+                    )
+                )?
+                $field: ident
+            ),*
+            $(,)?
+        )
+    ) => {
+        $(
+            generate_field_diff!(
+                $( $($optional)? optional, $($($default)? default,)? $remove, $fieldsmember,)?
+                $self, $before, $partial, $field
+            );
+        )*
+    }
+}
+
 mod drivers;
 pub use drivers::*;
 
@@ -114,7 +186,6 @@ pub use amqp::amqp::AMQP;
 
 #[cfg(feature = "voice")]
 pub mod voice;
-
 
 /// Utility function to check if a boolean value is false
 pub fn if_false(t: &bool) -> bool {

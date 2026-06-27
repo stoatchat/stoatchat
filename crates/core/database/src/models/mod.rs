@@ -1,4 +1,5 @@
 mod admin_migrations;
+mod audit_logs;
 mod bots;
 mod channel_invites;
 mod channel_unreads;
@@ -23,6 +24,7 @@ mod sessions;
 mod mfa_tickets;
 
 pub use admin_migrations::*;
+pub use audit_logs::*;
 pub use bots::*;
 pub use channel_invites::*;
 pub use channel_unreads::*;
@@ -55,6 +57,7 @@ pub trait AbstractDatabase:
     Sync
     + Send
     + admin_migrations::AbstractMigrations
+    + audit_logs::AbstractAuditLogs
     + bots::AbstractBots
     + channels::AbstractChannels
     + channel_invites::AbstractChannelInvites

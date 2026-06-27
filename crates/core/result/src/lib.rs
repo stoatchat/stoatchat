@@ -164,6 +164,7 @@ pub enum ErrorType {
     FailedValidation {
         error: String,
     },
+    HeaderTooLarge,
     OperationFailed,
     IncorrectData {
         with: String,

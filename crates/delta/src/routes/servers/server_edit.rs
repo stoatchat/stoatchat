@@ -2,13 +2,15 @@ use std::collections::HashSet;
 
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, File, PartialServer, User, ValidatedTicket,
+    AuditLogEntryAction, Database, FieldsServer, File, PartialServer, User, ValidatedTicket
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 use validator::Validate;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Edit Server
 ///
@@ -18,6 +20,7 @@ use validator::Validate;
 pub async fn edit(
     db: &State<Database>,
     user: User,
+    reason: AuditLogReason,
     target: Reference<'_>,
     data: Json<v0::DataEditServer>,
     validated_ticket: Option<ValidatedTicket>,
@@ -176,9 +179,21 @@ pub async fn edit(
         partial.owner = Some(server.owner.clone());
     }
 
-    server
-        .update(db, partial, remove.into_iter().map(Into::into).collect())
-        .await?;
+    let remove = remove
+        .into_iter()
+        .map(Into::into)
+        .collect::<Vec<FieldsServer>>();
+
+    let before = server.generate_diff(&partial, &remove);
+
+    server.update(db, partial.clone(), remove).await?;
+
+    AuditLogEntryAction::ServerEdit {
+        before,
+        after: partial,
+    }
+    .insert(db, server.id.clone(), reason, user.id, None)
+    .await;
 
     Ok(Json(server.into()))
 }
