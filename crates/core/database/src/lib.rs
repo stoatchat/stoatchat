@@ -95,7 +95,7 @@ macro_rules! database_test {
         db.drop_database().await;
 
         #[allow(clippy::redundant_closure_call)]
-        (|$db: $crate::Database| $test)(db.clone()).await;
+        std::boxed::Box::pin((|$db: $crate::Database| $test)(db.clone())).await;
 
         db.drop_database().await
     };
