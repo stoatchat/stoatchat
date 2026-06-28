@@ -40,6 +40,16 @@ impl AbstractServers for ReferenceDb {
             .collect()
     }
 
+    async fn fetch_owned_servers(&self, user_id: &str) -> Result<Vec<Server>> {
+        let servers = self.servers.lock().await;
+
+        Ok(servers
+            .values()
+            .filter(|server| server.owner == user_id)
+            .cloned()
+            .collect())
+    }
+
     /// Update a server with new information
     async fn update_server(
         &self,

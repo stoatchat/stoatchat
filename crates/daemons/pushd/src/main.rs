@@ -32,17 +32,6 @@ async fn main() {
 
     // Setup database
     let db = revolt_database::DatabaseInfo::Auto.connect().await.unwrap();
-    let authifier: authifier::Database;
-
-    if let Some(client) = match &db {
-        revolt_database::Database::Reference(_) => None,
-        revolt_database::Database::MongoDb(mongo) => Some(mongo),
-    } {
-        authifier =
-            authifier::Database::MongoDb(authifier::database::MongoDb(client.database("revolt")));
-    } else {
-        panic!("Mongo is not in use, can't connect via authifier!")
-    }
 
     let config = config().await;
 
@@ -75,7 +64,6 @@ async fn main() {
     channels.push(
         make_queue_and_consume::<GenericConsumer>(
             &db,
-            &authifier,
             &connection,
             &config,
             &config.pushd.generic_queue,
@@ -88,7 +76,6 @@ async fn main() {
     channels.push(
         make_queue_and_consume::<MessageConsumer>(
             &db,
-            &authifier,
             &connection,
             &config,
             &config.pushd.message_queue,
@@ -101,7 +88,6 @@ async fn main() {
     channels.push(
         make_queue_and_consume::<FRReceivedConsumer>(
             &db,
-            &authifier,
             &connection,
             &config,
             &config.pushd.fr_received_queue,
@@ -114,7 +100,6 @@ async fn main() {
     channels.push(
         make_queue_and_consume::<FRAcceptedConsumer>(
             &db,
-            &authifier,
             &connection,
             &config,
             &config.pushd.fr_accepted_queue,
@@ -127,7 +112,6 @@ async fn main() {
     channels.push(
         make_queue_and_consume::<MassMessageConsumer>(
             &db,
-            &authifier,
             &connection,
             &config,
             &config.pushd.mass_mention_queue,
@@ -140,7 +124,6 @@ async fn main() {
     channels.push(
         make_queue_and_consume::<DmCallConsumer>(
             &db,
-            &authifier,
             &connection,
             &config,
             &config.pushd.dm_call_queue,
@@ -154,7 +137,6 @@ async fn main() {
         channels.push(
             make_queue_and_consume::<ApnsOutboundConsumer>(
                 &db,
-                &authifier,
                 &connection,
                 &config,
                 &config.pushd.apn.queue,
@@ -170,7 +152,6 @@ async fn main() {
         channels.push(
             make_queue_and_consume::<AckConsumer>(
                 &db,
-                &authifier,
                 &connection,
                 &config,
                 &config.pushd.ack_queue,
@@ -185,7 +166,6 @@ async fn main() {
         channels.push(
             make_queue_and_consume::<FcmOutboundConsumer>(
                 &db,
-                &authifier,
                 &connection,
                 &config,
                 &config.pushd.fcm.queue,
@@ -200,7 +180,6 @@ async fn main() {
         channels.push(
             make_queue_and_consume::<VapidOutboundConsumer>(
                 &db,
-                &authifier,
                 &connection,
                 &config,
                 &config.pushd.vapid.queue,
@@ -220,7 +199,6 @@ async fn main() {
 
 async fn make_queue_and_consume<F>(
     db: &Database,
-    authifier_db: &authifier::Database,
     connection: &Arc<Connection>,
     config: &Settings,
     queue_name: &str,
@@ -300,7 +278,6 @@ where
     let delegate = Delegate(
         F::create(
             db.clone(),
-            authifier_db.clone(),
             connection.clone(),
             channel.clone(),
         )

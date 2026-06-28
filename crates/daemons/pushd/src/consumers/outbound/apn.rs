@@ -80,7 +80,6 @@ impl<'a> PayloadLike for CallStartStopPayload<'a> {
 #[allow(unused)]
 pub struct ApnsOutboundConsumer {
     db: Database,
-    authifier_db: authifier::Database,
     connection: Arc<Connection>,
     channel: Arc<AMQPChannel>,
     client: Client,
@@ -126,7 +125,6 @@ impl ApnsOutboundConsumer {
 impl Consumer for ApnsOutboundConsumer {
     async fn create(
         db: Database,
-        authifier_db: authifier::Database,
         connection: Arc<Connection>,
         channel: Arc<AMQPChannel>,
     ) -> Self {
@@ -161,7 +159,6 @@ impl Consumer for ApnsOutboundConsumer {
 
         Self {
             db,
-            authifier_db,
             connection,
             channel,
             client,

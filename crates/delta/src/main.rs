@@ -9,7 +9,7 @@ pub mod routes;
 pub mod util;
 
 use revolt_config::config;
-use revolt_database::{AMQP, events::client::EventV1};
+use revolt_database::AMQP;
 use revolt_ratelimits::rocket as ratelimiter;
 use rocket::{Build, Rocket};
 use rocket_cors::{AllowedOrigins, CorsOptions};
@@ -17,8 +17,6 @@ use rocket_prometheus::PrometheusMetrics;
 use std::net::Ipv4Addr;
 use std::str::FromStr;
 
-use async_std::channel::unbounded;
-use authifier::AuthifierEvent;
 use revolt_database::voice::VoiceClient;
 use rocket::data::ToByteUnit;
 
@@ -32,28 +30,6 @@ pub async fn web() -> Rocket<Build> {
     // Setup database
     let db = revolt_database::DatabaseInfo::Auto.connect().await.unwrap();
     db.migrate_database().await.unwrap();
-
-    // Setup Authifier event channel
-    let (_, receiver) = unbounded();
-
-    // Setup Authifier
-    let authifier = db.clone().to_authifier().await;
-
-    // Launch a listener for Authifier events
-    async_std::task::spawn(async move {
-        while let Ok(event) = receiver.recv().await {
-            match &event {
-                AuthifierEvent::CreateSession { .. } | AuthifierEvent::CreateAccount { .. } => {
-                    EventV1::Auth(event).global().await
-                }
-                AuthifierEvent::DeleteSession { user_id, .. }
-                | AuthifierEvent::DeleteAllSessions { user_id, .. } => {
-                    let id = user_id.to_string();
-                    EventV1::Auth(event).private(id).await
-                }
-            }
-        }
-    });
 
     // Configure CORS
     let cors = CorsOptions {
@@ -109,7 +85,6 @@ pub async fn web() -> Rocket<Build> {
         .mount("/", rocket_cors::catch_all_options_routes())
         .mount("/", ratelimiter::routes())
         .mount("/swagger/", swagger)
-        .manage(authifier)
         .manage(db)
         .manage(amqp)
         .manage(cors.clone())

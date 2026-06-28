@@ -408,7 +408,10 @@ impl Channel {
     /// Check whether has a user as a recipient
     pub fn contains_user(&self, user_id: &str) -> bool {
         match self {
-            Channel::Group { recipients, .. } => recipients.contains(&String::from(user_id)),
+            Channel::Group { recipients, .. } | Channel::DirectMessage { recipients, .. } => {
+                recipients.iter().any(|recipient| recipient == user_id)
+            }
+            Channel::SavedMessages { user, .. } => user == user_id,
             _ => false,
         }
     }
@@ -416,7 +419,9 @@ impl Channel {
     /// Get list of recipients
     pub fn users(&self) -> Result<Vec<String>> {
         match self {
-            Channel::Group { recipients, .. } => Ok(recipients.to_owned()),
+            Channel::Group { recipients, .. } | Channel::DirectMessage { recipients, .. } => {
+                Ok(recipients.to_owned())
+            }
             _ => Err(create_error!(NotFound)),
         }
     }
@@ -789,7 +794,7 @@ mod tests {
 
     use crate::{fixture, util::permissions::DatabasePermissionQuery};
 
-    #[async_std::test]
+    #[tokio::test]
     async fn permissions_group_channel() {
         database_test!(|db| async move {
             fixture!(db, "group_with_members",
@@ -815,7 +820,7 @@ mod tests {
         });
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn permissions_text_channel() {
         database_test!(|db| async move {
             fixture!(db, "server_with_roles",

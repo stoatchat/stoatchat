@@ -166,6 +166,10 @@ pub enum ErrorType {
     FailedValidation {
         error: String,
     },
+    OperationFailed,
+    IncorrectData {
+        with: String,
+    },
 
     // ? Voice errors
     LiveKitUnavailable,
@@ -190,6 +194,25 @@ pub enum ErrorType {
     FeatureDisabled {
         feature: String,
     },
+
+    // ? Authentication
+    RenderFail,
+    MissingHeaders,
+    CaptchaFailed,
+    BlockedByShield,
+    UnverifiedAccount,
+    EmailFailed,
+    InvalidToken,
+    MissingInvite,
+    InvalidInvite,
+
+    CompromisedPassword,
+    ShortPassword,
+    Blacklisted,
+    LockedOut,
+
+    TotpAlreadyEnabled,
+    DisallowedMFAMethod,
 
     // ? Admin API relate errors
     PrivilegedAccount,

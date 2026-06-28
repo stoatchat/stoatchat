@@ -11,7 +11,6 @@ use revolt_database::{events::rabbit::*, Database};
 #[allow(unused)]
 pub struct FRReceivedConsumer {
     db: Database,
-    authifier_db: authifier::Database,
     connection: Arc<Connection>,
     channel: Arc<Channel>,
 }
@@ -20,13 +19,11 @@ pub struct FRReceivedConsumer {
 impl Consumer for FRReceivedConsumer {
     async fn create(
         db: Database,
-        authifier_db: authifier::Database,
         connection: Arc<Connection>,
         channel: Arc<Channel>,
     ) -> Self {
         Self {
             db,
-            authifier_db,
             connection,
             channel,
         }
@@ -42,7 +39,7 @@ impl Consumer for FRReceivedConsumer {
 
         debug!("Received FR received event");
 
-        if let Ok(sessions) = self.authifier_db.find_sessions(&payload.user).await {
+        if let Ok(sessions) = self.db.fetch_sessions(&payload.user).await {
             let config = revolt_config::config().await;
             for session in sessions {
                 if let Some(sub) = session.subscription {

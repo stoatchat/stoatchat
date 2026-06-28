@@ -195,7 +195,7 @@ mod tests {
     use crate::{clear_region, create_session, delete_session, filter_online, is_online};
     use rand::Rng;
 
-    #[async_std::test]
+    #[tokio::test]
     async fn it_works() {
         revolt_config::config().await;
 

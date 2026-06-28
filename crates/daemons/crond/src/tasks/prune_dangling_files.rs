@@ -6,7 +6,7 @@ use tokio::time::sleep;
 
 use log::info;
 
-pub async fn task(db: Database) -> Result<()> {
+pub async fn task(db: Database, _: revolt_database::AMQP) -> Result<()> {
     loop {
         // This could just be a single database query
         // ... but timestamps are inconsistently serialised

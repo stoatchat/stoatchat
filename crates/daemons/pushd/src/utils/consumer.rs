@@ -18,7 +18,6 @@ use revolt_database::Database;
 pub trait Consumer: Clone + Send + Sync + 'static {
     async fn create(
         db: Database,
-        authifier_db: authifier::Database,
         connection: Arc<Connection>,
         channel: Arc<Channel>,
     ) -> Self;

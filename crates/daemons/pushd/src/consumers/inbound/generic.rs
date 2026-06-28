@@ -11,7 +11,6 @@ use revolt_database::{events::rabbit::*, Database};
 #[allow(unused)]
 pub struct GenericConsumer {
     db: Database,
-    authifier_db: authifier::Database,
     connection: Arc<Connection>,
     channel: Arc<Channel>,
 }
@@ -20,13 +19,11 @@ pub struct GenericConsumer {
 impl Consumer for GenericConsumer {
     async fn create(
         db: Database,
-        authifier_db: authifier::Database,
         connection: Arc<Connection>,
         channel: Arc<Channel>,
     ) -> Self {
         Self {
             db,
-            authifier_db,
             connection,
             channel,
         }
@@ -43,8 +40,8 @@ impl Consumer for GenericConsumer {
         debug!("Received message event on origin");
 
         if let Ok(sessions) = self
-            .authifier_db
-            .find_sessions_with_subscription(&payload.users)
+            .db
+            .fetch_sessions_with_subscription(&payload.users)
             .await
         {
             let config = revolt_config::config().await;

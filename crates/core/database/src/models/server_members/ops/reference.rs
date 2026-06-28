@@ -204,6 +204,15 @@ impl AbstractServerMembers for ReferenceDb {
         todo!()
     }
 
+    /// Removes a user from every server they are in
+    async fn clear_memberships(&self, user_id: &str) -> Result<()> {
+        let mut server_members = self.server_members.lock().await;
+
+        server_members.retain(|_, v| v.id.user != user_id);
+
+        Ok(())
+    }
+
     async fn fetch_server_participants(
         &self,
         server_id: &str,

@@ -23,6 +23,10 @@ mod server_members;
 mod servers;
 mod user_settings;
 mod users;
+mod accounts;
+mod account_invites;
+mod sessions;
+mod mfa_tickets;
 
 pub use admin_audits::*;
 pub use admin_cases::*;
@@ -49,6 +53,10 @@ pub use server_members::*;
 pub use servers::*;
 pub use user_settings::*;
 pub use users::*;
+pub use accounts::*;
+pub use account_invites::*;
+pub use sessions::*;
+pub use mfa_tickets::*;
 
 use crate::{Database, ReferenceDb};
 
@@ -83,6 +91,10 @@ pub trait AbstractDatabase:
     + servers::AbstractServers
     + user_settings::AbstractUserSettings
     + users::AbstractUsers
+    + accounts::AbstractAccounts
+    + account_invites::AbstractAccountInvites
+    + sessions::AbstractSessions
+    + mfa_tickets::AbstractMFATickets
 {
 }
 

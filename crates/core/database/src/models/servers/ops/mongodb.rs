@@ -43,6 +43,17 @@ impl AbstractServers for MongoDb {
             .await)
     }
 
+    async fn fetch_owned_servers(&self, user_id: &str) -> Result<Vec<Server>> {
+        query!(
+            self,
+            find,
+            COL,
+            doc! {
+                "owner": user_id
+            }
+        )
+    }
+
     /// Update a server with new information
     async fn update_server(
         &self,

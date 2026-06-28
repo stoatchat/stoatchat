@@ -9,7 +9,7 @@ use crate::{
     AdminAuditItem, AdminCase, AdminComment, AdminStrike, AdminToken, AdminUser, Bot, Channel,
     ChannelCompositeKey, ChannelUnread, Emoji, File, FileHash, Invite, Member, MemberCompositeKey,
     Message, PolicyChange, RatelimitEvent, Report, Server, ServerBan, Snapshot, User, UserSettings,
-    Webhook,
+    Webhook, Account, AccountInvite, Session, MFATicket
 };
 
 database_derived!(
@@ -40,5 +40,9 @@ database_derived!(
         pub servers: Arc<Mutex<HashMap<String, Server>>>,
         pub safety_reports: Arc<Mutex<HashMap<String, Report>>>,
         pub safety_snapshots: Arc<Mutex<HashMap<String, Snapshot>>>,
+        pub accounts: Arc<Mutex<HashMap<String, Account>>>,
+        pub account_invites: Arc<Mutex<HashMap<String, AccountInvite>>>,
+        pub sessions: Arc<Mutex<HashMap<String, Session>>>,
+        pub tickets: Arc<Mutex<HashMap<String, MFATicket>>>,
     }
 );

@@ -64,6 +64,12 @@ pub async fn edit(
         }
     }
 
+    if data.pronouns.is_some() || data.remove.contains(&v0::FieldsMember::Pronouns) {
+        if user.id != member.id.user {
+            return Err(create_error!(InvalidOperation))
+        }
+    }
+
     if data.avatar.is_some() || data.remove.contains(&v0::FieldsMember::Avatar) {
         if user.id == member.id.user {
             permissions.throw_if_lacking_channel_permission(ChannelPermission::ChangeAvatar)?;
@@ -172,6 +178,7 @@ pub async fn edit(
     // Apply edits to the member object
     let v0::DataMemberEdit {
         nickname,
+        pronouns,
         avatar,
         roles,
         timeout,
@@ -183,6 +190,7 @@ pub async fn edit(
 
     let mut partial = PartialMember {
         nickname,
+        pronouns,
         roles,
         timeout,
         can_publish,

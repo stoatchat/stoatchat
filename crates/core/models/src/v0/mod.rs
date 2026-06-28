@@ -15,6 +15,9 @@ mod server_members;
 mod servers;
 mod user_settings;
 mod users;
+mod accounts;
+mod mfa_tickets;
+mod sessions;
 
 pub use admin::*;
 pub use bots::*;
@@ -33,3 +36,6 @@ pub use server_members::*;
 pub use servers::*;
 pub use user_settings::*;
 pub use users::*;
+pub use accounts::*;
+pub use mfa_tickets::*;
+pub use sessions::*;

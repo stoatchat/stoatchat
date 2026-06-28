@@ -19,7 +19,6 @@ use revolt_result::ToRevoltError;
 #[allow(unused)]
 pub struct MassMessageConsumer {
     db: Database,
-    authifier_db: authifier::Database,
     connection: Arc<Connection>,
     channel: Arc<Channel>,
 }
@@ -31,8 +30,8 @@ impl MassMessageConsumer {
         users: &[String],
     ) -> Result<()> {
         if let Ok(sessions) = self
-            .authifier_db
-            .find_sessions_with_subscription(users)
+            .db
+            .fetch_sessions_with_subscription(users)
             .await
         {
             let config = revolt_config::config().await;
@@ -75,13 +74,11 @@ impl MassMessageConsumer {
 impl Consumer for MassMessageConsumer {
     async fn create(
         db: Database,
-        authifier_db: authifier::Database,
         connection: Arc<Connection>,
         channel: Arc<Channel>,
     ) -> Self {
         Self {
             db,
-            authifier_db,
             connection,
             channel,
         }

@@ -6,21 +6,17 @@ use revolt_files::delete_from_s3;
 use revolt_result::Result;
 use tokio::time::sleep;
 
-pub async fn task(db: Database) -> Result<()> {
+pub async fn task(db: Database, _: revolt_database::AMQP) -> Result<()> {
     loop {
         let files = db.fetch_deleted_attachments().await?;
 
         for file in files {
             if let Some(hash) = &file.hash {
-                let count = db
-                    .count_file_hash_references(hash)
-                    .await?;
+                let count = db.count_file_hash_references(hash).await?;
 
                 // No other files reference this file on disk anymore
                 if count <= 1 {
-                    let file_hash = db
-                        .fetch_attachment_hash(hash)
-                        .await?;
+                    let file_hash = db.fetch_attachment_hash(hash).await?;
 
                     // Delete from S3
                     delete_from_s3(&file_hash.bucket_id, &file_hash.path).await?;

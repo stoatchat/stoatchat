@@ -119,7 +119,6 @@ impl NotificationData {
 #[allow(unused)]
 pub struct FcmOutboundConsumer {
     db: Database,
-    authifier_db: authifier::Database,
     connection: Arc<Connection>,
     channel: Arc<AMQPChannel>,
     client: Client,
@@ -129,7 +128,6 @@ pub struct FcmOutboundConsumer {
 impl Consumer for FcmOutboundConsumer {
     async fn create(
         db: Database,
-        authifier_db: authifier::Database,
         connection: Arc<Connection>,
         channel: Arc<AMQPChannel>,
     ) -> Self {
@@ -137,7 +135,6 @@ impl Consumer for FcmOutboundConsumer {
 
         Self {
             db,
-            authifier_db,
             connection,
             channel,
             client: Client::new(

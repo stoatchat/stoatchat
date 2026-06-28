@@ -416,6 +416,12 @@ impl AbstractMessages for MongoDb {
 
         Ok(deleted_messages)
     }
+
+    async fn delete_messages_by_user(&self, user_id: &str) -> Result<()> {
+        self.delete_bulk_messages(doc! {
+            "author": user_id,
+        }).await
+    }
 }
 
 impl IntoDocumentPath for FieldsMessage {

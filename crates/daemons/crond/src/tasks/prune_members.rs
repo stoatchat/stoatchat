@@ -5,7 +5,7 @@ use revolt_database::Database;
 use revolt_result::Result;
 use tokio::time::sleep;
 
-pub async fn task(db: Database) -> Result<()> {
+pub async fn task(db: Database, _: revolt_database::AMQP) -> Result<()> {
     loop {
         let success = db.remove_dangling_members().await;
         if let Err(s) = success {

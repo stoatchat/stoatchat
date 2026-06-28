@@ -11,7 +11,7 @@ auto_derived!(
 
 #[cfg(test)]
 mod tests {
-    #[async_std::test]
+    #[tokio::test]
     async fn migrate() {
         database_test!(|db| async move {
             // Initialise the database

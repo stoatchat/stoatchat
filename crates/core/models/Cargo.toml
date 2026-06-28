@@ -41,6 +41,7 @@ iso8601-timestamp = { workspace = true, features = ["schema", "bson"] }
 # Spec Generation
 schemars = { workspace = true, features = ["indexmap2"], optional = true }
 utoipa = { workspace = true, optional = true }
+serde_json = { workspace = true }
 
 # Validation
 validator = { workspace = true, features = ["derive"], optional = true }

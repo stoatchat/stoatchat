@@ -19,7 +19,6 @@ use web_push::{
 #[allow(unused)]
 pub struct VapidOutboundConsumer {
     db: Database,
-    authifier_db: authifier::Database,
     connection: Arc<Connection>,
     channel: Arc<AMQPChannel>,
     client: IsahcWebPushClient,
@@ -30,7 +29,6 @@ pub struct VapidOutboundConsumer {
 impl Consumer for VapidOutboundConsumer {
     async fn create(
         db: Database,
-        authifier_db: authifier::Database,
         connection: Arc<Connection>,
         channel: Arc<AMQPChannel>,
     ) -> Self {
@@ -48,7 +46,6 @@ impl Consumer for VapidOutboundConsumer {
 
         Self {
             db,
-            authifier_db,
             connection,
             channel,
             client: IsahcWebPushClient::new().unwrap(),

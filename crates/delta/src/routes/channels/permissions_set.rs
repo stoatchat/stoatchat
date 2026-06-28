@@ -2,7 +2,7 @@ use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference}, voice::{sync_voice_permissions, VoiceClient}, Database, User
 };
 use revolt_models::v0;
-use revolt_permissions::{calculate_channel_permissions, ChannelPermission, Override};
+use revolt_permissions::{calculate_channel_permissions, ChannelPermission, Override, PermissionQuery};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 
@@ -25,11 +25,15 @@ pub async fn set_role_permissions(
     let mut query = DatabasePermissionQuery::new(db, &user).channel(&channel);
     let permissions: revolt_permissions::PermissionValue = calculate_channel_permissions(&mut query).await;
 
+    query.set_server_from_channel().await;
+
     permissions.throw_if_lacking_channel_permission(ChannelPermission::ManagePermissions)?;
 
     if let Some(server) = query.server_ref() {
         if let Some(role) = server.roles.get(&role_id) {
-            if role.rank <= query.get_member_rank().unwrap_or(i64::MIN) {
+            if server.owner != user.id
+                && role.rank <= query.get_member_rank().unwrap_or(i64::MIN)
+            {
                 return Err(create_error!(NotElevated));
             }
 

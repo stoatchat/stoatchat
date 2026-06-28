@@ -305,6 +305,6 @@ pub async fn worker(db: Database, amqp: AMQP) {
         }
 
         // Sleep for an arbitrary amount of time.
-        async_std::task::sleep(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_secs(1)).await;
     }
 }

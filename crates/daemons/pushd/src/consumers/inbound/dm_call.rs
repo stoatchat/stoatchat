@@ -11,7 +11,6 @@ use revolt_database::{events::rabbit::*, Database};
 #[allow(unused)]
 pub struct DmCallConsumer {
     db: Database,
-    authifier_db: authifier::Database,
     connection: Arc<Connection>,
     channel: Arc<Channel>,
 }
@@ -20,13 +19,11 @@ pub struct DmCallConsumer {
 impl Consumer for DmCallConsumer {
     async fn create(
         db: Database,
-        authifier_db: authifier::Database,
         connection: Arc<Connection>,
         channel: Arc<Channel>,
     ) -> Self {
         Self {
             db,
-            authifier_db,
             connection,
             channel,
         }
@@ -70,7 +67,7 @@ impl Consumer for DmCallConsumer {
         let config = revolt_config::config().await;
 
         for user_id in call_recipients {
-            if let Ok(sessions) = self.authifier_db.find_sessions(&user_id).await {
+            if let Ok(sessions) = self.db.fetch_sessions(&user_id).await {
                 for session in sessions {
                     if let Some(sub) = session.subscription {
                         let mut sendable = PayloadToService {

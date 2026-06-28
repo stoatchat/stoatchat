@@ -20,12 +20,10 @@ fcm_v1 = { workspace = true }
 web-push = { workspace = true }
 isahc = { workspace = true, features = ["json"], optional = true }
 revolt_a2 = { workspace = true, features = ["ring"] }
-redis-kiss = { workspace = true }
+redis-kiss = { workspace = true, default-features = false, features = ["tokio-runtime"] }
 tokio = { workspace = true }
 async-trait = { workspace = true }
 ulid = { workspace = true }
-
-authifier = { workspace = true }
 
 log = { workspace = true }
 pretty_env_logger = { workspace = true }
