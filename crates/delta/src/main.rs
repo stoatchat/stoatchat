@@ -108,6 +108,7 @@ pub async fn web() -> Rocket<Build> {
         .mount("/metrics", prometheus)
         .mount("/", rocket_cors::catch_all_options_routes())
         .mount("/", ratelimiter::routes())
+        .mount("/", util::version_gate::routes())
         .mount("/swagger/", swagger)
         .manage(authifier)
         .manage(db)
@@ -116,6 +117,7 @@ pub async fn web() -> Rocket<Build> {
         .manage(voice_client)
         .manage(ratelimits)
         .attach(ratelimiter::RatelimitFairing)
+        .attach(util::version_gate::VersionGateFairing)
         .attach(cors)
         .configure(rocket::Config {
             limits: rocket::data::Limits::default().limit("string", 5.megabytes()),

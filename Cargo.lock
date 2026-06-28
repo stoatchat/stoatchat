@@ -7579,6 +7579,7 @@ dependencies = [
  "once_cell",
  "pretty_env_logger",
  "revolt-result",
+ "semver",
  "sentry",
  "sentry-anyhow",
  "serde",
@@ -7661,6 +7662,7 @@ version = "0.13.7"
 dependencies = [
  "async-channel 2.5.0",
  "async-std",
+ "async-trait",
  "authifier",
  "bitfield",
  "chrono",

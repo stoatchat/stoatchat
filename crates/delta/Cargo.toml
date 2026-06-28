@@ -41,6 +41,7 @@ iso8601-timestamp = { workspace = true }
 futures = { workspace = true }
 chrono = { workspace = true }
 async-channel = { workspace = true }
+async-trait = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 async-std = { workspace = true, features = [
     "tokio1",

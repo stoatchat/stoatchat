@@ -99,6 +99,8 @@ impl<'r> Responder<'r, 'static> for Error {
             ErrorType::ImageProcessingFailed => Status::InternalServerError,
             ErrorType::NoEmbedData => Status::BadRequest,
             ErrorType::VosoUnavailable => Status::BadRequest,
+
+            ErrorType::UpgradeRequired { .. } => Status::new(426),
         };
 
         // Serialize the error data structure into JSON.

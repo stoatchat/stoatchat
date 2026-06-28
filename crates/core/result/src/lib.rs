@@ -188,6 +188,11 @@ pub enum ErrorType {
     FeatureDisabled {
         feature: String,
     },
+
+    // ? Client version gate
+    UpgradeRequired {
+        min_version: String,
+    },
 }
 
 #[macro_export]
