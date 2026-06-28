@@ -123,6 +123,10 @@ auto_derived_partial!(
         /// database `Role.class` field for what this changes about `permissions`
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none", default))]
         pub class: Option<RoleClass>,
+        /// Max message length override for this role, taking precedence over its
+        /// class's default (if any)
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none", default))]
+        pub max_message_length: Option<u64>,
     },
     "PartialRole"
 );

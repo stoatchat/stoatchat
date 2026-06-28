@@ -2,7 +2,7 @@ use iso8601_timestamp::Timestamp;
 use revolt_database::{
     tasks,
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, Message, PartialMessage, User,
+    Channel, Database, Message, PartialMessage, User,
 };
 use revolt_models::v0::{self, Embed};
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
@@ -29,14 +29,36 @@ pub async fn edit(
         })
     })?;
 
+    let channel = target.as_channel(db).await?;
+
+    // Same role/class-aware resolution as sending - see Message::create_from_api's
+    // comment for why this falls back to the account-tier limit on any lookup miss.
+    let effective_message_length = match &channel {
+        Channel::TextChannel { server, .. } => {
+            match (
+                db.fetch_server(server).await,
+                db.fetch_member(server, &user.id).await,
+            ) {
+                (Ok(server), Ok(member)) => {
+                    match server.resolve_max_message_length(&member.roles) {
+                        Some(None) => usize::MAX,
+                        Some(Some(resolved)) => resolved as usize,
+                        None => user.limits().await.message_length,
+                    }
+                }
+                _ => user.limits().await.message_length,
+            }
+        }
+        _ => user.limits().await.message_length,
+    };
+
     Message::validate_sum(
         &edit.content,
         edit.embeds.as_deref().unwrap_or_default(),
-        user.limits().await.message_length,
+        effective_message_length,
     )?;
 
     // Ensure we have permissions to send a message
-    let channel = target.as_channel(db).await?;
     let mut query = DatabasePermissionQuery::new(db, &user).channel(&channel);
     let permissions = calculate_channel_permissions(&mut query).await;
 

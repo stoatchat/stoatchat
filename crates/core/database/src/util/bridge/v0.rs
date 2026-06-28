@@ -964,6 +964,7 @@ impl From<crate::Role> for Role {
             rank: value.rank,
             icon: value.icon.map(|f| f.into()),
             class: value.class,
+            max_message_length: value.max_message_length,
         }
     }
 }
@@ -979,6 +980,7 @@ impl From<Role> for crate::Role {
             rank: value.rank,
             icon: value.icon.map(|f| f.into()),
             class: value.class,
+            max_message_length: value.max_message_length,
         }
     }
 }
@@ -994,6 +996,7 @@ impl From<crate::PartialRole> for PartialRole {
             rank: value.rank,
             icon: value.icon.map(|f| f.into()),
             class: value.class,
+            max_message_length: value.max_message_length,
         }
     }
 }
@@ -1009,6 +1012,7 @@ impl From<PartialRole> for crate::PartialRole {
             rank: value.rank,
             icon: value.icon.map(|f| f.into()),
             class: value.class,
+            max_message_length: value.max_message_length,
         }
     }
 }

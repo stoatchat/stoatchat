@@ -548,3 +548,265 @@ impl<'a> DatabasePermissionQuery<'a> {
 pub fn perms<'a>(database: &'a Database, perspective: &'a User) -> DatabasePermissionQuery<'a> {
     DatabasePermissionQuery::new(database, perspective)
 }
+
+#[cfg(test)]
+mod resolve_override_tests {
+    use std::collections::HashMap;
+
+    use revolt_permissions::{ChannelPermission, OverrideField, RoleClass};
+
+    use crate::{ClassDefault, Role, Server};
+
+    use super::{resolve_role_base_override, resolve_role_channel_override};
+
+    fn test_role(permissions: OverrideField, class: Option<RoleClass>) -> Role {
+        Role {
+            id: "role".into(),
+            name: "Test Role".into(),
+            permissions,
+            colour: None,
+            hoist: false,
+            rank: 0,
+            icon: None,
+            class,
+            max_message_length: None,
+        }
+    }
+
+    fn test_server(class_defaults: HashMap<RoleClass, ClassDefault>) -> Server {
+        Server {
+            id: "server".into(),
+            owner: "owner".into(),
+            name: "Test Server".into(),
+            description: None,
+            channels: vec![],
+            categories: None,
+            system_messages: None,
+            roles: HashMap::new(),
+            default_permissions: 0,
+            class_defaults,
+            icon: None,
+            banner: None,
+            flags: None,
+            nsfw: false,
+            analytics: false,
+            discoverable: false,
+        }
+    }
+
+    #[test]
+    fn role_without_class_is_unaffected_by_class_defaults() {
+        let role = test_role(
+            OverrideField {
+                a: ChannelPermission::SendMessage as i64,
+                d: 0,
+            },
+            None,
+        );
+
+        let server = test_server(HashMap::from([(
+            RoleClass::Admin,
+            ClassDefault::built_in(RoleClass::Admin),
+        )]));
+
+        let resolved = resolve_role_base_override(&role, &server);
+        assert_eq!(resolved.allow, ChannelPermission::SendMessage as u64);
+        assert_eq!(resolved.deny, 0);
+    }
+
+    #[test]
+    fn classed_role_with_no_override_fully_inherits_class_default() {
+        let role = test_role(OverrideField { a: 0, d: 0 }, Some(RoleClass::Member));
+        let server = test_server(HashMap::new()); // uses ClassDefault::built_in fallback
+
+        let resolved = resolve_role_base_override(&role, &server);
+        let expected = ClassDefault::built_in(RoleClass::Member).permissions;
+        assert_eq!(resolved.allow, expected.a as u64);
+        assert_eq!(resolved.deny, expected.d as u64);
+    }
+
+    #[test]
+    fn classed_role_explicit_bits_win_over_class_default() {
+        // Class default allows SendMessage; role explicitly denies it - the role's
+        // explicit choice must win even though it disagrees with the class.
+        let mut class_defaults = HashMap::new();
+        class_defaults.insert(
+            RoleClass::Member,
+            ClassDefault {
+                permissions: OverrideField {
+                    a: ChannelPermission::SendMessage as i64,
+                    d: 0,
+                },
+                channel_overrides: HashMap::new(),
+                max_message_length: None,
+            },
+        );
+
+        let role = test_role(
+            OverrideField {
+                a: 0,
+                d: ChannelPermission::SendMessage as i64,
+            },
+            Some(RoleClass::Member),
+        );
+        let server = test_server(class_defaults);
+
+        let resolved = resolve_role_base_override(&role, &server);
+        assert_eq!(resolved.allow & ChannelPermission::SendMessage as u64, 0);
+        assert_eq!(
+            resolved.deny & ChannelPermission::SendMessage as u64,
+            ChannelPermission::SendMessage as u64
+        );
+    }
+
+    #[test]
+    fn classed_role_untouched_bits_still_inherit_alongside_explicit_override() {
+        // Role explicitly grants UploadFiles (something the class default doesn't
+        // mention) - the class's other bits (e.g. SendMessage) should still come
+        // through untouched.
+        let mut class_defaults = HashMap::new();
+        class_defaults.insert(
+            RoleClass::Member,
+            ClassDefault {
+                permissions: OverrideField {
+                    a: ChannelPermission::SendMessage as i64,
+                    d: 0,
+                },
+                channel_overrides: HashMap::new(),
+                max_message_length: None,
+            },
+        );
+
+        let role = test_role(
+            OverrideField {
+                a: ChannelPermission::UploadFiles as i64,
+                d: 0,
+            },
+            Some(RoleClass::Member),
+        );
+        let server = test_server(class_defaults);
+
+        let resolved = resolve_role_base_override(&role, &server);
+        assert_eq!(
+            resolved.allow & ChannelPermission::SendMessage as u64,
+            ChannelPermission::SendMessage as u64
+        );
+        assert_eq!(
+            resolved.allow & ChannelPermission::UploadFiles as u64,
+            ChannelPermission::UploadFiles as u64
+        );
+    }
+
+    #[test]
+    fn live_link_class_default_change_is_picked_up_without_touching_the_role() {
+        let role = test_role(OverrideField { a: 0, d: 0 }, Some(RoleClass::Free));
+
+        let mut class_defaults = HashMap::new();
+        class_defaults.insert(
+            RoleClass::Free,
+            ClassDefault {
+                permissions: OverrideField {
+                    a: ChannelPermission::ViewChannel as i64,
+                    d: 0,
+                },
+                channel_overrides: HashMap::new(),
+                max_message_length: Some(1000),
+            },
+        );
+        let server_before = test_server(class_defaults.clone());
+        let resolved_before = resolve_role_base_override(&role, &server_before);
+        assert_eq!(resolved_before.allow, ChannelPermission::ViewChannel as u64);
+
+        // Simulate the server owner editing the class default - same role doc,
+        // different server-level config.
+        class_defaults.insert(
+            RoleClass::Free,
+            ClassDefault {
+                permissions: OverrideField {
+                    a: (ChannelPermission::ViewChannel as u64
+                        | ChannelPermission::SendMessage as u64) as i64,
+                    d: 0,
+                },
+                channel_overrides: HashMap::new(),
+                max_message_length: Some(2000),
+            },
+        );
+        let server_after = test_server(class_defaults);
+        let resolved_after = resolve_role_base_override(&role, &server_after);
+        assert_eq!(
+            resolved_after.allow,
+            ChannelPermission::ViewChannel as u64 | ChannelPermission::SendMessage as u64
+        );
+    }
+
+    #[test]
+    fn channel_override_falls_back_to_class_channel_template() {
+        let role = test_role(OverrideField { a: 0, d: 0 }, Some(RoleClass::Member));
+
+        let mut channel_overrides = HashMap::new();
+        channel_overrides.insert(
+            "channel-1".to_string(),
+            OverrideField {
+                a: ChannelPermission::SendMessage as i64,
+                d: 0,
+            },
+        );
+
+        let mut class_defaults = HashMap::new();
+        class_defaults.insert(
+            RoleClass::Member,
+            ClassDefault {
+                permissions: Default::default(),
+                channel_overrides,
+                max_message_length: None,
+            },
+        );
+        let server = test_server(class_defaults);
+
+        let resolved = resolve_role_channel_override(&role, &server, "channel-1", None);
+        assert_eq!(resolved.allow, ChannelPermission::SendMessage as u64);
+
+        // A channel with no template entry at all stays a no-op, same as today.
+        let resolved_other_channel =
+            resolve_role_channel_override(&role, &server, "channel-2", None);
+        assert_eq!(resolved_other_channel.allow, 0);
+        assert_eq!(resolved_other_channel.deny, 0);
+    }
+
+    #[test]
+    fn explicit_channel_override_wins_over_class_channel_template() {
+        let role = test_role(OverrideField { a: 0, d: 0 }, Some(RoleClass::Member));
+
+        let mut channel_overrides = HashMap::new();
+        channel_overrides.insert(
+            "channel-1".to_string(),
+            OverrideField {
+                a: ChannelPermission::SendMessage as i64,
+                d: 0,
+            },
+        );
+
+        let mut class_defaults = HashMap::new();
+        class_defaults.insert(
+            RoleClass::Member,
+            ClassDefault {
+                permissions: Default::default(),
+                channel_overrides,
+                max_message_length: None,
+            },
+        );
+        let server = test_server(class_defaults);
+
+        let explicit = Some(revolt_permissions::Override {
+            allow: 0,
+            deny: ChannelPermission::SendMessage as u64,
+        });
+
+        let resolved = resolve_role_channel_override(&role, &server, "channel-1", explicit);
+        assert_eq!(resolved.allow & ChannelPermission::SendMessage as u64, 0);
+        assert_eq!(
+            resolved.deny & ChannelPermission::SendMessage as u64,
+            ChannelPermission::SendMessage as u64
+        );
+    }
+}

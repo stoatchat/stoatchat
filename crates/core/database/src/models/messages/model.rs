@@ -281,10 +281,35 @@ impl Message {
     ) -> Result<Message> {
         let config = config().await;
 
+        // Resolve the message length cap role/class-aware rather than purely by account
+        // tier - a member's roles can raise (or, via the Admin class, remove) the cap
+        // their account tier alone would give them. Best-effort: any lookup failure
+        // (no server, fetch error, no matching role info) just falls through to the
+        // existing account-tier value, so this can never make sending stricter than
+        // before for a case it doesn't understand.
+        let effective_message_length = match &channel {
+            Channel::TextChannel { server, .. } => match db.fetch_server(server).await {
+                Ok(server) => {
+                    let member_roles = member
+                        .as_ref()
+                        .map(|m| m.roles.clone())
+                        .unwrap_or_default();
+
+                    match server.resolve_max_message_length(&member_roles) {
+                        Some(None) => usize::MAX, // Admin class - unlimited
+                        Some(Some(resolved)) => resolved as usize,
+                        None => limits.message_length,
+                    }
+                }
+                Err(_) => limits.message_length,
+            },
+            _ => limits.message_length,
+        };
+
         Message::validate_sum(
             &data.content,
             data.embeds.as_deref().unwrap_or_default(),
-            limits.message_length,
+            effective_message_length,
         )?;
 
         idempotency
