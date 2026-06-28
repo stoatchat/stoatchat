@@ -326,6 +326,7 @@ auto_derived! {
         DeleteAccount,
         DisableAccount,
         EmailChange,
+        EmailVerify,
 
         // Channels
         DeleteChannel,
@@ -381,6 +382,7 @@ impl AdminAuditItemActions {
             AdminAuditItemActions::DeleteAccount => true,
             AdminAuditItemActions::DisableAccount => true,
             AdminAuditItemActions::EmailChange => true,
+            AdminAuditItemActions::EmailVerify => true,
             AdminAuditItemActions::DeleteChannel => true,
             AdminAuditItemActions::EditChannel => true,
             AdminAuditItemActions::WipeChannel => true,
