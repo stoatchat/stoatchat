@@ -95,3 +95,18 @@ impl From<OverrideField> for Bson {
         Self::Document(bson::to_document(&v).unwrap())
     }
 }
+
+/// The three built-in permission tiers a role can be assigned to.
+///
+/// Shared between the API (`v0::Role`/`v0::Server`) and database models so both
+/// layers refer to the exact same set of classes, the same way they already share
+/// [`OverrideField`].
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "schemas", derive(JsonSchema))]
+pub enum RoleClass {
+    Admin,
+    Member,
+    Free,
+}

@@ -1,7 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use revolt_models::v0::{self, DataCreateServerChannel};
-use revolt_permissions::{OverrideField, DEFAULT_PERMISSION_SERVER};
+use revolt_permissions::{
+    ChannelPermission, OverrideField, RoleClass, DEFAULT_PERMISSION, DEFAULT_PERMISSION_SERVER,
+    DEFAULT_PERMISSION_VIEW_ONLY,
+};
 use revolt_result::Result;
 use ulid::Ulid;
 
@@ -40,6 +43,17 @@ auto_derived_partial!(
         pub roles: HashMap<String, Role>,
         /// Default set of server and channel permissions
         pub default_permissions: i64,
+
+        /// Per-class default permissions, inherited live by every role assigned to that
+        /// class (see `Role.class`) unless the role explicitly overrides a given bit.
+        /// Missing entries fall back to `ClassDefault::built_in(class)` - servers created
+        /// before this feature, or that haven't customised a class yet, don't need a
+        /// migration to get sane behaviour.
+        #[serde(
+            default = "HashMap::<RoleClass, ClassDefault>::new",
+            skip_serializing_if = "HashMap::<RoleClass, ClassDefault>::is_empty"
+        )]
+        pub class_defaults: HashMap<RoleClass, ClassDefault>,
 
         /// Icon attachment
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -89,9 +103,71 @@ auto_derived_partial!(
         /// Custom icon attachment
         #[serde(skip_serializing_if = "Option::is_none")]
         pub icon: Option<File>,
+        /// Permission class this role belongs to, if any
+        ///
+        /// `None` (the default for every role created before this feature existed) means
+        /// this role behaves exactly as it always has - `permissions` is the role's
+        /// complete, self-contained allow/deny set. Assigning a class makes `permissions`
+        /// act as an override on top of that class's live-linked default instead.
+        #[serde(skip_serializing_if = "Option::is_none", default)]
+        pub class: Option<RoleClass>,
     },
     "PartialRole"
 );
+
+auto_derived!(
+    /// The live-linked default permission set for a [`RoleClass`] on a given server.
+    pub struct ClassDefault {
+        /// Server-wide base permission for roles in this class
+        pub permissions: OverrideField,
+        /// Per-channel permission template, applied to every channel (existing and
+        /// future) for roles in this class that don't have an explicit per-role,
+        /// per-channel override on that specific channel.
+        #[serde(
+            default = "HashMap::<String, OverrideField>::new",
+            skip_serializing_if = "HashMap::<String, OverrideField>::is_empty"
+        )]
+        pub channel_overrides: HashMap<String, OverrideField>,
+        /// Default max message length for roles in this class, if overriding the
+        /// instance-wide default
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub max_message_length: Option<u64>,
+    }
+);
+
+impl ClassDefault {
+    /// Sane built-in defaults for a class, used whenever a server hasn't customised
+    /// `Server.class_defaults` for this class yet - keeps every server's roles working
+    /// out of the box without needing a backfill migration.
+    pub fn built_in(class: RoleClass) -> Self {
+        let permissions = match class {
+            RoleClass::Admin => OverrideField {
+                a: ChannelPermission::GrantAllSafe as i64,
+                d: 0,
+            },
+            RoleClass::Member => OverrideField {
+                a: *DEFAULT_PERMISSION as i64,
+                d: 0,
+            },
+            RoleClass::Free => OverrideField {
+                a: (*DEFAULT_PERMISSION_VIEW_ONLY | ChannelPermission::SendMessage as u64) as i64,
+                d: 0,
+            },
+        };
+
+        let max_message_length = match class {
+            RoleClass::Admin => None, // unlimited - enforced separately, not via a number
+            RoleClass::Member => Some(5000),
+            RoleClass::Free => Some(2000),
+        };
+
+        Self {
+            permissions,
+            channel_overrides: HashMap::new(),
+            max_message_length,
+        }
+    }
+}
 
 auto_derived!(
     /// Channel category
@@ -138,6 +214,15 @@ auto_derived!(
 
 #[allow(clippy::disallowed_methods)]
 impl Server {
+    /// Get this server's effective default for a permission class, falling back to
+    /// `ClassDefault::built_in` if the server hasn't customised it yet
+    pub fn get_class_default(&self, class: RoleClass) -> ClassDefault {
+        self.class_defaults
+            .get(&class)
+            .cloned()
+            .unwrap_or_else(|| ClassDefault::built_in(class))
+    }
+
     /// Create a server
     pub async fn create(
         db: &Database,
@@ -161,6 +246,7 @@ impl Server {
             flags: None,
             icon: None,
             roles: HashMap::new(),
+            class_defaults: HashMap::new(),
             system_messages: None,
         };
 
@@ -310,6 +396,7 @@ impl Role {
             hoist: Some(self.hoist),
             rank: Some(self.rank),
             icon: self.icon,
+            class: self.class,
         }
     }
 
@@ -324,6 +411,7 @@ impl Role {
             hoist: false,
             permissions: Default::default(),
             icon: None,
+            class: None,
         };
 
         db.insert_role(&server.id, &role).await?;

@@ -1,6 +1,6 @@
 use super::{Channel, File, RE_COLOUR};
 
-use revolt_permissions::{Override, OverrideField};
+use revolt_permissions::{Override, OverrideField, RoleClass};
 use std::collections::HashMap;
 
 #[cfg(feature = "validator")]
@@ -45,6 +45,16 @@ auto_derived_partial!(
         pub roles: HashMap<String, Role>,
         /// Default set of server and channel permissions
         pub default_permissions: i64,
+
+        /// Per-class default permissions - see `Role.class`
+        #[cfg_attr(
+            feature = "serde",
+            serde(
+                default = "HashMap::<RoleClass, ClassDefault>::new",
+                skip_serializing_if = "HashMap::<RoleClass, ClassDefault>::is_empty"
+            )
+        )]
+        pub class_defaults: HashMap<RoleClass, ClassDefault>,
 
         /// Icon attachment
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
@@ -109,8 +119,35 @@ auto_derived_partial!(
         /// Role icon
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
         pub icon: Option<File>,
+        /// Permission class this role belongs to, if any - see top-level docs on the
+        /// database `Role.class` field for what this changes about `permissions`
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none", default))]
+        pub class: Option<RoleClass>,
     },
     "PartialRole"
+);
+
+auto_derived_partial!(
+    /// Live-linked default permission set for a [`RoleClass`] on a server
+    pub struct ClassDefault {
+        /// Server-wide base permission for roles in this class
+        pub permissions: OverrideField,
+        /// Per-channel permission template, applied to every channel for roles in this
+        /// class that don't have an explicit per-role, per-channel override
+        #[cfg_attr(
+            feature = "serde",
+            serde(
+                default = "HashMap::<String, OverrideField>::new",
+                skip_serializing_if = "HashMap::<String, OverrideField>::is_empty"
+            )
+        )]
+        pub channel_overrides: HashMap<String, OverrideField>,
+        /// Default max message length for roles in this class, if overriding the
+        /// instance-wide default
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+        pub max_message_length: Option<u64>,
+    },
+    "PartialClassDefault"
 );
 
 auto_derived!(

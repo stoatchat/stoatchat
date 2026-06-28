@@ -743,6 +743,26 @@ impl From<crate::RemovalIntention> for RemovalIntention {
     }
 }
 
+impl From<crate::ClassDefault> for ClassDefault {
+    fn from(value: crate::ClassDefault) -> Self {
+        ClassDefault {
+            permissions: value.permissions,
+            channel_overrides: value.channel_overrides,
+            max_message_length: value.max_message_length,
+        }
+    }
+}
+
+impl From<ClassDefault> for crate::ClassDefault {
+    fn from(value: ClassDefault) -> Self {
+        crate::ClassDefault {
+            permissions: value.permissions,
+            channel_overrides: value.channel_overrides,
+            max_message_length: value.max_message_length,
+        }
+    }
+}
+
 impl From<crate::Server> for Server {
     fn from(value: crate::Server) -> Self {
         Server {
@@ -761,6 +781,11 @@ impl From<crate::Server> for Server {
                 .map(|(k, v)| (k, v.into()))
                 .collect(),
             default_permissions: value.default_permissions,
+            class_defaults: value
+                .class_defaults
+                .into_iter()
+                .map(|(k, v)| (k, v.into()))
+                .collect(),
             icon: value.icon.map(|f| f.into()),
             banner: value.banner.map(|f| f.into()),
             flags: value.flags.unwrap_or_default() as u32,
@@ -789,6 +814,11 @@ impl From<Server> for crate::Server {
                 .map(|(k, v)| (k, v.into()))
                 .collect(),
             default_permissions: value.default_permissions,
+            class_defaults: value
+                .class_defaults
+                .into_iter()
+                .map(|(k, v)| (k, v.into()))
+                .collect(),
             icon: value.icon.map(|f| f.into()),
             banner: value.banner.map(|f| f.into()),
             flags: Some(value.flags as i32),
@@ -815,6 +845,9 @@ impl From<crate::PartialServer> for PartialServer {
                 .roles
                 .map(|roles| roles.into_iter().map(|(k, v)| (k, v.into())).collect()),
             default_permissions: value.default_permissions,
+            class_defaults: value
+                .class_defaults
+                .map(|m| m.into_iter().map(|(k, v)| (k, v.into())).collect()),
             icon: value.icon.map(|f| f.into()),
             banner: value.banner.map(|f| f.into()),
             flags: value.flags.map(|v| v as u32),
@@ -841,6 +874,9 @@ impl From<PartialServer> for crate::PartialServer {
                 .roles
                 .map(|roles| roles.into_iter().map(|(k, v)| (k, v.into())).collect()),
             default_permissions: value.default_permissions,
+            class_defaults: value
+                .class_defaults
+                .map(|m| m.into_iter().map(|(k, v)| (k, v.into())).collect()),
             icon: value.icon.map(|f| f.into()),
             banner: value.banner.map(|f| f.into()),
             flags: value.flags.map(|v| v as i32),
@@ -927,6 +963,7 @@ impl From<crate::Role> for Role {
             hoist: value.hoist,
             rank: value.rank,
             icon: value.icon.map(|f| f.into()),
+            class: value.class,
         }
     }
 }
@@ -941,6 +978,7 @@ impl From<Role> for crate::Role {
             hoist: value.hoist,
             rank: value.rank,
             icon: value.icon.map(|f| f.into()),
+            class: value.class,
         }
     }
 }
@@ -955,6 +993,7 @@ impl From<crate::PartialRole> for PartialRole {
             hoist: value.hoist,
             rank: value.rank,
             icon: value.icon.map(|f| f.into()),
+            class: value.class,
         }
     }
 }
@@ -969,6 +1008,7 @@ impl From<PartialRole> for crate::PartialRole {
             hoist: value.hoist,
             rank: value.rank,
             icon: value.icon.map(|f| f.into()),
+            class: value.class,
         }
     }
 }

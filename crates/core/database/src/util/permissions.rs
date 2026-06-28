@@ -5,7 +5,64 @@ use revolt_permissions::{
     RelationshipStatus, DEFAULT_PERMISSION_DIRECT_MESSAGE,
 };
 
-use crate::{Channel, Database, Member, Server, User};
+use crate::{Channel, Database, Member, Role, Server, User};
+
+/// Resolve a role's effective permission override, blending its class default (if any)
+/// underneath its own explicit override.
+///
+/// Bits the role hasn't explicitly allowed or denied "inherit" from the class default,
+/// live - this is read fresh on every resolution, never copied onto the role, so editing
+/// a class default immediately changes every role in that class that hasn't explicitly
+/// overridden the bit in question. Roles without a class are returned unchanged, so this
+/// is a no-op for every role that existed before this feature.
+fn resolve_role_base_override(role: &Role, server: &Server) -> Override {
+    let role_override: Override = role.permissions.into();
+
+    let Some(class) = role.class else {
+        return role_override;
+    };
+
+    let class_override: Override = server.get_class_default(class).permissions.into();
+    let role_touched_bits = role_override.allow | role_override.deny;
+
+    Override {
+        allow: (class_override.allow & !role_touched_bits) | role_override.allow,
+        deny: (class_override.deny & !role_touched_bits) | role_override.deny,
+    }
+}
+
+/// Same blend as [`resolve_role_base_override`], but for a role's override on one
+/// specific channel - `explicit` is the role's existing entry in that channel's
+/// `role_permissions` map, if it has one.
+fn resolve_role_channel_override(
+    role: &Role,
+    server: &Server,
+    channel_id: &str,
+    explicit: Option<Override>,
+) -> Override {
+    let role_override = explicit.unwrap_or_default();
+
+    let Some(class) = role.class else {
+        return role_override;
+    };
+
+    let Some(class_override) = server
+        .get_class_default(class)
+        .channel_overrides
+        .get(channel_id)
+        .copied()
+        .map(Override::from)
+    else {
+        return role_override;
+    };
+
+    let role_touched_bits = role_override.allow | role_override.deny;
+
+    Override {
+        allow: (class_override.allow & !role_touched_bits) | role_override.allow,
+        deny: (class_override.deny & !role_touched_bits) | role_override.deny,
+    }
+}
 
 /// Permissions calculator
 #[derive(Clone)]
@@ -164,7 +221,7 @@ impl PermissionQuery for DatabasePermissionQuery<'_> {
                 .iter()
                 .filter(|(id, _)| member_roles.contains(id))
                 .map(|(_, role)| {
-                    let v: Override = role.permissions.into();
+                    let v = resolve_role_base_override(role, server);
                     (role.rank, v)
                 })
                 .collect::<Vec<(i64, Override)>>();
@@ -253,10 +310,14 @@ impl PermissionQuery for DatabasePermissionQuery<'_> {
         if let Some(channel) = &self.channel {
             match channel {
                 Cow::Borrowed(Channel::TextChannel {
-                    role_permissions, ..
+                    id: channel_id,
+                    role_permissions,
+                    ..
                 })
                 | Cow::Owned(Channel::TextChannel {
-                    role_permissions, ..
+                    id: channel_id,
+                    role_permissions,
+                    ..
                 }) => {
                     if let Some(server) = &self.server {
                         let member_roles = self
@@ -265,14 +326,20 @@ impl PermissionQuery for DatabasePermissionQuery<'_> {
                             .map(|member| member.roles.clone())
                             .unwrap_or_default();
 
-                        let mut roles = role_permissions
+                        // Iterate every role the member holds, not just ones with an
+                        // explicit entry in `role_permissions` - a classed role with no
+                        // explicit override on this channel still needs its class's
+                        // channel template considered.
+                        let mut roles = server
+                            .roles
                             .iter()
                             .filter(|(id, _)| member_roles.contains(id))
-                            .filter_map(|(id, permission)| {
-                                server.roles.get(id).map(|role| {
-                                    let v: Override = (*permission).into();
-                                    (role.rank, v)
-                                })
+                            .map(|(id, role)| {
+                                let explicit = role_permissions.get(id).map(|p| (*p).into());
+                                let v = resolve_role_channel_override(
+                                    role, server, channel_id, explicit,
+                                );
+                                (role.rank, v)
                             })
                             .collect::<Vec<(i64, Override)>>();
 
