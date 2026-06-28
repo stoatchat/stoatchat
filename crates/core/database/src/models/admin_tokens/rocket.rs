@@ -1,6 +1,6 @@
 use iso8601_timestamp::Timestamp;
 use revolt_config::{capture_internal_error, report_error};
-use revolt_result::Result;
+use revolt_result::{Error, Result};
 use rocket::http::Status;
 use rocket::request::{self, FromRequest, Outcome, Request};
 
@@ -8,7 +8,7 @@ use crate::{AdminAuthorization, AdminMachineToken, AdminUser, Database};
 
 #[rocket::async_trait]
 impl<'r> FromRequest<'r> for AdminMachineToken {
-    type Error = authifier::Error;
+    type Error = Error;
 
     async fn from_request(request: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
         let user: &Option<AdminMachineToken> = request
@@ -48,14 +48,14 @@ impl<'r> FromRequest<'r> for AdminMachineToken {
         if let Some(user) = user {
             Outcome::Success(user.clone())
         } else {
-            Outcome::Error((Status::Unauthorized, authifier::Error::InvalidSession))
+            Outcome::Error((Status::Unauthorized, create_error!(InvalidSession)))
         }
     }
 }
 
 #[rocket::async_trait]
 impl<'r> FromRequest<'r> for AdminAuthorization {
-    type Error = authifier::Error;
+    type Error = Error;
 
     async fn from_request(request: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
         let machine: &Option<AdminMachineToken> = request
@@ -94,7 +94,7 @@ impl<'r> FromRequest<'r> for AdminAuthorization {
 
         if let Some(machine) = machine {
             if !machine.on_behalf_of.active {
-                Outcome::Error((Status::Unauthorized, authifier::Error::LockedOut))
+                Outcome::Error((Status::Unauthorized, create_error!(LockedOut)))
             } else {
                 Outcome::Success(AdminAuthorization::AdminMachine(machine.clone()))
             }
@@ -134,12 +134,12 @@ impl<'r> FromRequest<'r> for AdminAuthorization {
 
             if let Some(user) = user {
                 if !user.active {
-                    Outcome::Error((Status::Unauthorized, authifier::Error::LockedOut))
+                    Outcome::Error((Status::Unauthorized, create_error!(LockedOut)))
                 } else {
                     Outcome::Success(AdminAuthorization::AdminUser(user.clone()))
                 }
             } else {
-                Outcome::Error((Status::Unauthorized, authifier::Error::InvalidCredentials))
+                Outcome::Error((Status::Unauthorized, create_error!(InvalidSession)))
             }
         }
     }

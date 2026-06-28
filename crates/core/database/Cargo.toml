@@ -82,6 +82,7 @@ async-recursion = { workspace = true }
 
 # Async
 tokio = { workspace = true, optional = true }
+tokio-stream = { workspace = true }
 
 # Axum Impl
 axum = { workspace = true, optional = true }

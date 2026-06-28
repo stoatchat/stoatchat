@@ -1,4 +1,4 @@
-use async_std::stream::StreamExt;
+use tokio_stream::StreamExt;
 use revolt_result::Result;
 
 use crate::AdminAuditItem;

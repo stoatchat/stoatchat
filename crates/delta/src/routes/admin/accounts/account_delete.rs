@@ -37,7 +37,10 @@ pub async fn admin_account_delete(
         }
     }
 
-    db.delete_authifier_account(&target.id).await?;
+    db.fetch_account(&target.id)
+        .await?
+        .mark_deleted(db)
+        .await?;
 
     create_audit_action(
         db,

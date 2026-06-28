@@ -190,5 +190,5 @@ pub async fn edit_data(
         .update(db, partial, remove.into_iter().map(Into::into).collect())
         .await?;
 
-    Ok(Json(server.into()))
+    Ok(())
 }

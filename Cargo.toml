@@ -28,6 +28,7 @@ futures-locks = "0.7.1"
 async-lock = "2.8.0"
 async-recursion = "1.0.4"
 tokio-util = { version = "0.7.18" }
+tokio-stream = "0.1.18"
 
 # Error Handling
 anyhow = "1.0.100"

@@ -1,11 +1,11 @@
 use rocket::http::Status;
 use rocket::request::{self, FromRequest, Outcome, Request};
-
+use revolt_result::Error;
 use crate::{AdminUser, Database};
 
 #[rocket::async_trait]
 impl<'r> FromRequest<'r> for AdminUser {
-    type Error = authifier::Error;
+    type Error = Error;
 
     async fn from_request(request: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
         let user: &Option<AdminUser> = request
@@ -32,12 +32,12 @@ impl<'r> FromRequest<'r> for AdminUser {
 
         if let Some(user) = user {
             if !user.active {
-                Outcome::Error((Status::Unauthorized, authifier::Error::LockedOut))
+                Outcome::Error((Status::Unauthorized, create_error!(LockedOut)))
             } else {
                 Outcome::Success(user.clone())
             }
         } else {
-            Outcome::Error((Status::Unauthorized, authifier::Error::InvalidCredentials))
+            Outcome::Error((Status::Unauthorized, create_error!(InvalidCredentials)))
         }
     }
 }

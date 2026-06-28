@@ -39,7 +39,9 @@ pub async fn admin_account_disable(
         }
     }
 
-    db.disable_authifier_account(&target.id).await?;
+    db.fetch_account(&target.id).await?
+        .disable(db)
+        .await?;
 
     create_audit_action(
         db,

@@ -7330,6 +7330,7 @@ dependencies = [
  "serde_json",
  "sha1 0.10.6",
  "tokio",
+ "tokio-stream",
  "totp-lite",
  "ulid",
  "unicode-segmentation",
