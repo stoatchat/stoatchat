@@ -1,18 +1,28 @@
 name: Build NAC API (patched)
 
-# Builds the custom bluecords/api image from this fork.
-# The root Dockerfile compiles the Rust workspace (where NAC patches live,
-# e.g. the LiveKit token TTL fix); crates/delta/Dockerfile bundles the
-# resulting binary into distroless and we push it to ghcr.io/bluecords/api.
+# Builds the custom bluecords/api + bluecords/events images from this fork.
+# The root Dockerfile compiles the Rust workspace (where NAC patches live);
+# crates/delta/Dockerfile and crates/bonfire/Dockerfile bundle the resulting
+# binaries into distroless and we push them to ghcr.io/bluecords/{api,events}.
 #
 # Runs on a standard GitHub runner (the upstream workflow needs a self-hosted
 # arc-runner-set the fork doesn't have). Single-arch amd64 (matches the Linode).
+#
+# Restored to `main` 2026-06-28 - this previously only ever lived on the old
+# `nac/voice-ttl-fix` branch and was never merged forward, which is why every
+# custom-tagged prod image push before today went through here but a later
+# session couldn't find any record of how.
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag to build and push (in addition to the commit SHA)'
+        required: true
+        default: 'voice-ttl-fix'
   push:
     branches:
-      - nac/voice-ttl-fix
+      - main
     paths:
       - 'crates/**'
       - 'Dockerfile'
@@ -52,6 +62,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Determine tag
+        id: tag
+        run: echo "tag=${{ inputs.tag || 'voice-ttl-fix' }}" >> "$GITHUB_OUTPUT"
+
       - name: Build base image (compiles Rust workspace incl. NAC patches)
         run: |
           DOCKER_BUILDKIT=1 docker build \
@@ -62,9 +76,19 @@ jobs:
       - name: Build & push API image
         run: |
           DOCKER_BUILDKIT=1 docker build \
-            -t ghcr.io/bluecords/api:voice-ttl-fix \
+            -t ghcr.io/bluecords/api:${{ steps.tag.outputs.tag }} \
             -t ghcr.io/bluecords/api:${GITHUB_SHA} \
             -f crates/delta/Dockerfile .
-          docker push ghcr.io/bluecords/api:voice-ttl-fix
+          docker push ghcr.io/bluecords/api:${{ steps.tag.outputs.tag }}
           docker push ghcr.io/bluecords/api:${GITHUB_SHA}
-          echo "Pushed ghcr.io/bluecords/api:voice-ttl-fix and :${GITHUB_SHA}"
+          echo "Pushed ghcr.io/bluecords/api:${{ steps.tag.outputs.tag }} and :${GITHUB_SHA}"
+
+      - name: Build & push events image
+        run: |
+          DOCKER_BUILDKIT=1 docker build \
+            -t ghcr.io/bluecords/events:${{ steps.tag.outputs.tag }} \
+            -t ghcr.io/bluecords/events:${GITHUB_SHA} \
+            -f crates/bonfire/Dockerfile .
+          docker push ghcr.io/bluecords/events:${{ steps.tag.outputs.tag }}
+          docker push ghcr.io/bluecords/events:${GITHUB_SHA}
+          echo "Pushed ghcr.io/bluecords/events:${{ steps.tag.outputs.tag }} and :${GITHUB_SHA}"
