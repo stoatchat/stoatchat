@@ -1,33 +1,34 @@
 name: Build NAC API (patched)
 
-# Builds the custom bluecords/api + bluecords/events images from this fork.
-# The root Dockerfile compiles the Rust workspace (where NAC patches live);
-# crates/delta/Dockerfile and crates/bonfire/Dockerfile bundle the resulting
-# binaries into distroless and we push them to ghcr.io/bluecords/{api,events}.
+# Builds the custom bluecords/api + bluecords/events images from this fork
+# and publishes them under the REAL release-please version number - not a
+# nickname tag. The root Dockerfile compiles the Rust workspace (where NAC
+# patches live); crates/delta/Dockerfile and crates/bonfire/Dockerfile bundle
+# the resulting binaries into distroless and we push them to
+# ghcr.io/bluecords/{api,events}.
 #
 # Runs on a standard GitHub runner (the upstream workflow needs a self-hosted
 # arc-runner-set the fork doesn't have). Single-arch amd64 (matches the Linode).
 #
-# Restored to `main` 2026-06-28 - this previously only ever lived on the old
-# `nac/voice-ttl-fix` branch and was never merged forward, which is why every
-# custom-tagged prod image push before today went through here but a later
-# session couldn't find any record of how.
+# 2026-06-29 - rewired as part of moving to a real release process: this
+# previously triggered on every push to main and pushed a fixed nickname tag
+# (voice-ttl-fix). That meant rebuilding the same tag silently, with nothing
+# in prod's config ever changing to reflect it - the deploy script had no
+# signal that anything new existed, so updates got silently skipped unless
+# someone noticed and force-pulled manually. Now it only builds when
+# release-please actually cuts a real release (a deliberate, visible version
+# bump you approve), and tags images with that exact version - so updating
+# nac-server's compose.yml to the new version is what triggers the deploy,
+# every time, with no silent skips possible.
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Image tag to build and push (in addition to the commit SHA)'
+        description: 'Image tag to build and push (for a manual/emergency build outside the normal release flow)'
         required: true
-        default: 'voice-ttl-fix'
-  push:
-    branches:
-      - main
-    paths:
-      - 'crates/**'
-      - 'Dockerfile'
-      - 'scripts/**'
-      - '.github/workflows/nac-api-build.yml'
+  release:
+    types: [published]
 
 permissions:
   contents: read
@@ -52,8 +53,10 @@ jobs:
           sudo swapon /swapfile
           free -h
 
-      - name: Checkout
+      - name: Checkout the exact release tag
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -64,7 +67,7 @@ jobs:
 
       - name: Determine tag
         id: tag
-        run: echo "tag=${{ inputs.tag || 'voice-ttl-fix' }}" >> "$GITHUB_OUTPUT"
+        run: echo "tag=${{ github.event.release.tag_name || inputs.tag }}" >> "$GITHUB_OUTPUT"
 
       - name: Build base image (compiles Rust workspace incl. NAC patches)
         run: |
@@ -77,18 +80,18 @@ jobs:
         run: |
           DOCKER_BUILDKIT=1 docker build \
             -t ghcr.io/bluecords/api:${{ steps.tag.outputs.tag }} \
-            -t ghcr.io/bluecords/api:${GITHUB_SHA} \
+            -t ghcr.io/bluecords/api:latest \
             -f crates/delta/Dockerfile .
           docker push ghcr.io/bluecords/api:${{ steps.tag.outputs.tag }}
-          docker push ghcr.io/bluecords/api:${GITHUB_SHA}
-          echo "Pushed ghcr.io/bluecords/api:${{ steps.tag.outputs.tag }} and :${GITHUB_SHA}"
+          docker push ghcr.io/bluecords/api:latest
+          echo "Pushed ghcr.io/bluecords/api:${{ steps.tag.outputs.tag }} (+ :latest)"
 
       - name: Build & push events image
         run: |
           DOCKER_BUILDKIT=1 docker build \
             -t ghcr.io/bluecords/events:${{ steps.tag.outputs.tag }} \
-            -t ghcr.io/bluecords/events:${GITHUB_SHA} \
+            -t ghcr.io/bluecords/events:latest \
             -f crates/bonfire/Dockerfile .
           docker push ghcr.io/bluecords/events:${{ steps.tag.outputs.tag }}
-          docker push ghcr.io/bluecords/events:${GITHUB_SHA}
-          echo "Pushed ghcr.io/bluecords/events:${{ steps.tag.outputs.tag }} and :${GITHUB_SHA}"
+          docker push ghcr.io/bluecords/events:latest
+          echo "Pushed ghcr.io/bluecords/events:${{ steps.tag.outputs.tag }} (+ :latest)"
