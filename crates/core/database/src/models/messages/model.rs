@@ -219,6 +219,7 @@ auto_derived!(
     /// Optional fields on message
     pub enum FieldsMessage {
         Pinned,
+        ForumSolution,
     }
 );
 
@@ -1178,6 +1179,7 @@ impl Message {
     pub fn remove_field(&mut self, field: &FieldsMessage) {
         match field {
             FieldsMessage::Pinned => self.pinned = None,
+            FieldsMessage::ForumSolution => self.forum_solution = None,
         }
     }
 }

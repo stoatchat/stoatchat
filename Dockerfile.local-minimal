@@ -1,0 +1,31 @@
+# Local-only minimal build for deploying the role-classes/version-gate
+# release - builds ONLY revolt-delta and revolt-bonfire (the two services
+# whose source actually changed; autumn/january/gifbox/crond/pushd/
+# voice-ingress stay on their existing upstream image tags, unaffected).
+# Not meant to be committed.
+FROM rust:1.92.0-slim-bookworm AS builder
+WORKDIR /home/rust/src
+
+RUN apt-get update && apt-get install -y make pkg-config libssl-dev
+
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+
+RUN cargo build --release -p revolt-delta -p revolt-bonfire
+
+FROM debian:12 AS debian
+
+FROM gcr.io/distroless/cc-debian12:nonroot AS delta
+COPY --from=builder /home/rust/src/target/release/revolt-delta ./
+COPY --from=debian /usr/bin/uname /usr/bin/uname
+EXPOSE 14702
+ENV ROCKET_ADDRESS=0.0.0.0
+USER nonroot
+CMD ["./revolt-delta"]
+
+FROM gcr.io/distroless/cc-debian12:nonroot AS bonfire
+COPY --from=builder /home/rust/src/target/release/revolt-bonfire ./
+COPY --from=debian /usr/bin/uname /usr/bin/uname
+EXPOSE 14703
+USER nonroot
+CMD ["./revolt-bonfire"]

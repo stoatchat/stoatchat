@@ -1506,6 +1506,7 @@ impl From<crate::FieldsMessage> for FieldsMessage {
     fn from(value: crate::FieldsMessage) -> Self {
         match value {
             crate::FieldsMessage::Pinned => FieldsMessage::Pinned,
+            crate::FieldsMessage::ForumSolution => FieldsMessage::ForumSolution,
         }
     }
 }
@@ -1513,6 +1514,7 @@ impl From<FieldsMessage> for crate::FieldsMessage {
     fn from(value: FieldsMessage) -> Self {
         match value {
             FieldsMessage::Pinned => crate::FieldsMessage::Pinned,
+            FieldsMessage::ForumSolution => crate::FieldsMessage::ForumSolution,
         }
     }
 }

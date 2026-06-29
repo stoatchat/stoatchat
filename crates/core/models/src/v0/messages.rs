@@ -406,6 +406,7 @@ auto_derived!(
     /// Optional fields on message
     pub enum FieldsMessage {
         Pinned,
+        ForumSolution,
     }
 );
 

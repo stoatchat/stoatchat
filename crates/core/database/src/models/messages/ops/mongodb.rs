@@ -422,6 +422,7 @@ impl IntoDocumentPath for FieldsMessage {
     fn as_path(&self) -> Option<&'static str> {
         Some(match self {
             FieldsMessage::Pinned => "pinned",
+            FieldsMessage::ForumSolution => "forum_solution",
         })
     }
 }
