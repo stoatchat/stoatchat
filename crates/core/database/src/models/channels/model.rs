@@ -161,6 +161,7 @@ auto_derived!(
         Icon,
         DefaultPermissions,
         Voice,
+        Slowmode,
     }
 );
 
@@ -554,6 +555,12 @@ impl Channel {
                 }
                 _ => {}
             },
+            FieldsChannel::Slowmode => match self {
+                Self::TextChannel { slowmode, .. } => {
+                    slowmode.take();
+                }
+                _ => {}
+            }
         }
     }
 
@@ -777,6 +784,7 @@ impl IntoDocumentPath for FieldsChannel {
             FieldsChannel::Icon => "icon",
             FieldsChannel::DefaultPermissions => "default_permissions",
             FieldsChannel::Voice => "voice",
+            FieldsChannel::Slowmode => "slowmode",
         })
     }
 }
