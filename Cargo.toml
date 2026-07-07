@@ -45,7 +45,7 @@ ulid = "1.2.1"
 nanoid = "0.4.0"
 typenum = "1.17.0"
 num_enum = "0.6.1"
-bitfield = "0.13.2"
+bitfield = "0.19.0"
 
 # Time
 chrono = "0.4.15"
