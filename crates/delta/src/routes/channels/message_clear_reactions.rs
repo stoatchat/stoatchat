@@ -1,6 +1,6 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, PartialMessage, User,
+    Database, PartialMessage, User, AMQP,
 };
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::Result;
@@ -16,6 +16,7 @@ use rocket_empty::EmptyResponse;
 #[delete("/<target>/messages/<msg>/reactions")]
 pub async fn clear_reactions(
     db: &State<Database>,
+    amqp: &State<AMQP>,
     user: User,
     target: Reference<'_>,
     msg: Reference<'_>,
@@ -33,11 +34,12 @@ pub async fn clear_reactions(
     message
         .update(
             db,
+            Some(amqp),
             PartialMessage {
                 reactions: Some(Default::default()),
                 ..Default::default()
             },
-            vec![]
+            vec![],
         )
         .await
         .map(|_| EmptyResponse)

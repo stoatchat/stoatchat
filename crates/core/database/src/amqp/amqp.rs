@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use crate::events::rabbit::*;
+use crate::{Message, events::rabbit::*};
 use crate::User;
 use lapin::{
     options::BasicPublishOptions,
@@ -25,6 +25,10 @@ pub struct AMQP {
     ack_notification_message: Arc<Channel>,
     dm_call_updated: Arc<Channel>,
     process_ack: Arc<Channel>,
+    message_search: Arc<Channel>,
+    edit_message_search: Arc<Channel>,
+    delete_message_search: Arc<Channel>,
+    delete_channel_search: Arc<Channel>,
     #[allow(unused)]
     connection: Arc<Connection>,
 }
@@ -40,6 +44,10 @@ impl AMQP {
             ack_notification_message: Self::create_channel(&connection).await,
             dm_call_updated: Self::create_channel(&connection).await,
             process_ack: Self::create_channel(&connection).await,
+            message_search: Self::create_channel(&connection).await,
+            edit_message_search: Self::create_channel(&connection).await,
+            delete_message_search: Self::create_channel(&connection).await,
+            delete_channel_search: Self::create_channel(&connection).await,
             connection,
         }
     }
@@ -369,6 +377,114 @@ impl AMQP {
             .basic_publish(
                 config.rabbit.default_exchange.clone().into(),
                 config.rabbit.queues.acks.into(),
+                BasicPublishOptions::default(),
+                payload.as_bytes(),
+                AMQPProperties::default()
+                    .with_content_type("application/json".into())
+                    .with_delivery_mode(2),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn new_message_search(
+        &self,
+        message: Message,
+        user: Option<User>,
+    ) -> Result<(), AMQPError> {
+        let config = revolt_config::config().await;
+
+        let payload = to_string(&MessageCreatePayload { message, user }).unwrap();
+
+        debug!(
+            "Sending new message search payload on channel {}: {}",
+            config.elasticsearch.message_queue, payload
+        );
+
+        self.message_search
+            .basic_publish(
+                config.elasticsearch.exchange.clone().into(),
+                config.elasticsearch.message_queue.into(),
+                BasicPublishOptions::default(),
+                payload.as_bytes(),
+                AMQPProperties::default()
+                    .with_content_type("application/json".into())
+                    .with_delivery_mode(2),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn edit_message_search(
+        &self,
+        message: Message,
+        user: Option<User>,
+    ) -> Result<(), AMQPError> {
+        let config = revolt_config::config().await;
+
+        let payload = to_string(&MessageEditPayload { message, user }).unwrap();
+
+        debug!(
+            "Sending edit message search payload on channel {}: {}",
+            config.elasticsearch.message_edit_queue, payload
+        );
+
+        self.edit_message_search
+            .basic_publish(
+                config.elasticsearch.exchange.clone().into(),
+                config.elasticsearch.message_edit_queue.into(),
+                BasicPublishOptions::default(),
+                payload.as_bytes(),
+                AMQPProperties::default()
+                    .with_content_type("application/json".into())
+                    .with_delivery_mode(2),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn delete_message_search(&self, message_id: String) -> Result<(), AMQPError> {
+        let config = revolt_config::config().await;
+
+        let payload = to_string(&MessageDeletePayload { message_id }).unwrap();
+
+        debug!(
+            "Sending delete message search payload on channel {}: {}",
+            config.elasticsearch.message_delete_queue, payload
+        );
+
+        self.delete_message_search
+            .basic_publish(
+                config.elasticsearch.exchange.clone().into(),
+                config.elasticsearch.message_delete_queue.into(),
+                BasicPublishOptions::default(),
+                payload.as_bytes(),
+                AMQPProperties::default()
+                    .with_content_type("application/json".into())
+                    .with_delivery_mode(2),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn delete_channel_search(&self, channel_id: String) -> Result<(), AMQPError> {
+        let config = revolt_config::config().await;
+
+        let payload = to_string(&ChannelDeletePayload { channel_id }).unwrap();
+
+        debug!(
+            "Sending delete channel search payload on channel {}: {}",
+            config.elasticsearch.channel_delete_queue, payload
+        );
+
+        self.delete_channel_search
+            .basic_publish(
+                config.elasticsearch.exchange.clone().into(),
+                config.elasticsearch.channel_delete_queue.into(),
                 BasicPublishOptions::default(),
                 payload.as_bytes(),
                 AMQPProperties::default()

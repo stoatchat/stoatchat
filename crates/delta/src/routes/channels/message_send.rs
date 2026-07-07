@@ -162,16 +162,10 @@ pub async fn message_send(
     // Make sure we have server member (edge case if server owner)
     query.are_we_a_member().await;
 
-    // Create model user / members
-    let model_user = user
-        .clone()
-        .into_known_static(revolt_presence::is_online(&user.id).await)
-        .await;
-
-    let model_member: Option<v0::Member> = query
+    let member = query
         .member_ref()
         .as_ref()
-        .map(|member| member.clone().into_owned().into());
+        .map(|member| member.clone().into_owned());
 
     Ok(Json(
         Message::create_from_api(
@@ -180,15 +174,22 @@ pub async fn message_send(
             channel,
             data,
             v0::MessageAuthor::User(&author),
-            Some(model_user.clone()),
-            model_member.clone(),
+            Some(user.clone()),
+            member.clone(),
             user.limits().await,
             idempotency,
             permissions.has_channel_permission(ChannelPermission::SendEmbeds),
             allow_mentions,
         )
         .await?
-        .into_model(Some(model_user), model_member),
+        .into_model(
+            Some(
+                user.clone()
+                    .into_known_static(revolt_presence::is_online(&user.id).await)
+                    .await,
+            ),
+            member.map(Into::into),
+        ),
     ))
 }
 
@@ -298,8 +299,8 @@ mod test {
                 flags: None,
             },
             v0::MessageAuthor::User(&user.clone().into(&harness.db, Some(&user)).await),
-            Some(user.clone().into(&harness.db, Some(&user)).await),
-            Some(member.clone().into()),
+            Some(user.clone()),
+            Some(member.clone()),
             user.limits().await,
             IdempotencyKey::unchecked_from_string("0".to_string()),
             false,
@@ -338,8 +339,8 @@ mod test {
                 flags: None,
             },
             v0::MessageAuthor::User(&user.clone().into(&harness.db, Some(&user)).await),
-            Some(user.clone().into(&harness.db, Some(&user)).await),
-            Some(member.clone().into()),
+            Some(user.clone()),
+            Some(member.clone()),
             user.limits().await,
             IdempotencyKey::unchecked_from_string("1".to_string()),
             false,
@@ -387,8 +388,8 @@ mod test {
                 flags: None,
             },
             v0::MessageAuthor::User(&user.clone().into(&harness.db, Some(&user)).await),
-            Some(user.clone().into(&harness.db, Some(&user)).await),
-            Some(member.clone().into()),
+            Some(user.clone()),
+            Some(member.clone()),
             user.limits().await,
             IdempotencyKey::unchecked_from_string("2".to_string()),
             false,
@@ -433,8 +434,8 @@ mod test {
                 flags: None,
             },
             v0::MessageAuthor::User(&user.clone().into(&harness.db, Some(&user)).await),
-            Some(user.clone().into(&harness.db, Some(&user)).await),
-            Some(member.clone().into()),
+            Some(user.clone()),
+            Some(member.clone()),
             user.limits().await,
             IdempotencyKey::unchecked_from_string("1".to_string()),
             false,
@@ -457,7 +458,7 @@ mod test {
         // Delete the message
         message
             .clone()
-            .delete(&harness.db)
+            .delete(&harness.db, None)
             .await
             .expect("Failed to delete message");
 
@@ -484,8 +485,8 @@ mod test {
                 flags: None,
             },
             v0::MessageAuthor::User(&user.clone().into(&harness.db, Some(&user)).await),
-            Some(user.clone().into(&harness.db, Some(&user)).await),
-            Some(member.clone().into()),
+            Some(user.clone()),
+            Some(member.clone()),
             user.limits().await,
             IdempotencyKey::unchecked_from_string("3".to_string()),
             false,
@@ -521,7 +522,7 @@ mod test {
                 flags: None,
             },
             v0::MessageAuthor::User(&user.clone().into(&harness.db, Some(&user)).await),
-            Some(user.clone().into(&harness.db, Some(&user)).await),
+            Some(user.clone()),
             Some(member.clone().into()),
             user.limits().await,
             IdempotencyKey::unchecked_from_string("4".to_string()),
@@ -552,7 +553,7 @@ mod test {
                 flags: None,
             },
             v0::MessageAuthor::User(&user.clone().into(&harness.db, Some(&user)).await),
-            Some(user.clone().into(&harness.db, Some(&user)).await),
+            Some(user.clone()),
             Some(member.clone().into()),
             user.limits().await,
             IdempotencyKey::unchecked_from_string("4".to_string()),
@@ -607,13 +608,8 @@ mod test {
                     .into(&harness.db, Some(&other_user))
                     .await,
             ),
-            Some(
-                other_user
-                    .clone()
-                    .into(&harness.db, Some(&other_user))
-                    .await,
-            ),
-            Some(other_member.clone().into()),
+            Some(other_user.clone()),
+            Some(other_member.clone()),
             other_user.limits().await,
             IdempotencyKey::unchecked_from_string("1".to_string()),
             false,
@@ -652,13 +648,8 @@ mod test {
                     .into(&harness.db, Some(&other_user))
                     .await,
             ),
-            Some(
-                other_user
-                    .clone()
-                    .into(&harness.db, Some(&other_user))
-                    .await,
-            ),
-            Some(other_member.clone().into()),
+            Some(other_user.clone()),
+            Some(other_member.clone()),
             other_user.limits().await,
             IdempotencyKey::unchecked_from_string("1".to_string()),
             false,
@@ -722,13 +713,8 @@ mod test {
                     .into(&harness.db, Some(&other_user))
                     .await,
             ),
-            Some(
-                other_user
-                    .clone()
-                    .into(&harness.db, Some(&other_user))
-                    .await,
-            ),
-            Some(other_member.clone().into()),
+            Some(other_user.clone()),
+            Some(other_member.clone()),
             other_user.limits().await,
             IdempotencyKey::unchecked_from_string("1".to_string()),
             false,

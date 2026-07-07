@@ -1,0 +1,17 @@
+[package]
+name = "revolt-searchd"
+version = "0.13.7"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[dependencies]
+tokio = { workspace = true, features = ["macros"] }
+revolt-database = { workspace = true }
+revolt-config = { workspace = true }
+revolt-search = { workspace = true }
+lapin = { workspace = true }
+async-trait = { workspace = true }
+log = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }

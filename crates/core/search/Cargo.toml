@@ -1,0 +1,19 @@
+[package]
+name = "revolt-search"
+version = "0.13.7"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[dependencies]
+revolt-config = { workspace = true }
+revolt-database = { workspace = true }
+revolt-models = { workspace = true }
+elasticsearch = { workspace = true }
+serde_json = { workspace = true }
+ulid = { workspace = true }
+iso8601-timestamp = { workspace = true, features = ["serde", "bson"] }
+futures = { workspace = true }
+elasticsearch-dsl = { workspace = true }
+serde = { workspace = true }
+linkify = { workspace = true }

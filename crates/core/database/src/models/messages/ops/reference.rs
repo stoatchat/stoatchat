@@ -1,6 +1,6 @@
 use crate::{
-    AppendMessage, FieldsMessage, Message, MessageQuery,
-    PartialMessage, ReferenceDb,
+    util::ChunkedDatabaseGenerator, AppendMessage, FieldsMessage, Message, MessageQuery,
+    MessageWithUser, PartialMessage, ReferenceDb,
 };
 use futures::future::try_join_all;
 use indexmap::IndexSet;
@@ -215,7 +215,7 @@ impl AbstractMessages for ReferenceDb {
     }
 
     /// Append information to a given message
-    async fn append_message(&self, id: &str, append: &AppendMessage) -> Result<()> {
+    async fn append_message(&self, id: &str, append: &AppendMessage) -> Result<Option<Message>> {
         let mut messages = self.messages.lock().await;
         if let Some(message_data) = messages.get_mut(id) {
             if let Some(embeds) = &append.embeds {
@@ -226,9 +226,11 @@ impl AbstractMessages for ReferenceDb {
                         message_data.embeds = Some(embeds.clone());
                     }
                 }
-            }
 
-            Ok(())
+                Ok(Some(message_data.clone()))
+            } else {
+                Ok(None)
+            }
         } else {
             Err(create_error!(NotFound))
         }
@@ -351,6 +353,24 @@ impl AbstractMessages for ReferenceDb {
         });
 
         Ok(deleted_messages)
+    }
+
+    /// Fetches all messages along with their author from every message in decending order
+    async fn fetch_all_messages(&self) -> Result<ChunkedDatabaseGenerator<MessageWithUser>> {
+        let users = self.users.lock().await;
+
+        Ok(ChunkedDatabaseGenerator::new_reference(
+            self.messages
+                .lock()
+                .await
+                .values()
+                .cloned()
+                .map(|message| MessageWithUser {
+                    user: users.get(&message.author).cloned(),
+                    message,
+                })
+                .collect(),
+        ))
     }
 
     async fn delete_messages_by_user(&self, user_id: &str) -> Result<()> {

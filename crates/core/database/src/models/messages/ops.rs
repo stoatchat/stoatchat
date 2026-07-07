@@ -1,8 +1,11 @@
+use revolt_result::Result;
 use std::collections::HashMap;
 use std::time::SystemTime;
-use revolt_result::Result;
 
-use crate::{AppendMessage, FieldsMessage, Message, MessageQuery, PartialMessage};
+use crate::{
+    util::ChunkedDatabaseGenerator, AppendMessage, FieldsMessage, Message, MessageQuery,
+    MessageWithUser, PartialMessage,
+};
 
 #[cfg(feature = "mongodb")]
 mod mongodb;
@@ -23,10 +26,15 @@ pub trait AbstractMessages: Sync + Send {
     async fn fetch_messages_by_id(&self, ids: &[String]) -> Result<Vec<Message>>;
 
     /// Update a given message with new information
-    async fn update_message(&self, id: &str, message: &PartialMessage, remove: Vec<FieldsMessage>) -> Result<()>;
+    async fn update_message(
+        &self,
+        id: &str,
+        message: &PartialMessage,
+        remove: Vec<FieldsMessage>,
+    ) -> Result<()>;
 
     /// Append information to a given message
-    async fn append_message(&self, id: &str, append: &AppendMessage) -> Result<()>;
+    async fn append_message(&self, id: &str, append: &AppendMessage) -> Result<Option<Message>>;
 
     /// Add a new reaction to a message
     async fn add_reaction(&self, id: &str, emoji: &str, user: &str) -> Result<()>;
@@ -48,8 +56,11 @@ pub trait AbstractMessages: Sync + Send {
         &self,
         channels: &[String],
         author: &str,
-        since: SystemTime
+        since: SystemTime,
     ) -> Result<HashMap<String, Vec<String>>>;
 
+    /// Fetches all messages along with their author from every message in decending order
+    async fn fetch_all_messages(&self) -> Result<ChunkedDatabaseGenerator<MessageWithUser>>;
+    
     async fn delete_messages_by_user(&self, user_id: &str) -> Result<()>;
 }

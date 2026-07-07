@@ -1,6 +1,5 @@
 use std::{borrow::Cow, collections::BTreeMap, io::Cursor, sync::Arc};
 
-use crate::utils::Consumer;
 use anyhow::Result;
 use async_trait::async_trait;
 use base64::{
@@ -15,7 +14,7 @@ use revolt_a2::{
     },
     Client, ClientConfig, Endpoint, Error, ErrorBody, ErrorReason, Priority, PushType, Response,
 };
-use revolt_database::{events::rabbit::*, Database};
+use revolt_database::{amqp::consumer::Consumer, events::rabbit::*, Database};
 use revolt_models::v0::{Channel, Message, PushNotification};
 use serde::Serialize;
 
@@ -123,11 +122,7 @@ impl ApnsOutboundConsumer {
 
 #[async_trait]
 impl Consumer for ApnsOutboundConsumer {
-    async fn create(
-        db: Database,
-        connection: Arc<Connection>,
-        channel: Arc<AMQPChannel>,
-    ) -> Self {
+    async fn create(db: Database, connection: Arc<Connection>, channel: Arc<AMQPChannel>, _: ()) -> Self {
         let config = revolt_config::config().await;
 
         if config.pushd.apn.pkcs8.is_empty()

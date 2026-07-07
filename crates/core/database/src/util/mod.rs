@@ -13,5 +13,5 @@ pub mod reference;
 pub mod shield;
 pub mod test_fixtures;
 
-pub use funcs::*;
 pub use chunked::ChunkedDatabaseGenerator;
+pub use funcs::*;
