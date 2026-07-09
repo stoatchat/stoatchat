@@ -144,7 +144,7 @@ simdutf8 = "0.1.4"
 # Content type processing
 infer = "0.16.0"
 ffprobe = "0.4.0"
-imagesize = "0.13.0"
+imagesize = "0.15.0"
 
 # OpenTelemetry
 tracing = "0.1.44"
