@@ -1478,16 +1478,22 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     if revision <= 50 {
         info!("Running migration [revision 50 / 13-04-2026]: Rename invites collection to account_invites");
 
-        db.db()
+        let result = db.db()
             .client()
             .database("admin")
             .run_command(doc! {
-                "renameCollection": "revolt.invites",
-                "to": "revolt.account_invites",
-                "dropTarget": true
-            })
-            .await
-            .unwrap();
+            "renameCollection": "revolt.invites",
+            "to": "revolt.account_invites",
+            "dropTarget": true
+        })
+            .await;
+
+        if let Err(e) = result {
+            // NamespaceNotFound (26) = source collection doesn't exist, safe to ignore
+            if !matches!(e.kind.as_ref(), mongodb::error::ErrorKind::Command(ce) if ce.code == 26) {
+                panic!("Failed to rename invites collection: {e}");
+            }
+        }
     }
 
     if revision >= 51 {
