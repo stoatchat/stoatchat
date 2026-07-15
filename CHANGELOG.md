@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.14.0](https://github.com/stoatchat/stoatchat/compare/v0.13.7...v0.14.0) (2026-07-15)
+
+
+### Features
+
+* add pronouns to user and server members field ([#811](https://github.com/stoatchat/stoatchat/issues/811)) ([ffab236](https://github.com/stoatchat/stoatchat/commit/ffab2369ab5c9b88e007dcd74b91bb48e1988d26))
+* Audit Logs ([#466](https://github.com/stoatchat/stoatchat/issues/466)) ([502203d](https://github.com/stoatchat/stoatchat/commit/502203d37c63e486c32e33078e0021bf6390fe97))
+* replace tenor with gifbox ([#844](https://github.com/stoatchat/stoatchat/issues/844)) ([59f6e01](https://github.com/stoatchat/stoatchat/commit/59f6e012f827ab08a8e326354bfe6c9026e2cb2d))
+
+
+### Bug Fixes
+
+* allow removing channel slowmode ([#836](https://github.com/stoatchat/stoatchat/issues/836)) ([21daf3a](https://github.com/stoatchat/stoatchat/commit/21daf3aec693beae55bff51235e5e4b7d90f2362))
+* allow true server owner to bypass rank check on channel role-permission overrides ([0af376c](https://github.com/stoatchat/stoatchat/commit/0af376c26b149a5a0286608ebe3869587780a949))
+* channel role permissions fail with 400 InvalidOperation for server owners/admins ([#802](https://github.com/stoatchat/stoatchat/issues/802)) ([a7af24b](https://github.com/stoatchat/stoatchat/commit/a7af24b38d0a38d6f04187464a89e67d459d1708))
+* channel role permissions fail with InvalidOperation for owners/admins ([a7af24b](https://github.com/stoatchat/stoatchat/commit/a7af24b38d0a38d6f04187464a89e67d459d1708))
+* **docs:** update react version ([#842](https://github.com/stoatchat/stoatchat/issues/842)) ([a22378c](https://github.com/stoatchat/stoatchat/commit/a22378c35c2c6c84f8897ce897b9c4df420871d9))
+* migration script would panic on fresh installations since it couldn't find invites collection ([#820](https://github.com/stoatchat/stoatchat/issues/820)) ([784f35e](https://github.com/stoatchat/stoatchat/commit/784f35ebfa8568593812683b5fa399ca87af2d6b))
+* openapi using old naming ([#777](https://github.com/stoatchat/stoatchat/issues/777)) ([c70459b](https://github.com/stoatchat/stoatchat/commit/c70459b10ce107611b9d478add26db372361baf2))
+* point docs favicon to correct location ([#789](https://github.com/stoatchat/stoatchat/issues/789)) ([bebfe34](https://github.com/stoatchat/stoatchat/commit/bebfe349227d8cc555e1b488eb343f2c28b28b88))
+* server owner should bypass rank check on channel role-permission overrides ([#805](https://github.com/stoatchat/stoatchat/issues/805)) ([0af376c](https://github.com/stoatchat/stoatchat/commit/0af376c26b149a5a0286608ebe3869587780a949))
+* voice system messages and call notifs by fetching participant list ([#846](https://github.com/stoatchat/stoatchat/issues/846)) ([0b53db9](https://github.com/stoatchat/stoatchat/commit/0b53db9921f5ee5992d57a6316cd4e75d241726a))
+
 ## [0.13.7](https://github.com/stoatchat/stoatchat/compare/v0.13.6...v0.13.7) (2026-05-21)
 
 
