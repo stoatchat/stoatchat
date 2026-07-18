@@ -4,7 +4,7 @@ extern crate log;
 use once_cell::sync::Lazy;
 use rand::Rng;
 use redis_kiss::{get_connection, AsyncCommands};
-use std::collections::HashSet;
+use std::{collections::HashSet, fmt::format};
 
 mod operations;
 use operations::{
