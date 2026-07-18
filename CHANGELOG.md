@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.1](https://github.com/stoatchat/stoatchat/compare/v0.14.0...v0.14.1) (2026-07-18)
+
+
+### Bug Fixes
+
+* presence key was incorrect after other related update ([#861](https://github.com/stoatchat/stoatchat/issues/861)) ([81648db](https://github.com/stoatchat/stoatchat/commit/81648dbf9511b32a6e023d556061bb8b74fe41ed))
+
 ## [0.14.0](https://github.com/stoatchat/stoatchat/compare/v0.13.7...v0.14.0) (2026-07-15)
 
 
