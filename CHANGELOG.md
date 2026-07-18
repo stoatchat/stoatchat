@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.2](https://github.com/stoatchat/stoatchat/compare/v0.14.1...v0.14.2) (2026-07-18)
+
+
+### Bug Fixes
+
+* bonfire session deletion redis key is incorrect ([#863](https://github.com/stoatchat/stoatchat/issues/863)) ([764a4dc](https://github.com/stoatchat/stoatchat/commit/764a4dc81c8eab22dfea6a1723f8ffaef1de40bc))
+
 ## [0.14.1](https://github.com/stoatchat/stoatchat/compare/v0.14.0...v0.14.1) (2026-07-18)
 
 
