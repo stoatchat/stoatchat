@@ -429,12 +429,15 @@ pub struct LegalLinks {
 pub struct FeaturesAdvanced {
     #[serde(default)]
     pub process_message_delay_limit: u16,
+    #[serde(default)]
+    pub seen_events_cache_size: u32,
 }
 
 impl Default for FeaturesAdvanced {
     fn default() -> Self {
         Self {
             process_message_delay_limit: 5,
+            seen_events_cache_size: 20,
         }
     }
 }

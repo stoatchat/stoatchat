@@ -333,6 +333,9 @@ emojis = 500_000
 # The max amount of messages the rabbitmq provider/db mention adder job will delay for before forcing handling of a channel.
 # default: 5
 process_message_delay_limit = 5
+# How many event ids to cache per bonfire connections.
+# Higher numbers result in more deduplication but more ram usage.
+seen_events_cache_size = 2048
 
 [features.legal_links]
 # URLs for legal documents

@@ -1,11 +1,14 @@
 use std::{
-    collections::{HashMap, HashSet}, num::NonZeroUsize, sync::Arc, time::Duration
+    collections::{HashMap, HashSet},
+    num::NonZeroUsize,
+    sync::Arc,
+    time::Duration,
 };
 
-use tokio::sync::{Mutex, RwLock};
 use lru::LruCache;
 use lru_time_cache::{LruCache as LruTimeCache, TimedEntry};
 use revolt_database::{Channel, Member, Server, User};
+use tokio::sync::{Mutex, RwLock};
 
 /// Enumeration representing some change in subscriptions
 pub enum SubscriptionStateChange {
@@ -44,6 +47,16 @@ pub struct Cache {
     pub seen_events: LruCache<String, ()>,
 }
 
+impl Cache {
+    fn with_events_size(user_id: Option<String>, seen_events_size: NonZeroUsize) -> Self {
+        Self {
+            user_id: user_id.unwrap_or(String::default()),
+            seen_events: LruCache::new(seen_events_size),
+            ..Default::default()
+        }
+    }
+}
+
 impl Default for Cache {
     fn default() -> Self {
         Cache {
@@ -55,7 +68,7 @@ impl Default for Cache {
             members: Default::default(),
             servers: Default::default(),
 
-            seen_events: LruCache::new(NonZeroUsize::new(20).unwrap()),
+            seen_events: LruCache::new(NonZeroUsize::new(2048).unwrap()),
         }
     }
 }
@@ -74,16 +87,13 @@ pub struct State {
 
 impl State {
     /// Create state from User
-    pub fn from(user: User, session_id: String) -> State {
+    pub fn from(user: User, session_id: String, cache_size: NonZeroUsize) -> State {
         let mut subscribed = HashSet::new();
         let private_topic = format!("{}!", user.id);
         subscribed.insert(private_topic.clone());
         subscribed.insert(user.id.clone());
 
-        let mut cache: Cache = Cache {
-            user_id: user.id.clone(),
-            ..Default::default()
-        };
+        let mut cache: Cache = Cache::with_events_size(Some(user.id.clone()), cache_size);
 
         cache.users.insert(user.id.clone(), user);
 
