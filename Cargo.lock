@@ -3994,6 +3994,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edcd27d72f2f071c64249075f42e205ff93c9a4c5f6c6da53e79ed9f9832c285"
 
 [[package]]
+name = "imagesize"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65b27460c2c92b037f3f94c538ed9a3342f3fdf923606781629ccb35f82d042a"
+
+[[package]]
 name = "imgref"
 version = "1.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7171,7 +7177,7 @@ dependencies = [
  "axum_typed_multipart",
  "ffprobe",
  "image",
- "imagesize",
+ "imagesize 0.15.0",
  "infer",
  "jxl-oxide",
  "kamadak-exif",
@@ -7397,7 +7403,7 @@ dependencies = [
  "base64 0.21.7",
  "ffprobe",
  "image",
- "imagesize",
+ "imagesize 0.15.0",
  "jxl-oxide",
  "resvg",
  "revolt-config",
@@ -10011,7 +10017,7 @@ dependencies = [
  "data-url",
  "flate2",
  "fontdb",
- "imagesize",
+ "imagesize 0.13.0",
  "kurbo",
  "log",
  "pico-args",
