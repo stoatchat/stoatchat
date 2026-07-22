@@ -3,6 +3,9 @@ FROM rust:1.92.0-slim-bookworm
 USER 0:0
 WORKDIR /home/rust/src
 
+ARG CARGO_BUILD_JOBS=10
+ENV CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}
+
 # Install build requirements
 RUN apt-get update && \
     apt-get install -y \

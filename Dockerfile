@@ -5,6 +5,9 @@ WORKDIR /home/rust/src
 
 ARG TARGETARCH
 
+ARG CARGO_BUILD_JOBS=10
+ENV CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}
+
 # Install build requirements
 RUN dpkg --add-architecture "${TARGETARCH}"
 RUN apt-get update && \
