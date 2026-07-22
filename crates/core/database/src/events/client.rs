@@ -369,6 +369,8 @@ impl EventV1 {
     /// Publish helper wrapper
     pub async fn p(self, channel: String) {
         //redis_kiss::p(channel.clone(), &self).await;
+        #[cfg(debug_assertions)]
+        info!("Publishing event to {channel}: {self:?}");
 
         if let Err(e) = get_amqp().publish_event(channel, &self).await {
             if cfg!(debug_assertions) {
