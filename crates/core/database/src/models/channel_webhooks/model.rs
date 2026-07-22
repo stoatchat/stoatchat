@@ -96,6 +96,7 @@ impl Webhook {
 
         EventV1::WebhookUpdate {
             id: self.id.clone(),
+            channel_id: self.channel_id.clone(),
             data: partial.into(),
             remove: remove.into_iter().map(|v| v.into()).collect(),
         }
@@ -116,6 +117,7 @@ impl Webhook {
 
         EventV1::WebhookDelete {
             id: self.id.clone(),
+            channel_id: self.channel_id.clone(),
         }
         .p(self.channel_id.clone())
         .await;

@@ -319,6 +319,7 @@ pub enum EventV1 {
     /// Update existing webhook
     WebhookUpdate {
         id: String,
+        channel_id: String,
         data: PartialWebhook,
         remove: Vec<FieldsWebhook>,
     },
@@ -326,6 +327,7 @@ pub enum EventV1 {
     /// Delete webhook
     WebhookDelete {
         id: String,
+        channel_id: String,
     },
 
     /// Auth events
