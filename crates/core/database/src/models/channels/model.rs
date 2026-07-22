@@ -462,7 +462,6 @@ impl Channel {
         match self {
             Channel::TextChannel {
                 id,
-                server,
                 role_permissions,
                 ..
             } => {
@@ -480,7 +479,7 @@ impl Channel {
                     .into(),
                     clear: vec![],
                 }
-                .p(server.clone())
+                .p(id.clone())
                 .await;
 
                 Ok(())
@@ -510,10 +509,7 @@ impl Channel {
             data: partial.into(),
             clear: remove.into_iter().map(|v| v.into()).collect(),
         }
-        .p(match self {
-            Self::TextChannel { server, .. } => server.clone(),
-            _ => id,
-        })
+        .p(id)
         .await;
 
         Ok(())
