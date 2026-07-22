@@ -108,10 +108,10 @@ aws-config = "1.5.5"
 aws-sdk-s3 = "1.46.0"
 
 # Axum (HTTP server)
-axum-macros = "0.4.1"
+axum-macros = "0.5.0"
 axum_typed_multipart = "0.12.1"
-axum = "0.7.5"
-axum-extra = "0.9"
+axum = "0.8.0"
+axum-extra = "0.12"
 tower-http = "0.5.2"
 
 # Rocket (HTTP server)
