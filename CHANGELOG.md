@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.3](https://github.com/stoatchat/stoatchat/compare/v0.14.2...v0.14.3) (2026-07-22)
+
+
+### Bug Fixes
+
+* increase cache size to hopefully deduplicate events ([#865](https://github.com/stoatchat/stoatchat/issues/865)) ([44c35bf](https://github.com/stoatchat/stoatchat/commit/44c35bfb519143f1726f7eba9636a87dbef04800))
+
 ## [0.14.2](https://github.com/stoatchat/stoatchat/compare/v0.14.1...v0.14.2) (2026-07-18)
 
 
