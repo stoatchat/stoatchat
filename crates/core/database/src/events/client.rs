@@ -366,14 +366,7 @@ pub enum EventV1 {
 impl EventV1 {
     /// Publish helper wrapper
     pub async fn p(self, channel: String) {
-        #[cfg(not(debug_assertions))]
-        redis_kiss::p(channel, self).await;
-
-        #[cfg(debug_assertions)]
-        info!("Publishing event to {channel}: {self:?}");
-
-        // #[cfg(debug_assertions)]
-        // redis_kiss::publish(channel, self).await.unwrap();
+        //redis_kiss::p(channel.clone(), &self).await;
 
         if let Err(e) = get_amqp().publish_event(channel, &self).await {
             if cfg!(debug_assertions) {
@@ -387,23 +380,16 @@ impl EventV1 {
     /// Publish user event
     pub async fn p_user(self, id: String, db: &Database) {
         self.clone().p(id.clone()).await;
-
-        // TODO: this should be captured by member list in the future and not immediately fanned out to users
-        if let Ok(members) = db.fetch_all_memberships(&id).await {
-            for member in members {
-                self.clone().server(member.id.server).await;
-            }
-        }
     }
 
     /// Publish private event
     pub async fn private(self, id: String) {
-        self.p(format!("{id}!")).await;
+        self.p(format!("{id}")).await;
     }
 
     /// Publish server member event
     pub async fn server(self, id: String) {
-        self.p(format!("{id}u")).await;
+        self.p(format!("{id}")).await;
     }
 
     /// Publish internal global event
