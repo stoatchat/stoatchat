@@ -1,3 +1,4 @@
+use iso8601_timestamp::Timestamp;
 use revolt_result::Error;
 use serde::{Deserialize, Serialize};
 
@@ -373,6 +374,12 @@ pub enum EventV1 {
     UserSlowmodes {
         slowmodes: Vec<ChannelSlowmode>,
     },
+    VoiceCallUpdate {
+        initiator_id: String,
+        channel_id: String,
+        started_at: Option<Timestamp>,
+        ended: bool,
+    }
 }
 
 impl EventV1 {

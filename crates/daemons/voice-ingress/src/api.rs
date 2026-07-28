@@ -1,9 +1,17 @@
 use livekit_api::{access_token::TokenVerifier, webhooks::WebhookReceiver};
 use livekit_protocol::TrackType;
 use revolt_database::{
-    AMQP, Database, PartialMessage, SystemMessage, events::client::EventV1, iso8601_timestamp::{Duration, Timestamp}, util::reference::Reference, voice::{
-        RoomMetadata, UserVoiceChannel, VoiceClient, create_voice_state, delete_channel_voice_state, delete_voice_state, get_call_notification_recipients, get_user_moved_from_voice, get_user_moved_to_voice, get_voice_channel_members, set_channel_call_started_system_message, take_channel_call_started_system_message, update_voice_state_tracks
-    }
+    events::client::EventV1,
+    iso8601_timestamp::{Duration, Timestamp},
+    util::reference::Reference,
+    voice::{
+        create_voice_state, delete_channel_voice_state, delete_voice_state,
+        get_call_notification_recipients, get_user_moved_from_voice, get_user_moved_to_voice,
+        get_voice_channel_members, set_channel_call_started_system_message,
+        take_channel_call_started_system_message, update_voice_state_tracks, RoomMetadata,
+        UserVoiceChannel, VoiceClient,
+    },
+    Channel, Database, PartialMessage, SystemMessage, AMQP,
 };
 use revolt_models::v0;
 use revolt_result::{Result, ToRevoltError};
@@ -48,7 +56,7 @@ pub async fn ingress(
     let channel_id = event.room.as_ref().map(|r| &r.name);
     let user_id = event.participant.as_ref().map(|r| &r.identity);
     let room_metadata = if let Some(room) = event.room.as_ref() {
-        Some(serde_json::from_str::<RoomMetadata>(&room.metadata).to_internal_error()?)
+        serde_json::from_str::<RoomMetadata>(&room.metadata).ok()
     } else {
         None
     };
@@ -129,14 +137,52 @@ pub async fn ingress(
                     )
                     .await?;
 
-                let recipients = get_call_notification_recipients(channel_id, user_id).await?;
-                let now = joined_at.format_short().to_string();
-
-                if let Err(e) = amqp
-                    .dm_call_updated(&user.id, channel_id, Some(&now), false, recipients)
-                    .await
+                if let Channel::DirectMessage { recipients, .. }
+                | Channel::Group { recipients, .. } = channel
                 {
-                    revolt_config::capture_error(&e);
+                    let call_recipients =
+                        get_call_notification_recipients(channel_id, user_id).await?;
+
+                    {
+                        let call_recipients = if let Some(user_recipients) = call_recipients.clone()
+                        {
+                            user_recipients
+                                .into_iter()
+                                .filter(|user_id| {
+                                    recipients.contains(user_id) && user_id != &user.id
+                                })
+                                .collect::<Vec<_>>()
+                        } else {
+                            recipients
+                                .into_iter()
+                                .filter(|user_id| user_id != &user.id)
+                                .collect()
+                        };
+
+                        for recipient in call_recipients {
+                            EventV1::VoiceCallUpdate {
+                                initiator_id: user.id.clone(),
+                                channel_id: channel_id.clone(),
+                                started_at: Some(joined_at),
+                                ended: false,
+                            }
+                            .private(recipient)
+                            .await
+                        }
+                    }
+
+                    if let Err(e) = amqp
+                        .dm_call_updated(
+                            &user.id,
+                            channel_id,
+                            Some(&joined_at.format_short()),
+                            false,
+                            call_recipients,
+                        )
+                        .await
+                    {
+                        revolt_config::capture_error(&e);
+                    }
                 }
             }
         }
@@ -169,12 +215,28 @@ pub async fn ingress(
             let members = get_voice_channel_members(&voice_channel).await?;
 
             if members.is_none_or(|m| m.is_empty()) {
-                // The channel is empty so send out an "end" message for ringing
-                if let Err(e) = amqp
-                    .dm_call_updated(user_id, channel_id, None, true, None)
-                    .await
-                {
-                    revolt_config::capture_internal_error!(&e);
+                let channel = Reference::from_unchecked(channel_id).as_channel(db).await?;
+
+                // The channel is empty so send out an "end" notification for ringing
+                if matches!(
+                    channel,
+                    Channel::DirectMessage { .. } | Channel::Group { .. }
+                ) {
+                    EventV1::VoiceCallUpdate {
+                        initiator_id: user_id.clone(),
+                        channel_id: channel_id.clone(),
+                        started_at: None,
+                        ended: true,
+                    }
+                    .p(channel_id.clone())
+                    .await;
+
+                    if let Err(e) = amqp
+                        .dm_call_updated(user_id, channel_id, None, true, None)
+                        .await
+                    {
+                        revolt_config::capture_internal_error!(&e);
+                    }
                 }
 
                 if let Some(system_message_id) =
