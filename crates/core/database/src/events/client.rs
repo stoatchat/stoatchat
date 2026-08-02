@@ -96,6 +96,10 @@ pub enum EventV1 {
     Pong {
         data: Ping,
     },
+
+    /// Release the bees.
+    Bees,
+
     /// New message
     Message(Message),
 
@@ -379,7 +383,7 @@ pub enum EventV1 {
         channel_id: String,
         started_at: Option<Timestamp>,
         ended: bool,
-    }
+    },
 }
 
 impl EventV1 {
