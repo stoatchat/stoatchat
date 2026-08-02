@@ -11,6 +11,7 @@ use utoipa_scalar::{Scalar, Servable as ScalarServable};
 
 mod api;
 pub mod requests;
+pub mod specialty;
 pub mod website_embed;
 
 #[tokio::main]

@@ -61,6 +61,8 @@ auto_derived!(
         /// YouTube video
         YouTube {
             id: String,
+            creator_name: Option<String>,
+            creator_url: Option<String>,
 
             #[serde(skip_serializing_if = "Option::is_none")]
             timestamp: Option<String>,

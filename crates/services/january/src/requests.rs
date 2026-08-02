@@ -20,6 +20,8 @@ use std::{
 };
 use url::{Host, Url};
 
+use crate::specialty;
+
 lazy_static! {
     /// Request client
     static ref CLIENT: Client = reqwest::Client::builder()
@@ -37,7 +39,13 @@ lazy_static! {
     static ref RE_URL_NEW_REDDIT: Regex = Regex::new("^(?:(?:new\\.|www\\.)?reddit).com").expect("valid regex");
 
     /// Regex for matching YouTube Shorts URLs
-    static ref RE_URL_YOUTUBE_SHORTS: Regex = Regex::new("^(?:(?:https?:)?//)?(?:(?:www\\.)?youtube\\.com)/shorts/([a-zA-Z0-9_-]+)").expect("valid regex");
+    pub static ref RE_URL_YOUTUBE_SHORTS: Regex = Regex::new("^(?:(?:https?:)?//)?(?:(?:www\\.)?youtube\\.com)/shorts/([a-zA-Z0-9_-]+)").expect("valid regex");
+
+    /// Regex for matching YouTube URLs
+    pub static ref RE_URL_YOUTUBE: Regex = Regex::new("^(?:(?:https?:)?//)?(?:(?:www|m)\\.)?(?:(?:youtube\\.com|youtu\\.be))(?:/(?:[\\w\\-]+\\?v=|embed/|v/|shorts/)?)([\\w\\-]+)(?:(?:&t|&start)=([\\d]+))?(?:\\S+)?$").unwrap();
+
+    /// Url for YouTube oembed
+    pub static ref OEMBED_URL: Url = Url::parse("https://www.youtube.com/oembed").unwrap();
 
     /// Cache for proxy results
     static ref PROXY_CACHE: moka::future::Cache<String, Result<(String, Vec<u8>)>> = moka::future::Cache::builder()
@@ -130,8 +138,8 @@ impl reqwest::dns::Resolve for CachedDnsResolver {
 
 /// Information about a successful request
 pub struct Request {
-    response: Response,
-    mime: Mime,
+    pub response: Response,
+    pub mime: Mime,
 }
 
 impl Request {
@@ -285,6 +293,16 @@ impl Request {
         // Generate the actual embed
         if let Some(hit) = EMBED_CACHE.get(&url).await {
             Ok(hit)
+        } else if RE_URL_YOUTUBE.is_match(&url) {
+            let mut yt_url = OEMBED_URL.clone();
+            yt_url.set_query(Some(&format!("url={url}")));
+
+            let request = Request::new(yt_url).await?;
+            let embed = specialty::SpecialtySitesGenerator::youtube(&url, request).await?;
+
+            EMBED_CACHE.insert(url.to_owned(), embed.clone()).await;
+
+            Ok(embed)
         } else {
             let request = Request::new_from_str(&url).await?;
             let embed = match (request.mime.type_(), request.mime.subtype()) {
