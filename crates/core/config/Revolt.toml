@@ -70,6 +70,8 @@ trust_cloudflare = false
 easypwned = ""
 # Tenor API Key
 tenor_key = ""
+# Admin keys for future admin api and for bonfire reported image fetching
+admin_keys = []
 
 [api.security.captcha]
 # hCaptcha configuration
