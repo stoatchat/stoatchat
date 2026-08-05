@@ -28,7 +28,7 @@ pub async fn fetch(db: &State<Database>, target: Reference<'_>) -> Result<Json<v
 
                     v0::InviteResponse::Server {
                         code: target.id.to_string(),
-                        member_count: db.fetch_member_count(&server.id).await? as i64,
+                        member_count: server.get_approximate_member_count(db).await as i64,
                         server_id: server.id,
                         server_name: server.name,
                         server_icon: server.icon.map(|f| f.into()),
