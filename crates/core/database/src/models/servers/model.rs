@@ -1,5 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
+use redis_kiss::{
+    get_connection,
+    redis::{SetExpiry, SetOptions},
+    AsyncCommands,
+};
 use revolt_models::v0::{self, DataCreateServerChannel};
 use revolt_permissions::{OverrideField, DEFAULT_PERMISSION_SERVER};
 use revolt_result::Result;
@@ -321,6 +326,30 @@ impl Server {
         .await;
 
         Ok(())
+    }
+
+    /// Gets a approximate count of the members in this server
+    ///
+    /// this value is cached for one hour
+    pub async fn get_approximate_member_count(&self, db: &Database) -> usize {
+        let Ok(mut redis) = get_connection().await else {
+            return 0;
+        };
+        let key = format!("member_count:{}", &self.id);
+
+        if let Some(count) = redis.get::<_, Option<usize>>(&key).await.ok().flatten() {
+            count
+        } else {
+            let count = db.fetch_member_count(&self.id).await.unwrap_or(0);
+            let _ = redis
+                .set_options::<_, _, ()>(
+                    &key,
+                    count,
+                    SetOptions::default().with_expiration(SetExpiry::EX(60 * 60)),
+                )
+                .await;
+            count
+        }
     }
 }
 

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    AuditLogEntryAction, Database, FieldsServer, File, PartialServer, User, ValidatedTicket
+    AuditLogEntryAction, Database, FieldsServer, File, PartialServer, User, ValidatedTicket,
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
@@ -50,7 +50,7 @@ pub async fn edit(
         && data.owner.is_none()
         && data.remove.is_empty()
     {
-        return Ok(Json(server.into()));
+        return Ok(Json(server.into(db).await));
     } else if data.name.is_some()
         || data.description.is_some()
         || data.icon.is_some()
@@ -195,5 +195,5 @@ pub async fn edit(
     .insert(db, server.id.clone(), reason, user.id, None)
     .await;
 
-    Ok(Json(server.into()))
+    Ok(Json(server.into(db).await))
 }

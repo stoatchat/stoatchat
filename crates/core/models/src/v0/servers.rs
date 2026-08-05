@@ -78,6 +78,9 @@ auto_derived_partial!(
             serde(skip_serializing_if = "crate::if_false", default)
         )]
         pub discoverable: bool,
+
+        /// Approximate amount of members in the server
+        pub approximate_member_count: usize,
     },
     "PartialServer"
 );

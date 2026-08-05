@@ -88,7 +88,7 @@ pub async fn edit_role_ranks(
         sync_voice_permissions(db, voice_client, &channel, Some(&server), None).await?;
     }
 
-    Ok(Json(server.into()))
+    Ok(Json(server.into(db).await))
 }
 
 #[cfg(test)]

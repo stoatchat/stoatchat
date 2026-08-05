@@ -52,7 +52,7 @@ pub async fn create_server(
     let (_, channels) = Member::create(db, &server, &user, Some(channels)).await?;
 
     Ok(Json(v0::CreateServerLegacyResponse {
-        server: server.into(),
+        server: server.into(db).await,
         channels: channels.into_iter().map(|channel| channel.into()).collect(),
     }))
 }

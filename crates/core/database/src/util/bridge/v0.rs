@@ -751,30 +751,29 @@ impl From<crate::RemovalIntention> for RemovalIntention {
     }
 }
 
-impl From<crate::Server> for Server {
-    fn from(value: crate::Server) -> Self {
+impl crate::Server {
+    pub async fn into(self, db: &Database) -> Server {
+        let approximate_member_count = self.get_approximate_member_count(db).await;
+
         Server {
-            id: value.id,
-            owner: value.owner,
-            name: value.name,
-            description: value.description,
-            channels: value.channels,
-            categories: value
+            id: self.id,
+            owner: self.owner,
+            name: self.name,
+            description: self.description,
+            channels: self.channels,
+            categories: self
                 .categories
                 .map(|categories| categories.into_iter().map(|v| v.into()).collect()),
-            system_messages: value.system_messages.map(|v| v.into()),
-            roles: value
-                .roles
-                .into_iter()
-                .map(|(k, v)| (k, v.into()))
-                .collect(),
-            default_permissions: value.default_permissions,
-            icon: value.icon.map(|f| f.into()),
-            banner: value.banner.map(|f| f.into()),
-            flags: value.flags.unwrap_or_default() as u32,
-            nsfw: value.nsfw,
-            analytics: value.analytics,
-            discoverable: value.discoverable,
+            system_messages: self.system_messages.map(|v| v.into()),
+            roles: self.roles.into_iter().map(|(k, v)| (k, v.into())).collect(),
+            default_permissions: self.default_permissions,
+            icon: self.icon.map(|f| f.into()),
+            banner: self.banner.map(|f| f.into()),
+            flags: self.flags.unwrap_or_default() as u32,
+            nsfw: self.nsfw,
+            analytics: self.analytics,
+            discoverable: self.discoverable,
+            approximate_member_count,
         }
     }
 }
@@ -829,6 +828,7 @@ impl From<crate::PartialServer> for PartialServer {
             nsfw: value.nsfw,
             analytics: value.analytics,
             discoverable: value.discoverable,
+            approximate_member_count: None,
         }
     }
 }

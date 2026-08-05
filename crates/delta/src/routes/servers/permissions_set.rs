@@ -78,5 +78,5 @@ pub async fn set_role_permission(
         sync_voice_permissions(db, voice_client, &channel, Some(&server), Some(&role_id)).await?;
     }
 
-    Ok(Json(server.into()))
+    Ok(Json(server.into(db).await))
 }
