@@ -228,6 +228,7 @@ pub struct ApiSecurity {
     pub trust_cloudflare: bool,
     pub easypwned: String,
     pub tenor_key: String,
+    pub admin_keys: Vec<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
