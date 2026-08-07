@@ -1,7 +1,7 @@
 use revolt_result::Result;
 use ulid::Ulid;
 
-use crate::{events::client::EventV1, BotInformation, Database, PartialUser, User};
+use crate::{events::client::EventV1, BotInformation, Database, PartialUser, RemovalIntention, User};
 
 auto_derived_partial!(
     /// Bot
@@ -18,6 +18,9 @@ auto_derived_partial!(
         /// Whether the bot is public
         /// (may be invited by anyone)
         pub public: bool,
+        /// The permissions the bot will ask to have upon being invited to a server,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub default_permissions: Option<i64>,
 
         /// Whether to enable analytics
         #[serde(skip_serializing_if = "crate::if_false", default)]
@@ -58,6 +61,7 @@ impl Default for Bot {
             owner: Default::default(),
             token: Default::default(),
             public: Default::default(),
+            default_permissions: Default::default(),
             analytics: Default::default(),
             discoverable: Default::default(),
             interactions_url: Default::default(),
@@ -155,6 +159,16 @@ impl Bot {
 
     /// Delete this bot
     pub async fn delete(&self, db: &Database) -> Result<()> {
+        for member in db.fetch_all_memberships(&self.id).await? {
+            let server = db.fetch_server(&member.id.server).await?;
+
+            member
+                .remove(db, &server, RemovalIntention::Leave, true)
+                .await?;
+
+            server.cleanup_managed_bot_role(db, &self.id).await?;
+        }
+        
         db.fetch_user(&self.id).await?.mark_deleted(db).await?;
         db.delete_bot(&self.id).await
     }
