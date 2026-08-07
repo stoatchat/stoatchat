@@ -70,7 +70,7 @@ services:
 
   # Mock SMTP server
   maildev:
-    image: maildev/maildev
+    image: maildev/maildev:2.2.1
     ports:
       - "14025:25"
       - "14080:8080"
