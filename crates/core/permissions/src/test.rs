@@ -407,3 +407,114 @@ async fn validate_timed_out_member() {
         }
     }
 }
+
+#[tokio::test]
+async fn validate_channel_default_below_server_roles() {
+    /// Scenario where:
+    /// - Server default allows ViewChannel.
+    /// - Channel default override denies SendMessage.
+    /// - Server role override allows SendMessage.
+    /// - We don't have channel role overrides.
+    /// Since default permissions should be below role permissions,
+    /// our server role override (allowing SendMessage) should take precedence
+    /// over the channel default permission (denying SendMessage).
+    struct Scenario {}
+    let mut query = Scenario {};
+
+    let perms = calculate_channel_permissions(&mut query).await;
+    let value: u64 = perms.into();
+    assert_eq!(
+        value,
+        ChannelPermission::ViewChannel as u64 | ChannelPermission::SendMessage as u64
+    );
+
+    #[async_trait]
+    impl PermissionQuery for Scenario {
+        async fn are_we_privileged(&mut self) -> bool {
+            false
+        }
+
+        async fn are_we_a_bot(&mut self) -> bool {
+            unreachable!()
+        }
+
+        async fn are_the_users_same(&mut self) -> bool {
+            unreachable!()
+        }
+
+        async fn user_relationship(&mut self) -> RelationshipStatus {
+            unreachable!()
+        }
+
+        async fn user_is_bot(&mut self) -> bool {
+            unreachable!()
+        }
+
+        async fn have_mutual_connection(&mut self) -> bool {
+            unreachable!()
+        }
+
+        async fn are_we_server_owner(&mut self) -> bool {
+            false
+        }
+
+        async fn are_we_a_member(&mut self) -> bool {
+            true
+        }
+
+        async fn get_default_server_permissions(&mut self) -> u64 {
+            ChannelPermission::ViewChannel as u64
+        }
+
+        async fn get_our_server_role_overrides(&mut self) -> Vec<Override> {
+            vec![Override {
+                allow: ChannelPermission::SendMessage as u64,
+                deny: 0,
+            }]
+        }
+
+        async fn are_we_timed_out(&mut self) -> bool {
+            false
+        }
+
+        async fn do_we_have_publish_overwrites(&mut self) -> bool {
+            true
+        }
+
+        async fn do_we_have_receive_overwrites(&mut self) -> bool {
+            true
+        }
+
+        async fn get_channel_type(&mut self) -> ChannelType {
+            ChannelType::ServerChannel
+        }
+
+        async fn get_default_channel_permissions(&mut self) -> Override {
+            Override {
+                allow: 0,
+                deny: ChannelPermission::SendMessage as u64,
+            }
+        }
+
+        async fn get_our_channel_role_overrides(&mut self) -> Vec<Override> {
+            vec![]
+        }
+
+        async fn do_we_own_the_channel(&mut self) -> bool {
+            unreachable!()
+        }
+
+        async fn are_we_part_of_the_channel(&mut self) -> bool {
+            unreachable!()
+        }
+
+        async fn set_recipient_as_user(&mut self) {
+            unreachable!()
+        }
+
+        async fn set_server_from_channel(&mut self) {
+            // no-op
+        }
+    }
+}
+

@@ -122,11 +122,24 @@ pub async fn calculate_channel_permissions<P: PermissionQuery>(query: &mut P) ->
             if query.are_we_server_owner().await {
                 ChannelPermission::GrantAllSafe.into()
             } else if query.are_we_a_member().await {
-                let mut permissions = calculate_server_permissions(query).await;
+                let mut permissions = PermissionValue::from(query.get_default_server_permissions().await);
                 permissions.apply(query.get_default_channel_permissions().await);
+
+                for role_override in query.get_our_server_role_overrides().await {
+                    permissions.apply(role_override);
+                }
 
                 for role_override in query.get_our_channel_role_overrides().await {
                     permissions.apply(role_override);
+                }
+
+                if !query.do_we_have_publish_overwrites().await {
+                    permissions.revoke(ChannelPermission::Speak as u64);
+                    permissions.revoke(ChannelPermission::Video as u64);
+                }
+
+                if !query.do_we_have_receive_overwrites().await {
+                    permissions.revoke(ChannelPermission::Listen as u64);
                 }
 
                 if query.are_we_timed_out().await {
