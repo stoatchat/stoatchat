@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.1](https://github.com/stoatchat/stoatchat/compare/v0.15.0...v0.15.1) (2026-08-07)
+
+
+### Features
+
+* moderation API for pulling reported images. ([#880](https://github.com/stoatchat/stoatchat/issues/880)) ([fe331f0](https://github.com/stoatchat/stoatchat/commit/fe331f0dcb1704e0bb99a42f89bd8bfe263069d2))
+
+
+### Bug Fixes
+
+* Give first instance of a meta tag preference when creating website embed. ([4feeeb1](https://github.com/stoatchat/stoatchat/commit/4feeeb11f316a8ace0f3029424585c541e3310f6))
+* Prefer first instance of a meta property in create_website_embed ([#895](https://github.com/stoatchat/stoatchat/issues/895)) ([4feeeb1](https://github.com/stoatchat/stoatchat/commit/4feeeb11f316a8ace0f3029424585c541e3310f6))
+
 ## [0.15.0](https://github.com/stoatchat/stoatchat/compare/v0.14.3...v0.15.0) (2026-08-05)
 
 

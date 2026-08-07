@@ -1,6 +1,6 @@
 [package]
 name = "revolt-permissions"
-version = "0.15.0"
+version = "0.15.1"
 edition = "2021"
 license = "MIT"
 authors = ["Paul Makles <me@insrt.uk>"]
