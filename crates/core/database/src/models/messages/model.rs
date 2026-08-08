@@ -219,7 +219,7 @@ impl MessageFlagsValue {
         self.has_value(flag as u32)
     }
     pub fn has_value(&self, bit: u32) -> bool {
-        let mask = 1 << bit;
+        let mask = 1 << (bit - 1);
         self.0 & mask == mask
     }
 
@@ -227,10 +227,11 @@ impl MessageFlagsValue {
         self.set_value(flag as u32, toggle)
     }
     pub fn set_value(&mut self, bit: u32, toggle: bool) -> &mut Self {
+        let mask = 1 << (bit - 1);
         if toggle {
-            self.0 |= 1 << bit;
+            self.0 |= mask;
         } else {
-            self.0 &= !(1 << bit);
+            self.0 &= !mask;
         }
         self
     }
