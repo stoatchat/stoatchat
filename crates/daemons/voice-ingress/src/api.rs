@@ -255,6 +255,7 @@ pub async fn ingress(
                             message
                                 .update(
                                     db,
+                                    Some(amqp),
                                     PartialMessage {
                                         system: message.system.clone(),
                                         ..Default::default()

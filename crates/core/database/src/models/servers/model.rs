@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use revolt_config::capture_error;
 use redis_kiss::{
     get_connection,
     redis::{SetExpiry, SetOptions},
@@ -10,7 +11,7 @@ use revolt_permissions::{OverrideField, DEFAULT_PERMISSION_SERVER};
 use revolt_result::Result;
 use ulid::Ulid;
 
-use crate::{events::client::EventV1, Channel, Database, File, User};
+use crate::{AMQP, Channel, Database, File, User, events::client::EventV1};
 
 auto_derived_partial!(
     /// Server
@@ -219,7 +220,16 @@ impl Server {
     }
 
     /// Delete a server
-    pub async fn delete(self, db: &Database) -> Result<()> {
+    pub async fn delete(self, db: &Database, amqp: Option<&AMQP>) -> Result<()> {
+        if let Some(amqp) = amqp {
+            for channel_id in self.channels {
+                if let Err(e) = amqp.delete_channel_search(channel_id).await {
+                    log::error!("Error pushing message to RabbitMQ: {e}");
+                    capture_error(&e);
+                }
+            }
+        }
+
         EventV1::ServerDelete {
             id: self.id.clone(),
         }

@@ -29,6 +29,7 @@ docker build -t ghcr.io/stoatchat/gifbox:$TAG - < crates/services/gifbox/Dockerf
 docker build -t ghcr.io/stoatchat/crond:$TAG - < crates/daemons/crond/Dockerfile
 docker build -t ghcr.io/stoatchat/pushd:$TAG - < crates/daemons/pushd/Dockerfile
 docker build -t ghcr.io/stoatchat/voice-ingress:$TAG - < crates/daemons/voice-ingress/Dockerfile
+docker build -t ghcr.io/stoatchat/searchd:$TAG - < crates/daemons/searchd/Dockerfile
 
 if [ "$DEBUG" = "true" ]; then
   git restore Cargo.toml
@@ -42,3 +43,4 @@ docker push ghcr.io/stoatchat/gifbox:$TAG
 docker push ghcr.io/stoatchat/crond:$TAG
 docker push ghcr.io/stoatchat/pushd:$TAG
 docker push ghcr.io/stoatchat/voice-ingress:$TAG
+docker push ghcr.io/stoatchat/searchd:$TAG

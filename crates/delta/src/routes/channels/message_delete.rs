@@ -1,6 +1,6 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    AuditLogEntryAction, Database, User,
+    AuditLogEntryAction, Database, User, AMQP
 };
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::Result;
@@ -16,6 +16,7 @@ use crate::util::audit_log_reason::AuditLogReason;
 #[delete("/<target>/messages/<msg>", rank = 2)]
 pub async fn delete(
     db: &State<Database>,
+    amqp: &State<AMQP>,
     user: User,
     reason: AuditLogReason,
     target: Reference<'_>,
@@ -35,7 +36,7 @@ pub async fn delete(
         None
     };
 
-    message.delete(db).await?;
+    message.delete(db, Some(amqp)).await?;
 
     if let Some(server) = channel.and_then(|c| c.server().map(|s| s.to_string())) {
         AuditLogEntryAction::MessageDelete {

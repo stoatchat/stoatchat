@@ -72,6 +72,11 @@
                 },
                 {
                     "type": "toml",
+                    "path": "crates/core/search/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
                     "path": "crates/daemons/crond/Cargo.toml",
                     "jsonpath": "$.package.version"
                 },
@@ -83,6 +88,11 @@
                 {
                     "type": "toml",
                     "path": "crates/daemons/voice-ingress/Cargo.toml",
+                    "jsonpath": "$.package.version"
+                },
+                {
+                    "type": "toml",
+                    "path": "crates/daemons/searchd/Cargo.toml",
                     "jsonpath": "$.package.version"
                 },
                 {
@@ -149,6 +159,11 @@
                     "type": "toml",
                     "path": "Cargo.toml",
                     "jsonpath": "$.workspace.dependencies['revolt-result'].version"
+                },
+                {
+                    "type": "toml",
+                    "path": "Cargo.toml",
+                    "jsonpath": "$.workspace.dependencies['revolt-search'].version"
                 }
             ]
         }

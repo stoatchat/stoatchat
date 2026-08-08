@@ -36,12 +36,14 @@ deps() {
     crates/core/result/src \
     crates/core/coalesced/src \
     crates/core/ratelimits/src \
+    crates/core/search/src \
     crates/services/autumn/src \
     crates/services/january/src \
     crates/services/gifbox/src \
     crates/daemons/crond/src \
     crates/daemons/pushd/src \
-    crates/daemons/voice-ingress/src
+    crates/daemons/voice-ingress/src \
+    crates/daemons/searchd/src
   echo 'fn main() { panic!("stub"); }' |
     tee crates/bonfire/src/main.rs |
     tee crates/delta/src/main.rs |
@@ -50,7 +52,8 @@ deps() {
     tee crates/services/gifbox/src/main.rs |
     tee crates/daemons/crond/src/main.rs |
     tee crates/daemons/pushd/src/main.rs |
-    tee crates/daemons/voice-ingress/src/main.rs
+    tee crates/daemons/voice-ingress/src/main.rs |
+    tee crates/daemons/searchd/src/main.rs
   echo '' |
     tee crates/core/config/src/lib.rs |
     tee crates/core/database/src/lib.rs |
@@ -61,7 +64,8 @@ deps() {
     tee crates/core/presence/src/lib.rs |
     tee crates/core/result/src/lib.rs |
     tee crates/core/coalesced/src/lib.rs |
-    tee crates/core/ratelimits/src/lib.rs
+    tee crates/core/ratelimits/src/lib.rs |
+    tee crates/core/search/src/lib.rs
   
   if [ -z "$TARGETARCH" ]; then
     cargo build -j "${CARGO_BUILD_JOBS:-10}" --locked --release
@@ -77,6 +81,10 @@ apps() {
     crates/daemons/crond/src/main.rs \
     crates/daemons/pushd/src/main.rs \
     crates/daemons/voice-ingress/src/main.rs \
+    crates/daemons/searchd/src/main.rs \
+    crates/services/autumn/src/main.rs \
+    crates/services/january/src/main.rs \
+    crates/services/gifbox/src/main.rs \
     crates/core/config/src/lib.rs \
     crates/core/database/src/lib.rs \
     crates/core/models/src/lib.rs \
@@ -85,8 +93,8 @@ apps() {
     crates/core/presence/src/lib.rs \
     crates/core/result/src/lib.rs \
     crates/core/coalesced/src/lib.rs \
-    crates/core/ratelimits/src/lib.rs
-  
+    crates/core/ratelimits/src/lib.rs \
+    crates/core/search/src/lib.rs
   if [ -z "$TARGETARCH" ]; then
     cargo build -j "${CARGO_BUILD_JOBS:-10}" --locked --release
   else

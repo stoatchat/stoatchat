@@ -1,4 +1,4 @@
-use revolt_database::{util::reference::Reference, Database};
+use revolt_database::{util::reference::Reference, Database, AMQP};
 use revolt_result::{create_error, Result};
 use rocket::State;
 use rocket_empty::EmptyResponse;
@@ -10,6 +10,7 @@ use rocket_empty::EmptyResponse;
 #[delete("/<webhook_id>/<token>/<message_id>")]
 pub async fn webhook_delete_message(
     db: &State<Database>,
+    amqp: &State<AMQP>,
     webhook_id: Reference<'_>,
     token: String,
     message_id: Reference<'_>,
@@ -23,5 +24,5 @@ pub async fn webhook_delete_message(
         return Err(create_error!(CannotDeleteMessage));
     }
 
-    message.delete(db).await.map(|_| EmptyResponse)
+    message.delete(db, Some(amqp)).await.map(|_| EmptyResponse)
 }

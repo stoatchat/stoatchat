@@ -4,13 +4,13 @@ use std::{
     sync::Arc,
 };
 
-use crate::utils::{render_notification_content, Consumer};
+use crate::utils::render_notification_content;
 use anyhow::Result;
 use async_trait::async_trait;
 use lapin::{message::Delivery, Channel, Connection};
 use revolt_database::{
-    events::rabbit::*, util::bulk_permissions::BulkDatabasePermissionQuery, Database, Member,
-    MessageFlagsValue,
+    amqp::consumer::Consumer, events::rabbit::*,
+    util::bulk_permissions::BulkDatabasePermissionQuery, Database, Member, MessageFlagsValue,
 };
 use revolt_models::v0::{MessageFlags, PushNotification};
 use revolt_result::ToRevoltError;
@@ -29,11 +29,7 @@ impl MassMessageConsumer {
         push: &PushNotification,
         users: &[String],
     ) -> Result<()> {
-        if let Ok(sessions) = self
-            .db
-            .fetch_sessions_with_subscription(users)
-            .await
-        {
+        if let Ok(sessions) = self.db.fetch_sessions_with_subscription(users).await {
             let config = revolt_config::config().await;
             for session in sessions {
                 if let Some(sub) = session.subscription {
@@ -72,11 +68,7 @@ impl MassMessageConsumer {
 
 #[async_trait]
 impl Consumer for MassMessageConsumer {
-    async fn create(
-        db: Database,
-        connection: Arc<Connection>,
-        channel: Arc<Channel>,
-    ) -> Self {
+    async fn create(db: Database, connection: Arc<Connection>, channel: Arc<Channel>, _: ()) -> Self {
         Self {
             db,
             connection,

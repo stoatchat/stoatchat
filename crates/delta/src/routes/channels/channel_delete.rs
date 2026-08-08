@@ -53,7 +53,7 @@ pub async fn delete(
             channel
                 .remove_user_from_group(
                     db,
-                    amqp,
+                    Some(amqp),
                     &user,
                     None,
                     options.leave_silently.unwrap_or_default(),
@@ -68,7 +68,7 @@ pub async fn delete(
         }
         Channel::TextChannel { name, server, .. } => {
             permissions.throw_if_lacking_channel_permission(ChannelPermission::ManageChannel)?;
-            channel.delete(db).await?;
+            channel.delete(db, Some(amqp)).await?;
 
             AuditLogEntryAction::ChannelDelete {
                 channel: channel.id().to_string(),
