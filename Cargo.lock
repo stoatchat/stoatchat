@@ -2622,7 +2622,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4103,7 +4103,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi 0.5.2",
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -5312,7 +5312,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -5856,16 +5856,16 @@ dependencies = [
 
 [[package]]
 name = "pdk-classy"
-version = "1.9.0"
+version = "1.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b272f9dc3cd8446c4be61715a2396d1c0dea022e45c701c8446fa7bc81a0448"
+checksum = "eb00f10ccc886727a3c0e8411b6765397fce25551105c06e9ec0a612bbcfb3ea"
 dependencies = [
- "bincode",
  "futures",
  "getrandom 0.2.17",
  "http 0.2.12",
  "log",
  "pdk-proxy-wasm-stub",
+ "pdk-serde-fixint",
  "protobuf",
  "proxy-wasm",
  "serde",
@@ -5875,11 +5875,12 @@ dependencies = [
 
 [[package]]
 name = "pdk-core"
-version = "1.9.0"
+version = "1.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94e3a49e0045a651298424a582db6ef81978b3f619f914b485feb2a8d3cb18eb"
+checksum = "ddf898d6b8680e0fc4ac952dffec8d1f2818d3785871710a4c10f82998c54a78"
 dependencies = [
  "anyhow",
+ "hex",
  "log",
  "pdk-classy",
  "pdk-macros",
@@ -5890,15 +5891,15 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "sha2 0.10.9",
+ "sha2 0.11.0",
  "url",
 ]
 
 [[package]]
 name = "pdk-ip-filter-lib"
-version = "1.9.0"
+version = "1.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0eab0326a148dc64b3ce0b444b9be79e77e2c32c8a11e98800cb897f46d077ec"
+checksum = "8f953aa2cd82ce17a84886742b4084644eb30e6c0584ee665d462af1c18a52f3"
 dependencies = [
  "anyhow",
  "ipnet",
@@ -5908,9 +5909,9 @@ dependencies = [
 
 [[package]]
 name = "pdk-macros"
-version = "1.9.0"
+version = "1.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3123ab64f4cea8374fbb6d0697997a209fe16794e330caacb4914967530d10a"
+checksum = "e735bc3dfc6f90a2fafd2b71c58cc79b3f0cfa09797d7d898e6bf9c3eead5efa"
 dependencies = [
  "proc-macro2",
  "quote 1.0.46",
@@ -5919,9 +5920,9 @@ dependencies = [
 
 [[package]]
 name = "pdk-pel"
-version = "1.9.0"
+version = "1.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7af9cbea6ed98d843d106e95451ea907b5e411061e23783b86a37c5748f7be3a"
+checksum = "489e07871b591df4ec8da54ca02b7026e0d9e24244be0fd77ce6129b5e04710c"
 dependencies = [
  "base64 0.22.1",
  "getrandom 0.2.17",
@@ -5932,15 +5933,15 @@ dependencies = [
 
 [[package]]
 name = "pdk-proxy-wasm-stub"
-version = "1.9.0"
+version = "1.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9469584d6a62ac97a46cfd3e67a270dbac8af33e27169b4e87a1a7f2e10d321f"
+checksum = "67a04a951fd89798d89453f1e39a45e90d36c317d5e13655ecd5489dc3772f87"
 
 [[package]]
 name = "pdk-script"
-version = "1.9.0"
+version = "1.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db9968802349bd53285e846450a534ff91d9c9d51f9bd1da4e833eff17b906d9"
+checksum = "93f509f4087a69f8b822c0f361ad604fe210f831fd4d7f3b627b706c67e1e963"
 dependencies = [
  "log",
  "num-traits",
@@ -5951,6 +5952,16 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "url",
+]
+
+[[package]]
+name = "pdk-serde-fixint"
+version = "1.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc17ada3cc1c9ef53cfce93bb524aa64607bc99ab28102ae5a6a1072a6f6557a"
+dependencies = [
+ "serde",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -7991,7 +8002,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -8004,7 +8015,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -8134,7 +8145,7 @@ dependencies = [
  "security-framework 3.7.0",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -8903,7 +8914,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52d1cfed4120b4d927bf7c0f86d2087a4a7d6027c906d9f9d525a80573b9be51"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -9225,10 +9236,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand 2.4.1",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -10414,7 +10425,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
