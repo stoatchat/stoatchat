@@ -9988,9 +9988,9 @@ dependencies = [
 
 [[package]]
 name = "url-escape"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44e0ce4d1246d075ca5abec4b41d33e87a6054d08e2366b63205665e950db218"
+checksum = "fd4105a4fc511f6b1c9616a372a1313ae7c15afcaac839617c1c7cf25ce0a965"
 dependencies = [
  "percent-encoding",
 ]
