@@ -64,7 +64,7 @@ scraper = "0.20.0"
 encoding_rs = "0.8.34"
 
 # Mail
-lettre = "0.10.0-alpha.4"
+lettre = "0.11.0"
 handlebars = "4.3.0"
 
 # HTTP Requests
