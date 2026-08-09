@@ -49,7 +49,7 @@ bitfield = "0.13.2"
 
 # Time
 chrono = "0.4.15"
-iso8601-timestamp = "0.2.10"
+iso8601-timestamp = "0.4.0"
 
 # Data Collections
 lru = "0.16.3"

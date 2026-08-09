@@ -4136,13 +4136,13 @@ dependencies = [
 
 [[package]]
 name = "iso8601-timestamp"
-version = "0.2.17"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24d4e5d712dd664b11e778d1cfc06c79ba2700d6bc1771e44fb7b6a4656b487d"
+checksum = "664d15f33cfa25f56bc56b01f051247b0e76504ba3f17c391f84bd85d25a2ecc"
 dependencies = [
  "generic-array 1.4.3",
- "schemars",
- "serde",
+ "schemars 1.2.2",
+ "serde_core",
  "time",
 ]
 
@@ -7325,7 +7325,7 @@ dependencies = [
  "revolt_rocket_okapi",
  "rocket",
  "rust-argon2",
- "schemars",
+ "schemars 0.8.22",
  "serde",
  "serde_json",
  "sha1 0.10.6",
@@ -7375,7 +7375,7 @@ dependencies = [
  "rocket_cors",
  "rocket_empty",
  "rocket_prometheus",
- "schemars",
+ "schemars 0.8.22",
  "serde",
  "serde_json",
  "tokio",
@@ -7479,7 +7479,7 @@ dependencies = [
  "revolt-permissions",
  "revolt_optional_struct",
  "rocket",
- "schemars",
+ "schemars 0.8.22",
  "serde",
  "serde_json",
  "utoipa",
@@ -7503,7 +7503,7 @@ dependencies = [
  "num_enum",
  "once_cell",
  "revolt-result",
- "schemars",
+ "schemars 0.8.22",
  "serde",
  "tokio",
 ]
@@ -7575,7 +7575,7 @@ dependencies = [
  "revolt_okapi",
  "revolt_rocket_okapi",
  "rocket",
- "schemars",
+ "schemars 0.8.22",
  "sentry",
  "serde",
  "serde_json",
@@ -7646,7 +7646,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23bfdf7ae769c3042fe727f6e5c17363b02a64b4b33ad60c3e5f73b26df7835b"
 dependencies = [
  "log",
- "schemars",
+ "schemars 0.8.22",
  "serde",
  "serde_json",
 ]
@@ -7672,7 +7672,7 @@ dependencies = [
  "revolt_okapi",
  "revolt_rocket_okapi_codegen",
  "rocket",
- "schemars",
+ "schemars 0.8.22",
  "serde",
  "serde_json",
 ]
@@ -8242,7 +8242,20 @@ dependencies = [
  "dyn-clone",
  "indexmap 1.9.3",
  "indexmap 2.14.0",
- "schemars_derive",
+ "schemars_derive 0.8.22",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "schemars"
+version = "1.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "687274d293b6cdc6e73e0fee520bf2049650090d7164f87672d212a3c530cf4a"
+dependencies = [
+ "dyn-clone",
+ "ref-cast",
+ "schemars_derive 1.2.2",
  "serde",
  "serde_json",
 ]
@@ -8255,8 +8268,20 @@ checksum = "32e265784ad618884abaea0600a9adf15393368d840e0222d101a072f3f7534d"
 dependencies = [
  "proc-macro2",
  "quote 1.0.46",
- "serde_derive_internals",
+ "serde_derive_internals 0.29.1",
  "syn 2.0.118",
+]
+
+[[package]]
+name = "schemars_derive"
+version = "1.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d98c67716b46af2f0b8cf752abc930f6f9aecfbf671ecfb531db8a31dbe4e2ba"
+dependencies = [
+ "proc-macro2",
+ "quote 1.0.46",
+ "serde_derive_internals 0.30.0",
+ "syn 3.0.3",
 ]
 
 [[package]]
@@ -8607,6 +8632,17 @@ dependencies = [
  "proc-macro2",
  "quote 1.0.46",
  "syn 2.0.118",
+]
+
+[[package]]
+name = "serde_derive_internals"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f852137cce035d6a4df67ccce505ff6b3e9fd3a10e3e52b24dc71e650bb1a9bd"
+dependencies = [
+ "proc-macro2",
+ "quote 1.0.46",
+ "syn 3.0.3",
 ]
 
 [[package]]
@@ -9078,6 +9114,17 @@ name = "syn"
 version = "2.0.118"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b9ae57f904213ebb649ce6895b8a66c66f0203b9319718f69a5612a065b1422"
+dependencies = [
+ "proc-macro2",
+ "quote 1.0.46",
+ "unicode-ident",
+]
+
+[[package]]
+name = "syn"
+version = "3.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53e9bae58849f64dfa4f5d5ae372c8341f7305f82a3868709269343628b659a3"
 dependencies = [
  "proc-macro2",
  "quote 1.0.46",
