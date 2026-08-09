@@ -1,5 +1,8 @@
 use super::AbstractChannels;
-use crate::{AbstractServers, Channel, FieldsChannel, IntoDocumentPath, MongoDb, PartialChannel, util::ChunkedDatabaseGenerator};
+use crate::{
+    util::ChunkedDatabaseGenerator, AbstractServers, Channel, FieldsChannel, IntoDocumentPath,
+    MongoDb, PartialChannel,
+};
 use bson::{Bson, Document};
 use futures::StreamExt;
 use mongodb::options::ReadConcern;
@@ -71,7 +74,10 @@ impl AbstractChannels for MongoDb {
     }
 
     // Fetch all group dms for a user
-    async fn find_group_message_channels(&self, user_id: &str) -> Result<ChunkedDatabaseGenerator<Channel>> {
+    async fn find_group_message_channels(
+        &self,
+        user_id: &str,
+    ) -> Result<ChunkedDatabaseGenerator<Channel>> {
         let mut session = self
             .start_session()
             .await
@@ -83,7 +89,8 @@ impl AbstractChannels for MongoDb {
             .await
             .map_err(|_| create_database_error!("start_transaction", COL))?;
 
-        let cursor = self.col(COL)
+        let cursor = self
+            .col(COL)
             .find(doc! {
                 "channel_type": "Group",
                 "recipients": user_id
@@ -303,6 +310,42 @@ impl AbstractChannels for MongoDb {
 
         // Delete the channel itself
         query!(self, delete_one_by_id, COL, channel.id()).map(|_| ())
+    }
+
+    async fn fetch_last_message(&self, channel_id: &str) -> Result<Option<String>> {
+        self.col::<Document>("messages")
+            .find_one(doc! {"channel": channel_id})
+            .sort(doc! {"_id": -1})
+            .projection(doc! {"_id": 1})
+            .await
+            .map(|doc| doc.map(|d| d.get("_id").expect("Missing _id").to_string()))
+            .map_err(|_| create_database_error!("find_one", "messages"))
+    }
+
+    async fn update_last_messsage_id(
+        &self,
+        channel_id: &str,
+        message_id: Option<&str>,
+    ) -> Result<()> {
+        if let Some(message_id) = message_id {
+            self.col::<Document>(COL)
+                .update_one(
+                    doc! {"_id": channel_id},
+                    doc! {"$set": {"last_message_id": message_id}},
+                )
+                .await
+                .map(|_| ())
+                .map_err(|_| create_database_error!("update_one", "channels"))
+        } else {
+            self.col::<Document>(COL)
+                .update_one(
+                    doc! {"_id": channel_id},
+                    doc! {"$unset": {"last_message_id": ""}},
+                )
+                .await
+                .map(|_| ())
+                .map_err(|_| create_database_error!("update_one", "channels"))
+        }
     }
 }
 

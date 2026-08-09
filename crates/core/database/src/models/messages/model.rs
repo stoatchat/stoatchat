@@ -1012,6 +1012,42 @@ impl Message {
 
         db.delete_message(&self.id).await?;
 
+        if let Ok(mut channel) = db.fetch_channel(&self.channel).await {
+            match &channel {
+                Channel::DirectMessage {
+                    last_message_id, ..
+                }
+                | Channel::Group {
+                    last_message_id, ..
+                }
+                | Channel::TextChannel {
+                    last_message_id, ..
+                } => {
+                    if last_message_id.is_some() && last_message_id.as_ref().unwrap() == &self.id {
+                        let new_last_message_id =
+                            db.fetch_last_message(channel.id()).await.unwrap();
+
+                        db.update_last_messsage_id(channel.id(), new_last_message_id.as_deref())
+                            .await?;
+
+                        if new_last_message_id.is_some() {
+                            EventV1::ChannelUpdate {
+                                id: channel.id().to_string(),
+                                data: revolt_models::v0::PartialChannel {
+                                    last_message_id: new_last_message_id,
+                                    ..Default::default()
+                                },
+                                clear: vec![],
+                            }
+                            .p(channel.id().to_string())
+                            .await;
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+
         EventV1::MessageDelete {
             id: self.id.clone(),
             channel: self.channel.clone(),
