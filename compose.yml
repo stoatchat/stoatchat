@@ -81,7 +81,7 @@ services:
       MAILDEV_INCOMING_PASS: smtp
 
   livekit:
-    image: ghcr.io/stoatchat/livekit-server:v1.9.13
+    image: ghcr.io/stoatchat/livekit-server:v1.9.14
     command: --config /etc/livekit.yml
     network_mode: "host"
     volumes:
