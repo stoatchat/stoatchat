@@ -30,6 +30,7 @@ jobs:
           - crond
           - pushd
           - voice-ingress
+          - searchd
     steps:
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

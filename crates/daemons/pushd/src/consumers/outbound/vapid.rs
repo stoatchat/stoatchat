@@ -1,7 +1,5 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::utils::Consumer;
-
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
 use base64::{
@@ -9,7 +7,9 @@ use base64::{
     Engine as _,
 };
 use lapin::{message::Delivery, Channel as AMQPChannel, Connection};
-use revolt_database::{events::rabbit::*, util::format_display_name, Database};
+use revolt_database::{
+    amqp::consumer::Consumer, events::rabbit::*, util::format_display_name, Database,
+};
 use web_push::{
     ContentEncoding, IsahcWebPushClient, SubscriptionInfo, SubscriptionKeys, VapidSignatureBuilder,
     WebPushClient, WebPushError, WebPushMessageBuilder,
@@ -27,11 +27,7 @@ pub struct VapidOutboundConsumer {
 
 #[async_trait]
 impl Consumer for VapidOutboundConsumer {
-    async fn create(
-        db: Database,
-        connection: Arc<Connection>,
-        channel: Arc<AMQPChannel>,
-    ) -> Self {
+    async fn create(db: Database, connection: Arc<Connection>, channel: Arc<AMQPChannel>, _: ()) -> Self {
         let config = revolt_config::config().await;
 
         if config.pushd.vapid.private_key.is_empty() || config.pushd.vapid.public_key.is_empty() {

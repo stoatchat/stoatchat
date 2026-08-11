@@ -1,11 +1,10 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::utils::Consumer;
 use anyhow::Result;
 use async_trait::async_trait;
 use lapin::{message::Delivery, Channel, Connection};
 use log::debug;
-use revolt_database::{events::rabbit::*, Database};
+use revolt_database::{amqp::consumer::Consumer, events::rabbit::*, Database};
 
 #[derive(Clone)]
 #[allow(unused)]
@@ -17,11 +16,7 @@ pub struct DmCallConsumer {
 
 #[async_trait]
 impl Consumer for DmCallConsumer {
-    async fn create(
-        db: Database,
-        connection: Arc<Connection>,
-        channel: Arc<Channel>,
-    ) -> Self {
+    async fn create(db: Database, connection: Arc<Connection>, channel: Arc<Channel>, _: ()) -> Self {
         Self {
             db,
             connection,

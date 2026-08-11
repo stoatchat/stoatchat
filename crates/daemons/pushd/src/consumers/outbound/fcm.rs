@@ -1,6 +1,5 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use crate::utils::Consumer;
 use anyhow::{bail, Result};
 use async_trait::async_trait;
 use fcm_v1::{
@@ -10,7 +9,7 @@ use fcm_v1::{
 };
 use lapin::{message::Delivery, Channel as AMQPChannel, Connection};
 use revolt_config::config;
-use revolt_database::{events::rabbit::*, Database};
+use revolt_database::{amqp::consumer::Consumer, events::rabbit::*, Database};
 use serde_json::Value;
 
 /// Custom notification data
@@ -126,11 +125,7 @@ pub struct FcmOutboundConsumer {
 
 #[async_trait]
 impl Consumer for FcmOutboundConsumer {
-    async fn create(
-        db: Database,
-        connection: Arc<Connection>,
-        channel: Arc<AMQPChannel>,
-    ) -> Self {
+    async fn create(db: Database, connection: Arc<Connection>, channel: Arc<AMQPChannel>, _: ()) -> Self {
         let config = revolt_config::config().await;
 
         Self {

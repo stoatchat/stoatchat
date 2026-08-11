@@ -4,7 +4,7 @@
 [database]
 # MongoDB connection URL
 # Defaults to the container name specified in self-hosted
-mongodb = "mongodb://127.0.0.1:27017"
+mongodb = "mongodb://127.0.0.1:27017?directConnection=true&replicaSet=rs0"
 # Redis connection URL
 # Defaults to the container name specified in self-hosted
 redis = "redis://127.0.0.1:6379/"
@@ -68,3 +68,6 @@ access_key_id = "minioautumn"
 secret_access_key = "minioautumn"
 # Bucket to upload to by default
 default_bucket = "revolt-uploads"
+
+[elasticsearch]
+api_key = ""

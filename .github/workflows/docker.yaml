@@ -228,3 +228,22 @@ jobs:
           build-args: |
             BASE_IMAGE=ghcr.io/${{ github.repository_owner }}/base:${{ steps.base.outputs.tag }}
           labels: ${{ steps.meta-voice-ingress.outputs.labels }}
+
+      # stoatchat/searchd
+      - name: Docker meta
+        id: meta-searchd
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            ghcr.io/stoatchat/searchd
+      - name: Publish
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          file: crates/daemons/searchd/Dockerfile
+          tags: ${{ steps.meta-searchd.outputs.tags }}
+          build-args: |
+            BASE_IMAGE=ghcr.io/${{ github.repository_owner }}/base:${{ steps.base.outputs.tag }}
+          labels: ${{ steps.meta-searchd.outputs.labels }}

@@ -1,5 +1,7 @@
 # Build Stage
-FROM ghcr.io/stoatchat/base:latest AS builder
+ARG BASE_IMAGE=ghcr.io/stoatchat/base:latest
+FROM $BASE_IMAGE AS builder
+FROM debian:12 AS debian
 
 # Bundle Stage
 FROM gcr.io/distroless/cc-debian12:nonroot

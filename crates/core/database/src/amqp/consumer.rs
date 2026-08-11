@@ -1,7 +1,5 @@
 use std::{
-    future::{ready, Future},
-    pin::Pin,
-    sync::Arc,
+    future::{Future, ready}, marker::PhantomData, pin::Pin, sync::Arc
 };
 
 use anyhow::Result;
@@ -12,14 +10,15 @@ use lapin::{
     BasicProperties, Channel, Connection, ConsumerDelegate, Error as AMQPError,
 };
 use log::debug;
-use revolt_database::Database;
+use crate::Database;
 
 #[async_trait]
-pub trait Consumer: Clone + Send + Sync + 'static {
+pub trait Consumer<T: Clone = ()>: Clone + Send + Sync + 'static {
     async fn create(
         db: Database,
         connection: Arc<Connection>,
         channel: Arc<Channel>,
+        data: T,
     ) -> Self;
     fn channel(&self) -> &Arc<Channel>;
     async fn consume(&self, delivery: Delivery) -> Result<()>;
@@ -65,9 +64,15 @@ pub trait Consumer: Clone + Send + Sync + 'static {
     }
 }
 
-pub struct Delegate<C: Consumer>(pub C);
+pub struct Delegate<C: Consumer<D>, D: Clone>(C, PhantomData<D>);
 
-impl<C: Consumer> ConsumerDelegate for Delegate<C> {
+impl<C: Consumer<D>, D: Clone> Delegate<C, D> {
+    pub fn new(consumer: C) -> Self {
+        Self(consumer, PhantomData)
+    }
+}
+
+impl<C: Consumer<D>, D: Clone + Send + Sync> ConsumerDelegate for Delegate<C, D> {
     fn on_new_delivery(
         &self,
         delivery: DeliveryResult,

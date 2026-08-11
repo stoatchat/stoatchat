@@ -2,6 +2,7 @@ use iso8601_timestamp::Timestamp;
 use revolt_config::config;
 use revolt_database::{
     tasks::process_embeds::queue, util::reference::Reference, Database, Message, PartialMessage,
+    AMQP,
 };
 use revolt_models::v0::{self, DataEditMessage, Embed};
 use revolt_models::validator::Validate;
@@ -15,6 +16,7 @@ use rocket::{serde::json::Json, State};
 #[patch("/<webhook_id>/<token>/<message_id>", data = "<data>")]
 pub async fn webhook_edit_message(
     db: &State<Database>,
+    amqp: &State<AMQP>,
     webhook_id: Reference<'_>,
     token: String,
     message_id: Reference<'_>,
@@ -73,7 +75,7 @@ pub async fn webhook_edit_message(
 
     partial.embeds = Some(new_embeds);
 
-    message.update(db, partial, vec![]).await?;
+    message.update(db, Some(amqp), partial, vec![]).await?;
 
     // Queue up a task for processing embeds
     if let Some(content) = edit.content {

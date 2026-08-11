@@ -1,8 +1,9 @@
 use iso8601_timestamp::Timestamp;
+use revolt_config::capture_error;
 use revolt_database::{
     tasks,
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, Message, PartialMessage, User,
+    Database, Message, PartialMessage, User, AMQP,
 };
 use revolt_models::v0::{self, Embed};
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
@@ -17,6 +18,7 @@ use validator::Validate;
 #[patch("/<target>/messages/<msg>", data = "<edit>")]
 pub async fn edit(
     db: &State<Database>,
+    amqp: &State<AMQP>,
     user: User,
     target: Reference<'_>,
     msg: Reference<'_>,
@@ -82,7 +84,7 @@ pub async fn edit(
 
     partial.embeds = Some(new_embeds);
 
-    message.update(db, partial, vec![]).await?;
+    message.update(db, Some(amqp), partial, vec![]).await?;
 
     // Queue up a task for processing embeds if the we have sufficient permissions
     if permissions.has_channel_permission(ChannelPermission::SendEmbeds) {
