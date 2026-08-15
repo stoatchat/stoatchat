@@ -223,7 +223,6 @@ pub struct ApiSecurityShield {
 #[derive(Deserialize, Debug, Clone)]
 pub struct ApiSecurity {
     pub shield: ApiSecurityShield,
-    pub voso_legacy_token: String,
     pub captcha: ApiSecurityCaptcha,
     pub trust_cloudflare: bool,
     pub easypwned: String,

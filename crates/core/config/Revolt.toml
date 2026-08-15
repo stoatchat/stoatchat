@@ -62,8 +62,6 @@ expire_account_deletion = 86400  # 3600 * 24
 [api.security]
 # Authifier Shield API key
 authifier_shield_key = ""
-# Legacy voice server management token
-voso_legacy_token = ""
 # Whether services are behind the Cloudflare network
 trust_cloudflare = false
 # easypwned endpoint
