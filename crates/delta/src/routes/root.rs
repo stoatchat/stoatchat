@@ -153,27 +153,12 @@ impl UserLimits {
     }
 }
 
-/// # Build Information
-#[derive(Serialize, JsonSchema, Debug)]
-pub struct BuildInformation {
-    /// Commit Hash
-    pub commit_sha: String,
-    /// Commit Timestamp
-    pub commit_timestamp: String,
-    /// Git Semver
-    pub semver: String,
-    /// Git Origin URL
-    pub origin_url: String,
-    /// Build Timestamp
-    pub timestamp: String,
-}
-
 /// # Server Configuration
 #[derive(Serialize, JsonSchema, Debug)]
 pub struct RevoltConfig {
-    /// Revolt API Version
-    pub revolt: String,
-    /// Features enabled on this Revolt node
+    /// Stoat API Version
+    pub stoat: String,
+    /// Features enabled on this Stoat node
     pub features: RevoltFeatures,
     /// WebSocket URL
     pub ws: String,
@@ -181,8 +166,6 @@ pub struct RevoltConfig {
     pub app: String,
     /// Web Push VAPID public key
     pub vapid: String,
-    /// Build information
-    pub build: BuildInformation,
 }
 
 /// # Query Node
@@ -194,7 +177,7 @@ pub async fn root() -> Result<Json<RevoltConfig>> {
     let config = config().await;
 
     Ok(Json(RevoltConfig {
-        revolt: env!("CARGO_PKG_VERSION").to_string(),
+        stoat: env!("CARGO_PKG_VERSION").to_string(),
         features: RevoltFeatures {
             captcha: CaptchaFeature {
                 enabled: !config.api.security.captcha.hcaptcha_key.is_empty(),
@@ -260,23 +243,6 @@ pub async fn root() -> Result<Json<RevoltConfig>> {
         ws: config.hosts.events,
         app: config.hosts.app,
         vapid: config.pushd.vapid.public_key,
-        build: BuildInformation {
-            commit_sha: option_env!("VERGEN_GIT_SHA")
-                .unwrap_or_else(|| "<failed to generate>")
-                .to_string(),
-            commit_timestamp: option_env!("VERGEN_GIT_COMMIT_TIMESTAMP")
-                .unwrap_or_else(|| "<failed to generate>")
-                .to_string(),
-            semver: option_env!("VERGEN_GIT_SEMVER")
-                .unwrap_or_else(|| "<failed to generate>")
-                .to_string(),
-            origin_url: option_env!("GIT_ORIGIN_URL")
-                .unwrap_or_else(|| "<failed to generate>")
-                .to_string(),
-            timestamp: option_env!("VERGEN_BUILD_TIMESTAMP")
-                .unwrap_or_else(|| "<failed to generate>")
-                .to_string(),
-        },
     }))
 }
 
