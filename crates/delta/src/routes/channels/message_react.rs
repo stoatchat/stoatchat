@@ -26,7 +26,9 @@ pub async fn react_message(
         .throw_if_lacking_channel_permission(ChannelPermission::React)?;
 
     // Fetch relevant message
-    let message = msg.as_message_in_channel(db, channel.id()).await?;
+    let message = msg
+        .as_message_in_channel(db, channel.id(), &user.id)
+        .await?;
 
     // Add the reaction
     message

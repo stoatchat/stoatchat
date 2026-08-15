@@ -33,7 +33,9 @@ pub async fn message_unpin(
             .throw_if_lacking_channel_permission(ChannelPermission::ManageMessages)?;
     }
 
-    let mut message = msg.as_message_in_channel(db, channel.id()).await?;
+    let mut message = msg
+        .as_message_in_channel(db, channel.id(), &user.id)
+        .await?;
 
     if !message.pinned.unwrap_or_default() {
         return Err(create_error!(NotPinned));
@@ -131,6 +133,7 @@ mod test {
                 embeds: None,
                 masquerade: None,
                 interactions: None,
+                ephemeral: None,
                 flags: None,
             },
             v0::MessageAuthor::User(&user.clone().into(&harness.db, Some(&user)).await),
