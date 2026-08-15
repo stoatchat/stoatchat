@@ -36,7 +36,9 @@ pub async fn unreact_message(
     }
 
     // Fetch relevant message
-    let message = msg.as_message_in_channel(db, channel.id()).await?;
+    let message = msg
+        .as_message_in_channel(db, channel.id(), &user.id)
+        .await?;
 
     // Check if we should wipe all of this reaction
     if remove_all {

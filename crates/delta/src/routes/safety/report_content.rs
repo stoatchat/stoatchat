@@ -45,7 +45,7 @@ pub async fn report_content(
     // Also retrieve any references to Files
     let (snapshots, files): (Vec<SnapshotContent>, Vec<String>) = match &data.content {
         ReportedContent::Message { id, .. } => {
-            let message = db.fetch_message(id).await?;
+            let message = db.fetch_message(id, None).await?;
 
             // Users cannot report themselves
             if message.author == user.id {
@@ -76,7 +76,7 @@ pub async fn report_content(
 
             // Determine if there is a message provided as context
             let message = if let Some(id) = message_id {
-                db.fetch_message(id).await.ok()
+                db.fetch_message(id, None).await.ok()
             } else {
                 None
             };

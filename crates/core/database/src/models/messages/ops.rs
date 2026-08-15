@@ -1,6 +1,6 @@
+use revolt_result::Result;
 use std::collections::HashMap;
 use std::time::SystemTime;
-use revolt_result::Result;
 
 use crate::{AppendMessage, FieldsMessage, Message, MessageQuery, PartialMessage};
 
@@ -14,16 +14,26 @@ pub trait AbstractMessages: Sync + Send {
     async fn insert_message(&self, message: &Message) -> Result<()>;
 
     /// Fetch a message by its id
-    async fn fetch_message(&self, id: &str) -> Result<Message>;
+    async fn fetch_message(&self, id: &str, user: Option<&str>) -> Result<Message>;
 
     /// Fetch multiple messages by given query
-    async fn fetch_messages(&self, query: MessageQuery) -> Result<Vec<Message>>;
+    async fn fetch_messages(&self, query: MessageQuery, user: Option<&str>)
+        -> Result<Vec<Message>>;
 
     /// Fetch multiple messages by given IDs
-    async fn fetch_messages_by_id(&self, ids: &[String]) -> Result<Vec<Message>>;
+    async fn fetch_messages_by_id(
+        &self,
+        ids: &[String],
+        user: Option<&str>,
+    ) -> Result<Vec<Message>>;
 
     /// Update a given message with new information
-    async fn update_message(&self, id: &str, message: &PartialMessage, remove: Vec<FieldsMessage>) -> Result<()>;
+    async fn update_message(
+        &self,
+        id: &str,
+        message: &PartialMessage,
+        remove: Vec<FieldsMessage>,
+    ) -> Result<()>;
 
     /// Append information to a given message
     async fn append_message(&self, id: &str, append: &AppendMessage) -> Result<()>;
@@ -48,8 +58,11 @@ pub trait AbstractMessages: Sync + Send {
         &self,
         channels: &[String],
         author: &str,
-        since: SystemTime
+        since: SystemTime,
     ) -> Result<HashMap<String, Vec<String>>>;
 
     async fn delete_messages_by_user(&self, user_id: &str) -> Result<()>;
+
+    /// Delete all expired ephemeral messages
+    async fn prune_ephemeral(&self, delay: u64) -> Result<()>;
 }

@@ -42,7 +42,8 @@ pub async fn bulk_delete_messages(
             .datetime()
             .elapsed()
             .expect("Time went backwards")
-            > Duration::from_hours(7 * 24)  // 7 days
+            > Duration::from_hours(7 * 24)
+        // 7 days
         {
             return Err(create_error!(InvalidOperation));
         }
@@ -54,7 +55,7 @@ pub async fn bulk_delete_messages(
         .await
         .throw_if_lacking_channel_permission(ChannelPermission::ManageMessages)?;
 
-    Message::bulk_delete(db, target.id, options.ids.clone()).await?;
+    Message::bulk_delete(db, target.id, options.ids.clone(), &user.id).await?;
 
     if let Some(server) = channel.server() {
         AuditLogEntryAction::MessageBulkDelete {
