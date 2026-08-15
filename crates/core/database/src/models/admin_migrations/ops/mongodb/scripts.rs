@@ -26,7 +26,7 @@ struct MigrationInfo {
     revision: i32,
 }
 
-pub const LATEST_REVISION: i32 = 52; // MUST BE +1 to last migration
+pub const LATEST_REVISION: i32 = 53; // MUST BE +1 to last migration
 
 pub async fn migrate_database(db: &MongoDb) {
     let migrations = db.col::<Document>("migrations");
@@ -1527,6 +1527,24 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             })
             .await
             .expect("Failed to create audit_logs index");
+    };
+
+    if revision <= 52 {
+        info!("Running migration [revision 52 / 14-08-2026]: Add UseExternalEmojis to default permissions");
+
+        db.col::<Document>("servers")
+            .update_many(
+                doc! {},
+                doc! {
+                "$bit": {
+                    "default_permissions": {
+                        "or": ChannelPermission::UseExternalEmojis as i64
+                    },
+                },
+            },
+            )
+            .await
+            .expect("Failed to update default_permissions");
     };
 
     // Reminder to update LATEST_REVISION when adding new migrations.

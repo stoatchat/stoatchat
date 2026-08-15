@@ -31,6 +31,8 @@ pub enum ChannelPermission {
     ManageRole = 1 << 3,
     /// Manage server customisation (includes emoji)
     ManageCustomisation = 1 << 4,
+    /// Allow external emoji usage
+    UseExternalEmojis = 1 << 41,
 
     // % 1 bit reserved
 
@@ -104,7 +106,7 @@ pub enum ChannelPermission {
     ViewAuditLogs = 1 << 40,
 
     // * Misc. permissions
-    // % Bits 41 to 52: free area
+    // % Bits 42 to 52: free area
     // % Bits 53 to 64: do not use
 
     // * Grant all permissions
@@ -153,7 +155,8 @@ pub static DEFAULT_PERMISSION_SERVER: Lazy<u64> = Lazy::new(|| {
     DEFAULT_PERMISSION.add(
         ChannelPermission::React
             + ChannelPermission::ChangeNickname
-            + ChannelPermission::ChangeAvatar,
+            + ChannelPermission::ChangeAvatar
+            + ChannelPermission::UseExternalEmojis,
     )
 });
 

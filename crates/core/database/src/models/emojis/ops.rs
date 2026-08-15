@@ -1,6 +1,6 @@
 use revolt_result::Result;
 
-use crate::{Emoji, PartialEmoji};
+use crate::{query, Emoji, PartialEmoji};
 
 #[cfg(feature = "mongodb")]
 mod mongodb;
@@ -13,6 +13,9 @@ pub trait AbstractEmojis: Sync + Send {
 
     /// Fetch an emoji by its id
     async fn fetch_emoji(&self, id: &str) -> Result<Emoji>;
+
+    /// Fetch emoji by their ids
+    async fn fetch_emojis(&self, ids: &[String]) -> Result<Vec<Emoji>>;
 
     /// Fetch emoji by their parent id
     async fn fetch_emoji_by_parent_id(&self, parent_id: &str) -> Result<Vec<Emoji>>;
