@@ -202,6 +202,7 @@ impl Request {
     pub async fn fetch_image_metadata(
         url: &str,
         request: Option<Request>,
+        size: ImageSize,
     ) -> Result<Option<Image>> {
         if let Some(hit) = EMBED_CACHE.get(url).await {
             match hit {
@@ -228,7 +229,7 @@ impl Request {
                     url: url.to_owned(),
                     width,
                     height,
-                    size: ImageSize::Large,
+                    size,
                 }))
             } else {
                 Ok(None)
@@ -332,10 +333,12 @@ impl Request {
                         .map(Embed::Website)
                         .unwrap_or_default()
                 }
-                (mime::IMAGE, _) => Request::fetch_image_metadata(&url, Some(request))
-                    .await
-                    .map(|res| res.map(Embed::Image).unwrap_or_default())
-                    .unwrap_or_default(),
+                (mime::IMAGE, _) => {
+                    Request::fetch_image_metadata(&url, Some(request), ImageSize::Large)
+                        .await
+                        .map(|res| res.map(Embed::Image).unwrap_or_default())
+                        .unwrap_or_default()
+                }
                 (mime::VIDEO, _) => Request::fetch_video_metadata(&url, Some(request))
                     .await
                     .map(|res| res.map(Embed::Video).unwrap_or_default())
