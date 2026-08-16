@@ -693,8 +693,6 @@ impl Message {
             Channel::DirectMessage { .. } | Channel::Group { .. }
         );
 
-        let suppressed = self.has_suppressed_notifications();
-
         if !self.has_suppressed_notifications()
             && (is_dm_or_group || self.mentions.is_some() || self.contains_mass_push_mention())
         {
