@@ -5,4 +5,7 @@ set -e
 : "${TEST_DB:=REFERENCE}"
 export TEST_DB
 
+: "${NEXTEST_TEST_THREADS:=4}"
+export NEXTEST_TEST_THREADS
+
 cargo nextest run
