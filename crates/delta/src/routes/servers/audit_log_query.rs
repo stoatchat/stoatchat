@@ -171,7 +171,10 @@ mod test {
 
         assert_eq!(&users[0].id, &user.id);
 
-        let entry = &entries[0];
+        let entry = entries
+            .iter()
+            .find(|entry| entry.reason.as_deref() == Some("Test Reason 3"))
+            .expect("Missing channel deletion audit record");
 
         assert_eq!(entry.reason.as_deref(), Some("Test Reason 3"));
         assert_eq!(&entry.server, &server.id);
@@ -184,7 +187,10 @@ mod test {
             }
         );
 
-        let entry = &entries[1];
+        let entry = entries
+            .iter()
+            .find(|entry| entry.reason.as_deref() == Some("Test Reason 2"))
+            .expect("Missing channel description edit audit record");
 
         assert_eq!(entry.reason.as_deref(), Some("Test Reason 2"));
         assert_eq!(&entry.server, &server.id);
@@ -204,7 +210,10 @@ mod test {
             }
         );
 
-        let entry = &entries[2];
+        let entry = entries
+            .iter()
+            .find(|entry| entry.reason.as_deref() == Some("Test Reason 1"))
+            .expect("Missing channel edit audit record");
 
         assert_eq!(entry.reason.as_deref(), Some("Test Reason 1"));
         assert_eq!(&entry.server, &server.id);
