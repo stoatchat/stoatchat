@@ -34,7 +34,7 @@ revolt-result = { workspace = true }
 
 # image processing
 jxl-oxide = { workspace = true, features = ["image"] }
-image = { workspace = true }
+image = { workspace = true, features = ["avif-native"] } # AVIF decoding requires dav1d
 
 # svg rendering
 usvg = { workspace = true }

@@ -1,5 +1,5 @@
 # Build Stage
-FROM rust:1.92.0-slim-bookworm
+FROM rust:1.92.0-slim-trixie
 USER 0:0
 WORKDIR /home/rust/src
 
@@ -11,6 +11,7 @@ RUN apt-get update && \
     apt-get install -y \
     make \
     pkg-config \
+    libdav1d-dev \
     libssl-dev
 COPY scripts/build-image-layer.sh /tmp/
 

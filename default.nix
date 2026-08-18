@@ -11,6 +11,7 @@ let
       stdenv.cc.cc.lib
       zlib
       openssl.out
+      dav1d
     ];
     pathsToLink = [ "/lib" ];
   };
@@ -27,6 +28,7 @@ in pkgs.mkShell {
   buildInputs = with pkgs; [
     pkg-config
     openssl.dev
+    dav1d
   ];
 
   shellHook = ''

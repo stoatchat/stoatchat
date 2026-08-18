@@ -16,7 +16,7 @@ sha2 = { workspace = true }
 jxl-oxide = { workspace = true }
 kamadak-exif = { workspace = true }
 # revolt_little_exif = "0.5.1"
-image = { workspace = true }
+image = { workspace = true, features = ["avif-native"] } # note: avif decoding requires dav1d on the system
 thumbhash = { workspace = true }
 lcms2 = { workspace = true }
 
