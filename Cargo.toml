@@ -52,7 +52,7 @@ chrono = "0.4.15"
 iso8601-timestamp = "0.2.10"
 
 # Data Collections
-lru = "0.16.3"
+lru = "0.18.0"
 indexmap = "2.13.1"
 dashmap = "5.2.0"
 moka = "0.12.8"
