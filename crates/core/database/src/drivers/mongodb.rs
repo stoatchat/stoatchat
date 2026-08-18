@@ -157,14 +157,26 @@ impl MongoDb {
             }
         }
 
-        let query = doc! {
-            "$unset": unset,
-            "$set": if let Some(prefix) = &prefix {
-                to_document(&prefix_keys(&partial, prefix))
-            } else {
-                to_document(&partial)
-            }?
-        };
+        let set = if let Some(prefix) = &prefix {
+            to_document(&prefix_keys(&partial, prefix))
+        } else {
+            to_document(&partial)
+        }?;
+
+        // MongoDB rejects update documents where an operator (e.g. $set)
+        // is present but empty, so only include the operators we actually
+        // have data for.
+        let mut query = doc! {};
+        if !unset.is_empty() {
+            query.insert("$unset", unset);
+        }
+        if !set.is_empty() {
+            query.insert("$set", set);
+        }
+
+        if query.is_empty() {
+            return Ok(UpdateResult::default());
+        }
 
         self.col::<Document>(collection)
             .update_one(projection, query)
