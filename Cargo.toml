@@ -77,7 +77,7 @@ web-push = "0.10.0"
 revolt_a2 = "0.10"
 
 # Parsing
-logos = "0.15"
+logos = "0.16"
 
 # SVG rendering
 usvg = "0.44.0"
