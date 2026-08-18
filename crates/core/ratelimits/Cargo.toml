@@ -27,7 +27,8 @@ revolt_rocket_okapi = { workspace = true, optional = true }
 
 axum = { workspace = true, optional = true, features = ["macros"] }
 
+redis-kiss = { workspace = true }
+
 serde = { workspace = true }
-dashmap = { workspace = true }
 async-trait = { workspace = true }
 log = { workspace = true }

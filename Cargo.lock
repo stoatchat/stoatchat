@@ -7556,8 +7556,8 @@ version = "0.15.1"
 dependencies = [
  "async-trait",
  "axum",
- "dashmap",
  "log",
+ "redis-kiss",
  "revolt-config",
  "revolt-database",
  "revolt-result",

@@ -47,7 +47,7 @@ where
             let limit = storage.resolver.resolve_bucket_limit(bucket);
 
             let ratelimiter =
-                Ratelimiter::from(&storage.map, &identifier, limit, (bucket, resource));
+                Ratelimiter::from(&identifier, limit, (bucket, resource)).await;
 
             parts.extensions.insert(ratelimiter.map_err(Json));
         };

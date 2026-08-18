@@ -16,7 +16,7 @@ impl RatelimitResolver<Parts> for GifboxRatelimits {
             Some("categories") => ("categories", None),
             Some("trending") => ("trending", None),
             Some("search") => ("search", None),
-            _ => ("any", None),
+            _ => ("any_gfbx", None),
         }
     }
 
@@ -25,8 +25,7 @@ impl RatelimitResolver<Parts> for GifboxRatelimits {
             "categories" => 2,
             "trending" => 5,
             "search" => 10,
-            "any" => u32::MAX,
-            _ => unreachable!("Bucket defined but no limit set"),
+            _ => u32::MAX,
         }
     }
 }

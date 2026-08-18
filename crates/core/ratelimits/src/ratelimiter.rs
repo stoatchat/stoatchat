@@ -1,12 +1,18 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use std::ops::Add;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use redis_kiss::redis::ExistenceCheck;
+use redis_kiss::{
+    get_connection,
+    redis::{Pipeline, SetExpiry, SetOptions, aio::Connection},
+};
+use revolt_result::ToRevoltError;
 use serde::Serialize;
 
-use dashmap::DashMap;
+static IS_TEST_ENV: LazyLock<bool> = LazyLock::new(|| std::env::var("TEST_DB").is_ok());
 
 pub trait RequestKind {
     type R<'a>;
@@ -20,14 +26,12 @@ pub trait RatelimitResolver<R>: Send + Sync {
 #[derive(Clone)]
 pub struct RatelimitStorage<K: RequestKind> {
     pub resolver: Arc<dyn for<'a> RatelimitResolver<K::R<'a>>>,
-    pub map: Arc<DashMap<u64, Entry>>,
 }
 
 impl<K: RequestKind> RatelimitStorage<K> {
     pub fn new<R: for<'a> RatelimitResolver<K::R<'a>> + 'static>(resolver: R) -> Self {
         Self {
             resolver: Arc::new(resolver),
-            map: Arc::new(DashMap::new()),
         }
     }
 }
@@ -47,42 +51,60 @@ fn now() -> Duration {
 }
 
 impl Entry {
-    /// Find bucket by its key
-    pub fn from(map: &DashMap<u64, Entry>, key: u64) -> Entry {
-        map.get(&key).map(|x| *x).unwrap_or_else(|| Entry {
-            used: 0,
-            reset: now().add(Duration::from_secs(10)).as_millis(),
-        })
+    /// Find bucket by its key, and incremement its usage count
+    pub async fn from(conn: &mut Connection, now: Duration, key: u64) -> Entry {
+        let expire = now.add(Duration::from_secs(10)).as_millis();
+
+        let (used, _, reset) = Pipeline::new()
+            .incr(format!("rl:{key}:used"), 1)
+            .set_options(
+                format!("rl:{key}:reset"),
+                expire as usize,
+                SetOptions::default()
+                    .conditional_set(ExistenceCheck::NX)
+                    .with_expiration(SetExpiry::EX(10)),
+            )
+            .get(format!("rl:{key}:reset"))
+            .query_async::<_, (u32, (), u128)>(conn)
+            .await
+            .ok()
+            .unwrap_or((1, (), expire));
+
+        Entry { used, reset }
     }
 
-    /// Deduct one unit from the bucket and save
-    pub fn deduct(&mut self) {
-        let current_time = now().as_millis();
+    /// Check if the entry is expired, and reset it if so
+    pub fn is_expired(&mut self, now: Duration) {
+        let current_time = now.as_millis();
+
         if current_time > self.reset {
             self.used = 1;
-            self.reset = now().add(Duration::from_secs(10)).as_millis();
-        } else {
-            self.used += 1;
-        }
+            self.reset = now.add(Duration::from_secs(10)).as_millis();
+        };
     }
 
     /// Save information
-    pub fn save(self, map: &DashMap<u64, Entry>, key: u64) {
-        map.insert(key, self);
+    pub async fn save(self, conn: &mut Connection, key: u64) {
+        let _ = Pipeline::new()
+            .pexpire_at(format!("rl:{key}:used"), self.reset as usize)
+            .pexpire_at(format!("rl:{key}:reset"), self.reset as usize)
+            .query_async::<_, ()>(conn)
+            .await
+            .to_internal_error();
     }
 
     /// Get remaining units in the bucket
-    pub fn get_remaining(&self, limit: u32) -> u32 {
-        if now().as_millis() > self.reset {
+    pub fn get_remaining(&self, now: Duration, limit: u32) -> u32 {
+        if now.as_millis() > self.reset {
             limit
         } else {
-            limit - self.used
+            (limit + 1).saturating_sub(self.used)
         }
     }
 
     /// Get how long bucket has until reset
-    pub fn left_until_reset(&self) -> u128 {
-        let current_time = now().as_millis();
+    pub fn left_until_reset(&self, now: Duration) -> u128 {
+        let current_time = now.as_millis();
         self.reset.saturating_sub(current_time)
     }
 }
@@ -99,8 +121,7 @@ pub struct Ratelimiter {
 
 impl Ratelimiter {
     /// Generate guard from identifier and target bucket
-    pub fn from(
-        map: &DashMap<u64, Entry>,
+    pub async fn from(
         identifier: &str,
         limit: u32,
         (bucket, resource): (&str, Option<&str>),
@@ -114,10 +135,26 @@ impl Ratelimiter {
         }
 
         let key = key.finish();
-        let mut entry = Entry::from(map, key);
 
-        let remaining = entry.get_remaining(limit);
-        let reset = entry.left_until_reset();
+        if *IS_TEST_ENV {
+            return Ok(Ratelimiter {
+                key,
+                limit,
+                remaining: limit,
+                reset: 10000,
+            });
+        }
+
+        let mut conn = get_connection()
+            .await
+            .expect("Failed to get redis connection")
+            .into_inner();
+
+        let now = now();
+        let mut entry = Entry::from(&mut conn, now, key).await;
+
+        let remaining = entry.get_remaining(now, limit);
+        let reset = entry.left_until_reset(now);
         let mut ratelimiter = Ratelimiter {
             key,
             limit,
@@ -128,10 +165,9 @@ impl Ratelimiter {
             return Err(ratelimiter);
         }
 
-        entry.deduct();
-        entry.save(map, key);
+        entry.is_expired(now);
+        entry.save(&mut conn, key).await;
         ratelimiter.remaining -= 1;
-        ratelimiter.reset = entry.left_until_reset();
 
         Ok(ratelimiter)
     }

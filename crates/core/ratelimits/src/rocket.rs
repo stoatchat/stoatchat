@@ -44,7 +44,7 @@ impl<'r> FromRequest<'r> for Ratelimiter {
                 let (bucket, resource) = storage.resolver.resolve_bucket(request);
                 let limit = storage.resolver.resolve_bucket_limit(bucket);
 
-                Ratelimiter::from(&storage.map, &identifier, limit, (bucket, resource))
+                Ratelimiter::from(&identifier, limit, (bucket, resource)).await
             })
             .await;
 
