@@ -1005,9 +1005,7 @@ impl crate::User {
         P: Into<Option<&'a crate::User>>,
     {
         let perspective = perspective.into();
-        let (relationship, can_see_profile) = if self.bot.is_some() {
-            (RelationshipStatus::None, true)
-        } else if let Some(perspective) = perspective {
+        let (relationship, can_see_profile) = if let Some(perspective) = perspective {
             let mut query = DatabasePermissionQuery::new(db, perspective).user(&self);
 
             if perspective.id == self.id {
@@ -1086,9 +1084,7 @@ impl crate::User {
         P: Into<Option<&'a crate::User>>,
     {
         let perspective = perspective.into();
-        let (relationship, can_see_profile) = if self.bot.is_some() {
-            (RelationshipStatus::None, true)
-        } else if let Some(perspective) = perspective {
+        let (relationship, can_see_profile) = if let Some(perspective) = perspective {
             if perspective.id == self.id {
                 (RelationshipStatus::User, true)
             } else {

@@ -6,11 +6,7 @@ use crate::{
 
 /// Calculate permissions against a user
 pub async fn calculate_user_permissions<P: PermissionQuery>(query: &mut P) -> PermissionValue {
-    if query.are_we_privileged().await {
-        return u64::MAX.into();
-    }
-
-    if query.are_the_users_same().await {
+    if query.are_we_privileged().await || query.are_the_users_same().await {
         return u64::MAX.into();
     }
 
@@ -26,17 +22,15 @@ pub async fn calculate_user_permissions<P: PermissionQuery>(query: &mut P) -> Pe
         _ => {}
     }
 
-    if query.have_mutual_connection().await {
+    if query.have_mutual_connection().await || query.user_is_bot().await {
         permissions = UserPermission::Access as u64 + UserPermission::ViewProfile as u64;
+    };
 
-        if query.user_is_bot().await || query.are_we_a_bot().await {
-            permissions += UserPermission::SendMessage as u64;
-        }
+    if query.have_mutual_connection().await && (query.are_we_a_bot().await || query.user_is_bot().await) {
+        permissions += UserPermission::SendMessage as u64;
+    };
 
-        permissions.into()
-    } else {
-        permissions.into()
-    }
+    permissions.into()
 
     // TODO: add boolean switch for permission for users to globally message a user
     // maybe an enum?
