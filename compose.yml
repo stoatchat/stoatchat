@@ -86,3 +86,11 @@ services:
     network_mode: "host"
     volumes:
       - ./livekit.yml:/etc/livekit.yml
+
+  assets:
+    build: ./crates/services/assets
+    ports:
+      - "14707:14707"
+    volumes:
+      - ./assets-custom:/srv/assets/custom
+    restart: unless-stopped
