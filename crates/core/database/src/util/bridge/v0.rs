@@ -102,6 +102,46 @@ impl From<crate::ChannelCompositeKey> for ChannelCompositeKey {
     }
 }
 
+impl From<crate::DiscoverBan> for DiscoverBan {
+    fn from(value: crate::DiscoverBan) -> Self {
+        DiscoverBan {
+            id: value.id,
+            item_type: value.item_type.into(),
+            item_id: value.item_id,
+        }
+    }
+}
+
+impl From<crate::DiscoverRequest> for DiscoverRequest {
+    fn from(value: crate::DiscoverRequest) -> Self {
+        DiscoverRequest {
+            request_type: value.request_type.into(),
+            request_id: value.request_id,
+            status: value.status.into(),
+        }
+    }
+}
+
+impl From<crate::DiscoverRequestType> for DiscoverRequestType {
+    fn from(value: crate::DiscoverRequestType) -> Self {
+        match value {
+            crate::DiscoverRequestType::Bot => DiscoverRequestType::Bot,
+            crate::DiscoverRequestType::Server => DiscoverRequestType::Server,
+        }
+    }
+}
+
+impl From<crate::DiscoverRequestStatus> for DiscoverRequestStatus {
+    fn from(value: crate::DiscoverRequestStatus) -> Self {
+        match value {
+            crate::DiscoverRequestStatus::Approved(s) => DiscoverRequestStatus::Approved(s),
+            crate::DiscoverRequestStatus::Denied(s) => DiscoverRequestStatus::Denied(s),
+            crate::DiscoverRequestStatus::Pending => DiscoverRequestStatus::Pending,
+            crate::DiscoverRequestStatus::UnderReview => DiscoverRequestStatus::UnderReview,
+        }
+    }
+}
+
 impl From<crate::Webhook> for Webhook {
     fn from(value: crate::Webhook) -> Self {
         Webhook {

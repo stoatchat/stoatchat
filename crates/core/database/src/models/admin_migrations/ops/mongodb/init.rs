@@ -113,6 +113,10 @@ pub async fn create_database(db: &MongoDb) {
         .await
         .expect("Failed to create mfa_tickets collection.");
 
+    db.create_collection("discover_requests")
+        .await
+        .expect("Failed to create discover_requests collection");
+
     db.run_command(doc! {
         "createIndexes": "users",
         "indexes": [
@@ -413,6 +417,21 @@ pub async fn create_database(db: &MongoDb) {
     })
     .await
     .unwrap();
+
+    db.run_command(doc! {
+        "createIndexes": "discover_requests",
+        "indexes": [
+            {
+                "key": {
+                    "request_type": 1,
+                    "request_id": 1
+                },
+                "name": "request_type_id"
+            }
+        ]
+    })
+    .await
+    .expect("Failed to create discover_requests index");
 
     info!("Created database.");
 }
