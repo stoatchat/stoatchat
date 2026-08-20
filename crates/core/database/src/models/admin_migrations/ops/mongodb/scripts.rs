@@ -1499,7 +1499,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
         }
     }
 
-    if revision >= 51 {
+    if revision <= 51 {
         info!("Running migration [revision 51 / 28-11-2025]: Add audit logs collection");
 
         db.db()
@@ -1532,7 +1532,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             .expect("Failed to create audit_logs index");
     };
 
-    if revision >= 52 {
+    if revision <= 52 {
         let config = revolt_config::config().await;
         if config.production {
             info!("Running migration [revision 52 / 20-08-2026]: Discover endpoints");

@@ -30,7 +30,7 @@ impl AbstractDiscoverRequest for ReferenceDb {
         }
     }
 
-    /// Fetch emoji by their parent id
+    /// Fetch discover by item type/id combo
     async fn fetch_discover_request_by_item_id(
         &self,
         request_type: DiscoverRequestType,
@@ -44,7 +44,7 @@ impl AbstractDiscoverRequest for ReferenceDb {
             .ok_or_else(|| create_error!(NotFound))
     }
 
-    /// Update emoji with new information
+    /// Remove discover request
     async fn delete_discover_request(
         &self,
         request_type: DiscoverRequestType,
