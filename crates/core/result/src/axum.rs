@@ -12,6 +12,8 @@ impl IntoResponse for Error {
         let status = match self.error_type {
             ErrorType::LabelMe => StatusCode::INTERNAL_SERVER_ERROR,
 
+            ErrorType::ContactSupport { .. } => StatusCode::BAD_REQUEST,
+
             ErrorType::AlreadyOnboarded => StatusCode::FORBIDDEN,
 
             ErrorType::UnknownUser => StatusCode::NOT_FOUND,

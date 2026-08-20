@@ -14,6 +14,8 @@ impl<'r> Responder<'r, 'static> for Error {
         let status = match self.error_type {
             ErrorType::LabelMe => Status::InternalServerError,
 
+            ErrorType::ContactSupport { .. } => Status::BadRequest,
+
             ErrorType::AlreadyOnboarded => Status::Forbidden,
 
             ErrorType::UnknownUser => Status::NotFound,
