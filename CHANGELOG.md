@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.15.2](https://github.com/stoatchat/stoatchat/compare/v0.15.1...v0.15.2) (2026-08-24)
+
+
+### Features
+
+* implement discover endpoints ([#940](https://github.com/stoatchat/stoatchat/issues/940)) ([7930616](https://github.com/stoatchat/stoatchat/commit/793061685ddd1648dc492dab61a5544ee287c450))
+
+
+### Bug Fixes
+
+* allow spaces in role colours ([#913](https://github.com/stoatchat/stoatchat/issues/913)) ([e956de9](https://github.com/stoatchat/stoatchat/commit/e956de923ecf5849ba7d5b2b6273e355d4a2f25a))
+* audit log test failures when events sort out-of-order ([#933](https://github.com/stoatchat/stoatchat/issues/933)) ([aea1e75](https://github.com/stoatchat/stoatchat/commit/aea1e75ed050440d8fcddcabca0067469e697b53))
+* Correct parsing of relative/absolute paths in embed images & fix ImageSize being overwritten ([#930](https://github.com/stoatchat/stoatchat/issues/930)) ([365572c](https://github.com/stoatchat/stoatchat/commit/365572ccd8f1e63f435b53cbda1d550a7ab46d06))
+* deleting messages renders channels unackable until a new message is posted ([df2e140](https://github.com/stoatchat/stoatchat/commit/df2e1408a17b39e2ff27452c80e9e1ec05a2d149))
+* deleting newest message renders channels unackable until a new message is posted ([#899](https://github.com/stoatchat/stoatchat/issues/899)) ([df2e140](https://github.com/stoatchat/stoatchat/commit/df2e1408a17b39e2ff27452c80e9e1ec05a2d149))
+* internal server error when uploading AVIF ([#937](https://github.com/stoatchat/stoatchat/issues/937)) ([8e2eacb](https://github.com/stoatchat/stoatchat/commit/8e2eacb1b06797346d98757e6079d681a124dd0c))
+* joined_at is set in ms not seconds ([#900](https://github.com/stoatchat/stoatchat/issues/900)) ([ee0e65f](https://github.com/stoatchat/stoatchat/commit/ee0e65ff57ac7decd04e61480f5ee150e6d8dcc8))
+* Make SuppressNotifications actually suppress notifications ([#931](https://github.com/stoatchat/stoatchat/issues/931)) ([99b3ea1](https://github.com/stoatchat/stoatchat/commit/99b3ea140f7c35359d8f54dbf1c5376ce5749beb))
+* **permissions:** reposition channel default permissions below role overrides ([#847](https://github.com/stoatchat/stoatchat/issues/847)) ([9ab2ae9](https://github.com/stoatchat/stoatchat/commit/9ab2ae92a667946ac95e2e36cbb101c744ed26ae))
+* pin maildev version to 2.2.1 ([#896](https://github.com/stoatchat/stoatchat/issues/896)) ([f354dee](https://github.com/stoatchat/stoatchat/commit/f354dee0ce162158829f478a16a10574838ed6ee))
+* pin maildev version to 2.2.1; latest now points to 3.x ([f354dee](https://github.com/stoatchat/stoatchat/commit/f354dee0ce162158829f478a16a10574838ed6ee))
+* select specific audit log entries to fix nondeterministic sorting of audited events submitted too quickly ([aea1e75](https://github.com/stoatchat/stoatchat/commit/aea1e75ed050440d8fcddcabca0067469e697b53))
+* send relationship info for bots ([#935](https://github.com/stoatchat/stoatchat/issues/935)) ([405d9bd](https://github.com/stoatchat/stoatchat/commit/405d9bdb8c82b84364c6a9efb573bea82d5ec1fb))
+* store ratelimits in redis ([#934](https://github.com/stoatchat/stoatchat/issues/934)) ([0bce9b3](https://github.com/stoatchat/stoatchat/commit/0bce9b332e94238698ce9532ce88ca405fa177d5))
+* tell klipy that we're discordbot ([#902](https://github.com/stoatchat/stoatchat/issues/902)) ([17036d2](https://github.com/stoatchat/stoatchat/commit/17036d234ca1b1079d93c6f743ba477dbae2b0b9))
+
 ## [0.15.1](https://github.com/stoatchat/stoatchat/compare/v0.15.0...v0.15.1) (2026-08-07)
 
 
