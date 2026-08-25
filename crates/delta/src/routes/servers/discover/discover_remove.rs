@@ -43,7 +43,13 @@ pub async fn discover_remove(
 
     match ret.status {
         DiscoverRequestStatus::Approved(_) => Err(create_error!(ContactSupport {
+            locale: "discover.server_removal_approved".to_string(),
             msg: "Contact support to have your server removed from Discover".to_string()
+        })),
+        DiscoverRequestStatus::Removed(_) => Err(create_error!(ContactSupport {
+            locale: "discover.server_removal_removed".to_string(),
+            msg: "Your server has been removed from discover, contact support for more information"
+                .to_string()
         })),
         DiscoverRequestStatus::Denied(_) => Err(create_error!(NoEffect)),
         DiscoverRequestStatus::Pending | DiscoverRequestStatus::UnderReview => {

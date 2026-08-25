@@ -27,6 +27,12 @@ impl AbstractDiscoverRequest for MongoDb {
                 DiscoverRequestStatus::Approved(_)
                 | DiscoverRequestStatus::Pending
                 | DiscoverRequestStatus::UnderReview => return Err(create_error!(NoEffect)),
+                DiscoverRequestStatus::Removed(_) => {
+                    return Err(create_error!(ContactSupport {
+                        locale: "discover.removed_cannot_apply".to_string(),
+                        msg: "Your server/bot was removed from Discover. Please contact support for more information.".to_string()
+                    }))
+                }
                 _ => Ok(()),
             }?;
             self.col::<DiscoverRequest>(DISCOVER_COL).update_one(
@@ -70,6 +76,20 @@ impl AbstractDiscoverRequest for MongoDb {
         request_type: DiscoverRequestType,
         item: &str,
     ) -> Result<()> {
+        let existing = self
+            .fetch_discover_request_by_item_id(request_type.clone(), item)
+            .await?;
+        match existing.status {
+            DiscoverRequestStatus::Approved(_) | DiscoverRequestStatus::Removed(_) => {
+                Err(create_error!(ContactSupport {
+                    locale: "discover.cannot_auto_remove".to_string(), msg: "Your Discover request cannot be automatically removed, please contact Support".to_string()
+                }))
+            }
+            DiscoverRequestStatus::Denied(_) => Err(create_error!(ContactSupport {
+                locale: "discover.declined_apply_again".to_string(), msg: "Your Discover request has been declined, and cannot be removed. Please apply again instead".to_string()
+            })),
+            DiscoverRequestStatus::Pending | DiscoverRequestStatus::UnderReview => Ok(()),
+        }?;
         query!(
             self,
             delete_one,

@@ -134,6 +134,7 @@ impl From<crate::DiscoverRequestType> for DiscoverRequestType {
 impl From<crate::DiscoverRequestStatus> for DiscoverRequestStatus {
     fn from(value: crate::DiscoverRequestStatus) -> Self {
         match value {
+            crate::DiscoverRequestStatus::Removed(s) => DiscoverRequestStatus::Removed(s),
             crate::DiscoverRequestStatus::Approved(s) => DiscoverRequestStatus::Approved(s),
             crate::DiscoverRequestStatus::Denied(s) => DiscoverRequestStatus::Denied(s),
             crate::DiscoverRequestStatus::Pending => DiscoverRequestStatus::Pending,

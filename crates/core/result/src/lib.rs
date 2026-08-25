@@ -59,6 +59,7 @@ pub enum ErrorType {
 
     // ? Support Errors
     ContactSupport {
+        locale: String,
         msg: String,
     },
 

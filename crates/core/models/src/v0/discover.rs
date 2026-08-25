@@ -7,6 +7,7 @@ auto_derived!(
     pub enum DiscoverRequestStatus {
         Pending,
         UnderReview,
+        Removed(Option<String>),
         Denied(Option<String>),   // reason
         Approved(Option<String>), // reason
     }
