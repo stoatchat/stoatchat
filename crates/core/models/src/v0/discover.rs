@@ -17,6 +17,7 @@ auto_derived!(
         #[serde(rename = "type")]
         pub request_type: DiscoverRequestType,
         /// The ID of the bot/server
+        #[serde(rename = "id")]
         pub request_id: String,
         /// status of the request
         pub status: DiscoverRequestStatus,

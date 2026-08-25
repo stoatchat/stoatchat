@@ -61,7 +61,7 @@ impl AbstractDiscoverRequest for MongoDb {
             find_one,
             DISCOVER_COL,
             doc! {"request_type": bson::to_bson(&request_type).expect("failed to serialize"), "request_id": item}
-        )?.ok_or_else(|| create_database_error!("find_one", DISCOVER_COL))
+        )?.ok_or_else(|| create_error!(NotFound))
     }
 
     /// Remove discover request
@@ -85,6 +85,6 @@ impl AbstractDiscoverRequest for MongoDb {
             find_one,
             DISCOVER_BANS_COL,
             doc! {"request_type": bson::to_bson(&item_type).expect("failed to serialize"), "request_id": item}
-        )?.ok_or_else(|| create_database_error!("find_one", DISCOVER_COL)).map(|_: DiscoverBan| true)
+        )?.ok_or_else(|| create_error!(NotFound)).map(|_: DiscoverBan| true)
     }
 }

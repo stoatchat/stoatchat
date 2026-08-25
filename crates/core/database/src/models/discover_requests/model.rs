@@ -15,7 +15,6 @@ auto_derived!(
     /// Discover request
     pub struct DiscoverRequest {
         /// The type of request.
-        #[serde(rename = "type")]
         pub request_type: DiscoverRequestType,
         /// The ID of the bot/server
         pub request_id: String,
