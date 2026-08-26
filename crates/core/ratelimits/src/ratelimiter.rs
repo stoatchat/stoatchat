@@ -98,7 +98,7 @@ impl Entry {
         if now.as_millis() > self.reset {
             limit
         } else {
-            (limit + 1).saturating_sub(self.used)
+            (limit.saturating_add(1)).saturating_sub(self.used)
         }
     }
 
@@ -167,7 +167,7 @@ impl Ratelimiter {
 
         entry.is_expired(now);
         entry.save(&mut conn, key).await;
-        ratelimiter.remaining -= 1;
+        ratelimiter.remaining = ratelimiter.remaining.saturating_sub(1);
 
         Ok(ratelimiter)
     }
