@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.15.3](https://github.com/stoatchat/stoatchat/compare/v0.15.2...v0.15.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* discover errors and Removed field ([#944](https://github.com/stoatchat/stoatchat/issues/944)) ([ee4d998](https://github.com/stoatchat/stoatchat/commit/ee4d9986929def624da7b7bee9fcf383f0beb29c))
+* Minor fixes for discover routes ([#942](https://github.com/stoatchat/stoatchat/issues/942)) ([509ebbf](https://github.com/stoatchat/stoatchat/commit/509ebbfc1511a2390fe45657f634b183b0bcb573))
+* propagate NotFound instead of 500, rename fields to their proper values without affecting database insertion ([509ebbf](https://github.com/stoatchat/stoatchat/commit/509ebbfc1511a2390fe45657f634b183b0bcb573))
+* saturate ratelimits to not cause overflows ([#957](https://github.com/stoatchat/stoatchat/issues/957)) ([5b69677](https://github.com/stoatchat/stoatchat/commit/5b696776cbaf4b2fe8a4f4dc5e87efdb30415a00))
+
 ## [0.15.2](https://github.com/stoatchat/stoatchat/compare/v0.15.1...v0.15.2) (2026-08-24)
 
 
