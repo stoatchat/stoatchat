@@ -160,7 +160,7 @@ opentelemetry-appender-tracing = "0.31.1"
 lapin = "4.7.1"
 
 # Voice
-livekit-api = "=0.4.23"
+livekit-api = "=0.6.4"
 livekit-protocol = "=0.7.7"
 livekit-runtime = "0.4.0"
 
