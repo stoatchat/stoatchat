@@ -60,7 +60,7 @@ lru_time_cache = "0.11.11"
 deadqueue = "0.2.4"
 
 # Web scraping
-scraper = "0.20.0"
+scraper = "0.27.0"
 encoding_rs = "0.8.34"
 
 # Mail
