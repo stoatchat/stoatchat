@@ -72,6 +72,10 @@ auto_derived!(
             /// Whether this group is marked as not safe for work
             #[serde(skip_serializing_if = "crate::if_false", default)]
             nsfw: bool,
+
+            /// Whether this group is end-to-end encrypted
+            #[serde(skip_serializing_if = "crate::if_false", default)]
+            e2e: bool,
         },
         /// Text channel belonging to a server
         TextChannel {
@@ -115,6 +119,10 @@ auto_derived!(
             /// The channel's slowmode delay in seconds
             #[serde(skip_serializing_if = "Option::is_none")]
             slowmode: Option<u64>,
+
+            /// Whether this channel is end-to-end encrypted
+            #[serde(skip_serializing_if = "crate::if_false", default)]
+            e2e: bool,
         },
     }
 
@@ -153,6 +161,8 @@ auto_derived!(
         pub voice: Option<VoiceInformation>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub slowmode: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub e2e: Option<bool>,
     }
 
     /// Optional fields on channel object
@@ -215,6 +225,7 @@ impl Channel {
                 nsfw: data.nsfw.unwrap_or(false),
                 voice: data.voice.map(|voice| voice.into()),
                 slowmode: None,
+                e2e: data.e2e.unwrap_or(false),
             },
             v0::LegacyServerChannelType::Voice => Channel::TextChannel {
                 id: id.clone(),
@@ -228,6 +239,7 @@ impl Channel {
                 nsfw: data.nsfw.unwrap_or(false),
                 voice: Some(data.voice.unwrap_or_default().into()),
                 slowmode: None,
+                e2e: data.e2e.unwrap_or(false),
             },
         };
 
@@ -291,6 +303,7 @@ impl Channel {
             permissions: None,
 
             nsfw: data.nsfw.unwrap_or(false),
+            e2e: data.e2e.unwrap_or(false),
         };
 
         db.insert_channel(&channel).await?;
@@ -560,7 +573,7 @@ impl Channel {
                     slowmode.take();
                 }
                 _ => {}
-            }
+            },
         }
     }
 
