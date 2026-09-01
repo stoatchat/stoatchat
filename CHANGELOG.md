@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.4](https://github.com/stoatchat/stoatchat/compare/v0.15.3...v0.15.4) (2026-09-01)
+
+
+### Bug Fixes
+
+* don't write quotes to db on last_message_id ([#968](https://github.com/stoatchat/stoatchat/issues/968)) ([eb64f2f](https://github.com/stoatchat/stoatchat/commit/eb64f2f8ff46e193ff7fa854c12b60e86934ef39))
+
 ## [0.15.3](https://github.com/stoatchat/stoatchat/compare/v0.15.2...v0.15.3) (2026-08-26)
 
 
