@@ -26,7 +26,7 @@ struct MigrationInfo {
     revision: i32,
 }
 
-pub const LATEST_REVISION: i32 = 53; // MUST BE +1 to last migration
+pub const LATEST_REVISION: i32 = 54; // MUST BE +1 to last migration
 
 pub async fn migrate_database(db: &MongoDb) {
     let migrations = db.col::<Document>("migrations");
@@ -1559,6 +1559,22 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
         } else {
             info!("Skipping migration [revision 52 / 20-08-2026]: Discover endpoints");
         }
+    }
+
+    if revision <= 53 {
+        info!(
+            "Running migration [revision 53 / 30-08-2026]: [FIX] clean bad last_channel_id values"
+        );
+        db.db()
+            .collection::<Document>("channels")
+            .update_many(
+                doc! {"last_message_id": {"$regex": "\""}},
+                vec![
+                    doc! {"$set": {"last_message_id": {"$trim": {"input": "$last_message_id", "chars": "\""}}}},
+                ],
+            )
+            .await
+            .expect("Failed to clean up channels");
     }
 
     // Reminder to update LATEST_REVISION when adding new migrations.

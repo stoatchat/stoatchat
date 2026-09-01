@@ -318,7 +318,7 @@ impl AbstractChannels for MongoDb {
             .sort(doc! {"_id": -1})
             .projection(doc! {"_id": 1})
             .await
-            .map(|doc| doc.map(|d| d.get("_id").expect("Missing _id").to_string()))
+            .map(|doc| doc.map(|d| String::from(d.get_str("_id").expect("failed to get _id"))))
             .map_err(|_| create_database_error!("find_one", "messages"))
     }
 
