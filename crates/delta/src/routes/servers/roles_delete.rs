@@ -40,6 +40,10 @@ pub async fn delete(
         return Err(create_error!(NotElevated));
     }
 
+    if role.is_managed() {
+        return Err(create_error!(InvalidOperation));
+    }
+
     role.delete(db, &server.id).await?;
 
     AuditLogEntryAction::RoleDelete {

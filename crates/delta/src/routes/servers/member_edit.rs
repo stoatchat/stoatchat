@@ -175,6 +175,10 @@ pub async fn edit(
                 if role.rank <= our_ranking {
                     return Err(create_error!(NotElevated));
                 }
+
+                if role.is_managed() {
+                    return Err(create_error!(InvalidOperation));
+                }
             } else {
                 return Err(create_error!(InvalidRole));
             }

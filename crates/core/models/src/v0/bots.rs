@@ -16,6 +16,9 @@ auto_derived!(
         /// Whether the bot is public
         /// (may be invited by anyone)
         pub public: bool,
+        /// The permissions the bot will ask to have upon being invited to a server,
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+        pub default_permissions: Option<i64>,
 
         /// Whether to enable analytics
         #[cfg_attr(
@@ -124,6 +127,10 @@ auto_derived!(
         pub name: Option<String>,
         /// Whether the bot can be added by anyone
         pub public: Option<bool>,
+        /// The permissions the bot will ask to have upon being invited to a server,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub default_permissions: Option<i64>,
+
         /// Whether analytics should be gathered for this bot
         ///
         /// Must be enabled in order to show up on [Revolt Discover](https://rvlt.gg).

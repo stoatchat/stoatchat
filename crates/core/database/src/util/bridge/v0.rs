@@ -28,6 +28,7 @@ impl From<crate::Bot> for Bot {
             owner_id: value.owner,
             token: value.token,
             public: value.public,
+            default_permissions: value.default_permissions,
             analytics: value.analytics,
             discoverable: value.discoverable,
             interactions_url: value.interactions_url,
@@ -976,6 +977,7 @@ impl From<crate::Role> for Role {
             hoist: value.hoist,
             rank: value.rank,
             icon: value.icon.map(|f| f.into()),
+            owner: value.owner
         }
     }
 }
@@ -990,6 +992,7 @@ impl From<Role> for crate::Role {
             hoist: value.hoist,
             rank: value.rank,
             icon: value.icon.map(|f| f.into()),
+            owner: value.owner
         }
     }
 }
@@ -1004,6 +1007,7 @@ impl From<crate::PartialRole> for PartialRole {
             hoist: value.hoist,
             rank: value.rank,
             icon: value.icon.map(|f| f.into()),
+            owner: value.owner
         }
     }
 }
@@ -1018,6 +1022,7 @@ impl From<PartialRole> for crate::PartialRole {
             hoist: value.hoist,
             rank: value.rank,
             icon: value.icon.map(|f| f.into()),
+            owner: value.owner
         }
     }
 }
