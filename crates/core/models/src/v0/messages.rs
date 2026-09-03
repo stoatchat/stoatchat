@@ -71,6 +71,9 @@ auto_derived_partial!(
         /// Whether or not the message in pinned
         #[serde(skip_serializing_if = "crate::if_option_false")]
         pub pinned: Option<bool>,
+        /// ID of the recipient if the message is ephemeral
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub ephemeral: Option<String>,
 
         /// Bitfield of message flags
         ///
@@ -277,6 +280,8 @@ auto_derived!(
         pub masquerade: Option<Masquerade>,
         /// Information about how this message should be interacted with
         pub interactions: Option<Interactions>,
+        /// Message is temporary and only visible to a single user of the given id
+        pub ephemeral: Option<String>,
 
         /// Bitfield of message flags
         ///

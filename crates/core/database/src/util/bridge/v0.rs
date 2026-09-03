@@ -523,6 +523,7 @@ impl crate::Message {
             reactions: self.reactions,
             interactions: self.interactions.into(),
             masquerade: self.masquerade.map(Into::into),
+            ephemeral: self.ephemeral,
             flags: self.flags.unwrap_or_default(),
             pinned: self.pinned,
         }
@@ -552,6 +553,7 @@ impl From<crate::PartialMessage> for PartialMessage {
             reactions: value.reactions,
             interactions: value.interactions.map(Into::into),
             masquerade: value.masquerade.map(Into::into),
+            ephemeral: value.ephemeral,
             flags: value.flags,
             pinned: value.pinned,
         }
