@@ -8,6 +8,7 @@ members = [
     "crates/services/*",
     "crates/daemons/*",
 ]
+exclude = ["crates/services/assets"]
 
 [patch.crates-io]
 redis23 = { package = "redis", version = "0.23.3", git = "https://github.com/revoltchat/redis-rs", rev = "523b2937367e17bd0073722bf6e23d06042cb4e4" }
