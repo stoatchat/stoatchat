@@ -7275,7 +7275,7 @@ dependencies = [
  "revolt_clamav-client",
  "serde",
  "serde_json",
- "sha2 0.10.9",
+ "sha2 0.11.0",
  "simdutf8",
  "strum_macros",
  "tempfile",
