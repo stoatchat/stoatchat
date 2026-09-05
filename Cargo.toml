@@ -82,7 +82,7 @@ logos = "0.15"
 # SVG rendering
 usvg = "0.44.0"
 resvg = "0.44.0"
-tiny-skia = "0.11.4"
+tiny-skia = "0.12.0"
 
 # Logging
 log = "0.4.29"
