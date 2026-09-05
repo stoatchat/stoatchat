@@ -20,11 +20,13 @@ mod tests {
     use revolt_database::events::client::EventV1;
     use revolt_result::ErrorType;
     use rocket::http::{Header, Status};
+    use crate::util::test::PubSubTestHelper;
 
     #[rocket::async_test]
     async fn success() {
         let mut harness = TestHarness::new().await;
         let (_, session, _) = harness.new_user().await;
+        let mut pubsub = PubSubTestHelper::new(&format!("{}!", &session.user_id)).await;
 
         let res = harness.client
             .post("/auth/session/logout")
@@ -42,7 +44,7 @@ mod tests {
             ErrorType::UnknownUser
         ));
 
-        let event = harness.wait_for_event(&format!("{}!", &session.user_id), |evt| matches!(evt, EventV1::DeleteSession { .. })).await;
+        let event = pubsub.wait_for_event(|evt| matches!(evt, EventV1::DeleteSession { .. })).await;
         if let EventV1::DeleteSession {
             user_id,
             session_id,

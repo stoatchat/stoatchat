@@ -170,10 +170,12 @@ mod tests {
     use rocket::http::{ContentType, Status};
     use revolt_models::v0;
     use revolt_result::{Error, ErrorType};
+    use crate::util::test::PubSubTestHelper;
 
     #[rocket::async_test]
     async fn success() {
         let mut harness = TestHarness::new().await;
+        let mut pubsub = PubSubTestHelper::new("global").await;
 
         Account::new(
             &harness.db,
@@ -184,7 +186,7 @@ mod tests {
         .await
         .unwrap();
 
-        harness.wait_for_event("global", |_| true).await;
+        pubsub.wait_for_event(|_| true).await;
 
         let res = harness.client
             .post("/auth/session/login")
@@ -202,7 +204,7 @@ mod tests {
         assert_eq!(res.status(), Status::Ok);
         assert!(res.into_json::<v0::Session>().await.is_some());
 
-        let event = harness.wait_for_event("global", |_| true).await;
+        let event = pubsub.wait_for_event(|_| true).await;
         if !matches!(event, EventV1::CreateSession { .. }) {
             panic!("Received incorrect event type. {:?}", event);
         }

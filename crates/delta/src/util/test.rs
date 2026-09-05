@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
 use rand::Rng;
 use redis_kiss::redis::aio::PubSub;
 use revolt_database::util::email::normalise_email;
@@ -227,6 +227,7 @@ impl TestHarness {
 
 pub struct PubSubTestHelper {
     sub: PubSub,
+    event_buffer: Vec<(String, EventV1)>,
 }
 
 impl PubSubTestHelper {
@@ -239,6 +240,7 @@ impl PubSubTestHelper {
 
         PubSubTestHelper {
             sub,
+            event_buffer: vec![],
         }
     }
 
@@ -246,12 +248,34 @@ impl PubSubTestHelper {
     where
         F: Fn(&EventV1) -> bool,
     {
+        for (_, event) in &self.event_buffer {
+            if predicate(event) {
+                // does not remove from buffer
+                return event.clone();
+            }
+        }
+
         let mut stream = self.sub.on_message();
         while let Some(item) = stream.next().await {
             let msg_topic = item.get_channel_name();
             let payload: EventV1 = redis_kiss::decode_payload(&item).unwrap();
 
-            return payload;
+            if predicate(&payload) {
+                let matched = payload;
+
+                // Saw this used while chasing ghosts in the Redis stream, s/o Alice Ryhl
+                // Seems to be necessary when events on the same channel arrive too quickly
+                while let Some(Some(item)) = stream.next().now_or_never() {
+                    let msg_topic = item.get_channel_name().to_string();
+                    let payload: EventV1 = redis_kiss::decode_payload(&item).unwrap();
+
+                    self.event_buffer.push((msg_topic, payload));
+                }
+
+                return matched;
+            }
+
+            self.event_buffer.push((msg_topic.to_string(), payload));
         }
 
         // WARNING: if predicate is never satisfied, this will never return
@@ -261,6 +285,8 @@ impl PubSubTestHelper {
     }
 
     pub async fn wait_for_message(&mut self) -> v0::Message {
+        dbg!(&self.event_buffer);
+
         match self
             .wait_for_event(|event| match event {
                 EventV1::Message(v0::Message { channel, .. }) => !channel.trim().is_empty(),

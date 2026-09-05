@@ -86,7 +86,6 @@ pub async fn delete(
 
 #[cfg(test)]
 mod test {
-    use redis_kiss::redis::PubSub;
     use crate::{rocket, util::test::TestHarness};
     use revolt_database::{events::client::EventV1, Channel};
     use revolt_models::v0::DataCreateGroup;
