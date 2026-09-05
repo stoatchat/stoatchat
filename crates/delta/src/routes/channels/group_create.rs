@@ -45,11 +45,13 @@ mod test {
     use revolt_database::events::client::EventV1;
     use revolt_models::v0;
     use rocket::http::{ContentType, Header, Status};
+    use crate::util::test::PubSubTestHelper;
 
     #[rocket::async_test]
     async fn create_group() {
         let mut harness = TestHarness::new().await;
         let (_, session, user) = harness.new_user().await;
+        let mut pubsub = PubSubTestHelper::new(&format!("{}!", user.id)).await;
 
         let response = harness
             .client
@@ -79,8 +81,8 @@ mod test {
                 assert_eq!(recipients.len(), 1);
                 assert!(harness.db.fetch_channel(&id).await.is_ok());
 
-                let event = harness
-                    .wait_for_event(&format!("{}!", user.id), |event| match event {
+                let event = pubsub
+                    .wait_for_event(|event| match event {
                         EventV1::ChannelCreate(channel) => channel.id() == id,
                         _ => false,
                     })

@@ -97,6 +97,7 @@ mod test {
     };
     use revolt_models::v0::{self, SystemMessage};
     use rocket::http::{Header, Status};
+    use crate::util::test::PubSubTestHelper;
 
     #[rocket::async_test]
     async fn pin_message() {
@@ -119,6 +120,7 @@ mod test {
             .await
             .expect("Failed to create member");
         let channel = &channels[0];
+        let mut pubsub = PubSubTestHelper::new(channel.id()).await;
 
         let message = Message::create_from_api(
             &harness.db,
@@ -159,8 +161,8 @@ mod test {
         assert_eq!(response.status(), Status::NoContent);
         drop(response);
 
-        harness
-            .wait_for_event(channel.id(), |event| match event {
+        pubsub
+            .wait_for_event(|event| match event {
                 EventV1::Message(message) => match &message.system {
                     Some(SystemMessage::MessagePinned { by, .. }) => {
                         assert_eq!(by, &user.id);
@@ -173,8 +175,8 @@ mod test {
             })
             .await;
 
-        harness
-            .wait_for_event(channel.id(), |event| match event {
+        pubsub
+            .wait_for_event(|event| match event {
                 EventV1::MessageUpdate {
                     id,
                     channel: channel_id,

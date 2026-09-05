@@ -91,6 +91,7 @@ mod test {
     };
     use revolt_models::v0::{self, FieldsMessage, SystemMessage};
     use rocket::http::{Header, Status};
+    use crate::util::test::PubSubTestHelper;
 
     #[rocket::async_test]
     async fn unpin_message() {
@@ -110,6 +111,7 @@ mod test {
         .expect("Failed to create test server");
 
         let channel = &channels[0];
+        let mut pubsub = PubSubTestHelper::new(channel.id()).await;
 
         Member::create(&harness.db, &server, &user, Some(channels.clone()))
             .await
@@ -171,8 +173,8 @@ mod test {
         assert_eq!(response.status(), Status::NoContent);
         drop(response);
 
-        harness
-            .wait_for_event(channel.id(), |event| match event {
+        pubsub
+            .wait_for_event(|event| match event {
                 EventV1::Message(message) => match &message.system {
                     Some(SystemMessage::MessageUnpinned { by, .. }) => {
                         assert_eq!(by, &user.id);
@@ -185,8 +187,8 @@ mod test {
             })
             .await;
 
-        harness
-            .wait_for_event(channel.id(), |event| match event {
+        pubsub
+            .wait_for_event(|event| match event {
                 EventV1::MessageUpdate { id, clear, .. } => {
                     assert_eq!(&message.id, id);
                     assert_eq!(clear, &[FieldsMessage::Pinned]);

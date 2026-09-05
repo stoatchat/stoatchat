@@ -86,10 +86,12 @@ pub async fn delete(
 
 #[cfg(test)]
 mod test {
+    use redis_kiss::redis::PubSub;
     use crate::{rocket, util::test::TestHarness};
     use revolt_database::{events::client::EventV1, Channel};
     use revolt_models::v0::DataCreateGroup;
     use rocket::http::{Header, Status};
+    use crate::util::test::PubSubTestHelper;
 
     #[rocket::async_test]
     async fn success_delete_group() {
@@ -106,6 +108,8 @@ mod test {
         .await
         .expect("`Channel`");
 
+        let mut pubsub = PubSubTestHelper::new(group.id()).await;
+
         let response = harness
             .client
             .delete(format!("/channels/{}", group.id()))
@@ -116,8 +120,8 @@ mod test {
         assert_eq!(response.status(), Status::NoContent);
         drop(response);
 
-        harness
-            .wait_for_event(group.id(), |event| match event {
+        pubsub
+            .wait_for_event( |event| match event {
                 EventV1::ChannelDelete { id, .. } => id == group.id(),
                 _ => false,
             })
@@ -133,6 +137,7 @@ mod test {
         let mut harness = TestHarness::new().await;
         let (_, session, user) = harness.new_user().await;
         let (_, channels) = harness.new_server(&user).await;
+        let mut pubsub = PubSubTestHelper::new(channels[0].id()).await;
         let response = TestHarness::with_session(
             session,
             harness
@@ -142,8 +147,8 @@ mod test {
         .await;
         assert_eq!(response.status(), Status::NoContent);
         drop(response);
-        harness
-            .wait_for_event(channels[0].id(), |event| match event {
+        pubsub
+            .wait_for_event(|event| match event {
                 EventV1::ChannelDelete { id, .. } => id == channels[0].id(),
                 _ => false,
             })
