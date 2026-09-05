@@ -1,5 +1,5 @@
 # Build Stage
-FROM --platform="${BUILDPLATFORM}" rust:1.92.0-slim-trixie
+FROM --platform="${BUILDPLATFORM}" rust:1.98.0-slim-trixie
 USER 0:0
 WORKDIR /home/rust/src
 
