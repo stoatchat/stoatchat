@@ -53,12 +53,14 @@ mod test {
     use revolt_database::{events::client::EventV1, Channel, RelationshipStatus};
     use revolt_models::v0;
     use rocket::http::{Header, Status};
+    use crate::util::test::PubSubTestHelper;
 
     #[rocket::async_test]
     async fn success_add_member() {
         let mut harness = TestHarness::new().await;
         let (_, session, mut user) = harness.new_user().await;
         let (_, _, mut other_user) = harness.new_user().await;
+        let mut other_user_pubsub = PubSubTestHelper::new(&format!("{}!", other_user.id)).await;
 
         #[allow(clippy::disallowed_methods)]
         user.apply_relationship(
@@ -80,6 +82,7 @@ mod test {
         )
         .await
         .unwrap();
+        let mut group_pubsub = PubSubTestHelper::new(group.id()).await;
 
         let response = harness
             .client
@@ -95,15 +98,15 @@ mod test {
         assert_eq!(response.status(), Status::NoContent);
         drop(response);
 
-        harness
-            .wait_for_event(&format!("{}!", other_user.id), |event| match event {
+        other_user_pubsub
+            .wait_for_event(|event| match event {
                 EventV1::ChannelCreate(channel) => channel.id() == group.id(),
                 _ => false,
             })
             .await;
 
-        let event = harness
-            .wait_for_event(group.id(), |event| match event {
+        let event = group_pubsub
+            .wait_for_event(|event| match event {
                 EventV1::ChannelGroupJoin { id, .. } => id == group.id(),
                 _ => false,
             })
@@ -114,7 +117,7 @@ mod test {
             _ => unreachable!(),
         };
 
-        let message = harness.wait_for_message(group.id()).await;
+        let message = group_pubsub.wait_for_message().await;
 
         assert_eq!(
             message.system,

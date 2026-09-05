@@ -24,11 +24,13 @@ mod tests {
     use revolt_database::{MFATicket, events::client::EventV1};
     use revolt_result::ErrorType;
     use rocket::http::{Header, Status};
+    use crate::util::test::PubSubTestHelper;
 
     #[rocket::async_test]
     async fn success() {
         let mut harness = TestHarness::new().await;
         let (account, session, _) = harness.new_user().await;
+        let mut pubsub = PubSubTestHelper::new(&format!("{}!", &account.id)).await;
 
         let ticket = MFATicket::new(account.id.to_string(), true);
         ticket.save(&harness.db).await.unwrap();
@@ -58,7 +60,7 @@ mod tests {
             ErrorType::UnknownUser
         ));
 
-        harness.wait_for_event(&format!("{}!", &account.id), |e| if let EventV1::DeleteAllSessions { user_id, .. } = e {
+        pubsub.wait_for_event(|e| if let EventV1::DeleteAllSessions { user_id, .. } = e {
             user_id == &account.id
         } else {
             false

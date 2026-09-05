@@ -35,6 +35,7 @@ mod test {
     use crate::{rocket, util::test::TestHarness};
     use revolt_database::{events::client::EventV1, Bot};
     use rocket::http::{Header, Status};
+    use crate::util::test::PubSubTestHelper;
 
     #[rocket::async_test]
     async fn delete_bot() {
@@ -44,6 +45,7 @@ mod test {
         let (bot, _) = Bot::create(&harness.db, TestHarness::rand_string(), &user, None)
             .await
             .expect("`Bot`");
+        let mut pubsub = PubSubTestHelper::new(&bot.id).await;
 
         let response = harness
             .client
@@ -56,8 +58,8 @@ mod test {
         assert!(harness.db.fetch_bot(&bot.id).await.is_err());
         drop(response);
 
-        let event = harness
-            .wait_for_event(&bot.id, |event| match event {
+        let event = pubsub
+            .wait_for_event(|event| match event {
                 EventV1::UserUpdate { id, .. } => id == &bot.id,
                 _ => false,
             })
