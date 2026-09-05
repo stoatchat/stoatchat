@@ -4,7 +4,7 @@ pnpm = "10.28.1"
 
 gh = "2.25.0"
 
-rust = "1.92.0"
+rust = "1.98.1"
 "cargo:cargo-nextest" = "0.9.122"
 
 "github:git-town/git-town" = "22.7.1"
