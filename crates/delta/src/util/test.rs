@@ -149,6 +149,7 @@ impl TestHarness {
                 description: None,
                 nsfw: Some(false),
                 voice: None,
+                e2e: None,
             },
             true,
         )
