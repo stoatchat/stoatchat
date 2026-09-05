@@ -112,7 +112,7 @@ axum-macros = "0.4.1"
 axum_typed_multipart = "0.12.1"
 axum = "0.7.5"
 axum-extra = "0.9"
-tower-http = "0.5.2"
+tower-http = "0.7.0"
 
 # Rocket (HTTP server)
 rocket = "0.5.1"
