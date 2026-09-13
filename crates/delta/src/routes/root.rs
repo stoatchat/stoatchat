@@ -158,6 +158,7 @@ impl UserLimits {
 pub struct RevoltConfig {
     /// Stoat API Version
     pub stoat: String,
+    pub revolt: String,
     /// Features enabled on this Stoat node
     pub features: RevoltFeatures,
     /// WebSocket URL
@@ -178,6 +179,7 @@ pub async fn root() -> Result<Json<RevoltConfig>> {
 
     Ok(Json(RevoltConfig {
         stoat: env!("CARGO_PKG_VERSION").to_string(),
+        revolt: env!("CARGO_PKG_VERSION").to_string(),
         features: RevoltFeatures {
             captcha: CaptchaFeature {
                 enabled: !config.api.security.captcha.hcaptcha_key.is_empty(),
