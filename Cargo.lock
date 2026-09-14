@@ -4830,9 +4830,9 @@ dependencies = [
 
 [[package]]
 name = "livekit-protocol"
-version = "0.7.7"
+version = "0.7.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd59f3759f1a14e60b6bc6d4d415414e1aed686c8e4d2c7862542d95301cdc70"
+checksum = "a76389797ee45f81577ee00d9f8a5d816bec8f9284988374bd20cdc1119c13e4"
 dependencies = [
  "pbjson",
  "pbjson-types",
