@@ -62,9 +62,18 @@ impl<'a> Reference<'a> {
                     .into_iter()
                     .next()
                     .ok_or(create_error!(NotFound))?,
+                max_uses: None,
+                uses: 0,
+                expires: None,
             })
         } else {
-            db.fetch_invite(self.id).await
+            let invite = db.fetch_invite(self.id).await?;
+
+            if !invite.is_valid() {
+                return Err(create_error!(NotFound));
+            }
+
+            Ok(invite)
         }
     }
 

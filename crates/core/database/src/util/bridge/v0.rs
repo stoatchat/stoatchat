@@ -63,21 +63,34 @@ impl From<crate::Invite> for Invite {
                 code,
                 creator,
                 channel,
+                max_uses,
+                uses,
+                expires
             } => Invite::Group {
                 code,
                 creator,
                 channel,
+                max_uses,
+                uses,
+                expires,
+
             },
             crate::Invite::Server {
                 code,
                 server,
                 creator,
                 channel,
+                max_uses,
+                uses,
+                expires,
             } => Invite::Server {
                 code,
                 server,
                 creator,
                 channel,
+                max_uses,
+                uses,
+                expires,
             },
         }
     }

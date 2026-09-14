@@ -21,6 +21,19 @@ pub async fn join(
     user.can_acquire_server(db).await?;
 
     let invite = target.as_invite(db).await?;
+
+    if !invite.is_valid() {
+        return Err(create_error!(NotFound));
+    }
+
+    let Some(updated_invite) = db.consume_invite_use(invite.code()).await? else {
+        return Err(create_error!(InvalidOperation));
+    };
+
+    if !updated_invite.is_valid() {
+        db.delete_invite(updated_invite.code()).await?;
+    }
+
     match &invite {
         Invite::Server { server, .. } => {
             let server = db.fetch_server(server).await?;

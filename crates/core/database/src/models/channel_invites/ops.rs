@@ -19,4 +19,10 @@ pub trait AbstractChannelInvites: Sync + Send {
 
     /// Delete an invite by its id
     async fn delete_invite(&self, code: &str) -> Result<()>;
+
+    /// Atomically consume one use of an invite, returning the invite's state
+    /// *after* the increment — or `None` if it had no uses remaining (or didn't exist).
+    async fn consume_invite_use(&self, code: &str) -> Result<Option<Invite>>;
+
+    async fn fetch_expired_invites(&self) -> Result<Vec<Invite>>;
 }

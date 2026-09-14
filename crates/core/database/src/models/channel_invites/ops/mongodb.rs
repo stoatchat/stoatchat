@@ -1,4 +1,7 @@
+use bson::to_bson;
 use futures::StreamExt;
+use iso8601_timestamp::Timestamp;
+use mongodb::options::ReturnDocument;
 use revolt_result::Result;
 
 use crate::Invite;
@@ -43,5 +46,41 @@ impl AbstractChannelInvites for MongoDb {
     /// Delete an invite by its code
     async fn delete_invite(&self, code: &str) -> Result<()> {
         query!(self, delete_one_by_id, COL, code).map(|_| ())
+    }
+
+
+    /// Atomically consume one use of an invite, returning the invite's state
+    /// *after* the increment — or `None` if it had no uses remaining (or didn't exist).
+    async fn consume_invite_use(&self, code: &str) -> Result<Option<Invite>> {
+        self.col::<Invite>(COL)
+            .find_one_and_update(
+                doc! {
+                    "_id": code,
+                    "$or": [
+                        { "max_uses": null },
+                        { "$expr": { "$lt": ["$uses", "$max_uses"] } },
+                    ],
+                },
+                doc! { "$inc": { "uses": 1 } },
+            )
+            .return_document(ReturnDocument::After)
+            .await
+            .map_err(|_| create_database_error!("find_one_and_update", COL))
+    }
+
+    async fn fetch_expired_invites(&self) -> Result<Vec<Invite>> {
+        let now = to_bson(&Timestamp::now_utc())
+            .map_err(|_| create_database_error!("to_bson", COL))?;
+
+        Ok(self
+            .col::<Invite>(COL)
+            .find(doc! {
+            "expires": { "$lte": now }
+        })
+            .await
+            .map_err(|_| create_database_error!("find", COL))?
+            .filter_map(|s| async { s.ok() })
+            .collect()
+            .await)
     }
 }
