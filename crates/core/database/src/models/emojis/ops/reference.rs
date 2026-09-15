@@ -28,6 +28,15 @@ impl AbstractEmojis for ReferenceDb {
             .ok_or_else(|| create_error!(NotFound))
     }
 
+    async fn fetch_emojis(&self, ids: &[String]) -> Result<Vec<Emoji>> {
+        let emojis = self.emojis.lock().await;
+        Ok(emojis
+            .values()
+            .filter(|emoji| ids.contains(&emoji.id))
+            .cloned()
+            .collect())
+    }
+
     /// Fetch emoji by their parent id
     async fn fetch_emoji_by_parent_id(&self, parent_id: &str) -> Result<Vec<Emoji>> {
         let emojis = self.emojis.lock().await;
