@@ -52,34 +52,40 @@ impl SnapshotContent {
 
         // Collect prior context
         let prior_context = db
-            .fetch_messages(MessageQuery {
-                filter: MessageFilter {
-                    channel: Some(message.channel.to_string()),
-                    ..Default::default()
+            .fetch_messages(
+                MessageQuery {
+                    filter: MessageFilter {
+                        channel: Some(message.channel.to_string()),
+                        ..Default::default()
+                    },
+                    limit: Some(15),
+                    time_period: MessageTimePeriod::Absolute {
+                        before: Some(message.id.to_string()),
+                        after: None,
+                        sort: Some(MessageSort::Latest),
+                    },
                 },
-                limit: Some(15),
-                time_period: MessageTimePeriod::Absolute {
-                    before: Some(message.id.to_string()),
-                    after: None,
-                    sort: Some(MessageSort::Latest),
-                },
-            })
+                None,
+            )
             .await?;
 
         // Collect leading context
         let leading_context = db
-            .fetch_messages(MessageQuery {
-                filter: MessageFilter {
-                    channel: Some(message.channel.to_string()),
-                    ..Default::default()
+            .fetch_messages(
+                MessageQuery {
+                    filter: MessageFilter {
+                        channel: Some(message.channel.to_string()),
+                        ..Default::default()
+                    },
+                    limit: Some(15),
+                    time_period: MessageTimePeriod::Absolute {
+                        before: None,
+                        after: Some(message.id.to_string()),
+                        sort: Some(MessageSort::Oldest),
+                    },
                 },
-                limit: Some(15),
-                time_period: MessageTimePeriod::Absolute {
-                    before: None,
-                    after: Some(message.id.to_string()),
-                    sort: Some(MessageSort::Oldest),
-                },
-            })
+                None,
+            )
             .await?;
 
         Ok((

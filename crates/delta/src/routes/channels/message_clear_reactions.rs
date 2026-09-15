@@ -27,7 +27,9 @@ pub async fn clear_reactions(
         .throw_if_lacking_channel_permission(ChannelPermission::ManageMessages)?;
 
     // Fetch relevant message
-    let mut message = msg.as_message_in_channel(db, channel.id()).await?;
+    let mut message = msg
+        .as_message_in_channel(db, channel.id(), &user.id)
+        .await?;
 
     // Clear reactions
     message
@@ -37,7 +39,7 @@ pub async fn clear_reactions(
                 reactions: Some(Default::default()),
                 ..Default::default()
             },
-            vec![]
+            vec![],
         )
         .await
         .map(|_| EmptyResponse)

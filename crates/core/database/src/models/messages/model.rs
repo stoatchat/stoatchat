@@ -76,6 +76,9 @@ auto_derived_partial!(
         /// Whether or not the message in pinned
         #[serde(skip_serializing_if = "crate::if_option_false")]
         pub pinned: Option<bool>,
+        /// ID of the recipient if the message is ephemeral
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub ephemeral: Option<String>,
 
         /// Bitfield of message flags
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -256,6 +259,7 @@ impl Default for Message {
             reactions: Default::default(),
             interactions: Default::default(),
             masquerade: None,
+            ephemeral: None,
             flags: None,
             pinned: None,
         }
@@ -356,6 +360,8 @@ impl Message {
             MessageAuthor::System { .. } => ("00000000000000000000000000".to_string(), None),
         };
 
+        //TODO Probably check if ephemeral is a valid user ID in channel or not?
+
         // Start constructing the message
         let message_id = Ulid::new().to_string();
         let mut message = Message {
@@ -367,6 +373,7 @@ impl Message {
                 .map(|interactions| interactions.into())
                 .unwrap_or_default(),
             author: author_id,
+            ephemeral: data.ephemeral,
             webhook: webhook.map(|w| w.into()),
             flags: data.flags,
             ..Default::default()
@@ -461,7 +468,10 @@ impl Message {
                 fail_if_not_exists,
             } in entries
             {
-                match db.fetch_message(&id).await {
+                match db
+                    .fetch_message(&id, user.as_ref().map(|u| u.id.as_str()))
+                    .await
+                {
                     // Referenced message exists
                     Ok(message) => {
                         if mention && allow_mentions {
@@ -623,9 +633,11 @@ impl Message {
         db.insert_message(self).await?;
 
         // Fan out events
-        EventV1::Message(self.clone().into_model(user, member))
-            .p(self.channel.to_string())
-            .await;
+        let ev = EventV1::Message(self.clone().into_model(user, member));
+        match self.ephemeral.as_ref() {
+            Some(id) => ev.private(id.clone()).await,
+            None => ev.p(self.channel.to_string()).await,
+        }
 
         // Update last_message_id
         #[cfg(feature = "tasks")]
@@ -633,7 +645,8 @@ impl Message {
 
         // Add mentions for affected users
         #[cfg(feature = "tasks")]
-        if !mentions_elsewhere {
+        //TODO Does serde_json automatically ignore empty strings and make them None?
+        if self.ephemeral.is_none() && !mentions_elsewhere {
             if let Some(mentions) = &self.mentions {
                 tasks::ack::queue_message(
                     self.channel.to_string(),
@@ -694,7 +707,10 @@ impl Message {
         );
 
         if !self.has_suppressed_notifications()
-            && (is_dm_or_group || self.mentions.is_some() || self.contains_mass_push_mention())
+            && (is_dm_or_group
+                || self.ephemeral.is_some()
+                || self.mentions.is_some()
+                || self.contains_mass_push_mention())
         {
             // send Push notifications
             #[cfg(feature = "tasks")]
@@ -711,17 +727,21 @@ impl Message {
                             .await,
                         ),
                         self.clone(),
-                        match channel {
-                            Channel::DirectMessage { recipients, .. }
-                            | Channel::Group { recipients, .. } => recipients
-                                .iter()
-                                .filter(|uid| *uid != author.id())
-                                .cloned()
-                                .collect(),
-                            Channel::TextChannel { .. } => {
-                                self.mentions.clone().unwrap_or_default()
+                        if self.ephemeral.is_some() {
+                            vec![self.ephemeral.clone().unwrap()]
+                        } else {
+                            match channel {
+                                Channel::DirectMessage { recipients, .. }
+                                | Channel::Group { recipients, .. } => recipients
+                                    .iter()
+                                    .filter(|uid| *uid != author.id())
+                                    .cloned()
+                                    .collect(),
+                                Channel::TextChannel { .. } => {
+                                    self.mentions.clone().unwrap_or_default()
+                                }
+                                _ => vec![],
                             }
-                            _ => vec![],
                         },
                         false, // branch already dictates this
                     )],
@@ -792,14 +812,16 @@ impl Message {
         db.update_message(&self.id, &partial, remove.clone())
             .await?;
 
-        EventV1::MessageUpdate {
+        let ev = EventV1::MessageUpdate {
             id: self.id.clone(),
             channel: self.channel.clone(),
             data: partial.into(),
             clear: remove.into_iter().map(|field| field.into()).collect(),
+        };
+        match self.ephemeral.as_ref() {
+            Some(id) => ev.private(id.clone()).await,
+            None => ev.p(self.channel.clone()).await,
         }
-        .p(self.channel.clone())
-        .await;
 
         Ok(())
     }
@@ -813,7 +835,7 @@ impl Message {
         server_id: Option<&str>,
     ) -> Result<BulkMessageResponse> {
         let messages: Vec<v0::Message> = db
-            .fetch_messages(query)
+            .fetch_messages(query, Some(&perspective.id))
             .await?
             .into_iter()
             .map(|msg| msg.into_model(None, None))
@@ -958,14 +980,16 @@ impl Message {
         }
 
         // Send reaction event
-        EventV1::MessageReact {
+        let ev = EventV1::MessageReact {
             id: self.id.to_string(),
             channel_id: self.channel.to_string(),
             user_id: user.id.to_string(),
             emoji_id: emoji.to_string(),
+        };
+        match self.ephemeral.as_ref() {
+            Some(id) => ev.private(id.clone()).await,
+            None => ev.p(self.channel.to_string()).await,
         }
-        .p(self.channel.to_string())
-        .await;
 
         // Add emoji
         db.add_reaction(&self.id, emoji, &user.id).await
@@ -1046,19 +1070,26 @@ impl Message {
             }
         }
 
-        EventV1::MessageDelete {
+        let ev = EventV1::MessageDelete {
             id: self.id.clone(),
             channel: self.channel.clone(),
+        };
+        match self.ephemeral.as_ref() {
+            Some(id) => ev.private(id.clone()).await,
+            None => ev.p(self.channel.clone()).await,
         }
-        .p(self.channel.clone())
-        .await;
         Ok(())
     }
 
     /// Bulk delete messages
-    pub async fn bulk_delete(db: &Database, channel: &str, ids: Vec<String>) -> Result<()> {
+    pub async fn bulk_delete(
+        db: &Database,
+        channel: &str,
+        ids: Vec<String>,
+        user: &str,
+    ) -> Result<()> {
         let valid_ids = db
-            .fetch_messages_by_id(&ids)
+            .fetch_messages_by_id(&ids, Some(user))
             .await?
             .into_iter()
             .filter(|msg| msg.channel == channel)
@@ -1114,14 +1145,16 @@ impl Message {
         };
 
         // Send reaction event
-        EventV1::MessageUnreact {
+        let ev = EventV1::MessageUnreact {
             id: self.id.to_string(),
             channel_id: self.channel.to_string(),
             user_id: user.to_string(),
             emoji_id: emoji.to_string(),
+        };
+        match self.ephemeral.as_ref() {
+            Some(id) => ev.private(id.clone()).await,
+            None => ev.p(self.channel.to_string()).await,
         }
-        .p(self.channel.to_string())
-        .await;
 
         if empty {
             // If empty, remove the reaction entirely
@@ -1135,13 +1168,15 @@ impl Message {
     /// Remove a reaction from a message
     pub async fn clear_reaction(&self, db: &Database, emoji: &str) -> Result<()> {
         // Send reaction event
-        EventV1::MessageRemoveReaction {
+        let ev = EventV1::MessageRemoveReaction {
             id: self.id.to_string(),
             channel_id: self.channel.to_string(),
             emoji_id: emoji.to_string(),
+        };
+        match self.ephemeral.as_ref() {
+            Some(id) => ev.private(id.clone()).await,
+            None => ev.p(self.channel.to_string()).await,
         }
-        .p(self.channel.to_string())
-        .await;
 
         // Write to database
         db.clear_reaction(&self.id, emoji).await

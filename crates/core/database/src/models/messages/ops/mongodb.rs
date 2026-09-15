@@ -1,13 +1,15 @@
-use bson::{to_bson, Document};
+use bson::{to_bson, Bson, Document};
 use futures::try_join;
 use futures::StreamExt;
 use mongodb::options::FindOptions;
 use revolt_models::v0::MessageSort;
 use revolt_result::Result;
 use std::collections::{HashMap, HashSet};
+use std::time::Duration;
 use std::time::SystemTime;
 use ulid::Ulid;
 
+use crate::events::client::EventV1;
 use crate::{
     AppendMessage, DocumentId, FieldsMessage, IntoDocumentPath, Message, MessageQuery,
     MessageTimePeriod, MongoDb, PartialMessage,
@@ -17,6 +19,13 @@ use super::AbstractMessages;
 
 static COL: &str = "messages";
 
+fn filter_by_user(mut doc: Document, user: Option<&str>) -> Document {
+    if let Some(user) = user {
+        doc.insert("ephemeral", doc! {"$in": [user, Bson::Null]});
+    }
+    doc
+}
+
 #[async_trait]
 impl AbstractMessages for MongoDb {
     /// Insert a new message into the database
@@ -25,13 +34,18 @@ impl AbstractMessages for MongoDb {
     }
 
     /// Fetch a message by its id
-    async fn fetch_message(&self, id: &str) -> Result<Message> {
-        query!(self, find_one_by_id, COL, id)?.ok_or_else(|| create_error!(NotFound))
+    async fn fetch_message(&self, id: &str, user: Option<&str>) -> Result<Message> {
+        query!(self, find_one, COL, filter_by_user(doc! {"_id": id}, user))?
+            .ok_or_else(|| create_error!(NotFound))
     }
 
     /// Fetch multiple messages by given query
-    async fn fetch_messages(&self, query: MessageQuery) -> Result<Vec<Message>> {
-        let mut filter = doc! {};
+    async fn fetch_messages(
+        &self,
+        query: MessageQuery,
+        user: Option<&str>,
+    ) -> Result<Vec<Message>> {
+        let mut filter = filter_by_user(doc! {}, user);
 
         // 1. Apply message filters
         if let Some(channel) = query.filter.channel {
@@ -171,18 +185,14 @@ impl AbstractMessages for MongoDb {
     }
 
     /// Fetch multiple messages by given IDs
-    async fn fetch_messages_by_id(&self, ids: &[String]) -> Result<Vec<Message>> {
-        self.find_with_options(
-            COL,
-            doc! {
-                "_id": {
-                    "$in": ids
-                }
-            },
-            None,
-        )
-        .await
-        .map_err(|_| create_database_error!("find", COL))
+    async fn fetch_messages_by_id(
+        &self,
+        ids: &[String],
+        user: Option<&str>,
+    ) -> Result<Vec<Message>> {
+        self.find_with_options(COL, filter_by_user(doc! {"_id": {"$in": ids}}, user), None)
+            .await
+            .map_err(|_| create_database_error!("find", COL))
     }
 
     /// Update a given message with new information
@@ -418,9 +428,22 @@ impl AbstractMessages for MongoDb {
     }
 
     async fn delete_messages_by_user(&self, user_id: &str) -> Result<()> {
-        self.delete_bulk_messages(doc! {
-            "author": user_id,
-        }).await
+        self.delete_bulk_messages(doc! {"author": user_id}).await
+    }
+
+    /// Delete all expired ephemeral messages
+    async fn prune_ephemeral(&self, delay: u64) -> Result<()> {
+        let after = SystemTime::now() - Duration::from_mins(delay);
+        let threshold = Ulid::from_datetime(after).to_string();
+
+        self.delete_bulk_messages_with_events(
+            doc! {
+                "ephemeral": {"$exists": 1_i32},
+                "_id": {"$gte": threshold},
+            },
+            true,
+        )
+        .await
     }
 }
 
@@ -434,6 +457,15 @@ impl IntoDocumentPath for FieldsMessage {
 
 impl MongoDb {
     pub async fn delete_bulk_messages(&self, projection: Document) -> Result<()> {
+        self.delete_bulk_messages_with_events(projection, false)
+            .await
+    }
+
+    pub async fn delete_bulk_messages_with_events(
+        &self,
+        mut projection: Document,
+        send_event: bool,
+    ) -> Result<()> {
         let mut for_attachments = projection.clone();
         for_attachments.insert(
             "attachments",
@@ -476,11 +508,46 @@ impl MongoDb {
                 .map_err(|_| create_database_error!("update_many", "attachments"))?;
         }
 
+        //Collect deleted messages for events
+        let mut msg_del: Option<Vec<Message>> = None;
+        if send_event {
+            msg_del = Some(
+                self.find_with_options::<_, Message>(COL, projection, None)
+                    .await
+                    .map_err(|_| create_database_error!("find", "messages"))
+                    .unwrap(),
+            );
+
+            let msg_ids = msg_del
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|x| &x.id)
+                .collect::<Vec<&String>>();
+
+            projection = doc! {"_id": doc! {"$in": msg_ids}};
+        }
+
         // And then delete said messages.
-        self.col::<Document>(COL)
+        let res = self
+            .col::<Document>(COL)
             .delete_many(projection)
             .await
             .map(|_| ())
-            .map_err(|_| create_database_error!("delete_many", COL))
+            .map_err(|_| create_database_error!("delete_many", COL));
+
+        //Sent events
+        if res.is_ok() && msg_del.is_some() {
+            for msg in msg_del.unwrap() {
+                EventV1::MessageDelete {
+                    id: msg.id,
+                    channel: msg.channel.clone(),
+                }
+                .p(msg.channel)
+                .await;
+            }
+        }
+
+        res
     }
 }
