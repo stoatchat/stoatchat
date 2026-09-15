@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.6](https://github.com/stoatchat/stoatchat/compare/v0.15.5...v0.15.6) (2026-09-15)
+
+
+### Bug Fixes
+
+* **tests:** PubSub refactor in Delta test harness ([#982](https://github.com/stoatchat/stoatchat/issues/982)) ([fc5fbdc](https://github.com/stoatchat/stoatchat/commit/fc5fbdc62baa15f426f71255d9f20324a8e21ced))
+
 ## [0.15.5](https://github.com/stoatchat/stoatchat/compare/v0.15.4...v0.15.5) (2026-09-11)
 
 
