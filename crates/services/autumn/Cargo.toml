@@ -59,8 +59,14 @@ tempfile = { workspace = true }
 axum-macros = { workspace = true }
 axum_typed_multipart = { workspace = true }
 axum = { workspace = true, features = ["multipart"] }
-tower-http = { workspace = true, features = ["cors"] }
+tower-http = { workspace = true, features = ["cors", "trace"] }
 
 # OpenAPI & documentation generation
 utoipa-scalar = { workspace = true, features = ["axum"] }
 utoipa = { workspace = true, features = ["axum_extras", "ulid"] }
+
+# OpenTelemetry
+opentelemetry = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+opentelemetry-appender-tracing = { workspace = true }
