@@ -1,9 +1,10 @@
 use revolt_database::util::permissions::DatabasePermissionQuery;
 use revolt_database::{util::reference::Reference, Database, User};
-use revolt_database::{Member, AMQP};
+use revolt_database::{Member, PartialMember, PartialRole, Role, AMQP, AuditLogEntryAction};
+use revolt_database::voice::{sync_voice_permissions, VoiceClient};
 use revolt_models::v0;
 use revolt_permissions::{
-    calculate_channel_permissions, calculate_server_permissions, ChannelPermission,
+    calculate_channel_permissions, calculate_server_permissions, ChannelPermission, Override,
 };
 use revolt_result::{create_error, Result};
 use rocket::State;
@@ -11,16 +12,20 @@ use rocket::State;
 use rocket::serde::json::Json;
 use rocket_empty::EmptyResponse;
 
+use crate::util::audit_log_reason::AuditLogReason;
+
 /// # Invite Bot
 ///
 /// Invite a bot to a server or group by its id.`
 #[openapi(tag = "Bots")]
-#[post("/<target>/invite", data = "<dest>")]
+#[post("/<target>/invite?<permissions>", data = "<dest>")]
 pub async fn invite_bot(
     db: &State<Database>,
     amqp: &State<AMQP>,
     user: User,
+    reason: AuditLogReason,
     target: Reference<'_>,
+    permissions: Option<i64>,
     dest: Json<v0::InviteBotDestination>,
 ) -> Result<EmptyResponse> {
     if user.bot.is_some() {
@@ -36,16 +41,61 @@ pub async fn invite_bot(
 
     match dest.into_inner() {
         v0::InviteBotDestination::Server { server } => {
-            let server = db.fetch_server(&server).await?;
+            let mut server = db.fetch_server(&server).await?;
 
             let mut query = DatabasePermissionQuery::new(db, &user).server(&server);
-            calculate_server_permissions(&mut query)
-                .await
+            let user_permissions = calculate_server_permissions(&mut query).await;
+            user_permissions
                 .throw_if_lacking_channel_permission(ChannelPermission::ManageServer)?;
 
-            Member::create(db, &server, &bot_user, None)
-                .await
-                .map(|_| EmptyResponse)
+            let (mut member, _channels) = Member::create(db, &server, &bot_user, None).await?;
+
+            if let Some(permissions) = permissions {
+                user_permissions
+                    .throw_if_lacking_channel_permission(ChannelPermission::ManageRole)?;
+
+                let requested = Override {
+                    allow: permissions as u64,
+                    deny: 0,
+                };
+
+                user_permissions
+                    .throw_permission_override(Override::default(), &requested)
+                    .await?;
+
+                let mut role = Role::create_managed(db, &server, bot_user.username.clone(), bot_user.id.clone()).await?;
+
+                role.update(
+                    db,
+                    &server.id,
+                    PartialRole {
+                        permissions: Some(requested.into()),
+                        ..Default::default()
+                    },
+                    vec![],
+                )
+                    .await?;
+
+                AuditLogEntryAction::RoleCreate {
+                    role: role.id.clone(),
+                    name: role.name.clone(),
+                }
+                    .insert(db, server.id.clone(), reason, user.id.clone(), None)
+                    .await;
+
+                member
+                    .update(
+                        db,
+                        PartialMember {
+                            roles: Some(vec![role.id.clone()]),
+                            ..Default::default()
+                        },
+                        vec![],
+                    )
+                    .await?;
+            }
+
+            Ok(EmptyResponse)
         }
         v0::InviteBotDestination::Group { group } => {
             let mut channel = db.fetch_channel(&group).await?;
