@@ -353,7 +353,7 @@ mod tests {
                 crate::Database::Reference(_) => return,
                 crate::Database::MongoDb(_) => (),
             }
-            let owner = User::create(&db, "Server Owner".to_string(), None, None)
+            let owner = User::create(&db, "ServerOwner".to_string(), None, None)
                 .await
                 .unwrap();
 

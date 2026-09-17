@@ -3,7 +3,7 @@ extern crate log;
 
 use once_cell::sync::Lazy;
 use rand::Rng;
-use redis_kiss::{get_connection, AsyncCommands};
+use redis_kiss::{AsyncCommands, get_connection};
 use std::collections::HashSet;
 
 mod operations;
@@ -35,7 +35,7 @@ pub async fn create_session(user_id: &str, flags: u8) -> (bool, u32) {
         // A session ID is comprised of random data and any flags ORed to the end
         let session_id = {
             let mut rng = rand::thread_rng();
-            (rng.gen::<u32>() & !FLAG_BITS) | (flags as u32 & FLAG_BITS)
+            (rng.r#gen::<u32>() & !FLAG_BITS) | (flags as u32 & FLAG_BITS)
         };
 
         // Add session to user's sessions and to the region
@@ -205,8 +205,8 @@ mod tests {
         clear_region(None).await;
 
         // Generate some data we'll use:
-        let user_id = rand::thread_rng().gen::<u32>().to_string();
-        let other_id = rand::thread_rng().gen::<u32>().to_string();
+        let user_id = rand::thread_rng().r#gen::<u32>().to_string();
+        let other_id = rand::thread_rng().r#gen::<u32>().to_string();
         let flags = 1;
 
         // Create a session

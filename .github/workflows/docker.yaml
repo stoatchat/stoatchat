@@ -16,19 +16,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-slim
+    outputs:
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            docker:
+              - 'Dockerfile'
+              - '**/Dockerfile'
+              - '.dockerignore'
+              - 'scripts/build-image-layer.sh'
+              - 'scripts/publish-debug-image.sh'
+
   base:
     name: Test base image build (fork)
     runs-on: arc-runner-set
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork
+    needs: changes
+    if: github.event_name == 'pull_request' || github.event.pull_request.head.repo.fork
     steps:
       # Configure build environment
       - name: Checkout
+        if: needs.changes.outputs.docker == 'true'
         uses: actions/checkout@v3
+
       - name: Set up Docker Buildx
+        if: needs.changes.outputs.docker == 'true'
         uses: docker/setup-buildx-action@v2
 
       # Build the image
       - name: Build base image
+        if: needs.changes.outputs.docker == 'true'
         uses: docker/build-push-action@v4
         with:
           context: .
@@ -40,7 +62,7 @@ jobs:
 
   publish:
     runs-on: arc-runner-set
-    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork }}
+    if: ${{ github.event_name != 'pull_request' }}
     name: Publish Docker images
     steps:
       # Configure build environment

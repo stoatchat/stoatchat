@@ -548,7 +548,7 @@ impl Account {
         &mut self,
         db: &Database,
         response: v0::MFAResponse,
-        ticket: Option<MFATicket>,
+        ticket: Option<&mut MFATicket>,
     ) -> Result<()> {
         let allowed_methods = self.mfa.get_methods();
 
@@ -564,9 +564,14 @@ impl Account {
                 if allowed_methods.contains(&MFAMethod::Totp) {
                     if let Totp::Enabled { .. } = &self.mfa.totp_token {
                         // Use TOTP code at generation if applicable
-                        if let Some(ticket) = ticket {
-                            if let Some(code) = ticket.last_totp_code {
-                                if code == totp_code {
+                        if let Some(ref ticket) = ticket {
+                            if ticket.attempts >= 3 {
+                                db.delete_ticket(&ticket.id).await?;
+                                return Err(create_error!(InvalidToken));
+                            }
+                            if let Some(code) = &ticket.last_totp_code {
+                                if code == &totp_code {
+                                    db.delete_ticket(&ticket.id).await?;
                                     return Ok(());
                                 }
                             }
@@ -574,8 +579,20 @@ impl Account {
 
                         // Otherwise read current TOTP token
                         if self.mfa.totp_token.generate_code()? == totp_code {
+                            if let Some(ticket) = ticket {
+                                db.delete_ticket(&ticket.id).await?;
+                            }
                             Ok(())
                         } else {
+                            if let Some(ticket) = ticket {
+                                ticket.attempts += 1;
+
+                                if ticket.attempts >= 3 {
+                                    db.delete_ticket(&ticket.id).await?;
+                                } else {
+                                    db.save_ticket(ticket).await?;
+                                }
+                            }
                             Err(create_error!(InvalidToken))
                         }
                     } else {

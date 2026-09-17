@@ -1,6 +1,6 @@
 use revolt_okapi::openapi3::{SecurityScheme, SecuritySchemeData};
 use revolt_rocket_okapi::{
-    gen::OpenApiGenerator,
+    r#gen::OpenApiGenerator,
     request::{OpenApiFromRequest, RequestHeaderInput},
 };
 

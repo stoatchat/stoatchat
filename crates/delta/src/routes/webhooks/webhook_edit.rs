@@ -1,11 +1,11 @@
 use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference},
     Database, File, PartialWebhook, User,
+    util::{permissions::DatabasePermissionQuery, reference::Reference},
 };
 use revolt_models::v0::{DataEditWebhook, Webhook};
-use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
-use revolt_result::{create_error, Result};
-use rocket::{serde::json::Json, State};
+use revolt_permissions::{ChannelPermission, Override, calculate_channel_permissions};
+use revolt_result::{Result, create_error};
+use rocket::{State, serde::json::Json};
 use validator::Validate;
 
 /// # Edits a webhook
@@ -30,13 +30,34 @@ pub async fn webhook_edit(
     let channel = db.fetch_channel(&webhook.channel_id).await?;
 
     let mut query = DatabasePermissionQuery::new(db, &user).channel(&channel);
-    calculate_channel_permissions(&mut query)
-        .await
-        .throw_if_lacking_channel_permission(ChannelPermission::ManageWebhooks)?;
+    let user_permissions = calculate_channel_permissions(&mut query).await;
 
-    if data.name.is_none() && data.avatar.is_none() && data.remove.is_empty() {
+    user_permissions.throw_if_lacking_channel_permission(ChannelPermission::ManageWebhooks)?;
+
+    if data.name.is_none()
+        && data.avatar.is_none()
+        && data.permissions.is_none()
+        && data.remove.is_empty()
+    {
         return Ok(Json(webhook.into()));
     };
+
+    if let Some(new_permissions) = data.permissions {
+        let current_value = webhook.permissions;
+
+        user_permissions
+            .throw_permission_override(
+                Override {
+                    allow: current_value,
+                    deny: 0,
+                },
+                &Override {
+                    allow: new_permissions,
+                    deny: 0,
+                },
+            )
+            .await?;
+    }
 
     let DataEditWebhook {
         name,

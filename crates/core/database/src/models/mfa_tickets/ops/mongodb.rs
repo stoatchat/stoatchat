@@ -48,7 +48,13 @@ impl AbstractMFATickets for MongoDb {
 
     /// Delete ticket
     async fn delete_ticket(&self, id: &str) -> Result<()> {
-        query!(self, delete_one_by_id, COL, id).map(|_| ())
+        query!(self, delete_one_by_id, COL, id).and_then(|resp| {
+            if resp.deleted_count == 0 {
+                Err(create_error!(InvalidToken))
+            } else {
+                Ok(())
+            }
+        })
     }
 
     /// Delete all expired tickets

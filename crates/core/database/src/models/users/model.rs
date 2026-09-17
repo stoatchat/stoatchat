@@ -178,6 +178,13 @@ static BLOCKED_USERNAME_PATTERNS: Lazy<Regex> = Lazy::new(|| {
         .unwrap()
 });
 
+static USERNAME_CODEPOINT_REGEX: Lazy<Regex> = Lazy::new(|| {
+    RegexBuilder::new("^(\\p{L}|[\\d_.-])+$")
+        .case_insensitive(true)
+        .build()
+        .unwrap()
+});
+
 #[allow(clippy::derivable_impls)]
 impl Default for User {
     fn default() -> Self {
@@ -300,6 +307,12 @@ impl User {
     ///
     /// This will check if the username is a blocked name or contains a blocked pattern.
     fn validate_username(username: &str) -> Result<()> {
+        if !USERNAME_CODEPOINT_REGEX.is_match(username)
+            || !validator::validate_length(username, Some(2), Some(32), None)
+        {
+            return Err(create_error!(InvalidUsername));
+        }
+
         let username_lowercase = username.to_lowercase();
 
         const BLOCKED_USERNAMES: &[&str] = &["admin", "revolt", "stoat"];
@@ -988,6 +1001,65 @@ mod tests {
                 .await;
 
             assert!(updated_invalid_update_result.is_err());
+        });
+    }
+
+    #[tokio::test]
+    async fn remove_profile_background() {
+        use crate::{FieldsUser, File, Metadata, PartialUser, UserProfile};
+
+        database_test!(|db| async move {
+            let mut user = User::create(&db, "Test".to_string(), None, None)
+                .await
+                .unwrap();
+
+            let background = File {
+                id: "banner_id".to_string(),
+                tag: "banners".to_string(),
+                filename: "banner.png".to_string(),
+                hash: None,
+                uploaded_at: None,
+                uploader_id: Some(user.id.clone()),
+                used_for: None,
+                deleted: None,
+                reported: None,
+                metadata: Metadata::Image {
+                    width: 100,
+                    height: 100,
+                    thumbhash: None,
+                    animated: None,
+                },
+                content_type: "image/png".to_string(),
+                size: 1,
+                message_id: None,
+                user_id: None,
+                server_id: None,
+                object_id: None,
+            };
+
+            user.update(
+                &db,
+                PartialUser {
+                    profile: Some(UserProfile {
+                        background: Some(background),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+                vec![],
+            )
+            .await
+            .unwrap();
+
+            assert!(user.profile.as_ref().unwrap().background.is_some());
+
+            // Removing the banner without any other field changes used to
+            // send MongoDB an empty $set, which it rejects outright.
+            user.update(&db, PartialUser::default(), vec![FieldsUser::ProfileBackground])
+                .await
+                .unwrap();
+
+            assert!(user.profile.as_ref().unwrap().background.is_none());
         });
     }
 }

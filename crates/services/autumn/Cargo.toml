@@ -1,7 +1,7 @@
 [package]
 name = "revolt-autumn"
-version = "0.15.4"
-edition = "2021"
+version = "0.15.5"
+edition = "2024"
 license = "AGPL-3.0-or-later"
 publish = false
 
@@ -16,7 +16,9 @@ sha2 = { workspace = true }
 jxl-oxide = { workspace = true }
 kamadak-exif = { workspace = true }
 # revolt_little_exif = "0.5.1"
-image = { workspace = true, features = ["avif-native"] } # note: avif decoding requires dav1d on the system
+image = { workspace = true, features = [
+    "avif-native",
+] } # note: avif decoding requires dav1d on the system
 thumbhash = { workspace = true }
 lcms2 = { workspace = true }
 

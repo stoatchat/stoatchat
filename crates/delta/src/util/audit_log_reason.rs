@@ -1,5 +1,10 @@
-use revolt_result::{create_error, Error};
-use revolt_rocket_okapi::{OpenApiError, gen::OpenApiGenerator, request::{OpenApiFromRequest, RequestHeaderInput}, revolt_okapi::openapi3::{Parameter, ParameterValue}};
+use revolt_result::{Error, create_error};
+use revolt_rocket_okapi::{
+    OpenApiError,
+    r#gen::OpenApiGenerator,
+    request::{OpenApiFromRequest, RequestHeaderInput},
+    revolt_okapi::openapi3::{Parameter, ParameterValue},
+};
 use rocket::{
     http::Status,
     request::{FromRequest, Outcome, Request},

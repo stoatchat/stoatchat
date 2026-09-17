@@ -52,6 +52,8 @@ pub async fn kick(
         .remove(db, &server, RemovalIntention::Kick, false)
         .await?;
 
+    server.cleanup_managed_bot_role(db, &member.id.user).await?;
+
     AuditLogEntryAction::MemberKick {
         user: member.id.user.clone(),
     }

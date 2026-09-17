@@ -1,7 +1,10 @@
 use crate::{AbstractAccounts, Account, MongoDb};
 use bson::{to_bson, to_document};
-use iso8601_timestamp::Timestamp;
-use mongodb::options::{Collation, CollationStrength, FindOneOptions, UpdateOptions};
+use iso8601_timestamp::{Duration, Timestamp};
+use mongodb::options::{
+    Collation, CollationStrength, FindOneAndUpdateOptions, FindOneOptions, ReturnDocument,
+    UpdateOptions,
+};
 use revolt_result::Result;
 
 const COL: &str = "accounts";
@@ -114,5 +117,56 @@ impl AbstractAccounts for MongoDb {
             .await
             .map_err(|_| create_database_error!("find_one", COL))
             .map(|_| ())
+    }
+
+    async fn bump_lockout_count(&self, id: &str) -> Result<Account> {
+        let now = Timestamp::now_utc();
+
+        self.col::<Account>(COL)
+            .find_one_and_update(
+                doc! {
+                    "_id": id
+                },
+                vec![
+                    doc! {
+                        "$set": {
+                            "lockout.attempts": {
+                                "$add": [{ "$ifNull": ["$lockout.attempts", 0] }, 1]
+                            }
+                        }
+                    },
+                    doc! {
+                        "$set": {
+                            "lockout.expiry": {
+                                "$switch": {
+                                    "branches": [
+                                        {
+                                            "case": { "$gte": ["$lockout.attempts", 5] },
+                                            "then": to_bson(&(now + Duration::hours(1))).expect("bson time error")
+                                        },
+                                        {
+                                            "case": { "$eq": ["$lockout.attempts", 4] },
+                                            "then": to_bson(&(now + Duration::minutes(5))).expect("bson time error")
+                                        },
+                                        {
+                                            "case": { "$eq": ["$lockout.attempts", 3] },
+                                            "then": to_bson(&(now + Duration::minutes(1))).expect("bson time error")
+                                        }
+                                    ],
+                                    "default": null
+                                }
+                            }
+                        }
+                    },
+                ],
+            )
+            .with_options(
+                FindOneAndUpdateOptions::builder()
+                    .return_document(ReturnDocument::After)
+                    .build(),
+            )
+            .await
+            .map_err(|_| create_database_error!("find_one_and_update", COL))?
+            .ok_or_else(|| create_error!(UnknownUser))
     }
 }

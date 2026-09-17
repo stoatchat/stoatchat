@@ -18,7 +18,7 @@ impl<'r> Responder<'r, 'static> for CachedFile {
 
 impl revolt_rocket_okapi::response::OpenApiResponderInner for CachedFile {
     fn responses(
-        _gen: &mut revolt_rocket_okapi::gen::OpenApiGenerator,
+        _gen: &mut revolt_rocket_okapi::r#gen::OpenApiGenerator,
     ) -> std::result::Result<openapi3::Responses, revolt_rocket_okapi::OpenApiError> {
         let mut responses = schemars::Map::new();
         let mut content = schemars::Map::new();
