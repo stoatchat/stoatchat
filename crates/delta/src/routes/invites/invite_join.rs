@@ -27,11 +27,11 @@ pub async fn join(
     }
 
     let Some(updated_invite) = db.consume_invite_use(invite.code()).await? else {
-        return Err(create_error!(InvalidOperation));
+        return Err(create_error!(NotFound));
     };
 
     if !updated_invite.is_valid() {
-        db.delete_invite(updated_invite.code()).await?;
+        return Err(create_error!(NotFound));
     }
 
     match &invite {

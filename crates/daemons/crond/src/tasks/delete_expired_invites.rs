@@ -6,12 +6,7 @@ use tokio::time::sleep;
 
 pub async fn task(db: Database, _: revolt_database::AMQP) -> Result<()> {
     loop {
-        let invites = db.fetch_expired_invites().await?;
-        let count = invites.len();
-
-        for invite in invites {
-            db.delete_invite(invite.code()).await?;
-        }
+        let count = db.delete_expired_invites().await?;
 
         log::info!("Deleted {count} expired invites.");
 

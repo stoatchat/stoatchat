@@ -251,6 +251,9 @@ body_limit_size = 20_000_000
 # Leave empty to allow all users to create servers
 restrict_server_creation = []
 
+# Number of days after creation before an invite expires
+max_invite_duration_days = 30
+
 [features.limits.new_user]
 # Limits imposed on new users
 

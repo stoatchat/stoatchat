@@ -68,19 +68,24 @@ impl AbstractChannelInvites for MongoDb {
             .map_err(|_| create_database_error!("find_one_and_update", COL))
     }
 
-    async fn fetch_expired_invites(&self) -> Result<Vec<Invite>> {
+    async fn delete_expired_invites(&self) -> Result<u64> {
         let now = to_bson(&Timestamp::now_utc())
             .map_err(|_| create_database_error!("to_bson", COL))?;
 
-        Ok(self
-            .col::<Invite>(COL)
-            .find(doc! {
-            "expires": { "$lte": now }
+        self.col::<Invite>(COL)
+            .delete_many(doc! {
+            "$or": [
+                { "expires": { "$lte": now } },
+                {
+                    "$and": [
+                        { "max_uses": { "$ne": null } },
+                        { "$expr": { "$gte": ["$uses", "$max_uses"] } },
+                    ]
+                },
+            ]
         })
             .await
-            .map_err(|_| create_database_error!("find", COL))?
-            .filter_map(|s| async { s.ok() })
-            .collect()
-            .await)
+            .map(|result| result.deleted_count)
+            .map_err(|_| create_database_error!("delete_many", COL))
     }
 }

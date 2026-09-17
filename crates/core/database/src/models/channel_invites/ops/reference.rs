@@ -76,19 +76,32 @@ impl AbstractChannelInvites for ReferenceDb {
         Ok(Some(invite.clone()))
     }
 
-    async fn fetch_expired_invites(&self) -> Result<Vec<Invite>> {
-        let invites = self.channel_invites.lock().await;
+    async fn delete_expired_invites(&self) -> Result<u64> {
+        let mut invites = self.channel_invites.lock().await;
         let now = Timestamp::now_utc();
 
-        Ok(invites
-            .values()
-            .filter(|invite| {
-                let expires = match invite {
-                    Invite::Server { expires, .. } | Invite::Group { expires, .. } => expires,
+        let expired_codes: Vec<String> = invites
+            .iter()
+            .filter(|(_, invite)| {
+                let (expires, uses, max_uses) = match invite {
+                    Invite::Server { expires, uses, max_uses, .. }
+                    | Invite::Group { expires, uses, max_uses, .. } => (expires, uses, max_uses),
                 };
-                matches!(expires, Some(expires) if *expires <= now)
+
+                let is_time_expired = matches!(expires, Some(expires) if *expires <= now);
+                let is_use_exhausted = matches!(max_uses, Some(max_uses) if uses >= max_uses);
+
+                is_time_expired || is_use_exhausted
             })
-            .cloned()
-            .collect())
+            .map(|(code, _)| code.clone())
+            .collect();
+
+        let count = expired_codes.len() as u64;
+
+        for code in expired_codes {
+            invites.remove(&code);
+        }
+
+        Ok(count)
     }
 }

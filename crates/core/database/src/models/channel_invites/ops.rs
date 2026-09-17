@@ -24,5 +24,5 @@ pub trait AbstractChannelInvites: Sync + Send {
     /// *after* the increment — or `None` if it had no uses remaining (or didn't exist).
     async fn consume_invite_use(&self, code: &str) -> Result<Option<Invite>>;
 
-    async fn fetch_expired_invites(&self) -> Result<Vec<Invite>>;
+    async fn delete_expired_invites(&self) -> Result<u64>;
 }

@@ -8,7 +8,7 @@ use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
-
+use revolt_config::config;
 use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Create Invite
@@ -31,11 +31,13 @@ pub async fn create_invite(
         return Err(create_error!(IsBot));
     }
 
-    const MAX_INVITE_LIFETIME: Duration = Duration::days(30);
+    let max_invite_duration_days = Duration::days(
+        config().await.features.limits.global.max_invite_duration_days as i64,
+    );
 
     if let Some(expires) = data.expires {
         let now = Timestamp::now_utc();
-        if expires <= now || expires > now + MAX_INVITE_LIFETIME {
+        if expires <= now || expires > now + max_invite_duration_days {
             return Err(create_error!(InvalidOperation));
         }
     }
