@@ -1,4 +1,4 @@
-use crate::{Database, MFATicket, UnvalidatedTicket, ValidatedTicket};
+use crate::{Database, MFATicket, Session, UnvalidatedTicket, ValidatedTicket};
 use revolt_result::Error;
 use rocket::{
     http::Status,
@@ -39,7 +39,8 @@ impl<'r> FromRequest<'r> for ValidatedTicket {
     async fn from_request(request: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
         match request.guard::<MFATicket>().await {
             Outcome::Success(ticket) => {
-                if ticket.validated {
+                if ticket.validated && let Outcome::Success(session) = Session::from_request(request).await && session.user_id == ticket.account_id {
+
                     let db = request
                         .rocket()
                         .state::<Database>()
@@ -68,7 +69,7 @@ impl<'r> FromRequest<'r> for UnvalidatedTicket {
     async fn from_request(request: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
         match request.guard::<MFATicket>().await {
             Outcome::Success(ticket) => {
-                if !ticket.validated {
+                if !ticket.validated && let Outcome::Success(session) = Session::from_request(request).await && session.user_id == ticket.account_id {
                     Outcome::Success(UnvalidatedTicket(ticket))
                 } else {
                     Outcome::Error((Status::Forbidden, create_error!(InvalidToken)))

@@ -119,7 +119,7 @@ impl<'a> JsonSchema for Reference<'a> {
         "Id".to_string()
     }
 
-    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> Schema {
+    fn json_schema(_gen: &mut schemars::r#gen::SchemaGenerator) -> Schema {
         Schema::Object(SchemaObject {
             instance_type: Some(SingleOrVec::Single(Box::new(InstanceType::String))),
             ..Default::default()

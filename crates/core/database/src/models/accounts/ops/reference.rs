@@ -1,5 +1,5 @@
-use crate::{AbstractAccounts, Account, DeletionInfo, EmailVerification, ReferenceDb};
-use iso8601_timestamp::Timestamp;
+use crate::{AbstractAccounts, Account, DeletionInfo, EmailVerification, Lockout, ReferenceDb};
+use iso8601_timestamp::{Duration, Timestamp};
 use revolt_result::Result;
 
 #[async_trait]
@@ -95,5 +95,30 @@ impl AbstractAccounts for ReferenceDb {
         let mut accounts = self.accounts.lock().await;
         accounts.insert(account.id.to_string(), account.clone());
         Ok(())
+    }
+
+    async fn bump_lockout_count(&self, id: &str) -> Result<Account> {
+        let mut accounts = self.accounts.lock().await;
+        let account = accounts
+            .get_mut(id)
+            .ok_or_else(|| create_error!(UnknownUser))?;
+
+        let attempts = account.lockout.as_ref().map(|l| l.attempts).unwrap_or(0) + 1;
+
+        let now = Timestamp::now_utc();
+
+        let expiry = if attempts >= 5 {
+            Some(now + Duration::hours(1))
+        } else if attempts == 4 {
+            Some(now + Duration::minutes(5))
+        } else if attempts == 3 {
+            Some(now + Duration::minutes(1))
+        } else {
+            None
+        };
+
+        account.lockout = Some(Lockout { attempts, expiry });
+
+        Ok(account.clone())
     }
 }

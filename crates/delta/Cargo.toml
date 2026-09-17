@@ -1,9 +1,9 @@
 [package]
 name = "revolt-delta"
-version = "0.15.4"
+version = "0.15.5"
 license = "AGPL-3.0-or-later"
 authors = ["Paul Makles <paulmakles@gmail.com>"]
-edition = "2018"
+edition = "2024"
 publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -11,7 +11,9 @@ publish = false
 [dependencies]
 # Test
 rand = { workspace = true }
-redis-kiss = { workspace = true, default-features = false, features = ["tokio-runtime"] }
+redis-kiss = { workspace = true, default-features = false, features = [
+    "tokio-runtime",
+] }
 
 # Utility
 lru = { workspace = true }

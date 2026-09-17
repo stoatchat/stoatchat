@@ -29,6 +29,9 @@ auto_derived_partial!(
 
         /// TOTP code at time of ticket creation
         pub last_totp_code: Option<String>,
+
+        #[serde(default)]
+        pub attempts: u8,
     },
     "PartialMFATicket"
 );
@@ -53,6 +56,7 @@ impl MFATicket {
             validated,
             authorised: false,
             last_totp_code: None,
+            attempts: 0,
         }
     }
 

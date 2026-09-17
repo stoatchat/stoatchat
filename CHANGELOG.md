@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.5](https://github.com/stoatchat/stoatchat/compare/v0.15.4...v0.15.5) (2026-09-11)
+
+
+### Bug Fixes
+
+* support mp4 audio mime ([#987](https://github.com/stoatchat/stoatchat/issues/987)) ([6f68a2a](https://github.com/stoatchat/stoatchat/commit/6f68a2a0c845838734847bd43da424a655afd201))
+
 ## [0.15.4](https://github.com/stoatchat/stoatchat/compare/v0.15.3...v0.15.4) (2026-09-01)
 
 

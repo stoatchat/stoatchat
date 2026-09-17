@@ -1,7 +1,7 @@
 [package]
 name = "revolt-presence"
-version = "0.15.4"
-edition = "2021"
+version = "0.15.5"
+edition = "2024"
 license = "AGPL-3.0-or-later"
 authors = ["Paul Makles <me@insrt.uk>"]
 description = "Revolt Backend: User Presence"
@@ -26,4 +26,6 @@ rand = { workspace = true }
 once_cell = { workspace = true }
 
 # Redis
-redis-kiss = { workspace = true, default-features = false, features = ["tokio-runtime"] }
+redis-kiss = { workspace = true, default-features = false, features = [
+    "tokio-runtime",
+] }

@@ -94,6 +94,13 @@ auto_derived_partial!(
         /// Custom icon attachment
         #[serde(skip_serializing_if = "Option::is_none")]
         pub icon: Option<File>,
+        /// Id of the bot that owns this role, if it is a managed role
+        ///
+        /// Managed roles are created automatically (e.g. via bot invite) and
+        /// should be hidden from "assign role" UI and cleaned up when the
+        /// owning bot leaves the server.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub owner: Option<String>,
     },
     "PartialRole"
 );
@@ -328,6 +335,20 @@ impl Server {
         Ok(())
     }
 
+    /// Delete the managed role owned by the given bot in this server, if one exists.
+    /// No-op if the bot never had a managed role.
+    pub async fn cleanup_managed_bot_role(&self, db: &Database, bot_id: &str) -> Result<()> {
+        if let Some(role) = self
+            .roles
+            .values()
+            .find(|role| role.owner.as_deref() == Some(bot_id))
+        {
+            role.delete(db, &self.id).await?;
+        }
+
+        Ok(())
+    }
+
     /// Gets a approximate count of the members in this server
     ///
     /// this value is cached for one hour
@@ -364,11 +385,32 @@ impl Role {
             hoist: Some(self.hoist),
             rank: Some(self.rank),
             icon: self.icon,
+            owner: self.owner,
         }
     }
 
     /// Create a role
     pub async fn create(db: &Database, server: &Server, name: String) -> Result<Self> {
+        Self::create_inner(db, server, name, None).await
+    }
+
+    /// Create a role owned/managed by a bot
+    pub async fn create_managed(
+        db: &Database,
+        server: &Server,
+        name: String,
+        owner_bot_id: String,
+    ) -> Result<Self> {
+        Self::create_inner(db, server, name, Some(owner_bot_id)).await
+    }
+
+    /// Helper function to avoid code duplication between `create` and `create_managed`
+    async fn create_inner(
+        db: &Database,
+        server: &Server,
+        name: String,
+        owner: Option<String>,
+    ) -> Result<Self> {
         let role = Role {
             id: Ulid::new().to_string(),
             name,
@@ -378,6 +420,7 @@ impl Role {
             hoist: false,
             permissions: Default::default(),
             icon: None,
+            owner,
         };
 
         db.insert_role(&server.id, &role).await?;
@@ -388,10 +431,14 @@ impl Role {
             data: role.clone().into_optional().into(),
             clear: vec![],
         }
-        .p(server.id.clone())
-        .await;
+            .p(server.id.clone())
+            .await;
 
         Ok(role)
+    }
+
+    pub fn is_managed(&self) -> bool {
+        self.owner.is_some()
     }
 
     /// Update server data

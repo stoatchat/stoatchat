@@ -45,7 +45,7 @@ impl IdempotencyKey {
 
 #[cfg(feature = "rocket-impl")]
 use revolt_rocket_okapi::{
-    gen::OpenApiGenerator,
+    r#gen::OpenApiGenerator,
     request::{OpenApiFromRequest, RequestHeaderInput},
     revolt_okapi::openapi3::{Parameter, ParameterValue},
 };

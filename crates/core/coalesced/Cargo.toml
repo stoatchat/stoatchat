@@ -1,7 +1,7 @@
 [package]
 name = "revolt-coalesced"
-version = "0.15.4"
-edition = "2021"
+version = "0.15.5"
+edition = "2024"
 license = "MIT"
 authors = ["Paul Makles <me@insrt.uk>", "Zomatree <me@zomatree.live>"]
 description = "Revolt Backend: Coalescion service"

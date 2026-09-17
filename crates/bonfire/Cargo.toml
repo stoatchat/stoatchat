@@ -1,8 +1,8 @@
 [package]
 name = "revolt-bonfire"
-version = "0.15.4"
+version = "0.15.5"
 license = "AGPL-3.0-or-later"
-edition = "2021"
+edition = "2024"
 publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -14,7 +14,9 @@ sentry = { workspace = true }
 lru = { workspace = true }
 ulid = { workspace = true }
 once_cell = { workspace = true }
-redis-kiss = { workspace = true, default-features = false, features = ["tokio-runtime"] }
+redis-kiss = { workspace = true, default-features = false, features = [
+    "tokio-runtime",
+] }
 lru_time_cache = { workspace = true }
 async-channel = { workspace = true }
 

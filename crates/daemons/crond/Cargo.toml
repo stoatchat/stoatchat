@@ -1,9 +1,9 @@
 [package]
 name = "revolt-crond"
-version = "0.15.4"
+version = "0.15.5"
 license = "AGPL-3.0-or-later"
 authors = ["Paul Makles <me@insrt.uk>"]
-edition = "2021"
+edition = "2024"
 description = "Revolt Daemon Service: Timed data clean up tasks"
 publish = false
 
@@ -18,7 +18,9 @@ tokio = { workspace = true }
 futures = { workspace = true }
 
 # Redis
-redis-kiss = { workspace = true, default-features = false, features = ["tokio-runtime"] }
+redis-kiss = { workspace = true, default-features = false, features = [
+    "tokio-runtime",
+] }
 
 # RabbitMQ
 lapin = { workspace = true }

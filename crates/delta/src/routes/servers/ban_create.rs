@@ -91,6 +91,8 @@ pub async fn ban(
 
     let ban = ServerBan::create(db, &server, target.id, data.reason.clone()).await?;
 
+    server.cleanup_managed_bot_role(db, target.id).await?;
+
     AuditLogEntryAction::BanCreate {
         user: target.id.to_string(),
     }
