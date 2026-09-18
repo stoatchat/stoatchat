@@ -69,10 +69,6 @@ impl<'a> Reference<'a> {
         } else {
             let invite = db.fetch_invite(self.id).await?;
 
-            if !invite.is_valid() {
-                return Err(create_error!(NotFound));
-            }
-
             Ok(invite)
         }
     }

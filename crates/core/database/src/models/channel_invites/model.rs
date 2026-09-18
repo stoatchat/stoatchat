@@ -108,37 +108,11 @@ impl Invite {
         db.insert_invite(&invite).await?;
         Ok(invite)
     }
-
-    /// Whether this invite is still valid (not expired, under max uses)
-    pub fn is_valid(&self) -> bool {
-        let (uses, max_uses, expires) = match self {
-            Invite::Server { uses, max_uses, expires, .. }
-            | Invite::Group { uses, max_uses, expires, .. } => (uses, max_uses, expires),
-        };
-
-        if let Some(expires) = expires {
-            if *expires <= Timestamp::now_utc() {
-                return false;
-            }
-        }
-
-        if let Some(max_uses) = max_uses {
-            if uses >= max_uses {
-                return false;
-            }
-        }
-
-        true
-    }
-
+    
     /// Resolve an invite by its ID or by a public server ID
     pub async fn find(db: &Database, code: &str) -> Result<Invite> {
         if let Ok(invite) = db.fetch_invite(code).await {
-            return if invite.is_valid() {
-                Ok(invite)
-            } else {
-                Err(create_error!(NotFound))
-            };
+            return Ok(invite);
         } else if let Ok(server) = db.fetch_server(code).await {
             if server.discoverable {
                 if let Some(channel) = server.channels.into_iter().next() {
