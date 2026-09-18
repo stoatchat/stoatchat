@@ -27,10 +27,10 @@ services:
         soft: 65536
         hard: 65536
 
-  # MinIO
+  # Silo: The artist formerly known as MinIO: S3-compatible storage server
   minio:
-    image: firstfinger/minio:latest
-    #command: server /data
+    image: docker.io/pgsty/silo
+    command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioautumn
       MINIO_ROOT_PASSWORD: minioautumn
@@ -42,9 +42,9 @@ services:
       - "14010:9001"
     restart: always
 
-  # Create buckets for minio.
+  # Create buckets for Silo.
   createbuckets:
-    image: minio/mc
+    image: docker.io/pgsty/mc
     depends_on:
       - minio
     entrypoint: >
