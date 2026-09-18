@@ -12,8 +12,11 @@ use super::AbstractChannelInvites;
 static COL: &str = "channel_invites";
 
 /// Helper function for valid invite filtering
-fn valid_invite_filter(now: &bson::Bson) -> Document {
-    doc! {
+fn valid_invite_filter() -> Result<Document> {
+    let now = to_bson(&Timestamp::now_utc())
+        .map_err(|_| create_database_error!("to_bson", COL))?;
+
+    Ok(doc! {
         "$and": [
             {
                 "$or": [
@@ -28,9 +31,8 @@ fn valid_invite_filter(now: &bson::Bson) -> Document {
                 ]
             },
         ]
-    }
+    })
 }
-
 #[async_trait]
 impl AbstractChannelInvites for MongoDb {
     /// Insert a new invite into the database
@@ -40,11 +42,8 @@ impl AbstractChannelInvites for MongoDb {
 
     /// Fetch an invite by the code
     async fn fetch_invite(&self, code: &str) -> Result<Invite> {
-        let now = to_bson(&Timestamp::now_utc())
-            .map_err(|_| create_database_error!("to_bson", COL))?;
-
         let mut filter = doc! { "_id": code };
-        filter.extend(valid_invite_filter(&now));
+        filter.extend(valid_invite_filter()?);
 
         self.col::<Invite>(COL)
             .find_one(filter)
@@ -55,11 +54,8 @@ impl AbstractChannelInvites for MongoDb {
 
     /// Fetch all invites for a server
     async fn fetch_invites_for_server(&self, server_id: &str) -> Result<Vec<Invite>> {
-        let now = to_bson(&Timestamp::now_utc())
-            .map_err(|_| create_database_error!("to_bson", COL))?;
-
         let mut filter = doc! { "server": server_id };
-        filter.extend(valid_invite_filter(&now));
+        filter.extend(valid_invite_filter()?);
 
         Ok(self
             .col::<Invite>(COL)
@@ -86,11 +82,8 @@ impl AbstractChannelInvites for MongoDb {
     /// *after* the increment — or `None` if it was expired, exhausted, or
     /// didn't exist.
     async fn consume_invite_use(&self, code: &str) -> Result<Option<Invite>> {
-        let now = to_bson(&Timestamp::now_utc())
-            .map_err(|_| create_database_error!("to_bson", COL))?;
-
         let mut filter = doc! { "_id": code };
-        filter.extend(valid_invite_filter(&now));
+        filter.extend(valid_invite_filter()?);
 
         self.col::<Invite>(COL)
             .find_one_and_update(filter, doc! { "$inc": { "uses": 1 } })
