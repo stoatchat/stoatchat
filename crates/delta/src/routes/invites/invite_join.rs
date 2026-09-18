@@ -22,15 +22,7 @@ pub async fn join(
 
     let invite = target.as_invite(db).await?;
 
-    if !invite.is_valid() {
-        return Err(create_error!(NotFound));
-    }
-
-    let Some(updated_invite) = db.consume_invite_use(invite.code()).await? else {
-        return Err(create_error!(NotFound));
-    };
-
-    if !updated_invite.is_valid() {
+    if db.consume_invite_use(invite.code()).await?.is_none() {
         return Err(create_error!(NotFound));
     }
 
