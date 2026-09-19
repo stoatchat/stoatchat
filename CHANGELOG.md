@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.16.0](https://github.com/stoatchat/stoatchat/compare/v0.15.5...v0.16.0) (2026-09-19)
+
+
+### Features
+
+* bot roles with permissions upon joining a server ([#883](https://github.com/stoatchat/stoatchat/issues/883)) ([5f9e82f](https://github.com/stoatchat/stoatchat/commit/5f9e82f18caea6452f052b89009eb283a7e362af))
+* invite expiry and max use limit ([#986](https://github.com/stoatchat/stoatchat/issues/986)) ([2573699](https://github.com/stoatchat/stoatchat/commit/2573699f083d49a674ba094dac740daa2610ac74))
+* permissions to block external emojis ([#926](https://github.com/stoatchat/stoatchat/issues/926)) ([2e03051](https://github.com/stoatchat/stoatchat/commit/2e03051cc457b69659dcc05233354d202580c3b4))
+
+
+### Bug Fixes
+
+* Actually update permissions for webhooks ([#1003](https://github.com/stoatchat/stoatchat/issues/1003)) ([2825481](https://github.com/stoatchat/stoatchat/commit/282548107008768e4bcfbf67fab7eb0955508df7))
+* **compose:** Swap MinIO to Silo ([#1005](https://github.com/stoatchat/stoatchat/issues/1005)) ([eca6ffd](https://github.com/stoatchat/stoatchat/commit/eca6ffd7e4a2eb6a8468edf5ef6af605d2274423))
+* **database:** omit empty MongoDB update operators ([#872](https://github.com/stoatchat/stoatchat/issues/872)) ([fae7325](https://github.com/stoatchat/stoatchat/commit/fae732521c900f0874991075ccbc2935e224793e))
+* deduplicate role entries when editing member roles ([#1004](https://github.com/stoatchat/stoatchat/issues/1004)) ([7a51ab1](https://github.com/stoatchat/stoatchat/commit/7a51ab141a865bacfffa71ec901652c1515bda59))
+* **tests:** PubSub refactor in Delta test harness ([#982](https://github.com/stoatchat/stoatchat/issues/982)) ([fc5fbdc](https://github.com/stoatchat/stoatchat/commit/fc5fbdc62baa15f426f71255d9f20324a8e21ced))
+
 ## [0.15.5](https://github.com/stoatchat/stoatchat/compare/v0.15.4...v0.15.5) (2026-09-11)
 
 
