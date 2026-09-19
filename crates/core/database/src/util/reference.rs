@@ -70,12 +70,17 @@ impl<'a> Reference<'a> {
 
     /// Fetch message from Ref
     pub async fn as_message(&self, db: &Database) -> Result<Message> {
-        db.fetch_message(self.id).await
+        db.fetch_message(self.id, None).await
     }
 
     /// Fetch message from Ref and validate channel
-    pub async fn as_message_in_channel(&self, db: &Database, channel: &str) -> Result<Message> {
-        let msg = db.fetch_message(self.id).await?;
+    pub async fn as_message_in_channel(
+        &self,
+        db: &Database,
+        channel: &str,
+        user: &str,
+    ) -> Result<Message> {
+        let msg = db.fetch_message(self.id, Some(user)).await?;
         if msg.channel != channel {
             return Err(create_error!(NotFound));
         }

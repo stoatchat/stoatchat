@@ -44,6 +44,7 @@ async fn main() {
     join!(
         cron_task_wrapper(file_deletion::task, db.clone(), amqp.clone()),
         cron_task_wrapper(prune_dangling_files::task, db.clone(), amqp.clone()),
+        cron_task_wrapper(prune_ephemeral::task, db.clone(), amqp.clone()),
         cron_task_wrapper(prune_members::task, db.clone(), amqp.clone()),
         cron_task_wrapper(delete_accounts::task, db.clone(), amqp.clone()),
         cron_task_wrapper(acks::task, db.clone(), amqp.clone()),

@@ -431,6 +431,8 @@ pub struct FeaturesAdvanced {
     pub process_message_delay_limit: u16,
     #[serde(default)]
     pub seen_events_cache_size: u32,
+    #[serde(default)]
+    pub ephemeral_delay: u64,
 }
 
 impl Default for FeaturesAdvanced {
@@ -438,6 +440,7 @@ impl Default for FeaturesAdvanced {
         Self {
             process_message_delay_limit: 5,
             seen_events_cache_size: 20,
+            ephemeral_delay: 1800,
         }
     }
 }

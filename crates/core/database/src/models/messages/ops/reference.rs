@@ -1,7 +1,4 @@
-use crate::{
-    AppendMessage, FieldsMessage, Message, MessageQuery,
-    PartialMessage, ReferenceDb,
-};
+use crate::{AppendMessage, FieldsMessage, Message, MessageQuery, PartialMessage, ReferenceDb};
 use futures::future::try_join_all;
 use indexmap::IndexSet;
 use revolt_result::Result;
@@ -25,7 +22,7 @@ impl AbstractMessages for ReferenceDb {
     }
 
     /// Fetch a message by its id
-    async fn fetch_message(&self, id: &str) -> Result<Message> {
+    async fn fetch_message(&self, id: &str, _user: Option<&str>) -> Result<Message> {
         let messages = self.messages.lock().await;
         messages
             .get(id)
@@ -34,7 +31,11 @@ impl AbstractMessages for ReferenceDb {
     }
 
     /// Fetch multiple messages by given query
-    async fn fetch_messages(&self, query: MessageQuery) -> Result<Vec<Message>> {
+    async fn fetch_messages(
+        &self,
+        query: MessageQuery,
+        _user: Option<&str>,
+    ) -> Result<Vec<Message>> {
         let messages = self.messages.lock().await;
         let matched_messages = messages
             .values()
@@ -189,8 +190,12 @@ impl AbstractMessages for ReferenceDb {
     }
 
     /// Fetch multiple messages by given IDs
-    async fn fetch_messages_by_id(&self, ids: &[String]) -> Result<Vec<Message>> {
-        try_join_all(ids.iter().map(|id| self.fetch_message(id))).await
+    async fn fetch_messages_by_id(
+        &self,
+        ids: &[String],
+        user: Option<&str>,
+    ) -> Result<Vec<Message>> {
+        try_join_all(ids.iter().map(|id| self.fetch_message(id, user))).await
     }
 
     /// Update a given message with new information
@@ -361,5 +366,9 @@ impl AbstractMessages for ReferenceDb {
         // TODO: remove attachments as well
 
         Ok(())
+    }
+
+    async fn prune_ephemeral(&self, _delay: u64) -> Result<()> {
+        todo!()
     }
 }
