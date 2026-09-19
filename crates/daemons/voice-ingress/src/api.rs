@@ -159,16 +159,14 @@ pub async fn ingress(
                                 .collect()
                         };
 
-                        for recipient in call_recipients {
-                            EventV1::VoiceCallUpdate {
-                                initiator_id: user.id.clone(),
-                                channel_id: channel_id.clone(),
-                                started_at: Some(joined_at),
-                                ended: false,
-                            }
-                            .private(recipient)
-                            .await
+                        EventV1::VoiceCallUpdate {
+                            initiator_id: user.id.clone(),
+                            channel_id: channel_id.clone(),
+                            started_at: Some(joined_at),
+                            ended: false,
                         }
+                        .p_broadcast(call_recipients)
+                        .await
                     }
 
                     if let Err(e) = amqp

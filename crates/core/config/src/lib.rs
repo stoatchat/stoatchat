@@ -126,6 +126,7 @@ pub struct Database {
 #[derive(Deserialize, Debug, Clone)]
 pub struct RabbitQueues {
     pub acks: String,
+    pub events: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]

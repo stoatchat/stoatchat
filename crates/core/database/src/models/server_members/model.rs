@@ -185,7 +185,7 @@ impl Member {
             emojis: emojis.into_iter().map(|emoji| emoji.into()).collect(),
             voice_states,
         }
-        .private(user.id.clone())
+        .p(user.id.clone())
         .await;
 
         if let Some(id) = server

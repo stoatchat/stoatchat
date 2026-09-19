@@ -66,7 +66,7 @@ pub async fn ack_server(user: &User, server: &Server, db: &Database, amqp: &AMQP
                         user: user.id.clone(),
                         message_id: channel_last_msg,
                     }
-                    .private(user.id.clone())
+                    .p(user.id.clone())
                     .await;
                 }
             }
