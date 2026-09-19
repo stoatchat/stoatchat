@@ -95,7 +95,11 @@ mod test {
             session,
             harness
                 .client
-                .post(format!("/channels/{}/invites", group.id())),
+                .post(format!("/channels/{}/invites", group.id()))
+                .json(&DataCreateInvite {
+                    max_uses: None,
+                    expires: None,
+                }),
         )
         .await;
         assert_eq!(create_response.status(), Status::Ok);
