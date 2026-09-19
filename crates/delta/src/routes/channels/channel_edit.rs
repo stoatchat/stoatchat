@@ -47,6 +47,7 @@ pub async fn edit(
         && data.voice.is_none()
         && data.slowmode.is_none()
         && data.remove.is_empty()
+        && data.e2e.is_none()
     {
         return Ok(Json(channel.into()));
     }
@@ -104,6 +105,7 @@ pub async fn edit(
             description,
             icon,
             nsfw,
+            e2e,
             ..
         } => {
             if data.remove.contains(&v0::FieldsChannel::Icon) {
@@ -142,6 +144,11 @@ pub async fn edit(
             if let Some(new_nsfw) = data.nsfw {
                 *nsfw = new_nsfw;
                 partial.nsfw = Some(new_nsfw);
+            }
+
+            if let Some(new_e2e) = data.e2e {
+                *e2e = new_e2e;
+                partial.e2e = Some(new_e2e);
             }
 
             // Send out mutation system messages.
@@ -208,6 +215,7 @@ pub async fn edit(
             nsfw,
             voice,
             slowmode,
+            e2e,
             ..
         } => {
             if data.remove.contains(&v0::FieldsChannel::Icon) {
@@ -254,6 +262,11 @@ pub async fn edit(
                 partial.nsfw = Some(new_nsfw);
             }
 
+            if let Some(new_e2e) = data.e2e {
+                *e2e = new_e2e;
+                partial.e2e = Some(new_e2e);
+            }
+
             if let Some(new_voice) = data.voice {
                 *voice = Some(new_voice.clone().into());
                 partial.voice = Some(new_voice.into());
@@ -291,7 +304,13 @@ pub async fn edit(
             before,
             after: partial,
         }
-        .insert(db, channel.server().unwrap().to_string(), reason, user.id, None)
+        .insert(
+            db,
+            channel.server().unwrap().to_string(),
+            reason,
+            user.id,
+            None,
+        )
         .await;
     };
 
