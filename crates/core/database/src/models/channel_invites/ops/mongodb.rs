@@ -1,6 +1,5 @@
-use bson::{to_bson, Document};
+use bson::{Document};
 use futures::StreamExt;
-use iso8601_timestamp::Timestamp;
 use mongodb::options::ReturnDocument;
 use revolt_result::Result;
 
@@ -13,8 +12,7 @@ static COL: &str = "channel_invites";
 
 /// Helper function for valid invite filtering
 fn valid_invite_filter() -> Result<Document> {
-    let now = to_bson(&Timestamp::now_utc())
-        .map_err(|_| create_database_error!("to_bson", COL))?;
+    let now = bson::DateTime::now().timestamp_millis();
 
     Ok(doc! {
         "$and": [
@@ -93,8 +91,7 @@ impl AbstractChannelInvites for MongoDb {
     }
 
     async fn delete_expired_invites(&self) -> Result<u64> {
-        let now = to_bson(&Timestamp::now_utc())
-            .map_err(|_| create_database_error!("to_bson", COL))?;
+        let now = bson::DateTime::now().timestamp_millis();
 
         self.col::<Invite>(COL)
             .delete_many(doc! {
