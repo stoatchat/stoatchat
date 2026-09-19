@@ -6,6 +6,7 @@ use revolt_models::v0;
 use revolt_permissions::{
     calculate_channel_permissions, ChannelPermission, DEFAULT_WEBHOOK_PERMISSIONS,
 };
+use crate::routes::channels::webhook_fetch_all::fetch_webhooks;
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 use ulid::Ulid;
@@ -73,4 +74,129 @@ pub async fn create_webhook(
     };
 
     Ok(Json(webhook.into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;#[cfg(test)]
+mod test {
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_database::{Member, Server};
+    use revolt_models::v0;
+    use rocket::http::{Header, Status};
+
+    #[rocket::async_test]
+    async fn create_webhook_success() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+
+        let (server, channels) = Server::create(
+            &harness.db,
+            v0::DataCreateServer {
+                name: "Test Server".to_string(),
+                ..Default::default()
+            },
+            &user,
+            true,
+        )
+        .await
+        .expect("Failed to create test server");
+
+        let (_, channels) = Member::create(&harness.db, &server, &user, Some(channels))
+            .await
+            .expect("Failed to create member");
+        let channel = &channels[0];
+
+        let response = harness
+            .client
+            .post(format!("/channels/{}/webhooks", channel.id()))
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .json(&v0::CreateWebhookBody {
+                name: "Test Webhook".to_string(),
+                avatar: None,
+            })
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Ok);
+
+        let webhook: v0::Webhook = response.into_json().await.unwrap();
+        assert_eq!(webhook.name, "Test Webhook");
+        assert_eq!(webhook.channel_id, channel.id());
+    }
+
+    #[rocket::async_test]
+    async fn create_webhook_unauthorized() {
+        let harness = TestHarness::new().await;
+        let (_, owner_session, owner_user) = harness.new_user().await;
+        let (_, unpriv_session, _) = harness.new_user().await;
+
+        let (server, channels) = Server::create(
+            &harness.db,
+            v0::DataCreateServer {
+                name: "Test Server".to_string(),
+                ..Default::default()
+            },
+            &owner_user,
+            true,
+        )
+        .await
+        .expect("Failed to create test server");
+
+        let (_, channels) = Member::create(&harness.db, &server, &owner_user, Some(channels))
+            .await
+            .expect("Failed to create member");
+        let channel = &channels[0];
+
+        let response = harness
+            .client
+            .post(format!("/channels/{}/webhooks", channel.id()))
+            .header(Header::new("x-session-token", unpriv_session.token.to_string()))
+            .json(&v0::CreateWebhookBody {
+                name: "Unauthorized Webhook".to_string(),
+                avatar: None,
+            })
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Forbidden);
+    }
+}
+
+    use revolt_database::util::reference::Reference;
+    use rocket::State;
+
+    #[tokio::test]
+    async fn test_fetch_webhooks_permission_denied() {
+        let harness = crate::util::test::TestHarness::new().await;
+        let (_, _session, user) = harness.new_user().await;
+
+        let result = fetch_webhooks(
+            State::from(&harness.db),
+            user,
+            Reference::from_unchecked("01ARZ3NDEKTSV4RRFFQ69G5FAV"),
+        )
+        .await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_fetch_webhooks_success() {
+        let harness = crate::util::test::TestHarness::new().await;
+        let (_, _session, user) = harness.new_user().await;
+        let (server, _) = harness.new_server(&user).await;
+        let channel = harness.new_channel(&server).await;
+
+        let result = fetch_webhooks(
+            State::from(&harness.db),
+            user,
+            Reference::from_unchecked(&channel.id()),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let Json(webhooks) = result.unwrap();
+        assert_eq!(webhooks.len(), 0);
+    }
 }
