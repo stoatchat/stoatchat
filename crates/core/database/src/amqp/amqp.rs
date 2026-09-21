@@ -6,8 +6,8 @@ use std::{
 use crate::User;
 use crate::events::{client::EventV1, rabbit::*};
 use lapin::{
-    BasicProperties, Channel, Connection, ConnectionProperties, Error as AMQPError, ExchangeKind,
-    options::{BasicPublishOptions, ExchangeDeclareOptions},
+    BasicProperties, Channel, Connection, ConnectionProperties, Error as AMQPError,
+    options::BasicPublishOptions,
     protocol::basic::AMQPProperties,
     types::{AMQPValue, FieldTable},
 };
@@ -76,26 +76,6 @@ impl AMQP {
             .await
             .expect("Failed to connect to RabbitMQ"),
         );
-
-        #[cfg(test)]
-        let channel = connection
-            .create_channel()
-            .await
-            .expect("Failed to open channel for test exchange");
-
-        #[cfg(test)]
-        channel
-            .exchange_declare(
-                "revolt.default".into(),
-                ExchangeKind::Topic,
-                ExchangeDeclareOptions {
-                    durable: true,
-                    ..Default::default()
-                },
-                FieldTable::default(),
-            )
-            .await
-            .expect("Failed to declare test exchange");
 
         Self::new(connection).await
     }
