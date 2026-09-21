@@ -129,6 +129,7 @@ impl Webhook {
 #[cfg(test)]
 mod tests {
     use crate::{FieldsWebhook, PartialWebhook, Webhook};
+    use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
 
     #[tokio::test]
     async fn crud() {

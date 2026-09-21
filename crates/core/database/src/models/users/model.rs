@@ -972,6 +972,7 @@ mod tests {
     #[tokio::test]
     async fn create_user() {
         use revolt_result::Result;
+        use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
 
         database_test!(|db| async move {
             let mut created_clean = User::create(&db, "Test".to_string(), None, None)
@@ -1007,6 +1008,7 @@ mod tests {
     #[tokio::test]
     async fn remove_profile_background() {
         use crate::{FieldsUser, File, Metadata, PartialUser, UserProfile};
+        use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
 
         database_test!(|db| async move {
             let mut user = User::create(&db, "Test".to_string(), None, None)

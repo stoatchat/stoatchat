@@ -538,6 +538,7 @@ impl SystemMessageChannels {
 mod tests {
     use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 
+    use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
     use crate::{fixture, util::permissions::DatabasePermissionQuery};
 
     #[tokio::test]

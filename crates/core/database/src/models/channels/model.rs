@@ -903,7 +903,7 @@ impl IntoDocumentPath for FieldsChannel {
 #[cfg(test)]
 mod tests {
     use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
-
+    use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
     use crate::{fixture, util::permissions::DatabasePermissionQuery};
 
     #[tokio::test]

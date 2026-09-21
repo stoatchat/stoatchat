@@ -176,7 +176,9 @@ impl Bot {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Bot, FieldsBot, PartialBot, User};
+
+use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
+use crate::{Bot, FieldsBot, PartialBot, User};
 
     #[tokio::test]
     async fn crud() {
