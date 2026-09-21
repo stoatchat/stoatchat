@@ -1,10 +1,6 @@
 use std::time::Duration;
 
 use futures::{FutureExt, StreamExt};
-use lapin::{
-    ExchangeKind, options::ExchangeDeclareOptions, protocol::basic::AMQPProperties,
-    types::FieldTable,
-};
 use rand::Rng;
 use redis_kiss::redis::aio::PubSub;
 use revolt_database::util::email::normalise_email;
@@ -40,19 +36,6 @@ impl TestHarness {
             .clone();
 
         let amqp = AMQP::new_auto().await;
-        let channel = amqp.connection().create_channel().await.expect("channel");
-        channel
-            .exchange_declare(
-                "revolt.default".into(),
-                ExchangeKind::Topic,
-                ExchangeDeclareOptions {
-                    durable: true,
-                    ..Default::default()
-                },
-                FieldTable::default(),
-            )
-            .await
-            .expect("Failed to declare test exchange");
         TestHarness { client, db, amqp }
     }
 
