@@ -7,6 +7,7 @@ use revolt_models::v0::{
 };
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission, PermissionValue};
 use revolt_result::{ErrorType, Result};
+use std::str::FromStr;
 use std::time::SystemTime;
 use std::{collections::HashSet, hash::RandomState};
 use ulid::Ulid;
@@ -968,7 +969,13 @@ impl Message {
     }
 
     /// Add a reaction to a message
-    pub async fn add_reaction(&self, db: &Database, user: &User, emoji: &str) -> Result<()> {
+    pub async fn add_reaction(
+        &self,
+        db: &Database,
+        user: &User,
+        channel: &Channel,
+        emoji: &str,
+    ) -> Result<()> {
         // Check how many reactions are already on the message
         let config = config().await;
         if self.reactions.len() >= config.features.limits.global.message_reactions
@@ -985,6 +992,27 @@ impl Message {
         // Check if the emoji is usable by us
         if !Emoji::can_use(db, emoji).await? {
             return Err(create_error!(InvalidOperation));
+        }
+
+        // Validate external emoji usage
+        if let (Ok(_), Some(server_id)) = (Ulid::from_str(emoji), channel.server()) {
+            if let Ok(resolved) = db.fetch_emoji(emoji).await {
+                let is_foreign = matches!(
+                    &resolved.parent,
+                    EmojiParent::Server { id } if id.as_str() != server_id
+                );
+
+                if is_foreign {
+                    let mut query = DatabasePermissionQuery::new(db, user).channel(channel);
+                    let perms = calculate_channel_permissions(&mut query).await;
+
+                    if !perms.has_channel_permission(ChannelPermission::UseExternalEmojis) {
+                        return Err(create_error!(MissingPermission {
+                            permission: ChannelPermission::UseExternalEmojis.to_string()
+                        }));
+                    }
+                }
+            }
         }
 
         // Send reaction event
