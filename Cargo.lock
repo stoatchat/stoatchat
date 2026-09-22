@@ -2676,6 +2676,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "erltf"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4882da31a311a37fbc2a1cefd6162decd3fce8d2339d275465dd820e849db3e"
+dependencies = [
+ "bytes",
+ "flate2",
+ "log",
+ "nom 8.0.0",
+ "serde",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "erltf_serde"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c208fe76b4a4045f30caf1dabc7c1ad4cf297bcb47e1b97bb250ebd44a9e817"
+dependencies = [
+ "erltf",
+ "erltf_serde_derive",
+ "serde",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "erltf_serde_derive"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4d2b684bfcc1ec8f801c0793f529fd60a138cd42e323f4f0cb8ba20f80eab3b"
+dependencies = [
+ "proc-macro2",
+ "quote 1.0.46",
+ "syn 2.0.118",
+]
+
+[[package]]
 name = "errno"
 version = "0.3.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7381,6 +7418,7 @@ dependencies = [
  "bson",
  "deadqueue",
  "decancer",
+ "erltf_serde",
  "futures",
  "handlebars",
  "indexmap 2.14.0",

@@ -1,9 +1,9 @@
 use std::{collections::HashSet, str::FromStr, time::Duration};
 
 use crate::{
+    AMQP, Database, File, RatelimitEvent,
     events::client::EventV1,
     util::email::{email_templates, send_email},
-    Database, File, RatelimitEvent, AMQP,
 };
 
 use futures::future::join_all;
@@ -11,10 +11,10 @@ use iso8601_timestamp::Timestamp;
 use once_cell::sync::Lazy;
 use rand::seq::SliceRandom;
 use regex::{Regex, RegexBuilder};
-use revolt_config::{config, FeaturesLimits};
+use revolt_config::{FeaturesLimits, config};
 use revolt_models::v0::{self, UserBadges, UserFlags};
 use revolt_presence::filter_online;
-use revolt_result::{create_error, Result};
+use revolt_result::{Result, create_error};
 use serde_json::json;
 use ulid::Ulid;
 
@@ -527,14 +527,14 @@ impl User {
             id: target.id.clone(),
             user: self.clone().into(db, Some(&*target)).await,
         }
-        .private(target.id.clone())
+        .p(target.id.clone())
         .await;
 
         EventV1::UserRelationship {
             id: self.id.clone(),
             user: target.clone().into(db, Some(&*self)).await,
         }
-        .private(self.id.clone())
+        .p(self.id.clone())
         .await;
 
         Ok(())
@@ -693,7 +693,7 @@ impl User {
             clear: remove.into_iter().map(|v| v.into()).collect(),
             event_id: Some(Ulid::new().to_string()),
         }
-        .p_user(self.id.clone(), db)
+        .p(self.id.clone())
         .await;
 
         Ok(())
@@ -971,6 +971,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_user() {
+        use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
         use revolt_result::Result;
 
         database_test!(|db| async move {
@@ -1001,6 +1002,70 @@ mod tests {
                 .await;
 
             assert!(updated_invalid_update_result.is_err());
+        });
+    }
+
+    #[tokio::test]
+    async fn remove_profile_background() {
+        use crate::{FieldsUser, File, Metadata, PartialUser, UserProfile};
+        use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
+
+        database_test!(|db| async move {
+            let mut user = User::create(&db, "Test".to_string(), None, None)
+                .await
+                .unwrap();
+
+            let background = File {
+                id: "banner_id".to_string(),
+                tag: "banners".to_string(),
+                filename: "banner.png".to_string(),
+                hash: None,
+                uploaded_at: None,
+                uploader_id: Some(user.id.clone()),
+                used_for: None,
+                deleted: None,
+                reported: None,
+                metadata: Metadata::Image {
+                    width: 100,
+                    height: 100,
+                    thumbhash: None,
+                    animated: None,
+                },
+                content_type: "image/png".to_string(),
+                size: 1,
+                message_id: None,
+                user_id: None,
+                server_id: None,
+                object_id: None,
+            };
+
+            user.update(
+                &db,
+                PartialUser {
+                    profile: Some(UserProfile {
+                        background: Some(background),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+                vec![],
+            )
+            .await
+            .unwrap();
+
+            assert!(user.profile.as_ref().unwrap().background.is_some());
+
+            // Removing the banner without any other field changes used to
+            // send MongoDB an empty $set, which it rejects outright.
+            user.update(
+                &db,
+                PartialUser::default(),
+                vec![FieldsUser::ProfileBackground],
+            )
+            .await
+            .unwrap();
+
+            assert!(user.profile.as_ref().unwrap().background.is_none());
         });
     }
 }

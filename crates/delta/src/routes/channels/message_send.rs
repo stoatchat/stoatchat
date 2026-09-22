@@ -111,7 +111,7 @@ pub async fn message_send(
                                     retry_after: ttl as u64,
                                 }],
                             }
-                            .private(user.id.clone())
+                            .p(user.id.clone())
                             .await;
                             return Err(create_error!(InSlowmode {
                                 retry_after: ttl as u64
@@ -125,7 +125,7 @@ pub async fn message_send(
                                 retry_after: *channel_slowmode,
                             }],
                         }
-                        .private(user.id.clone())
+                        .p(user.id.clone())
                         .await;
                     }
                 }

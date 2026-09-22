@@ -1,15 +1,15 @@
 use std::time::Duration;
 
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
 use rand::Rng;
 use redis_kiss::redis::aio::PubSub;
 use revolt_database::util::email::normalise_email;
 use revolt_database::util::password::hash_password;
 use revolt_database::{
-    events::client::EventV1, Channel, Database, Member, Message, PartialRole, Server, User, AMQP,
+    AMQP, Channel, Database, Member, Message, PartialRole, Server, User, events::client::EventV1,
 };
-use revolt_database::{util::idempotency::IdempotencyKey, Role};
 use revolt_database::{Account, EmailVerification, Session};
+use revolt_database::{Role, util::idempotency::IdempotencyKey};
 use revolt_models::v0;
 use revolt_permissions::OverrideField;
 use rocket::http::Header;
@@ -262,12 +262,72 @@ impl TestHarness {
 
         panic!("Email not found.")
     }
+}
+
+pub struct PubSubTestHelper {
+    sub: PubSub,
+    event_buffer: Vec<(String, EventV1)>,
+}
+
+impl PubSubTestHelper {
+    pub async fn new(topic: &str) -> Self {
+        let mut sub = redis_kiss::open_pubsub_connection()
+            .await
+            .expect("`PubSub`");
+
+        sub.subscribe(topic).await.unwrap();
+
+        PubSubTestHelper {
+            sub,
+            event_buffer: vec![],
+        }
+    }
+
+    pub async fn wait_for_event<F>(&mut self, predicate: F) -> EventV1
+    where
+        F: Fn(&EventV1) -> bool,
+    {
+        for (_, event) in &self.event_buffer {
+            if predicate(event) {
+                // does not remove from buffer
+                return event.clone();
+            }
+        }
+
+        let mut stream = self.sub.on_message();
+        while let Some(item) = stream.next().await {
+            let msg_topic = item.get_channel_name();
+            let payload: EventV1 = redis_kiss::decode_payload(&item).unwrap();
+
+            if predicate(&payload) {
+                let matched = payload;
+
+                // Saw this used while chasing ghosts in the Redis stream, s/o Alice Ryhl
+                // Seems to be necessary when events on the same channel arrive too quickly
+                while let Some(Some(item)) = stream.next().now_or_never() {
+                    let msg_topic = item.get_channel_name().to_string();
+                    let payload: EventV1 = redis_kiss::decode_payload(&item).unwrap();
+
+                    self.event_buffer.push((msg_topic, payload));
+                }
+
+                return matched;
+            }
+
+            self.event_buffer.push((msg_topic.to_string(), payload));
+        }
+
+        // WARNING: if predicate is never satisfied, this will never return
+        //          should add a timeout for events so tests can fail gracefully
+
+        unreachable!()
+    }
 
     pub async fn wait_for_message(&mut self, channel_id: &str) -> v0::Message {
         dbg!(&self.event_buffer);
 
         match self
-            .wait_for_event(channel_id, |event| match event {
+            .wait_for_event(|event| match event {
                 EventV1::Message(v0::Message { channel, .. }) => channel == channel_id,
                 _ => false,
             })

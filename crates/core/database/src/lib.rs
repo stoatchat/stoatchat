@@ -164,6 +164,20 @@ macro_rules! database_test {
         .await
         .expect("Database connection failed.");
 
+        $crate::AMQP::new_auto().await
+        .connection().create_channel().await
+        .expect("channel").exchange_declare(
+                "revolt.default".into(),
+                ExchangeKind::Topic,
+                ExchangeDeclareOptions {
+                    durable: true,
+                    ..Default::default()
+                },
+                FieldTable::default(),
+            )
+            .await
+            .expect("Failed to declare test exchange");
+
         db.drop_database().await;
 
         #[allow(clippy::redundant_closure_call)]

@@ -286,7 +286,7 @@ pub async fn edit(
                 to: new_voice_channel.id().to_string(),
                 token,
             }
-            .private(target_user.id.clone())
+            .p(target_user.id.clone())
             .await;
         };
     } else if can_publish.is_some()
