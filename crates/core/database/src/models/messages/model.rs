@@ -535,30 +535,16 @@ impl Message {
         if !emojis.is_empty() {
             if let Some(server_id) = &server_id {
                 let emoji_ids: Vec<String> = emojis.iter().cloned().collect();
-                let resolved = db.fetch_emojis(&emoji_ids).await.map_err(|e| {
-                    revolt_config::capture_error(&e);
-                    create_database_error!("find", "emojis")
-                })?;
-
-                let foreign: Vec<&Emoji> = resolved
-                    .iter()
-                    .filter(|e: &&Emoji| match &e.parent {
-                        EmojiParent::Server { id } => id != server_id,
-                        EmojiParent::Detached => false,
-                    })
-                    .collect();
-
-                if !foreign.is_empty() {
+                if Message::any_foreign_emoji(db, server_id, &emoji_ids).await? {
                     if let MessageAuthor::User(user) = author {
                         let owned_user: User = user.clone().into();
-                        let mut query = DatabasePermissionQuery::new(db, &owned_user).channel(&channel);
-                        let perms = calculate_channel_permissions(&mut query).await;
-
-                        if !perms.has_channel_permission(ChannelPermission::UseExternalEmojis) {
-                            return Err(create_error!(MissingPermission {
-                        permission: ChannelPermission::UseExternalEmojis.to_string()
-                    }));
-                        }
+                        let mut query =
+                            DatabasePermissionQuery::new(db, &owned_user).channel(&channel);
+                        calculate_channel_permissions(&mut query)
+                            .await
+                            .throw_if_lacking_channel_permission(
+                                ChannelPermission::UseExternalEmojis,
+                            )?;
                     }
                 }
             }
@@ -968,12 +954,28 @@ impl Message {
         Ok(())
     }
 
+    /// Check whether any of the given emoji IDs belong to a server other than `server_id`
+    async fn any_foreign_emoji(
+        db: &Database,
+        server_id: &str,
+        emoji_ids: &[String],
+    ) -> Result<bool> {
+        let resolved = db.fetch_emojis(emoji_ids).await.map_err(|e| {
+            revolt_config::capture_error(&e);
+            create_database_error!("find", "emojis")
+        })?;
+
+        Ok(resolved
+            .iter()
+            .any(|e| matches!(&e.parent, EmojiParent::Server { id } if id.as_str() != server_id)))
+    }
+
     /// Add a reaction to a message
     pub async fn add_reaction(
         &self,
         db: &Database,
         user: &User,
-        channel: &Channel,
+        query: &mut DatabasePermissionQuery<'_>,
         emoji: &str,
     ) -> Result<()> {
         // Check how many reactions are already on the message
@@ -995,22 +997,17 @@ impl Message {
         }
 
         // Validate external emoji usage
-        if let (Ok(_), Some(server_id)) = (Ulid::from_str(emoji), channel.server()) {
-            if let Ok(resolved) = db.fetch_emoji(emoji).await {
-                let is_foreign = matches!(
-                    &resolved.parent,
-                    EmojiParent::Server { id } if id.as_str() != server_id
-                );
+        if Ulid::from_str(emoji).is_ok() {
+            let server_id = query
+                .channel_ref()
+                .as_ref()
+                .and_then(|channel| channel.server().map(str::to_string));
 
-                if is_foreign {
-                    let mut query = DatabasePermissionQuery::new(db, user).channel(channel);
-                    let perms = calculate_channel_permissions(&mut query).await;
-
-                    if !perms.has_channel_permission(ChannelPermission::UseExternalEmojis) {
-                        return Err(create_error!(MissingPermission {
-                            permission: ChannelPermission::UseExternalEmojis.to_string()
-                        }));
-                    }
+            if let Some(server_id) = server_id {
+                if Message::any_foreign_emoji(db, &server_id, &[emoji.to_string()]).await? {
+                    calculate_channel_permissions(query)
+                        .await
+                        .throw_if_lacking_channel_permission(ChannelPermission::UseExternalEmojis)?;
                 }
             }
         }
