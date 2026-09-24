@@ -77,6 +77,27 @@ auto_derived!(
             content_type: TwitchType,
             id: String,
         },
+        /// Twitter post
+        Twitter {
+            id: String,
+            text: String,
+            author_name: String,
+            author_handle: String,
+            author_url: String,
+            author_avatar_url: String,
+            created_timestamp: usize,
+
+            quote_id: Option<String>,
+            quote_text: Option<String>,
+            quote_author_handle: Option<String>,
+            quote_author_name: Option<String>,
+            quote_author_url: Option<String>,
+
+            replies: usize,
+            reposts: usize,
+            likes: usize,
+            views: usize,
+        },
         /// Spotify track
         Spotify { content_type: String, id: String },
         /// Soundcloud track
