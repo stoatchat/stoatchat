@@ -112,7 +112,7 @@ impl SpecialtySitesGenerator {
                 "https://x.com/{}/status/{id}",
                 twitter.author.screen_name.clone()
             )),
-            special: Some(Special::XTheEverythingAppByElonMusk {
+            special: Some(Special::XTheEverythingApp {
                 id: twitter.status.id,
                 text: twitter.status.text,
                 author_name: twitter.author.name.clone(),

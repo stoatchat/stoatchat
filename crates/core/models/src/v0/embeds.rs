@@ -79,7 +79,7 @@ auto_derived!(
             id: String,
         },
         /// X/Twitter post
-        XTheEverythingAppByElonMusk {
+        XTheEverythingApp {
             id: String,
             text: String,
             author_name: String,
