@@ -1,13 +1,13 @@
 services:
   # Redis
   redis:
-    image: eqalpha/keydb
+    image: mirror.gcr.io/eqalpha/keydb
     ports:
       - "6379:6379"
 
   # MongoDB
   database:
-    image: mongo
+    image: mirror.gcr.io/mongo
     command: mongod --replSet rs0
     ports:
       - "27017:27017"
@@ -29,7 +29,7 @@ services:
 
   # Silo: The artist formerly known as MinIO: S3-compatible storage server
   minio:
-    image: docker.io/pgsty/silo
+    image: mirror.gcr.io/pgsty/silo
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioautumn
@@ -44,7 +44,7 @@ services:
 
   # Create buckets for Silo.
   createbuckets:
-    image: docker.io/pgsty/mc
+    image: mirror.gcr.io/pgsty/mc
     depends_on:
       - minio
     entrypoint: >
@@ -55,7 +55,7 @@ services:
 
   # Rabbit
   rabbit:
-    image: rabbitmq:4-management
+    image: mirror.gcr.io/rabbitmq:4-management
     environment:
       RABBITMQ_DEFAULT_USER: rabbituser
       RABBITMQ_DEFAULT_PASS: rabbitpass
@@ -70,7 +70,7 @@ services:
 
   # Mock SMTP server
   maildev:
-    image: maildev/maildev:2.2.1
+    image: mirror.gcr.io/maildev/maildev:2.2.1
     ports:
       - "14025:25"
       - "14080:8080"
