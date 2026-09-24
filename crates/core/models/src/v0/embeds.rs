@@ -51,6 +51,7 @@ auto_derived!(
 
     /// Information about special remote content
     #[serde(tag = "type")]
+    #[allow(clippy::large_enum_variant)]
     pub enum Special {
         /// No remote content
         None,
@@ -77,8 +78,8 @@ auto_derived!(
             content_type: TwitchType,
             id: String,
         },
-        /// Twitter post
-        Twitter {
+        /// X/Twitter post
+        XTheEverythingAppByElonMusk {
             id: String,
             text: String,
             author_name: String,
