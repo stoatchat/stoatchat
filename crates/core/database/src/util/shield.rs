@@ -1,9 +1,9 @@
+use crate::util::ip;
 use reqwest::Client;
 use revolt_config::config;
 use revolt_result::Result;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::LazyLock};
-use crate::util::ip;
 
 static CLIENT: LazyLock<Client> = LazyLock::new(Client::new);
 
@@ -22,34 +22,56 @@ pub struct ShieldValidationInput {
     pub dry_run: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ValidationReason {
+    rule_id: String,
+    /// How many points this rule added
+    points: i64,
+    /// Human-readable string, why the points were added.
+    reason: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ValidationResult {
     /// Whether this request was blocked
     blocked: bool,
-
-    /// Reasons for the request being blocked
-    reasons: Vec<String>,
+    /// Whether this request was flagged but considered allowable
+    flagged: bool,
+    /// Total points scored
+    points: i64,
+    /// Rules which matched this request
+    reasons: Vec<ValidationReason>,
 }
 
 pub async fn validate_shield(input: ShieldValidationInput) -> Result<()> {
     let shield = config().await.api.security.shield;
 
-    if !shield.host.is_empty() {
-        if let Ok(response) = CLIENT
-            .post(format!("{}/validate", &shield.host))
+    if !shield.host.is_empty()
+        && let Ok(response) = CLIENT
+            .post(format!("{}/v1/validate", &shield.host))
             .json(&input)
-            .header("Authorization", &shield.key)
+            .bearer_auth(&shield.key)
             .send()
             .await
-        {
-            let result = response
-                .json::<ValidationResult>()
-                .await
-                .map_err(|_| create_error!(InternalError))?;
+    {
+        let status = response.status();
+        if !status.is_success() {
+            log::error!(
+                "Shield returned {status}: {}",
+                response.text().await.unwrap_or("<No Text>".to_string())
+            );
 
-            if result.blocked {
-                return Err(create_error!(BlockedByShield));
-            }
+            return Ok(());
+        }
+
+        let result = response
+            .json::<ValidationResult>()
+            .await
+            .map_err(|_| create_error!(InternalError))?;
+
+        if result.blocked {
+            return Err(create_error!(BlockedByShield));
         }
     }
 
@@ -92,7 +114,7 @@ impl<'r> revolt_rocket_okapi::request::OpenApiFromRequest<'r> for ShieldValidati
 #[cfg(feature = "axum-impl")]
 #[async_trait]
 impl<S> axum::extract::FromRequestParts<S> for ShieldValidationInput {
-    type Rejection = axum::Json<revolt_result::Error> ;
+    type Rejection = axum::Json<revolt_result::Error>;
 
     async fn from_request_parts(
         parts: &mut axum::http::request::Parts,
