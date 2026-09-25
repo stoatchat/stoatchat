@@ -147,6 +147,7 @@ pub struct Hosts {
     pub autumn: String,
     pub january: String,
     pub livekit: HashMap<String, String>,
+    pub assets: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]

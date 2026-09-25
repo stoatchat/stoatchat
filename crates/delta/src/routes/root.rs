@@ -59,6 +59,8 @@ pub struct RevoltFeatures {
     pub limits: LimitsConfig,
     /// Legal links
     pub legal_links: LegalLinks,
+    /// Asset link
+    pub assets: String,
 }
 
 /// # Limits For Users
@@ -219,6 +221,7 @@ pub async fn root() -> Result<Json<RevoltConfig>> {
                     })
                     .collect(),
             },
+            assets: config.hosts.assets.clone(),
             limits: LimitsConfig {
                 global: GlobalLimits {
                     group_size: config.features.limits.global.group_size as i64,
