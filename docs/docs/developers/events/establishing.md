@@ -48,10 +48,10 @@ The ready query parameter can be passed multiple times to specify multiple field
 | `channel_unreads` | Includes all channel unreads you have.                                                                          |
 | `policy_changes`  | Includes all new policy changes you should be aware of, this is not sent to bots.                               |
 
-For example:
+Example:
 
 ```
 ?ready=users&ready=servers&ready=user_settings[ordering]
 ```
 
-You may specify these in the connection URL: `wss://stoat.chat/events?version=1&format=json`.
+You may specify these params in the connection URL: `wss://stoat.chat/events?version=1&format=json`.
