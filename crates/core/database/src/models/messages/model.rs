@@ -7,19 +7,16 @@ use revolt_models::v0::{
 };
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission, PermissionValue};
 use revolt_result::{ErrorType, Result};
+use std::str::FromStr;
 use std::time::SystemTime;
 use std::{collections::HashSet, hash::RandomState};
 use ulid::Ulid;
 use validator::Validate;
 
-use crate::{
-    events::client::EventV1,
-    util::{
-        bulk_permissions::BulkDatabasePermissionQuery, idempotency::IdempotencyKey,
-        permissions::DatabasePermissionQuery,
-    },
-    Channel, Database, Emoji, File, User, AMQP,
-};
+use crate::{events::client::EventV1, util::{
+    bulk_permissions::BulkDatabasePermissionQuery, idempotency::IdempotencyKey,
+    permissions::DatabasePermissionQuery,
+}, Channel, Database, Emoji, EmojiParent, File, User, AMQP};
 
 #[cfg(feature = "tasks")]
 use crate::tasks::{self, ack::AckEvent};
@@ -388,12 +385,13 @@ impl Message {
             mut role_mentions,
             mut mentions_everyone,
             mut mentions_online,
+            emojis,
             ..
         } = message_mentions;
 
         if allow_mass_mentions && server_id.is_some() && !role_mentions.is_empty() {
             let server_data = db
-                .fetch_server(server_id.unwrap().as_str())
+                .fetch_server(server_id.as_ref().unwrap().as_str())
                 .await
                 .expect("Failed to fetch server");
 
@@ -529,6 +527,25 @@ impl Message {
                 }
                 Channel::SavedMessages { .. } => {
                     user_mentions.clear();
+                }
+            }
+        }
+
+        // Validate external emoji usage
+        if !emojis.is_empty() {
+            if let Some(server_id) = &server_id {
+                let emoji_ids: Vec<String> = emojis.iter().cloned().collect();
+                if Message::any_foreign_emoji(db, server_id, &emoji_ids).await? {
+                    if let MessageAuthor::User(user) = author {
+                        let owned_user: User = user.clone().into();
+                        let mut query =
+                            DatabasePermissionQuery::new(db, &owned_user).channel(&channel);
+                        calculate_channel_permissions(&mut query)
+                            .await
+                            .throw_if_lacking_channel_permission(
+                                ChannelPermission::UseExternalEmojis,
+                            )?;
+                    }
                 }
             }
         }
@@ -760,8 +777,7 @@ impl Message {
     /// Whether this message has suppressed notifications
     pub fn has_suppressed_notifications(&self) -> bool {
         if let Some(flags) = self.flags {
-            flags & MessageFlags::SuppressNotifications as u32
-                == MessageFlags::SuppressNotifications as u32
+            MessageFlagsValue(flags).has(MessageFlags::SuppressNotifications)
         } else {
             false
         }
@@ -769,8 +785,7 @@ impl Message {
 
     pub fn contains_mass_push_mention(&self) -> bool {
         let ping = if let Some(flags) = self.flags {
-            let flags = MessageFlagsValue(flags);
-            flags.has(MessageFlags::MentionsEveryone)
+            MessageFlagsValue(flags).has(MessageFlags::MentionsEveryone)
         } else {
             false
         };
@@ -939,8 +954,30 @@ impl Message {
         Ok(())
     }
 
+    /// Check whether any of the given emoji IDs belong to a server other than `server_id`
+    async fn any_foreign_emoji(
+        db: &Database,
+        server_id: &str,
+        emoji_ids: &[String],
+    ) -> Result<bool> {
+        let resolved = db.fetch_emojis(emoji_ids).await.map_err(|e| {
+            revolt_config::capture_error(&e);
+            create_database_error!("find", "emojis")
+        })?;
+
+        Ok(resolved
+            .iter()
+            .any(|e| matches!(&e.parent, EmojiParent::Server { id } if id.as_str() != server_id)))
+    }
+
     /// Add a reaction to a message
-    pub async fn add_reaction(&self, db: &Database, user: &User, emoji: &str) -> Result<()> {
+    pub async fn add_reaction(
+        &self,
+        db: &Database,
+        user: &User,
+        query: &mut DatabasePermissionQuery<'_>,
+        emoji: &str,
+    ) -> Result<()> {
         // Check how many reactions are already on the message
         let config = config().await;
         if self.reactions.len() >= config.features.limits.global.message_reactions
@@ -957,6 +994,22 @@ impl Message {
         // Check if the emoji is usable by us
         if !Emoji::can_use(db, emoji).await? {
             return Err(create_error!(InvalidOperation));
+        }
+
+        // Validate external emoji usage
+        if Ulid::from_str(emoji).is_ok() {
+            let server_id = query
+                .channel_ref()
+                .as_ref()
+                .and_then(|channel| channel.server().map(str::to_string));
+
+            if let Some(server_id) = server_id {
+                if Message::any_foreign_emoji(db, &server_id, &[emoji.to_string()]).await? {
+                    calculate_channel_permissions(query)
+                        .await
+                        .throw_if_lacking_channel_permission(ChannelPermission::UseExternalEmojis)?;
+                }
+            }
         }
 
         // Send reaction event
@@ -998,11 +1051,13 @@ impl Message {
     }
 
     /// Delete a message
-    pub async fn delete(self, db: &Database) -> Result<()> {
-        let file_ids: Vec<String> = self
+    pub async fn delete(&self, db: &Database) -> Result<()> {
+        let file_ids = self
             .attachments
-            .map(|files| files.iter().map(|file| file.id.to_string()).collect())
-            .unwrap_or_default();
+            .iter()
+            .flatten()
+            .map(|file| file.id.clone())
+            .collect::<Vec<_>>();
 
         if !file_ids.is_empty() {
             db.mark_attachments_as_deleted(&file_ids).await?;
@@ -1010,11 +1065,47 @@ impl Message {
 
         db.delete_message(&self.id).await?;
 
+        if let Ok(mut channel) = db.fetch_channel(&self.channel).await {
+            match &channel {
+                Channel::DirectMessage {
+                    last_message_id, ..
+                }
+                | Channel::Group {
+                    last_message_id, ..
+                }
+                | Channel::TextChannel {
+                    last_message_id, ..
+                } => {
+                    if last_message_id.is_some() && last_message_id.as_ref().unwrap() == &self.id {
+                        let new_last_message_id =
+                            db.fetch_last_message(channel.id()).await.unwrap();
+
+                        db.update_last_messsage_id(channel.id(), new_last_message_id.as_deref())
+                            .await?;
+
+                        if new_last_message_id.is_some() {
+                            EventV1::ChannelUpdate {
+                                id: channel.id().to_string(),
+                                data: revolt_models::v0::PartialChannel {
+                                    last_message_id: new_last_message_id,
+                                    ..Default::default()
+                                },
+                                clear: vec![],
+                            }
+                            .p(channel.id().to_string())
+                            .await;
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+
         EventV1::MessageDelete {
-            id: self.id,
+            id: self.id.clone(),
             channel: self.channel.clone(),
         }
-        .p(self.channel)
+        .p(self.channel.clone())
         .await;
         Ok(())
     }

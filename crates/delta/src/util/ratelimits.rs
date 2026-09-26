@@ -5,19 +5,11 @@ pub struct DeltaRatelimits;
 
 impl<'a> RatelimitResolver<Request<'a>> for DeltaRatelimits {
     fn resolve_bucket<'r>(&self, request: &'r Request<'_>) -> (&'r str, Option<&'r str>) {
-        let (segment, resource, extra) = if request.routed_segment(0) == Some("0.8") {
-            (
-                request.routed_segment(1),
-                request.routed_segment(2),
-                request.routed_segment(3),
-            )
-        } else {
-            (
-                request.routed_segment(0),
-                request.routed_segment(1),
-                request.routed_segment(2),
-            )
-        };
+        let (segment, resource, extra) = (
+            request.routed_segment(0),
+            request.routed_segment(1),
+            request.routed_segment(2),
+        );
 
         if let Some(segment) = segment {
             #[allow(clippy::redundant_locals)]
@@ -54,10 +46,10 @@ impl<'a> RatelimitResolver<Request<'a>> for DeltaRatelimits {
                 ("swagger", _, _) => ("swagger", None),
                 ("safety", Some("report"), _) => ("safety_report", Some("report")),
                 ("safety", _, _) => ("safety", None),
-                _ => ("any", None),
+                _ => ("any_dlta", None),
             }
         } else {
-            ("any", None)
+            ("any_dlta", None)
         }
     }
 

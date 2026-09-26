@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+#MISE description="Build the API image and push it to the canary registry. Use CARGO_BUILD_JOBS= to lower the job count if this OOMs."
+set -e
+
+IMAGE="registry.stoatinternal.com/stoat/backend-canary"
+TAG=latest
+PLATFORM=linux/amd64
+
+# echo "Building base image for ${PLATFORM}..."
+# docker buildx build --platform "${PLATFORM}" --load \
+#   -t ghcr.io/stoatchat/base:latest -f Dockerfile \
+#   --build-arg CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-10}" .
+
+echo "Building API image for ${PLATFORM}..."
+docker buildx build --platform "${PLATFORM}" --load \
+  -t "${IMAGE}:${TAG}-delta" - < crates/delta/Dockerfile
+
+echo "Building Bonfire image for ${PLATFORM}..."
+docker buildx build --platform "${PLATFORM}" --load \
+  -t "${IMAGE}:${TAG}-bonfire" - < crates/bonfire/Dockerfile
+
+echo "Building Autumn image for ${PLATFORM}..."
+docker buildx build --platform "${PLATFORM}" --load \
+  -t "${IMAGE}:${TAG}-autumn" - < crates/services/autumn/Dockerfile
+
+echo "Building Gifbox image for ${PLATFORM}..."
+docker buildx build --platform "${PLATFORM}" --load \
+  -t "${IMAGE}:${TAG}-gifbox" - < crates/services/gifbox/Dockerfile
+
+echo "Building January image for ${PLATFORM}..."
+docker buildx build --platform "${PLATFORM}" --load \
+  -t "${IMAGE}:${TAG}-january" - < crates/services/january/Dockerfile
+
+echo "Building Crond image for ${PLATFORM}..."
+docker buildx build --platform "${PLATFORM}" --load \
+  -t "${IMAGE}:${TAG}-crond" - < crates/daemons/crond/Dockerfile
+
+echo "Building Pushd image for ${PLATFORM}..."
+docker buildx build --platform "${PLATFORM}" --load \
+  -t "${IMAGE}:${TAG}-pushd" - < crates/daemons/pushd/Dockerfile
+
+echo "Building Voice-ingress image for ${PLATFORM}..."
+docker buildx build --platform "${PLATFORM}" --load \
+  -t "${IMAGE}:${TAG}-voice-ingress" - < crates/daemons/voice-ingress/Dockerfile
+
+echo "Logging in to registry.stoatinternal.com..."
+docker login registry.stoatinternal.com \
+  --username "$(op read "op://Employee/canary-robot/username")" \
+  --password-stdin < <(op read "op://Employee/canary-robot/credential")
+
+echo "Pushing ${IMAGE}:${TAG}..."
+docker push "${IMAGE}:${TAG}-delta"
+docker push "${IMAGE}:${TAG}-bonfire"
+docker push "${IMAGE}:${TAG}-autumn"
+docker push "${IMAGE}:${TAG}-gifbox"
+docker push "${IMAGE}:${TAG}-january"
+docker push "${IMAGE}:${TAG}-crond"
+docker push "${IMAGE}:${TAG}-pushd"
+docker push "${IMAGE}:${TAG}-voice-ingress"

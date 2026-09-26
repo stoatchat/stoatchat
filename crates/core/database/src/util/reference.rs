@@ -62,9 +62,14 @@ impl<'a> Reference<'a> {
                     .into_iter()
                     .next()
                     .ok_or(create_error!(NotFound))?,
+                max_uses: None,
+                uses: 0,
+                expires: None,
             })
         } else {
-            db.fetch_invite(self.id).await
+            let invite = db.fetch_invite(self.id).await?;
+
+            Ok(invite)
         }
     }
 
@@ -119,7 +124,7 @@ impl<'a> JsonSchema for Reference<'a> {
         "Id".to_string()
     }
 
-    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> Schema {
+    fn json_schema(_gen: &mut schemars::r#gen::SchemaGenerator) -> Schema {
         Schema::Object(SchemaObject {
             instance_type: Some(SingleOrVec::Single(Box::new(InstanceType::String))),
             ..Default::default()

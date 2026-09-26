@@ -1,13 +1,18 @@
+mod account_invites;
+mod accounts;
 mod admin_migrations;
+mod audit_logs;
 mod bots;
 mod channel_invites;
 mod channel_unreads;
 mod channel_webhooks;
 mod channels;
+mod discover_requests;
 mod emojis;
 mod file_hashes;
 mod files;
 mod messages;
+mod mfa_tickets;
 mod policy_changes;
 mod ratelimit_events;
 mod safety_reports;
@@ -15,23 +20,25 @@ mod safety_snapshots;
 mod server_bans;
 mod server_members;
 mod servers;
+mod sessions;
 mod user_settings;
 mod users;
-mod accounts;
-mod account_invites;
-mod sessions;
-mod mfa_tickets;
 
+pub use account_invites::*;
+pub use accounts::*;
 pub use admin_migrations::*;
+pub use audit_logs::*;
 pub use bots::*;
 pub use channel_invites::*;
 pub use channel_unreads::*;
 pub use channel_webhooks::*;
 pub use channels::*;
+pub use discover_requests::*;
 pub use emojis::*;
 pub use file_hashes::*;
 pub use files::*;
 pub use messages::*;
+pub use mfa_tickets::*;
 pub use policy_changes::*;
 pub use ratelimit_events::*;
 pub use safety_reports::*;
@@ -39,12 +46,9 @@ pub use safety_snapshots::*;
 pub use server_bans::*;
 pub use server_members::*;
 pub use servers::*;
+pub use sessions::*;
 pub use user_settings::*;
 pub use users::*;
-pub use accounts::*;
-pub use account_invites::*;
-pub use sessions::*;
-pub use mfa_tickets::*;
 
 use crate::{Database, ReferenceDb};
 
@@ -55,6 +59,7 @@ pub trait AbstractDatabase:
     Sync
     + Send
     + admin_migrations::AbstractMigrations
+    + audit_logs::AbstractAuditLogs
     + bots::AbstractBots
     + channels::AbstractChannels
     + channel_invites::AbstractChannelInvites
@@ -77,6 +82,7 @@ pub trait AbstractDatabase:
     + account_invites::AbstractAccountInvites
     + sessions::AbstractSessions
     + mfa_tickets::AbstractMFATickets
+    + discover_requests::AbstractDiscoverRequest
 {
 }
 

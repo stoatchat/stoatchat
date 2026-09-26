@@ -20,6 +20,20 @@ impl AbstractEmojis for MongoDb {
         query!(self, find_one_by_id, COL, id)?.ok_or_else(|| create_error!(NotFound))
     }
 
+    /// Fetch emoji by their ids
+    async fn fetch_emojis(&self, ids: &[String]) -> Result<Vec<Emoji>> {
+        query!(
+        self,
+        find,
+        COL,
+        doc! {
+            "_id": {
+                "$in": ids
+            }
+        }
+    )
+    }
+
     /// Fetch emoji by their parent id
     async fn fetch_emoji_by_parent_id(&self, parent_id: &str) -> Result<Vec<Emoji>> {
         query!(

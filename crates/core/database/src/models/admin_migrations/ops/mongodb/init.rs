@@ -98,6 +98,9 @@ pub async fn create_database(db: &MongoDb) {
         .await
         .expect("Failed to create pubsub collection.");
 
+    db.create_collection("audit_logs")
+        .await
+        .expect("Failed to create audit_logs collection");
     db.create_collection("sessions")
         .await
         .expect("Failed to create sessions collection.");
@@ -109,6 +112,10 @@ pub async fn create_database(db: &MongoDb) {
     db.create_collection("mfa_tickets")
         .await
         .expect("Failed to create mfa_tickets collection.");
+
+    db.create_collection("discover_requests")
+        .await
+        .expect("Failed to create discover_requests collection");
 
     db.run_command(doc! {
         "createIndexes": "users",
@@ -276,6 +283,58 @@ pub async fn create_database(db: &MongoDb) {
     .expect("Failed to create ratelimit_events index.");
 
     db.run_command(doc! {
+        "createIndexes": "audit_logs",
+        "indexes": [
+            {
+                "key": {
+                    "expires_at": 1_i32,
+                },
+                "name": "expires_at_ttl",
+                // We set the expire after to 0 because we store when it expires instead of when the document was inserted,
+                // this is because mongo cant read the timestamp from the ulid so we need to do this workaround.
+                // relevant docs: https://www.mongodb.com/docs/manual/tutorial/expire-data/#expire-documents-at-a-specific-clock-time
+                "expireAfterSeconds": 0
+            },
+            {
+                "key": {
+                    "server": 1_i32,
+                    "user": 1_i32,
+                    "action.type": 1_i32,
+                },
+                "name": "audit_log_filters",
+            },
+        ]
+    })
+    .await
+    .expect("Failed to create audit_logs index");
+
+    db.run_command(doc! {
+        "createIndexes": "audit_logs",
+        "indexes": [
+            {
+                "key": {
+                    "expires_at": 1_i32,
+                },
+                "name": "expires_at_ttl",
+                // We set the expire after to 0 because we store when it expires instead of when the document was inserted,
+                // this is because mongo cant read the timestamp from the ulid so we need to do this workaround.
+                // relevant docs: https://www.mongodb.com/docs/manual/tutorial/expire-data/#expire-documents-at-a-specific-clock-time
+                "expireAfterSeconds": 0
+            },
+            {
+                "key": {
+                    "server": 1_i32,
+                    "user": 1_i32,
+                    "action.type": 1_i32,
+                },
+                "name": "audit_log_filters",
+            },
+        ]
+    })
+    .await
+    .expect("Failed to create audit_logs index");
+
+    db.run_command(doc! {
         "createIndexes": "accounts",
         "indexes": [
             {
@@ -358,6 +417,21 @@ pub async fn create_database(db: &MongoDb) {
     })
     .await
     .unwrap();
+
+    db.run_command(doc! {
+        "createIndexes": "discover_requests",
+        "indexes": [
+            {
+                "key": {
+                    "request_type": 1,
+                    "request_id": 1
+                },
+                "name": "request_type_id"
+            }
+        ]
+    })
+    .await
+    .expect("Failed to create discover_requests index");
 
     info!("Created database.");
 }

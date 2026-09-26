@@ -1,5 +1,125 @@
 # Changelog
 
+## [0.15.5](https://github.com/stoatchat/stoatchat/compare/v0.15.4...v0.15.5) (2026-09-11)
+
+
+### Bug Fixes
+
+* support mp4 audio mime ([#987](https://github.com/stoatchat/stoatchat/issues/987)) ([6f68a2a](https://github.com/stoatchat/stoatchat/commit/6f68a2a0c845838734847bd43da424a655afd201))
+
+## [0.15.4](https://github.com/stoatchat/stoatchat/compare/v0.15.3...v0.15.4) (2026-09-01)
+
+
+### Bug Fixes
+
+* don't write quotes to db on last_message_id ([#968](https://github.com/stoatchat/stoatchat/issues/968)) ([eb64f2f](https://github.com/stoatchat/stoatchat/commit/eb64f2f8ff46e193ff7fa854c12b60e86934ef39))
+
+## [0.15.3](https://github.com/stoatchat/stoatchat/compare/v0.15.2...v0.15.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* discover errors and Removed field ([#944](https://github.com/stoatchat/stoatchat/issues/944)) ([ee4d998](https://github.com/stoatchat/stoatchat/commit/ee4d9986929def624da7b7bee9fcf383f0beb29c))
+* Minor fixes for discover routes ([#942](https://github.com/stoatchat/stoatchat/issues/942)) ([509ebbf](https://github.com/stoatchat/stoatchat/commit/509ebbfc1511a2390fe45657f634b183b0bcb573))
+* propagate NotFound instead of 500, rename fields to their proper values without affecting database insertion ([509ebbf](https://github.com/stoatchat/stoatchat/commit/509ebbfc1511a2390fe45657f634b183b0bcb573))
+* saturate ratelimits to not cause overflows ([#957](https://github.com/stoatchat/stoatchat/issues/957)) ([5b69677](https://github.com/stoatchat/stoatchat/commit/5b696776cbaf4b2fe8a4f4dc5e87efdb30415a00))
+
+## [0.15.2](https://github.com/stoatchat/stoatchat/compare/v0.15.1...v0.15.2) (2026-08-24)
+
+
+### Features
+
+* implement discover endpoints ([#940](https://github.com/stoatchat/stoatchat/issues/940)) ([7930616](https://github.com/stoatchat/stoatchat/commit/793061685ddd1648dc492dab61a5544ee287c450))
+
+
+### Bug Fixes
+
+* allow spaces in role colours ([#913](https://github.com/stoatchat/stoatchat/issues/913)) ([e956de9](https://github.com/stoatchat/stoatchat/commit/e956de923ecf5849ba7d5b2b6273e355d4a2f25a))
+* audit log test failures when events sort out-of-order ([#933](https://github.com/stoatchat/stoatchat/issues/933)) ([aea1e75](https://github.com/stoatchat/stoatchat/commit/aea1e75ed050440d8fcddcabca0067469e697b53))
+* Correct parsing of relative/absolute paths in embed images & fix ImageSize being overwritten ([#930](https://github.com/stoatchat/stoatchat/issues/930)) ([365572c](https://github.com/stoatchat/stoatchat/commit/365572ccd8f1e63f435b53cbda1d550a7ab46d06))
+* deleting messages renders channels unackable until a new message is posted ([df2e140](https://github.com/stoatchat/stoatchat/commit/df2e1408a17b39e2ff27452c80e9e1ec05a2d149))
+* deleting newest message renders channels unackable until a new message is posted ([#899](https://github.com/stoatchat/stoatchat/issues/899)) ([df2e140](https://github.com/stoatchat/stoatchat/commit/df2e1408a17b39e2ff27452c80e9e1ec05a2d149))
+* internal server error when uploading AVIF ([#937](https://github.com/stoatchat/stoatchat/issues/937)) ([8e2eacb](https://github.com/stoatchat/stoatchat/commit/8e2eacb1b06797346d98757e6079d681a124dd0c))
+* joined_at is set in ms not seconds ([#900](https://github.com/stoatchat/stoatchat/issues/900)) ([ee0e65f](https://github.com/stoatchat/stoatchat/commit/ee0e65ff57ac7decd04e61480f5ee150e6d8dcc8))
+* Make SuppressNotifications actually suppress notifications ([#931](https://github.com/stoatchat/stoatchat/issues/931)) ([99b3ea1](https://github.com/stoatchat/stoatchat/commit/99b3ea140f7c35359d8f54dbf1c5376ce5749beb))
+* **permissions:** reposition channel default permissions below role overrides ([#847](https://github.com/stoatchat/stoatchat/issues/847)) ([9ab2ae9](https://github.com/stoatchat/stoatchat/commit/9ab2ae92a667946ac95e2e36cbb101c744ed26ae))
+* pin maildev version to 2.2.1 ([#896](https://github.com/stoatchat/stoatchat/issues/896)) ([f354dee](https://github.com/stoatchat/stoatchat/commit/f354dee0ce162158829f478a16a10574838ed6ee))
+* pin maildev version to 2.2.1; latest now points to 3.x ([f354dee](https://github.com/stoatchat/stoatchat/commit/f354dee0ce162158829f478a16a10574838ed6ee))
+* select specific audit log entries to fix nondeterministic sorting of audited events submitted too quickly ([aea1e75](https://github.com/stoatchat/stoatchat/commit/aea1e75ed050440d8fcddcabca0067469e697b53))
+* send relationship info for bots ([#935](https://github.com/stoatchat/stoatchat/issues/935)) ([405d9bd](https://github.com/stoatchat/stoatchat/commit/405d9bdb8c82b84364c6a9efb573bea82d5ec1fb))
+* store ratelimits in redis ([#934](https://github.com/stoatchat/stoatchat/issues/934)) ([0bce9b3](https://github.com/stoatchat/stoatchat/commit/0bce9b332e94238698ce9532ce88ca405fa177d5))
+* tell klipy that we're discordbot ([#902](https://github.com/stoatchat/stoatchat/issues/902)) ([17036d2](https://github.com/stoatchat/stoatchat/commit/17036d234ca1b1079d93c6f743ba477dbae2b0b9))
+
+## [0.15.1](https://github.com/stoatchat/stoatchat/compare/v0.15.0...v0.15.1) (2026-08-07)
+
+
+### Features
+
+* moderation API for pulling reported images. ([#880](https://github.com/stoatchat/stoatchat/issues/880)) ([fe331f0](https://github.com/stoatchat/stoatchat/commit/fe331f0dcb1704e0bb99a42f89bd8bfe263069d2))
+
+
+### Bug Fixes
+
+* Give first instance of a meta tag preference when creating website embed. ([4feeeb1](https://github.com/stoatchat/stoatchat/commit/4feeeb11f316a8ace0f3029424585c541e3310f6))
+* Prefer first instance of a meta property in create_website_embed ([#895](https://github.com/stoatchat/stoatchat/issues/895)) ([4feeeb1](https://github.com/stoatchat/stoatchat/commit/4feeeb11f316a8ace0f3029424585c541e3310f6))
+
+## [0.15.0](https://github.com/stoatchat/stoatchat/compare/v0.14.3...v0.15.0) (2026-08-05)
+
+
+### Features
+
+* add an approximate member count to servers ([#884](https://github.com/stoatchat/stoatchat/issues/884)) ([ccfb5f1](https://github.com/stoatchat/stoatchat/commit/ccfb5f1a62f1be9177ac9c1c09fd18ea8e9c7f18))
+* add call event ([#873](https://github.com/stoatchat/stoatchat/issues/873)) ([457c770](https://github.com/stoatchat/stoatchat/commit/457c7709c75060cd8519cc45df3badcfc1b629ea))
+
+
+### Bug Fixes
+
+* rewrite youtube embedder to use youtube oembed ([#878](https://github.com/stoatchat/stoatchat/issues/878)) ([0369451](https://github.com/stoatchat/stoatchat/commit/03694512b90be90367299c3ebfb072ebbc8a681d))
+
+## [0.14.3](https://github.com/stoatchat/stoatchat/compare/v0.14.2...v0.14.3) (2026-07-22)
+
+
+### Bug Fixes
+
+* increase cache size to hopefully deduplicate events ([#865](https://github.com/stoatchat/stoatchat/issues/865)) ([44c35bf](https://github.com/stoatchat/stoatchat/commit/44c35bfb519143f1726f7eba9636a87dbef04800))
+
+## [0.14.2](https://github.com/stoatchat/stoatchat/compare/v0.14.1...v0.14.2) (2026-07-18)
+
+
+### Bug Fixes
+
+* bonfire session deletion redis key is incorrect ([#863](https://github.com/stoatchat/stoatchat/issues/863)) ([764a4dc](https://github.com/stoatchat/stoatchat/commit/764a4dc81c8eab22dfea6a1723f8ffaef1de40bc))
+
+## [0.14.1](https://github.com/stoatchat/stoatchat/compare/v0.14.0...v0.14.1) (2026-07-18)
+
+
+### Bug Fixes
+
+* presence key was incorrect after other related update ([#861](https://github.com/stoatchat/stoatchat/issues/861)) ([81648db](https://github.com/stoatchat/stoatchat/commit/81648dbf9511b32a6e023d556061bb8b74fe41ed))
+
+## [0.14.0](https://github.com/stoatchat/stoatchat/compare/v0.13.7...v0.14.0) (2026-07-15)
+
+
+### Features
+
+* add pronouns to user and server members field ([#811](https://github.com/stoatchat/stoatchat/issues/811)) ([ffab236](https://github.com/stoatchat/stoatchat/commit/ffab2369ab5c9b88e007dcd74b91bb48e1988d26))
+* Audit Logs ([#466](https://github.com/stoatchat/stoatchat/issues/466)) ([502203d](https://github.com/stoatchat/stoatchat/commit/502203d37c63e486c32e33078e0021bf6390fe97))
+* replace tenor with gifbox ([#844](https://github.com/stoatchat/stoatchat/issues/844)) ([59f6e01](https://github.com/stoatchat/stoatchat/commit/59f6e012f827ab08a8e326354bfe6c9026e2cb2d))
+
+
+### Bug Fixes
+
+* allow removing channel slowmode ([#836](https://github.com/stoatchat/stoatchat/issues/836)) ([21daf3a](https://github.com/stoatchat/stoatchat/commit/21daf3aec693beae55bff51235e5e4b7d90f2362))
+* allow true server owner to bypass rank check on channel role-permission overrides ([0af376c](https://github.com/stoatchat/stoatchat/commit/0af376c26b149a5a0286608ebe3869587780a949))
+* channel role permissions fail with 400 InvalidOperation for server owners/admins ([#802](https://github.com/stoatchat/stoatchat/issues/802)) ([a7af24b](https://github.com/stoatchat/stoatchat/commit/a7af24b38d0a38d6f04187464a89e67d459d1708))
+* channel role permissions fail with InvalidOperation for owners/admins ([a7af24b](https://github.com/stoatchat/stoatchat/commit/a7af24b38d0a38d6f04187464a89e67d459d1708))
+* **docs:** update react version ([#842](https://github.com/stoatchat/stoatchat/issues/842)) ([a22378c](https://github.com/stoatchat/stoatchat/commit/a22378c35c2c6c84f8897ce897b9c4df420871d9))
+* migration script would panic on fresh installations since it couldn't find invites collection ([#820](https://github.com/stoatchat/stoatchat/issues/820)) ([784f35e](https://github.com/stoatchat/stoatchat/commit/784f35ebfa8568593812683b5fa399ca87af2d6b))
+* openapi using old naming ([#777](https://github.com/stoatchat/stoatchat/issues/777)) ([c70459b](https://github.com/stoatchat/stoatchat/commit/c70459b10ce107611b9d478add26db372361baf2))
+* point docs favicon to correct location ([#789](https://github.com/stoatchat/stoatchat/issues/789)) ([bebfe34](https://github.com/stoatchat/stoatchat/commit/bebfe349227d8cc555e1b488eb343f2c28b28b88))
+* server owner should bypass rank check on channel role-permission overrides ([#805](https://github.com/stoatchat/stoatchat/issues/805)) ([0af376c](https://github.com/stoatchat/stoatchat/commit/0af376c26b149a5a0286608ebe3869587780a949))
+* voice system messages and call notifs by fetching participant list ([#846](https://github.com/stoatchat/stoatchat/issues/846)) ([0b53db9](https://github.com/stoatchat/stoatchat/commit/0b53db9921f5ee5992d57a6316cd4e75d241726a))
+
 ## [0.13.7](https://github.com/stoatchat/stoatchat/compare/v0.13.6...v0.13.7) (2026-05-21)
 
 

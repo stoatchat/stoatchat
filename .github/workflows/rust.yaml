@@ -26,6 +26,16 @@ jobs:
       #   run: |
       #     sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
 
+      - name: Install dav1d
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libdav1d-dev pkg-config
+
+          if ! pkg-config --atleast-version=1.3.0 dav1d; then
+            echo "The runner's dav1d is older than 1.3, will install build tools"
+            sudo apt-get install --yes meson ninja-build nasm
+          fi
+
       - name: Setup Mise
         uses: immich-app/devtools/actions/use-mise@cd24790a7f5f6439ac32cc94f5523cb2de8bfa8c # use-mise-action-v1.1.0
         with:
@@ -33,7 +43,7 @@ jobs:
 
       - run: mise build
       - run: mise docker:start
-    
+
       - name: Reference Test
         env:
           TEST_DB: REFERENCE

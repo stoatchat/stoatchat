@@ -5,6 +5,7 @@ use revolt_config::report_internal_error;
 use std::io::{BufRead, Read, Seek};
 use tempfile::NamedTempFile;
 use tiny_skia::Pixmap;
+use usvg::Transform;
 
 use crate::{MediaError, MediaRepository};
 
@@ -63,8 +64,9 @@ impl MediaRepository for MediaImpl {
     fn image_size_vec(&self, v: &[u8], mime: &str) -> Option<(usize, usize)> {
         match mime {
             "image/svg+xml" => {
-                let tree =
-                    report_internal_error!(usvg::Tree::from_data(v, &Default::default())).ok()?;
+                let mut options = usvg::Options::default();
+                options.image_href_resolver.resolve_string = Box::new(|_, _| None);
+                let tree = report_internal_error!(usvg::Tree::from_data(v, &options)).ok()?;
 
                 let size = tree.size();
                 Some((size.width() as usize, size.height() as usize))
@@ -100,27 +102,34 @@ impl MediaRepository for MediaImpl {
                     .read_to_end(&mut buf)
                     .map_err(|e| MediaError::from(anyhow::anyhow!(e)))?;
 
-                let tree: usvg::Tree = usvg::Tree::from_data(&buf, &Default::default())
+                let mut options = usvg::Options::default();
+                options.image_href_resolver.resolve_string = Box::new(|_, _| None);
+
+                let tree: usvg::Tree = usvg::Tree::from_data(&buf, &options)
                     .map_err(|e| MediaError::from(anyhow::anyhow!(e)))?;
 
                 let size = tree.size();
-                let mut pixmap = Pixmap::new(size.width() as u32, size.height() as u32)
-                    .ok_or_else(|| MediaError::ImageProcessingFailed {
+
+                // scale down svg to a max of 500x500
+                let scale = (500. / size.width()).min(500. / size.height()).min(1.);
+
+                let width = size.width() * scale;
+                let height = size.height() * scale;
+
+                let mut pixmap = Pixmap::new(width as u32, height as u32).ok_or_else(|| {
+                    MediaError::ImageProcessingFailed {
                         cause: "failed to create Pixmap, likely zero sized".to_string(),
-                    })?;
+                    }
+                })?;
 
                 let mut pixmap_mut = pixmap.as_mut();
-                resvg::render(&tree, Default::default(), &mut pixmap_mut);
+                resvg::render(&tree, Transform::from_scale(scale, scale), &mut pixmap_mut);
 
                 Ok(DynamicImage::ImageRgba8(
-                    ImageBuffer::from_vec(
-                        size.width() as u32,
-                        size.height() as u32,
-                        pixmap.data().to_vec(),
-                    )
-                    .ok_or_else(|| MediaError::ImageProcessingFailed {
-                        cause: "buffer is not big enough".to_string(),
-                    })?,
+                    ImageBuffer::from_vec(width as u32, height as u32, pixmap.data().to_vec())
+                        .ok_or_else(|| MediaError::ImageProcessingFailed {
+                            cause: "buffer is not big enough".to_string(),
+                        })?,
                 ))
             }
             _ => {

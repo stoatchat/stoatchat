@@ -31,4 +31,6 @@ pub trait AbstractAccounts: Sync + Send {
 
     // Save account
     async fn save_account(&self, account: &Account) -> Result<()>;
+
+    async fn bump_lockout_count(&self, id: &str) -> Result<Account>;
 }

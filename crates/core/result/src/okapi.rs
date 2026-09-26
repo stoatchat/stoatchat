@@ -6,11 +6,11 @@ use crate::Error;
 
 impl revolt_rocket_okapi::response::OpenApiResponderInner for Error {
     fn responses(
-        gen: &mut revolt_rocket_okapi::gen::OpenApiGenerator,
+        r#gen: &mut revolt_rocket_okapi::r#gen::OpenApiGenerator,
     ) -> std::result::Result<openapi3::Responses, revolt_rocket_okapi::OpenApiError> {
         let mut content = revolt_okapi::Map::new();
 
-        let settings = schemars::gen::SchemaSettings::default().with(|s| {
+        let settings = schemars::r#gen::SchemaSettings::default().with(|s| {
             s.option_nullable = true;
             s.option_add_null_type = false;
             s.definitions_path = "#/components/schemas/".to_string();
@@ -19,7 +19,7 @@ impl revolt_rocket_okapi::response::OpenApiResponderInner for Error {
         let mut schema_generator = settings.into_generator();
         let schema = schema_generator.root_schema_for::<Error>();
 
-        let definitions = gen.schema_generator().definitions_mut();
+        let definitions = r#gen.schema_generator().definitions_mut();
         for (key, value) in schema.definitions {
             definitions.insert(key, value);
         }

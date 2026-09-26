@@ -1,13 +1,16 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     voice::{delete_voice_channel, UserVoiceChannel, VoiceClient},
-    Channel, Database, File, PartialChannel, SystemMessage, User, AMQP,
+    AuditLogEntryAction, Channel, Database, FieldsChannel, File, PartialChannel, SystemMessage,
+    User, AMQP,
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 use validator::Validate;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Edit Channel
 ///
@@ -19,6 +22,7 @@ pub async fn edit(
     voice_client: &State<VoiceClient>,
     amqp: &State<AMQP>,
     user: User,
+    reason: AuditLogReason,
     target: Reference<'_>,
     data: Json<v0::DataEditChannel>,
 ) -> Result<Json<v0::Channel>> {
@@ -65,6 +69,12 @@ pub async fn edit(
                 return Err(create_error!(NotInGroup));
             }
 
+            // Ensure new owner is not a bot
+            let new_owner_user = db.fetch_user(&new_owner).await?;
+            if new_owner_user.bot.is_some() {
+                return Err(create_error!(IsBot))
+            }
+
             // Transfer ownership
             partial.owner = Some(new_owner.to_string());
             let old_owner = std::mem::replace(owner, new_owner.to_string());
@@ -90,6 +100,8 @@ pub async fn edit(
         .await
         .ok();
     }
+
+    let before_channel = channel.clone();
 
     match &mut channel {
         Channel::Group {
@@ -221,6 +233,9 @@ pub async fn edit(
                     v0::FieldsChannel::Voice => {
                         voice.take();
                     }
+                    v0::FieldsChannel::Slowmode => {
+                        slowmode.take();
+                    }
                     _ => {}
                 }
             }
@@ -258,17 +273,135 @@ pub async fn edit(
         _ => return Err(create_error!(InvalidOperation)),
     };
 
-    channel
-        .update(
-            db,
-            partial,
-            data.remove.into_iter().map(|f| f.into()).collect(),
-        )
-        .await?;
+    let remove = data
+        .remove
+        .into_iter()
+        .map(|f| f.into())
+        .collect::<Vec<FieldsChannel>>();
+
+    let before = if before_channel.server().is_some() {
+        Some(before_channel.generate_diff(&partial, &remove))
+    } else {
+        None
+    };
+
+    channel.update(db, partial.clone(), remove).await?;
 
     if channel.voice().is_none() {
         delete_voice_channel(voice_client, &UserVoiceChannel::from_channel(&channel)).await?;
     }
 
+    if let Some(before) = before {
+        AuditLogEntryAction::ChannelEdit {
+            channel: channel.id().to_string(),
+            before,
+            after: partial,
+        }
+        .insert(db, channel.server().unwrap().to_string(), reason, user.id, None)
+        .await;
+    };
+
     Ok(Json(channel.into()))
+}
+
+#[cfg(test)]
+mod test {
+    use std::collections::HashSet;
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_database::{Channel};
+    use revolt_models::v0::{DataCreateGroup, SystemMessage};
+    use rocket::http::{ContentType, Header, Status};
+    use revolt_database::events::client::EventV1;
+    use crate::util::test::PubSubTestHelper;
+
+    #[rocket::async_test]
+    async fn success_transfer_group_owner() {
+        let harness = TestHarness::new().await;
+        let (_, session, mut user) = harness.new_user().await;
+        let (_, _, mut other_user) = harness.new_user().await;
+
+        // Create a group chat
+        let group = Channel::create_group(
+            &harness.db,
+            DataCreateGroup {
+                users: HashSet::from([other_user.id.clone()]),
+                ..Default::default()
+            },
+            user.id.clone(),
+        )
+            .await
+            .expect("`Channel`");
+
+        let mut pubsub = PubSubTestHelper::new(group.id()).await;
+
+        // Make other user the owner
+        let owner_response = harness
+            .client
+            .patch(format!("/channels/{}", group.id()))
+            .header(ContentType::JSON)
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .body(
+                json!({
+                    "owner": other_user.id,
+                })
+                    .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(owner_response.status(), Status::Ok);
+        drop(owner_response);
+
+        pubsub
+            .wait_for_event(|event| match event {
+                EventV1::Message(message) => match &message.system {
+                    Some(SystemMessage::ChannelOwnershipChanged { from, to }) => {
+                        assert_eq!(from, &user.id);
+                        assert_eq!(to, &other_user.id);
+
+                        true
+                    }
+                    _ => false,
+                },
+                _ => false,
+            })
+            .await;
+    }
+
+    #[rocket::async_test]
+    async fn fail_transfer_owner_to_bot() {
+        let harness = TestHarness::new().await;
+        let (_, session, mut user) = harness.new_user().await;
+        let (_, mut bot_user) = harness.new_bot(&user).await;
+
+        // Create a group chat
+        let group = Channel::create_group(
+            &harness.db,
+            DataCreateGroup {
+                users: HashSet::from([bot_user.id.clone()]),
+                ..Default::default()
+            },
+            user.id.clone(),
+        )
+            .await
+            .expect("`Channel`");
+
+        // Make bot the owner
+        let owner_response = harness
+            .client
+            .patch(format!("/channels/{}", group.id()))
+            .header(ContentType::JSON)
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .body(
+                json!({
+                    "owner": bot_user.id,
+                })
+                    .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(owner_response.status(), Status::BadRequest);
+        drop(owner_response);
+    }
 }

@@ -159,4 +159,17 @@ impl VoiceClient {
             .await
             .to_internal_error()
     }
+
+    pub async fn get_room_participants(
+        &self,
+        node: &str,
+        channel_id: &str,
+    ) -> Result<Vec<ParticipantInfo>> {
+        let room = self.get_node(node)?;
+
+        room.client
+            .list_participants(channel_id)
+            .await
+            .to_internal_error()
+    }
 }

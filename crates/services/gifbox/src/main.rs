@@ -108,5 +108,5 @@ async fn main() -> Result<(), std::io::Error> {
     tracing::info!("Play around with the API: http://localhost:14706/scalar");
     let address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, 14706));
     let listener = TcpListener::bind(&address).await?;
-    axum::serve(listener, app.into_make_service()).await
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await
 }

@@ -21,6 +21,11 @@ pub async fn join(
     user.can_acquire_server(db).await?;
 
     let invite = target.as_invite(db).await?;
+
+    if db.consume_invite_use(invite.code()).await?.is_none() {
+        return Err(create_error!(NotFound));
+    }
+
     match &invite {
         Invite::Server { server, .. } => {
             let server = db.fetch_server(server).await?;
@@ -28,7 +33,7 @@ pub async fn join(
 
             Ok(Json(InviteJoinResponse::Server {
                 channels: channels.into_iter().map(|c| c.into()).collect(),
-                server: server.into(),
+                server: server.into(db).await,
             }))
         }
         Invite::Group {

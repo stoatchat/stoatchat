@@ -1,12 +1,15 @@
+use iso8601_timestamp::{Duration, Timestamp};
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, Invite, User,
+    AuditLogEntryAction, Database, Invite, User,
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
+use revolt_config::config;
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Create Invite
 ///
@@ -14,14 +17,29 @@ use rocket::{serde::json::Json, State};
 ///
 /// Channel must be a `TextChannel`.
 #[openapi(tag = "Channel Invites")]
-#[post("/<target>/invites")]
+#[post("/<target>/invites", data = "<data>")]
 pub async fn create_invite(
     db: &State<Database>,
     user: User,
+    reason: AuditLogReason,
     target: Reference<'_>,
+    data: Json<v0::DataCreateInvite>,
 ) -> Result<Json<v0::Invite>> {
+    let data = data.into_inner();
+
     if user.bot.is_some() {
         return Err(create_error!(IsBot));
+    }
+
+    let max_invite_duration_days = Duration::days(
+        config().await.features.limits.global.max_invite_duration_days as i64,
+    );
+
+    if let Some(expires) = data.expires {
+        let now = Timestamp::now_utc();
+        if expires <= now || expires > now + max_invite_duration_days {
+            return Err(create_error!(InvalidOperation));
+        }
     }
 
     let channel = target.as_channel(db).await?;
@@ -30,8 +48,16 @@ pub async fn create_invite(
         .await
         .throw_if_lacking_channel_permission(ChannelPermission::InviteOthers)?;
 
-    Invite::create_channel_invite(db, &user, &channel)
-        .await
-        .map(|invite| invite.into())
-        .map(Json)
+    let invite = Invite::create_channel_invite(db, &user, &channel, data.max_uses, data.expires).await?;
+
+    if let Some(server_id) = channel.server() {
+        AuditLogEntryAction::InviteCreate {
+            invite: invite.code().to_string(),
+            channel: channel.id().to_string(),
+        }
+        .insert(db, server_id.to_string(), reason, user.id, None)
+        .await;
+    }
+
+    Ok(Json(invite.into()))
 }

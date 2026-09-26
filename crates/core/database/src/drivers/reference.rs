@@ -3,21 +3,25 @@ use std::{collections::HashMap, sync::Arc};
 use futures::lock::Mutex;
 
 use crate::{
-    Bot, Channel, ChannelCompositeKey, ChannelUnread, Emoji, File, FileHash, Invite, Member,
-    MemberCompositeKey, Message, PolicyChange, RatelimitEvent, Report, Server, ServerBan, Snapshot,
-    User, UserSettings, Webhook, Account, AccountInvite, Session, MFATicket
+    Account, AccountInvite, AuditLogEntry, Bot, Channel, ChannelCompositeKey, ChannelUnread,
+    DiscoverBan, DiscoverRequest, DiscoverRequestType, Emoji, File, FileHash, Invite, MFATicket,
+    Member, MemberCompositeKey, Message, PolicyChange, RatelimitEvent, Report, Server, ServerBan,
+    Session, Snapshot, User, UserSettings, Webhook,
 };
 
 database_derived!(
     /// Reference implementation
     #[derive(Default, Debug)]
     pub struct ReferenceDb {
+        pub audit_logs: Arc<Mutex<HashMap<String, AuditLogEntry>>>,
         pub bots: Arc<Mutex<HashMap<String, Bot>>>,
         pub channels: Arc<Mutex<HashMap<String, Channel>>>,
         pub channel_invites: Arc<Mutex<HashMap<String, Invite>>>,
         pub channel_unreads: Arc<Mutex<HashMap<ChannelCompositeKey, ChannelUnread>>>,
         pub channel_webhooks: Arc<Mutex<HashMap<String, Webhook>>>,
         pub emojis: Arc<Mutex<HashMap<String, Emoji>>>,
+        pub discover_requests: Arc<Mutex<HashMap<(DiscoverRequestType, String), DiscoverRequest>>>,
+        pub discover_bans: Arc<Mutex<HashMap<String, DiscoverBan>>>,
         pub file_hashes: Arc<Mutex<HashMap<String, FileHash>>>,
         pub files: Arc<Mutex<HashMap<String, File>>>,
         pub messages: Arc<Mutex<HashMap<String, Message>>>,

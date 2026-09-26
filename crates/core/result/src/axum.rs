@@ -12,6 +12,8 @@ impl IntoResponse for Error {
         let status = match self.error_type {
             ErrorType::LabelMe => StatusCode::INTERNAL_SERVER_ERROR,
 
+            ErrorType::ContactSupport { .. } => StatusCode::BAD_REQUEST,
+
             ErrorType::AlreadyOnboarded => StatusCode::FORBIDDEN,
 
             ErrorType::UnknownUser => StatusCode::NOT_FOUND,
@@ -92,6 +94,7 @@ impl IntoResponse for Error {
             ErrorType::UnknownNode => StatusCode::BAD_REQUEST,
             ErrorType::InvalidFlagValue => StatusCode::BAD_REQUEST,
             ErrorType::FeatureDisabled { .. } => StatusCode::BAD_REQUEST,
+            ErrorType::HeaderTooLarge => StatusCode::BAD_REQUEST,
 
             ErrorType::ProxyError => StatusCode::BAD_REQUEST,
             ErrorType::FileTooSmall => StatusCode::UNPROCESSABLE_ENTITY,

@@ -1,12 +1,12 @@
-use revolt_database::{util::reference::Reference, Database, Message, AMQP};
+use revolt_database::{AMQP, Database, Message, util::reference::Reference};
 use revolt_models::v0::{MessageAuthor, SendableEmbed, Webhook};
-use revolt_result::{create_error, Error, Result};
+use revolt_result::{Error, Result, create_error};
 use revolt_rocket_okapi::{
-    gen::OpenApiGenerator,
+    r#gen::OpenApiGenerator,
     request::{OpenApiFromRequest, RequestHeaderInput},
     revolt_okapi::openapi3::{MediaType, Parameter, ParameterValue},
 };
-use rocket::{http::Status, request::FromRequest, Request, State};
+use rocket::{Request, State, http::Status, request::FromRequest};
 use schemars::schema::SchemaObject;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

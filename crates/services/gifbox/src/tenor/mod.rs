@@ -10,7 +10,7 @@ use tokio::sync::RwLock;
 
 pub mod types;
 
-const TENOR_API_BASE_URL: &str = "https://tenor.googleapis.com/v2";
+const TENOR_API_BASE_URL: &str = "https://compat.gifbox.me/v2";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TenorError {
@@ -59,7 +59,11 @@ impl Tenor {
         }
     }
 
-    pub async fn request<T: DeserializeOwned>(&self, path: &str, query: &[Option<(&str, &str)>]) -> Result<Arc<T>, TenorError> {
+    pub async fn request<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        query: &[Option<(&str, &str)>],
+    ) -> Result<Arc<T>, TenorError> {
         let response = self
             .client
             .get(format!("{TENOR_API_BASE_URL}{path}"))
@@ -95,24 +99,27 @@ impl Tenor {
             }
         }
 
-        let res = self.coalescion.execute(unique_key.clone(), || async move {
-            self.request::<types::PaginatedMediaResponse>(
-                "/search",
-                &[
-                    Some(("key", &self.key)),
-                    Some(("q", query)),
-                    Some(("client_key", "Gifbox")),
-                    Some(("media_filter", "webm,tinywebm")),
-                    Some(("locale", locale)),
-                    Some(("contentfilter", "high")),
-                    Some(("limit", &limit.to_string())),
-                    position.is_empty().then_some(("pos", position)),
-                    is_category.then_some(("component", "categories"))
-                ]
-            ).await
-        })
-        .await
-        .unwrap();
+        let res = self
+            .coalescion
+            .execute(unique_key.clone(), || async move {
+                self.request::<types::PaginatedMediaResponse>(
+                    "/search",
+                    &[
+                        Some(("key", &self.key)),
+                        Some(("q", query)),
+                        Some(("client_key", "Gifbox")),
+                        Some(("media_filter", "webm,tinywebm")),
+                        Some(("locale", locale)),
+                        Some(("contentfilter", "high")),
+                        Some(("limit", &limit.to_string())),
+                        position.is_empty().then_some(("pos", position)),
+                        is_category.then_some(("component", "categories")),
+                    ],
+                )
+                .await
+            })
+            .await
+            .unwrap();
 
         if let Ok(resp) = &*res {
             self.cache.write().await.insert(unique_key, resp.clone());
@@ -143,8 +150,9 @@ impl Tenor {
                         Some(("client_key", "Gifbox")),
                         Some(("locale", locale)),
                         Some(("contentfilter", "high")),
-                    ]
-                ).await
+                    ],
+                )
+                .await
             })
             .await
             .unwrap();
@@ -173,22 +181,25 @@ impl Tenor {
             }
         }
 
-        let res = self.coalescion.execute(unique_key.clone(), || async move {
-            self.request::<types::PaginatedMediaResponse>(
-                "/featured",
-                &[
-                    Some(("key", &self.key)),
-                    Some(("client_key", "Gifbox")),
-                    Some(("media_filter", "webm,tinywebm")),
-                    Some(("locale", locale)),
-                    Some(("contentfilter", "high")),
-                    Some(("limit", &limit.to_string())),
-                    position.is_empty().then_some(("pos", position)),
-                ]
-            ).await
-        })
-        .await
-        .unwrap();
+        let res = self
+            .coalescion
+            .execute(unique_key.clone(), || async move {
+                self.request::<types::PaginatedMediaResponse>(
+                    "/featured",
+                    &[
+                        Some(("key", &self.key)),
+                        Some(("client_key", "Gifbox")),
+                        Some(("media_filter", "webm,tinywebm")),
+                        Some(("locale", locale)),
+                        Some(("contentfilter", "high")),
+                        Some(("limit", &limit.to_string())),
+                        position.is_empty().then_some(("pos", position)),
+                    ],
+                )
+                .await
+            })
+            .await
+            .unwrap();
 
         if let Ok(resp) = &*res {
             self.featured.write().await.insert(unique_key, resp.clone());

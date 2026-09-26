@@ -79,10 +79,12 @@ mod tests {
     use revolt_database::{events::client::EventV1, AccountInvite};
     use revolt_result::{Error, ErrorType};
     use rocket::http::{ContentType, Status};
+    use crate::util::test::PubSubTestHelper;
 
     #[rocket::async_test]
     async fn success() {
-        let mut harness = TestHarness::new().await;
+        let harness = TestHarness::new().await;
+        let mut pubsub = PubSubTestHelper::new("global").await;
 
         let res = harness
             .client
@@ -101,9 +103,11 @@ mod tests {
         assert_eq!(res.status(), Status::NoContent);
         drop(res);
 
-        harness
-            .wait_for_event("global", |e| matches!(e, EventV1::CreateAccount { .. }))
-            .await;
+        pubsub
+            .wait_for_event(|event| match event {
+                EventV1::CreateAccount { account } => account.email == "success@validemail.com",
+                _ => false,
+            }).await;
     }
 
     #[rocket::async_test]

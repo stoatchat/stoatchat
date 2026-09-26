@@ -20,9 +20,10 @@ pub async fn fetch(
 ) -> Result<Json<v0::Message>> {
     let channel = target.as_channel(db).await?;
     let mut query = DatabasePermissionQuery::new(db, &user).channel(&channel);
-    calculate_channel_permissions(&mut query)
-        .await
-        .throw_if_lacking_channel_permission(ChannelPermission::ViewChannel)?;
+    let perms = calculate_channel_permissions(&mut query).await;
+
+    perms.throw_if_lacking_channel_permission(ChannelPermission::ViewChannel)?;
+    perms.throw_if_lacking_channel_permission(ChannelPermission::ReadMessageHistory)?;
 
     let message = msg.as_message(db).await?;
     if message.channel != channel.id() {

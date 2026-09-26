@@ -5,7 +5,7 @@ use axum::{
 
 use revolt_result::{Error, Result};
 
-use crate::{Database, MFATicket, UnvalidatedTicket, ValidatedTicket};
+use crate::{Database, MFATicket, Session, UnvalidatedTicket, ValidatedTicket};
 
 #[async_trait]
 impl<S> FromRequestParts<S> for MFATicket
@@ -37,13 +37,16 @@ where
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self> {
         let db = Database::from_ref(state);
 
-        let ticket = MFATicket::from_request_parts(parts, state).await?;
+        if let Ok(ticket) = MFATicket::from_request_parts(parts, state).await
+            && ticket.validated
+            && let Ok(session) = Session::from_request_parts(parts, state).await
+            && session.user_id == ticket.account_id
+            && ticket.claim(&db).await.is_ok()
+        {
+            return Ok(ValidatedTicket(ticket));
+        };
 
-        if ticket.validated && ticket.claim(&db).await.is_ok() {
-            Ok(ValidatedTicket(ticket))
-        } else {
-            Err(create_error!(InvalidToken))
-        }
+        Err(create_error!(InvalidToken))
     }
 }
 
@@ -56,12 +59,14 @@ where
     type Rejection = Error;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self> {
-        let ticket = MFATicket::from_request_parts(parts, state).await?;
+        if let Ok(ticket) = MFATicket::from_request_parts(parts, state).await
+            && !ticket.validated
+            && let Ok(session) = Session::from_request_parts(parts, state).await
+            && session.user_id == ticket.account_id
+        {
+            return Ok(UnvalidatedTicket(ticket));
+        };
 
-        if !ticket.validated {
-            Ok(UnvalidatedTicket(ticket))
-        } else {
-            Err(create_error!(InvalidToken))
-        }
+        Err(create_error!(InvalidToken))
     }
 }

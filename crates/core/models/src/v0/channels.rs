@@ -170,6 +170,7 @@ auto_derived!(
         Icon,
         DefaultPermissions,
         Voice,
+        Slowmode,
     }
 
     /// New webhook information

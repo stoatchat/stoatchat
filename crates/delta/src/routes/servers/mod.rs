@@ -1,10 +1,12 @@
 use revolt_rocket_okapi::revolt_okapi::openapi3::OpenApi;
 use rocket::Route;
 
+mod audit_log_query;
 mod ban_create;
 mod ban_list;
 mod ban_remove;
 mod channel_create;
+mod discover;
 mod emoji_list;
 mod invites_fetch;
 mod member_edit;
@@ -60,5 +62,9 @@ pub fn routes() -> (Vec<Route>, OpenApi) {
         category_delete::delete,
         category_permissions_set_default::set_default_permissions,
         category_permissions_set::set_role_permissions,
+        audit_log_query::query,
+        discover::discover_add::discover_add,
+        discover::discover_get::discover_get,
+        discover::discover_remove::discover_remove,
     ]
 }

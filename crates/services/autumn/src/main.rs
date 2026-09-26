@@ -100,5 +100,5 @@ async fn main() -> Result<(), std::io::Error> {
     // Configure TCP listener and bind
     let address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, 14704));
     let listener = TcpListener::bind(&address).await?;
-    axum::serve(listener, app.into_make_service()).await
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await
 }

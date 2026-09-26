@@ -13,3 +13,4 @@ venv/
 
 livekit.yml
 .idea
+.vscode/launch.json

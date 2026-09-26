@@ -17,7 +17,7 @@ use validator::Validate;
 pub async fn delete(
     db: &State<Database>,
     user: User,
-    server: Reference,
+    server: Reference<'_>,
     category: String
 ) -> Result<EmptyResponse> {
     let mut server = server.as_server(db).await?;

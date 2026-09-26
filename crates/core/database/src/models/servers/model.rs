@@ -1,5 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
+use redis_kiss::{
+    get_connection,
+    redis::{SetExpiry, SetOptions},
+    AsyncCommands,
+};
 use revolt_models::v0::{self, DataCreateCategory, DataCreateServerChannel, DataEditCategory};
 use revolt_permissions::{OverrideField, DEFAULT_PERMISSION_SERVER};
 use revolt_result::Result;
@@ -89,6 +94,13 @@ auto_derived_partial!(
         /// Custom icon attachment
         #[serde(skip_serializing_if = "Option::is_none")]
         pub icon: Option<File>,
+        /// Id of the bot that owns this role, if it is a managed role
+        ///
+        /// Managed roles are created automatically (e.g. via bot invite) and
+        /// should be hidden from "assign role" UI and cleaned up when the
+        /// owning bot leaves the server.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub owner: Option<String>,
     },
     "PartialRole"
 );
@@ -135,7 +147,6 @@ auto_derived!(
     /// Optional fields on server object
     pub enum FieldsServer {
         Description,
-        Categories,
         SystemMessages,
         Icon,
         Banner,
@@ -244,11 +255,35 @@ impl Server {
     pub fn remove_field(&mut self, field: &FieldsServer) {
         match field {
             FieldsServer::Description => self.description = None,
-            FieldsServer::Categories => self.categories.clear(),
             FieldsServer::SystemMessages => self.system_messages = None,
             FieldsServer::Icon => self.icon = None,
             FieldsServer::Banner => self.banner = None,
         }
+    }
+
+    /// Generates a PartialServer containing the data which has changed in an update
+    pub fn generate_diff(&self, partial: &PartialServer, remove: &[FieldsServer]) -> PartialServer {
+        let mut before = PartialServer::default();
+
+        generate_diff!(
+            self, before, partial, remove,
+            (
+                owner,
+                name,
+                (FieldsServer::Description) description,
+                categories,
+                (FieldsServer::SystemMessages) system_messages,
+                roles,
+                default_permissions,
+                (FieldsServer::Icon) icon,
+                (FieldsServer::Banner) banner,
+                nsfw,
+                analytics,
+                discoverable,
+            )
+        );
+
+        before
     }
 
     /// Ordered roles list
@@ -313,6 +348,44 @@ impl Server {
 
         Ok(())
     }
+
+    /// Delete the managed role owned by the given bot in this server, if one exists.
+    /// No-op if the bot never had a managed role.
+    pub async fn cleanup_managed_bot_role(&self, db: &Database, bot_id: &str) -> Result<()> {
+        if let Some(role) = self
+            .roles
+            .values()
+            .find(|role| role.owner.as_deref() == Some(bot_id))
+        {
+            role.delete(db, &self.id).await?;
+        }
+
+        Ok(())
+    }
+
+    /// Gets a approximate count of the members in this server
+    ///
+    /// this value is cached for one hour
+    pub async fn get_approximate_member_count(&self, db: &Database) -> usize {
+        let Ok(mut redis) = get_connection().await else {
+            return 0;
+        };
+        let key = format!("member_count:{}", &self.id);
+
+        if let Some(count) = redis.get::<_, Option<usize>>(&key).await.ok().flatten() {
+            count
+        } else {
+            let count = db.fetch_member_count(&self.id).await.unwrap_or(0);
+            let _ = redis
+                .set_options::<_, _, ()>(
+                    &key,
+                    count,
+                    SetOptions::default().with_expiration(SetExpiry::EX(60 * 60)),
+                )
+                .await;
+            count
+        }
+    }
 }
 
 impl Role {
@@ -326,11 +399,32 @@ impl Role {
             hoist: Some(self.hoist),
             rank: Some(self.rank),
             icon: self.icon,
+            owner: self.owner,
         }
     }
 
     /// Create a role
     pub async fn create(db: &Database, server: &Server, name: String) -> Result<Self> {
+        Self::create_inner(db, server, name, None).await
+    }
+
+    /// Create a role owned/managed by a bot
+    pub async fn create_managed(
+        db: &Database,
+        server: &Server,
+        name: String,
+        owner_bot_id: String,
+    ) -> Result<Self> {
+        Self::create_inner(db, server, name, Some(owner_bot_id)).await
+    }
+
+    /// Helper function to avoid code duplication between `create` and `create_managed`
+    async fn create_inner(
+        db: &Database,
+        server: &Server,
+        name: String,
+        owner: Option<String>,
+    ) -> Result<Self> {
         let role = Role {
             id: Ulid::new().to_string(),
             name,
@@ -340,6 +434,7 @@ impl Role {
             hoist: false,
             permissions: Default::default(),
             icon: None,
+            owner,
         };
 
         db.insert_role(&server.id, &role).await?;
@@ -350,10 +445,14 @@ impl Role {
             data: role.clone().into_optional().into(),
             clear: vec![],
         }
-        .p(server.id.clone())
-        .await;
+            .p(server.id.clone())
+            .await;
 
         Ok(role)
+    }
+
+    pub fn is_managed(&self) -> bool {
+        self.owner.is_some()
     }
 
     /// Update server data
@@ -393,8 +492,27 @@ impl Role {
         }
     }
 
+    /// Generates a PartialRole containing the data which has changed in an update
+    pub fn generate_diff(&self, partial: &PartialRole, remove: &[FieldsRole]) -> PartialRole {
+        let mut before = PartialRole::default();
+
+        generate_diff!(
+            self, before, partial, remove,
+            (
+                name,
+                permissions,
+                (FieldsRole::Colour) colour,
+                hoist,
+                rank,
+                (FieldsRole::Icon) icon,
+            )
+        );
+
+        before
+    }
+
     /// Delete a role
-    pub async fn delete(self, db: &Database, server_id: &str) -> Result<()> {
+    pub async fn delete(&self, db: &Database, server_id: &str) -> Result<()> {
         EventV1::ServerRoleDelete {
             id: server_id.to_string(),
             role_id: self.id.clone(),
@@ -538,6 +656,7 @@ impl SystemMessageChannels {
 mod tests {
     use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 
+    use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
     use crate::{fixture, util::permissions::DatabasePermissionQuery};
 
     #[tokio::test]

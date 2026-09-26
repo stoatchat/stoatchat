@@ -78,6 +78,9 @@ auto_derived_partial!(
             serde(skip_serializing_if = "crate::if_false", default)
         )]
         pub discoverable: bool,
+
+        /// Approximate amount of members in the server
+        pub approximate_member_count: usize,
     },
     "PartialServer"
 );
@@ -109,6 +112,9 @@ auto_derived_partial!(
         /// Role icon
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
         pub icon: Option<File>,
+        /// Id of the bot that owns this role, if it is a managed role
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+        pub owner: Option<String>
     },
     "PartialRole"
 );
@@ -117,7 +123,6 @@ auto_derived!(
     /// Optional fields on server object
     pub enum FieldsServer {
         Description,
-        Categories,
         SystemMessages,
         Icon,
         Banner,

@@ -16,7 +16,7 @@ use rocket::{serde::json::Json, State};
 pub async fn set_default_permissions(
     db: &State<Database>,
     user: User,
-    server: Reference,
+    server: Reference<'_>,
     target: String,
     data: Json<v0::DataDefaultCategoryPermissions>,
 ) -> Result<Json<v0::Category>> {

@@ -1,18 +1,17 @@
 //! Login to an account
 //! POST /session/login
-use std::ops::Add;
 use std::time::Duration;
 
-use tokio::time::sleep;
 use iso8601_timestamp::Timestamp;
 use revolt_database::{
     util::{email::normalise_email, password::assert_safe},
-    Database, EmailVerification, Lockout, MFATicket,
+    Database, EmailVerification, MFATicket,
 };
 use revolt_models::v0;
 use revolt_result::{create_error, Result};
 use rocket::serde::json::Json;
 use rocket::State;
+use tokio::time::sleep;
 
 /// # Login
 ///
@@ -24,7 +23,10 @@ pub async fn login(
     data: Json<v0::DataLogin>,
 ) -> Result<Json<v0::ResponseLogin>> {
     // Random jitter from 0-1000ms
-    sleep(Duration::from_millis((rand::random::<f32>() * 1000.) as u64)).await;
+    sleep(Duration::from_millis(
+        (rand::random::<f32>() * 1000.) as u64,
+    ))
+    .await;
 
     let (account, name) = match data.into_inner() {
         v0::DataLogin::Email {
@@ -52,6 +54,7 @@ pub async fn login(
                 if let Some(lockout) = &account.lockout {
                     if let Some(expiry) = lockout.expiry {
                         if expiry > Timestamp::now_utc() {
+                            db.bump_lockout_count(&account.id).await?;
                             return Err(create_error!(LockedOut));
                         }
                     }
@@ -59,41 +62,8 @@ pub async fn login(
 
                 // Verify the password is correct.
                 if let Err(err) = account.verify_password(&password) {
-                    // Lock out account if attempts are too high
-                    if let Some(lockout) = &mut account.lockout {
-                        lockout.attempts += 1;
-
-                        // Allow 3 attempts
-                        //
-                        // Lockout for 1 minute on 3rd attempt
-                        // Lockout for 5 minutes on 4th attempt
-                        // Lockout for 1 hour on each subsequent attempt
-                        if lockout.attempts >= 3 {
-                            lockout.expiry = Some(Timestamp::now_utc().add(Duration::from_secs(
-                                if lockout.attempts >= 5 {
-                                    3600
-                                } else if lockout.attempts == 4 {
-                                    300
-                                } else {
-                                    60
-                                },
-                            )));
-                        }
-                    } else {
-                        account.lockout = Some(Lockout {
-                            attempts: 1,
-                            expiry: None,
-                        });
-                    }
-
-                    account.save(db).await?;
+                    db.bump_lockout_count(&account.id).await?;
                     return Err(err);
-                }
-
-                // Clear lockout information if present
-                if account.lockout.is_some() {
-                    account.lockout = None;
-                    account.save(db).await?;
                 }
 
                 // Check whether an MFA step is required
@@ -115,6 +85,12 @@ pub async fn login(
                     }));
                 }
 
+                // No MFA, clear lockout information if present
+                if account.lockout.is_some() {
+                    account.lockout = None;
+                    account.save(db).await?;
+                }
+
                 (account, friendly_name)
             } else {
                 return Err(create_error!(InvalidCredentials));
@@ -126,20 +102,39 @@ pub async fn login(
             friendly_name,
         } => {
             // Resolve the MFA ticket
-            let ticket = db
-                .fetch_ticket_by_token(&mfa_ticket)
-                .await?;
+            let ticket = &mut db.fetch_ticket_by_token(&mfa_ticket).await?;
 
             // Find the corresponding account
             let mut account = db.fetch_account(&ticket.account_id).await?;
 
+            // Check for account lockout
+            if let Some(lockout) = &account.lockout {
+                if let Some(expiry) = lockout.expiry {
+                    if expiry > Timestamp::now_utc() {
+                        db.bump_lockout_count(&account.id).await?;
+                        return Err(create_error!(LockedOut));
+                    }
+                }
+            }
+
             // Verify the MFA response
             if let Some(mfa_response) = mfa_response {
-                account
+                if let Err(err) = account
                     .consume_mfa_response(db, mfa_response, Some(ticket))
-                    .await?;
+                    .await
+                {
+                    // MFA failures count towards lockout
+                    db.bump_lockout_count(&account.id).await?;
+                    return Err(err);
+                }
             } else if !ticket.authorised {
                 return Err(create_error!(InvalidToken));
+            }
+
+            // MFA passed, clear lockout information if present
+            if account.lockout.is_some() {
+                account.lockout = None;
+                account.save(db).await?;
             }
 
             (account, friendly_name)
@@ -164,18 +159,21 @@ pub async fn login(
 
 #[cfg(test)]
 mod tests {
-    use iso8601_timestamp::Timestamp;
-    use revolt_database::{Account, EmailVerification, Lockout, MFATicket, Totp, events::client::EventV1};
     use crate::{rocket, util::test::TestHarness};
-    use rocket::http::{ContentType, Status};
+    use iso8601_timestamp::Timestamp;
+    use revolt_database::{
+        events::client::EventV1, Account, EmailVerification, Lockout, MFATicket, Totp,
+    };
     use revolt_models::v0;
     use revolt_result::{Error, ErrorType};
+    use crate::util::test::PubSubTestHelper;
+    use rocket::http::{ContentType, Status};
 
     #[rocket::async_test]
     async fn success() {
-        let mut harness = TestHarness::new().await;
+        let harness = TestHarness::new().await;
 
-        Account::new(
+        let account = Account::new(
             &harness.db,
             "example@validemail.com".into(),
             "password_insecure".into(),
@@ -184,9 +182,10 @@ mod tests {
         .await
         .unwrap();
 
-        harness.wait_for_event("global", |_| true).await;
+        let mut pubsub = PubSubTestHelper::new("global").await;
 
-        let res = harness.client
+        let res = harness
+            .client
             .post("/auth/session/login")
             .header(ContentType::JSON)
             .body(
@@ -202,7 +201,10 @@ mod tests {
         assert_eq!(res.status(), Status::Ok);
         assert!(res.into_json::<v0::Session>().await.is_some());
 
-        let event = harness.wait_for_event("global", |_| true).await;
+        let event = pubsub.wait_for_event(|event| match event {
+            EventV1::CreateSession { session } => session.user_id == account.id,
+            _ => false,
+        }).await;
         if !matches!(event, EventV1::CreateSession { .. }) {
             panic!("Received incorrect event type. {:?}", event);
         }
@@ -220,7 +222,8 @@ mod tests {
         account.mfa.totp_token = totp.clone();
         account.save(&harness.db).await.unwrap();
 
-        let res = harness.client
+        let res = harness
+            .client
             .post("/auth/session/login")
             .header(ContentType::JSON)
             .body(
@@ -234,10 +237,8 @@ mod tests {
             .await;
 
         assert_eq!(res.status(), Status::Ok);
-        let response = serde_json::from_str::<v0::ResponseLogin>(
-            &res.into_string().await.unwrap(),
-        )
-        .expect("`ResponseLogin`");
+        let response = serde_json::from_str::<v0::ResponseLogin>(&res.into_string().await.unwrap())
+            .expect("`ResponseLogin`");
 
         if let v0::ResponseLogin::MFA {
             ticket,
@@ -246,7 +247,8 @@ mod tests {
         {
             assert!(allowed_methods.contains(&v0::MFAMethod::Totp));
 
-            let res = harness.client
+            let res = harness
+                .client
                 .post("/auth/session/login")
                 .header(ContentType::JSON)
                 .body(
@@ -284,7 +286,8 @@ mod tests {
         ticket.last_totp_code = Some("token from earlier".into());
         ticket.save(&harness.db).await.unwrap();
 
-        let res = harness.client
+        let res = harness
+            .client
             .post("/auth/session/login")
             .header(ContentType::JSON)
             .body(
@@ -315,22 +318,19 @@ mod tests {
         account.mfa.totp_token = totp.clone();
         account.save(&harness.db).await.unwrap();
 
-        let res = harness.client
+        let res = harness
+            .client
             .post("/auth/session/login")
-            .json(
-                &json!({
-                    "email": account.email.clone(),
-                    "password": "password_insecure"
-                })
-            )
+            .json(&json!({
+                "email": account.email.clone(),
+                "password": "password_insecure"
+            }))
             .dispatch()
             .await;
 
         assert_eq!(res.status(), Status::Ok);
-        let response = serde_json::from_str::<v0::ResponseLogin>(
-            &res.into_string().await.unwrap(),
-        )
-        .expect("`ResponseLogin`");
+        let response = serde_json::from_str::<v0::ResponseLogin>(&res.into_string().await.unwrap())
+            .expect("`ResponseLogin`");
 
         if let v0::ResponseLogin::MFA {
             ticket,
@@ -339,24 +339,23 @@ mod tests {
         {
             assert!(allowed_methods.contains(&v0::MFAMethod::Totp));
 
-            let res = harness.client
+            let res = harness
+                .client
                 .post("/auth/session/login")
-                .json(
-                    &json!({
-                        "mfa_ticket": ticket,
-                        "mfa_response": {
-                            "totp_code": "some random data"
-                        }
-                    })
-                )
+                .json(&json!({
+                    "mfa_ticket": ticket,
+                    "mfa_response": {
+                        "totp_code": "some random data"
+                    }
+                }))
                 .dispatch()
                 .await;
 
             assert_eq!(res.status(), Status::Unauthorized);
-        assert!(matches!(
-            res.into_json::<Error>().await.unwrap().error_type,
-            ErrorType::InvalidToken,
-        ));
+            assert!(matches!(
+                res.into_json::<Error>().await.unwrap().error_type,
+                ErrorType::InvalidToken,
+            ));
         } else {
             panic!("expected `ResponseLogin::MFA`")
         }
@@ -366,14 +365,13 @@ mod tests {
     async fn fail_invalid_user() {
         let harness = TestHarness::new().await;
 
-        let res = harness.client
+        let res = harness
+            .client
             .post("/auth/session/login")
-            .json(
-                &json!({
-                    "email": "example@validemail.com",
-                    "password": "password_insecure"
-                })
-            )
+            .json(&json!({
+                "email": "example@validemail.com",
+                "password": "password_insecure"
+            }))
             .dispatch()
             .await;
 
@@ -400,7 +398,8 @@ mod tests {
         account.disabled = true;
         account.save(&harness.db).await.unwrap();
 
-        let res = harness.client
+        let res = harness
+            .client
             .post("/auth/session/login")
             .header(ContentType::JSON)
             .body(
@@ -414,15 +413,10 @@ mod tests {
             .await;
 
         assert_eq!(res.status(), Status::Ok);
-        let response = serde_json::from_str::<v0::ResponseLogin>(
-            &res.into_string().await.unwrap(),
-        )
-        .expect("`ResponseLogin`");
+        let response = serde_json::from_str::<v0::ResponseLogin>(&res.into_string().await.unwrap())
+            .expect("`ResponseLogin`");
 
-        assert!(matches!(
-            response,
-            v0::ResponseLogin::Disabled { .. }
-        ));
+        assert!(matches!(response, v0::ResponseLogin::Disabled { .. }));
     }
 
     #[rocket::async_test]
@@ -445,7 +439,8 @@ mod tests {
 
         account.save(&harness.db).await.unwrap();
 
-        let res = harness.client
+        let res = harness
+            .client
             .post("/auth/session/login")
             .header(ContentType::JSON)
             .body(
@@ -480,9 +475,9 @@ mod tests {
 
         account.save(&harness.db).await.unwrap();
 
-
         // Attempt 1
-        let res = harness.client
+        let res = harness
+            .client
             .post("/auth/session/login")
             .header(ContentType::JSON)
             .body(
@@ -502,7 +497,8 @@ mod tests {
         ));
 
         // Attempt 2
-        let res = harness.client
+        let res = harness
+            .client
             .post("/auth/session/login")
             .header(ContentType::JSON)
             .body(
@@ -522,7 +518,8 @@ mod tests {
         ));
 
         // Attempt 3
-        let res = harness.client
+        let res = harness
+            .client
             .post("/auth/session/login")
             .header(ContentType::JSON)
             .body(
@@ -542,7 +539,8 @@ mod tests {
         ));
 
         // Attempt 4: Locked Out
-        let res = harness.client
+        let res = harness
+            .client
             .post("/auth/session/login")
             .header(ContentType::JSON)
             .body(
@@ -569,7 +567,8 @@ mod tests {
         account.save(&harness.db).await.unwrap();
 
         // Once it expires, we can log in.
-        let res = harness.client
+        let res = harness
+            .client
             .post("/auth/session/login")
             .header(ContentType::JSON)
             .body(

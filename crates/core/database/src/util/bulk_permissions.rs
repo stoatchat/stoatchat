@@ -283,8 +283,8 @@ async fn calculate_members_permissions<'a>(
             continue;
         }
 
-        // Get the user's server permissions
-        let mut permission = calculate_server_permissions(&query.server, user, member);
+        // Get the server default permission, apply channel default override
+        let mut permission = PermissionValue::from(query.server.default_permissions);
 
         // Apply category overrides
         if let Some(category) = category {
@@ -318,7 +318,23 @@ async fn calculate_members_permissions<'a>(
             permission.apply(defaults.into());
         }
 
-        // Get the applicable role overrides for the channel
+        // Apply server role overrides
+        let mut server_roles = query.server
+            .roles
+            .iter()
+            .filter(|(id, _)| member.roles.contains(id))
+            .map(|(_, role)| {
+                let v: Override = role.permissions.into();
+                (role.rank, v)
+            })
+            .collect::<Vec<(i64, Override)>>();
+
+        server_roles.sort_by(|a, b| b.0.cmp(&a.0));
+        for (_, role_override) in server_roles {
+            permission.apply(role_override);
+        }
+
+        // Get the applicable channel role overrides
         let mut roles = channel_role_permissions
             .iter()
             .filter(|(id, _)| member.roles.contains(id))
@@ -335,6 +351,10 @@ async fn calculate_members_permissions<'a>(
 
         for role_override in overrides {
             permission.apply(role_override)
+        }
+
+        if member.in_timeout() {
+            permission.restrict(*ALLOW_IN_TIMEOUT);
         }
 
         resp.insert(user.id.clone(), permission);

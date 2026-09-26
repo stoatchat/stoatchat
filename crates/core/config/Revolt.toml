@@ -21,6 +21,7 @@ api = "http://local.revolt.chat/api"
 events = "ws://local.revolt.chat/ws"
 autumn = "http://local.revolt.chat/autumn"
 january = "http://local.revolt.chat/january"
+assets = ""
 voso_legacy = ""
 voso_legacy_ws = ""
 
@@ -35,6 +36,7 @@ default_exchange = "revolt.default"
 
 [rabbit.queues]
 acks = "internal.ack"
+events = "internal.event"
 
 [api]
 
@@ -62,14 +64,14 @@ expire_account_deletion = 86400  # 3600 * 24
 [api.security]
 # Authifier Shield API key
 authifier_shield_key = ""
-# Legacy voice server management token
-voso_legacy_token = ""
 # Whether services are behind the Cloudflare network
 trust_cloudflare = false
 # easypwned endpoint
 easypwned = ""
 # Tenor API Key
 tenor_key = ""
+# Admin keys for future admin api and for bonfire reported image fetching
+admin_keys = []
 
 [api.security.captcha]
 # hCaptcha configuration
@@ -87,6 +89,10 @@ max_concurrent_connections = 50
 [api.livekit]
 # How long to ring devices for when calling in dms/groups, in seconds
 call_ring_duration = 30
+
+[api.audit_logs]
+# How long audit log entries last before being removed, in seconds
+expires_after = 2592000  # 30d
 
 [api.livekit.nodes]
 
@@ -248,6 +254,9 @@ body_limit_size = 20_000_000
 # Leave empty to allow all users to create servers
 restrict_server_creation = []
 
+# Number of days after creation before an invite expires
+max_invite_duration_days = 30
+
 [features.limits.new_user]
 # Limits imposed on new users
 
@@ -330,6 +339,9 @@ emojis = 500_000
 # The max amount of messages the rabbitmq provider/db mention adder job will delay for before forcing handling of a channel.
 # default: 5
 process_message_delay_limit = 5
+# How many event ids to cache per bonfire connections.
+# Higher numbers result in more deduplication but more ram usage.
+seen_events_cache_size = 2048
 
 [features.legal_links]
 # URLs for legal documents

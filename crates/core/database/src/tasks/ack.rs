@@ -6,6 +6,7 @@ use once_cell::sync::Lazy;
 use revolt_config::capture_message;
 use revolt_models::v0::PushNotification;
 use std::{
+    any::Any,
     collections::{HashMap, HashSet},
     time::Duration,
 };
@@ -200,7 +201,10 @@ pub async fn handle_ack_event(
                         revolt_config::capture_error(&err);
                     }
                 } else {
-                    panic!("Unknown channel type when sending mass mention event");
+                    info!(
+                        "Unknown channel type {:?} when sending mass mention event",
+                        channel.type_id()
+                    );
                 }
             }
         }

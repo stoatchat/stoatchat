@@ -176,7 +176,7 @@ impl Member {
 
         EventV1::ServerCreate {
             id: server.id.clone(),
-            server: server.clone().into(),
+            server: server.clone().into(db).await,
             channels: channels
                 .clone()
                 .into_iter()
@@ -185,7 +185,7 @@ impl Member {
             emojis: emojis.into_iter().map(|emoji| emoji.into()).collect(),
             voice_states,
         }
-        .private(user.id.clone())
+        .p(user.id.clone())
         .await;
 
         if let Some(id) = server
@@ -245,6 +245,26 @@ impl Member {
         }
     }
 
+    /// Generates a PartialMember containing the data which has changed in an update
+    pub fn generate_diff(&self, partial: &PartialMember, remove: &[FieldsMember]) -> PartialMember {
+        let mut before = PartialMember::default();
+
+        generate_diff!(
+            self, before, partial, remove,
+            (
+                (FieldsMember::Nickname) nickname,
+                (FieldsMember::Avatar) avatar,
+                (FieldsMember::Timeout) timeout,
+                (FieldsMember::Pronouns) pronouns,
+                ((default) FieldsMember::Roles) roles,
+                ((default) FieldsMember::CanPublish) can_publish,
+                ((default) FieldsMember::CanReceive) can_receive,
+            )
+        );
+
+        before
+    }
+
     /// Get this user's current ranking
     pub fn get_ranking(&self, server: &Server) -> i64 {
         let mut value = i64::MAX;
@@ -270,7 +290,7 @@ impl Member {
 
     /// Remove member from server
     pub async fn remove(
-        self,
+        &self,
         db: &Database,
         server: &Server,
         intention: RemovalIntention,
@@ -297,9 +317,15 @@ impl Member {
                 })
             {
                 match intention {
-                    RemovalIntention::Leave => SystemMessage::UserLeft { id: self.id.user },
-                    RemovalIntention::Kick => SystemMessage::UserKicked { id: self.id.user },
-                    RemovalIntention::Ban => SystemMessage::UserBanned { id: self.id.user },
+                    RemovalIntention::Leave => SystemMessage::UserLeft {
+                        id: self.id.user.clone(),
+                    },
+                    RemovalIntention::Kick => SystemMessage::UserKicked {
+                        id: self.id.user.clone(),
+                    },
+                    RemovalIntention::Ban => SystemMessage::UserBanned {
+                        id: self.id.user.clone(),
+                    },
                 }
                 .into_message(id.to_string())
                 // TODO: support notifications here in the future?
@@ -317,7 +343,7 @@ impl Member {
 mod tests {
     use iso8601_timestamp::{Duration, Timestamp};
     use revolt_models::v0::DataCreateServer;
-
+    use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
     use crate::{Member, PartialMember, RemovalIntention, Server, User};
 
     #[tokio::test]
@@ -327,7 +353,7 @@ mod tests {
                 crate::Database::Reference(_) => return,
                 crate::Database::MongoDb(_) => (),
             }
-            let owner = User::create(&db, "Server Owner".to_string(), None, None)
+            let owner = User::create(&db, "ServerOwner".to_string(), None, None)
                 .await
                 .unwrap();
 

@@ -1,8 +1,8 @@
 use iso8601_timestamp::Timestamp;
 use revolt_models::v0::*;
-use revolt_permissions::{calculate_user_permissions, UserPermission};
+use revolt_permissions::{UserPermission, calculate_user_permissions};
 
-use crate::{util::permissions::DatabasePermissionQuery, Database};
+use crate::{Database, util::permissions::DatabasePermissionQuery};
 
 impl crate::Bot {
     pub fn into_public_bot(self, user: crate::User) -> PublicBot {
@@ -28,6 +28,7 @@ impl From<crate::Bot> for Bot {
             owner_id: value.owner,
             token: value.token,
             public: value.public,
+            default_permissions: value.default_permissions,
             analytics: value.analytics,
             discoverable: value.discoverable,
             interactions_url: value.interactions_url,
@@ -63,21 +64,33 @@ impl From<crate::Invite> for Invite {
                 code,
                 creator,
                 channel,
+                max_uses,
+                uses,
+                expires,
             } => Invite::Group {
                 code,
                 creator,
                 channel,
+                max_uses,
+                uses,
+                expires,
             },
             crate::Invite::Server {
                 code,
                 server,
                 creator,
                 channel,
+                max_uses,
+                uses,
+                expires,
             } => Invite::Server {
                 code,
                 server,
                 creator,
                 channel,
+                max_uses,
+                uses,
+                expires,
             },
         }
     }
@@ -98,6 +111,47 @@ impl From<crate::ChannelCompositeKey> for ChannelCompositeKey {
         ChannelCompositeKey {
             channel: value.channel,
             user: value.user,
+        }
+    }
+}
+
+impl From<crate::DiscoverBan> for DiscoverBan {
+    fn from(value: crate::DiscoverBan) -> Self {
+        DiscoverBan {
+            id: value.id,
+            item_type: value.item_type.into(),
+            item_id: value.item_id,
+        }
+    }
+}
+
+impl From<crate::DiscoverRequest> for DiscoverRequest {
+    fn from(value: crate::DiscoverRequest) -> Self {
+        DiscoverRequest {
+            request_type: value.request_type.into(),
+            request_id: value.request_id,
+            status: value.status.into(),
+        }
+    }
+}
+
+impl From<crate::DiscoverRequestType> for DiscoverRequestType {
+    fn from(value: crate::DiscoverRequestType) -> Self {
+        match value {
+            crate::DiscoverRequestType::Bot => DiscoverRequestType::Bot,
+            crate::DiscoverRequestType::Server => DiscoverRequestType::Server,
+        }
+    }
+}
+
+impl From<crate::DiscoverRequestStatus> for DiscoverRequestStatus {
+    fn from(value: crate::DiscoverRequestStatus) -> Self {
+        match value {
+            crate::DiscoverRequestStatus::Removed(s) => DiscoverRequestStatus::Removed(s),
+            crate::DiscoverRequestStatus::Approved(s) => DiscoverRequestStatus::Approved(s),
+            crate::DiscoverRequestStatus::Denied(s) => DiscoverRequestStatus::Denied(s),
+            crate::DiscoverRequestStatus::Pending => DiscoverRequestStatus::Pending,
+            crate::DiscoverRequestStatus::UnderReview => DiscoverRequestStatus::UnderReview,
         }
     }
 }
@@ -325,6 +379,7 @@ impl From<FieldsChannel> for crate::FieldsChannel {
             FieldsChannel::Icon => crate::FieldsChannel::Icon,
             FieldsChannel::DefaultPermissions => crate::FieldsChannel::DefaultPermissions,
             FieldsChannel::Voice => crate::FieldsChannel::Voice,
+            FieldsChannel::Slowmode => crate::FieldsChannel::Slowmode,
         }
     }
 }
@@ -336,6 +391,7 @@ impl From<crate::FieldsChannel> for FieldsChannel {
             crate::FieldsChannel::Icon => FieldsChannel::Icon,
             crate::FieldsChannel::DefaultPermissions => FieldsChannel::DefaultPermissions,
             crate::FieldsChannel::Voice => FieldsChannel::Voice,
+            crate::FieldsChannel::Slowmode => FieldsChannel::Slowmode,
         }
     }
 }
@@ -755,28 +811,31 @@ impl From<crate::RemovalIntention> for RemovalIntention {
     }
 }
 
-impl From<crate::Server> for Server {
-    fn from(value: crate::Server) -> Self {
+impl crate::Server {
+    pub async fn into(self, db: &Database) -> Server {
+        let approximate_member_count = self.get_approximate_member_count(db).await;
+
         Server {
-            id: value.id,
-            owner: value.owner,
-            name: value.name,
-            description: value.description,
-            channels: value.channels,
-            categories: value.categories.into_iter().map(|(k, v)| (k, v.into())).collect(),
-            system_messages: value.system_messages.map(|v| v.into()),
-            roles: value
-                .roles
+            id: self.id,
+            owner: self.owner,
+            name: self.name,
+            description: self.description,
+            channels: self.channels,
+            categories: self
+                .categories
                 .into_iter()
                 .map(|(k, v)| (k, v.into()))
                 .collect(),
-            default_permissions: value.default_permissions,
-            icon: value.icon.map(|f| f.into()),
-            banner: value.banner.map(|f| f.into()),
-            flags: value.flags.unwrap_or_default() as u32,
-            nsfw: value.nsfw,
-            analytics: value.analytics,
-            discoverable: value.discoverable,
+            system_messages: self.system_messages.map(|v| v.into()),
+            roles: self.roles.into_iter().map(|(k, v)| (k, v.into())).collect(),
+            default_permissions: self.default_permissions,
+            icon: self.icon.map(|f| f.into()),
+            banner: self.banner.map(|f| f.into()),
+            flags: self.flags.unwrap_or_default() as u32,
+            nsfw: self.nsfw,
+            analytics: self.analytics,
+            discoverable: self.discoverable,
+            approximate_member_count,
         }
     }
 }
@@ -789,7 +848,11 @@ impl From<Server> for crate::Server {
             name: value.name,
             description: value.description,
             channels: value.channels,
-            categories: value.categories.into_iter().map(|(k, v)| (k, v.into())).collect(),
+            categories: value
+                .categories
+                .into_iter()
+                .map(|(k, v)| (k, v.into()))
+                .collect(),
             system_messages: value.system_messages.map(|v| v.into()),
             roles: value
                 .roles
@@ -815,7 +878,9 @@ impl From<crate::PartialServer> for PartialServer {
             name: value.name,
             description: value.description,
             channels: value.channels,
-            categories: value.categories.map(|x| x.into_iter().map(|(k, v)| (k, v.into())).collect()),
+            categories: value
+                .categories
+                .map(|x| x.into_iter().map(|(k, v)| (k, v.into())).collect()),
             system_messages: value.system_messages.map(|v| v.into()),
             roles: value
                 .roles
@@ -827,6 +892,7 @@ impl From<crate::PartialServer> for PartialServer {
             nsfw: value.nsfw,
             analytics: value.analytics,
             discoverable: value.discoverable,
+            approximate_member_count: None,
         }
     }
 }
@@ -839,7 +905,9 @@ impl From<PartialServer> for crate::PartialServer {
             name: value.name,
             description: value.description,
             channels: value.channels,
-            categories: value.categories.map(|x| x.into_iter().map(|(k, v)| (k, v.into())).collect()),
+            categories: value
+                .categories
+                .map(|x| x.into_iter().map(|(k, v)| (k, v.into())).collect()),
             system_messages: value.system_messages.map(|v| v.into()),
             roles: value
                 .roles
@@ -859,7 +927,6 @@ impl From<crate::FieldsServer> for FieldsServer {
     fn from(value: crate::FieldsServer) -> Self {
         match value {
             crate::FieldsServer::Banner => FieldsServer::Banner,
-            crate::FieldsServer::Categories => FieldsServer::Categories,
             crate::FieldsServer::Description => FieldsServer::Description,
             crate::FieldsServer::Icon => FieldsServer::Icon,
             crate::FieldsServer::SystemMessages => FieldsServer::SystemMessages,
@@ -871,7 +938,6 @@ impl From<FieldsServer> for crate::FieldsServer {
     fn from(value: FieldsServer) -> crate::FieldsServer {
         match value {
             FieldsServer::Banner => crate::FieldsServer::Banner,
-            FieldsServer::Categories => crate::FieldsServer::Categories,
             FieldsServer::Description => crate::FieldsServer::Description,
             FieldsServer::Icon => crate::FieldsServer::Icon,
             FieldsServer::SystemMessages => crate::FieldsServer::SystemMessages,
@@ -951,6 +1017,7 @@ impl From<crate::Role> for Role {
             hoist: value.hoist,
             rank: value.rank,
             icon: value.icon.map(|f| f.into()),
+            owner: value.owner,
         }
     }
 }
@@ -965,6 +1032,7 @@ impl From<Role> for crate::Role {
             hoist: value.hoist,
             rank: value.rank,
             icon: value.icon.map(|f| f.into()),
+            owner: value.owner,
         }
     }
 }
@@ -979,6 +1047,7 @@ impl From<crate::PartialRole> for PartialRole {
             hoist: value.hoist,
             rank: value.rank,
             icon: value.icon.map(|f| f.into()),
+            owner: value.owner,
         }
     }
 }
@@ -993,6 +1062,7 @@ impl From<PartialRole> for crate::PartialRole {
             hoist: value.hoist,
             rank: value.rank,
             icon: value.icon.map(|f| f.into()),
+            owner: value.owner,
         }
     }
 }
@@ -1021,9 +1091,7 @@ impl crate::User {
         P: Into<Option<&'a crate::User>>,
     {
         let perspective = perspective.into();
-        let (relationship, can_see_profile) = if self.bot.is_some() {
-            (RelationshipStatus::None, true)
-        } else if let Some(perspective) = perspective {
+        let (relationship, can_see_profile) = if let Some(perspective) = perspective {
             let mut query = DatabasePermissionQuery::new(db, perspective).user(&self);
 
             if perspective.id == self.id {
@@ -1102,9 +1170,7 @@ impl crate::User {
         P: Into<Option<&'a crate::User>>,
     {
         let perspective = perspective.into();
-        let (relationship, can_see_profile) = if self.bot.is_some() {
-            (RelationshipStatus::None, true)
-        } else if let Some(perspective) = perspective {
+        let (relationship, can_see_profile) = if let Some(perspective) = perspective {
             if perspective.id == self.id {
                 (RelationshipStatus::User, true)
             } else {
@@ -1439,6 +1505,14 @@ impl From<FieldsMessage> for crate::FieldsMessage {
     }
 }
 
+impl From<crate::VoiceInformation> for VoiceInformation {
+    fn from(value: crate::VoiceInformation) -> Self {
+        VoiceInformation {
+            max_users: value.max_users,
+        }
+    }
+}
+
 impl From<VoiceInformation> for crate::VoiceInformation {
     fn from(value: VoiceInformation) -> Self {
         crate::VoiceInformation {
@@ -1447,10 +1521,151 @@ impl From<VoiceInformation> for crate::VoiceInformation {
     }
 }
 
-impl From<crate::VoiceInformation> for VoiceInformation {
-    fn from(value: crate::VoiceInformation) -> Self {
-        VoiceInformation {
-            max_users: value.max_users,
+impl From<crate::AuditLogEntryAction> for AuditLogEntryAction {
+    fn from(value: crate::AuditLogEntryAction) -> Self {
+        match value {
+            crate::AuditLogEntryAction::MessageDelete { author, channel } => {
+                AuditLogEntryAction::MessageDelete { author, channel }
+            }
+            crate::AuditLogEntryAction::BanCreate { user } => {
+                AuditLogEntryAction::BanCreate { user }
+            }
+            crate::AuditLogEntryAction::BanDelete { user } => {
+                AuditLogEntryAction::BanDelete { user }
+            }
+            crate::AuditLogEntryAction::ChannelCreate { channel, name } => {
+                AuditLogEntryAction::ChannelCreate { channel, name }
+            }
+            crate::AuditLogEntryAction::MemberEdit {
+                user,
+                before,
+                after,
+            } => AuditLogEntryAction::MemberEdit {
+                user,
+                before: before.into(),
+                after: after.into(),
+            },
+            crate::AuditLogEntryAction::MemberKick { user } => {
+                AuditLogEntryAction::MemberKick { user }
+            }
+            crate::AuditLogEntryAction::ServerEdit { before, after } => {
+                AuditLogEntryAction::ServerEdit {
+                    before: before.into(),
+                    after: after.into(),
+                }
+            }
+            crate::AuditLogEntryAction::RoleEdit {
+                role,
+                before,
+                after,
+            } => AuditLogEntryAction::RoleEdit {
+                role,
+                before: before.into(),
+                after: after.into(),
+            },
+            crate::AuditLogEntryAction::RoleCreate { role, name } => {
+                AuditLogEntryAction::RoleCreate { role, name }
+            }
+            crate::AuditLogEntryAction::RoleDelete { role, name } => {
+                AuditLogEntryAction::RoleDelete { role, name }
+            }
+            crate::AuditLogEntryAction::RolesReorder { before, after } => {
+                AuditLogEntryAction::RolesReorder { before, after }
+            }
+            crate::AuditLogEntryAction::MessageBulkDelete { channel, count } => {
+                AuditLogEntryAction::MessageBulkDelete { channel, count }
+            }
+            crate::AuditLogEntryAction::ChannelEdit {
+                channel,
+                before,
+                after,
+            } => AuditLogEntryAction::ChannelEdit {
+                channel,
+                before: before.into(),
+                after: after.into(),
+            },
+            crate::AuditLogEntryAction::ChannelRolePermissionsEdit {
+                channel,
+                role,
+                permissions,
+            } => AuditLogEntryAction::ChannelRolePermissionsEdit {
+                channel,
+                role,
+                permissions: permissions.into(),
+            },
+            crate::AuditLogEntryAction::ChannelDelete { channel, name } => {
+                AuditLogEntryAction::ChannelDelete { channel, name }
+            }
+            crate::AuditLogEntryAction::InviteDelete { invite, channel } => {
+                AuditLogEntryAction::InviteDelete { invite, channel }
+            }
+            crate::AuditLogEntryAction::WebhookCreate {
+                webhook,
+                name,
+                channel,
+            } => AuditLogEntryAction::WebhookCreate {
+                webhook,
+                name,
+                channel,
+            },
+            crate::AuditLogEntryAction::WebhookDelete {
+                webhook,
+                name,
+                channel,
+            } => AuditLogEntryAction::WebhookDelete {
+                webhook,
+                name,
+                channel,
+            },
+            crate::AuditLogEntryAction::EmojiCreate { emoji, name } => {
+                AuditLogEntryAction::EmojiCreate { emoji, name }
+            }
+            crate::AuditLogEntryAction::EmojiUpdate {
+                emoji,
+                before,
+                after,
+            } => AuditLogEntryAction::EmojiUpdate {
+                emoji,
+                before: before.into(),
+                after: after.into(),
+            },
+            crate::AuditLogEntryAction::EmojiDelete { emoji, name } => {
+                AuditLogEntryAction::EmojiDelete { emoji, name }
+            }
+            crate::AuditLogEntryAction::MessagePin {
+                message,
+                author,
+                channel,
+            } => AuditLogEntryAction::MessagePin {
+                message,
+                author,
+                channel,
+            },
+            crate::AuditLogEntryAction::MessageUnpin {
+                message,
+                author,
+                channel,
+            } => AuditLogEntryAction::MessageUnpin {
+                message,
+                author,
+                channel,
+            },
+            crate::AuditLogEntryAction::InviteCreate { invite, channel } => {
+                AuditLogEntryAction::InviteCreate { invite, channel }
+            }
+        }
+    }
+}
+
+impl From<crate::AuditLogEntry> for AuditLogEntry {
+    fn from(value: crate::AuditLogEntry) -> Self {
+        AuditLogEntry {
+            id: value.id,
+            server: value.server,
+            reason: value.reason,
+            user: value.user,
+            target: value.target,
+            action: value.action.into(),
         }
     }
 }
@@ -1541,5 +1756,11 @@ impl From<WebPushSubscription> for crate::WebPushSubscription {
             p256dh: value.p256dh,
             auth: value.auth,
         }
+    }
+}
+
+impl From<crate::PartialEmoji> for PartialEmoji {
+    fn from(value: crate::PartialEmoji) -> Self {
+        PartialEmoji { name: value.name }
     }
 }

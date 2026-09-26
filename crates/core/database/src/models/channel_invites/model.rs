@@ -1,3 +1,4 @@
+use iso8601_timestamp::{Timestamp};
 use revolt_result::{create_error, Result};
 
 use crate::{Channel, Database, User};
@@ -23,6 +24,12 @@ auto_derived!(
             creator: String,
             /// Id of the server channel this invite points to
             channel: String,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            max_uses: Option<u64>,
+            #[serde(default)]
+            uses: u64,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            expires: Option<Timestamp>,
         },
         /// Invite to a group channel
         Group {
@@ -33,6 +40,15 @@ auto_derived!(
             creator: String,
             /// Id of the group channel this invite points to
             channel: String,
+            /// Maximum number of times this invite can be used
+            #[serde(skip_serializing_if = "Option::is_none")]
+            max_uses: Option<u64>,
+            /// The amount of times this invite is used
+            #[serde(default)]
+            uses: u64,
+            /// Timestamp of when this invite expires
+            #[serde(skip_serializing_if = "Option::is_none")]
+            expires: Option<Timestamp>,
         }, /* User {
                code: String,
                user: String
@@ -61,13 +77,19 @@ impl Invite {
         db: &Database,
         creator: &User,
         channel: &Channel,
+        max_uses: Option<u64>,
+        expires: Option<Timestamp>,
     ) -> Result<Invite> {
         let code = nanoid::nanoid!(8, &ALPHABET);
+
         let invite = match &channel {
             Channel::Group { id, .. } => Ok(Invite::Group {
                 code,
                 creator: creator.id.clone(),
                 channel: id.clone(),
+                max_uses,
+                uses: 0,
+                expires,
             }),
             Channel::TextChannel { id, server, .. } => {
                 Ok(Invite::Server {
@@ -75,6 +97,9 @@ impl Invite {
                     creator: creator.id.clone(),
                     server: server.clone(),
                     channel: id.clone(),
+                    max_uses,
+                    uses: 0,
+                    expires,
                 })
             }
             _ => Err(create_error!(InvalidOperation)),
@@ -83,7 +108,7 @@ impl Invite {
         db.insert_invite(&invite).await?;
         Ok(invite)
     }
-
+    
     /// Resolve an invite by its ID or by a public server ID
     pub async fn find(db: &Database, code: &str) -> Result<Invite> {
         if let Ok(invite) = db.fetch_invite(code).await {
@@ -96,6 +121,9 @@ impl Invite {
                         server: server.id,
                         creator: server.owner,
                         channel,
+                        max_uses: None,
+                        uses: 0,
+                        expires: None,
                     });
                 }
             }

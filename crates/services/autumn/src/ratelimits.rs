@@ -14,15 +14,14 @@ impl RatelimitResolver<Parts> for AutumnRatelimits {
 
         match (&parts.method, path.as_slice()) {
             (&Method::POST, &[tag]) => ("upload", Some(tag)),
-            _ => ("any", None),
+            _ => ("any_atmn", None),
         }
     }
 
     fn resolve_bucket_limit(&self, bucket: &str) -> u32 {
         match bucket {
             "upload" => 10,
-            "any" => u32::MAX,
-            _ => unreachable!("Bucket defined but no limit set"),
+            _ => u32::MAX,
         }
     }
 }

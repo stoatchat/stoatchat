@@ -39,10 +39,12 @@ pub async fn fetch(
         }
 
         Ok(Json(v0::FetchServerResponse::ServerWithChannels {
-            server: server.into(),
+            server: server.into(db).await,
             channels: visible_channels,
         }))
     } else {
-        Ok(Json(v0::FetchServerResponse::JustServer(server.into())))
+        Ok(Json(v0::FetchServerResponse::JustServer(
+            server.into(db).await,
+        )))
     }
 }

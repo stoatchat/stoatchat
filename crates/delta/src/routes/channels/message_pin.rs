@@ -1,12 +1,14 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Channel, Database, PartialMessage, SystemMessage, User, AMQP,
+    AuditLogEntryAction, Channel, Database, PartialMessage, SystemMessage, User, AMQP,
 };
 use revolt_models::v0::MessageAuthor;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::State;
 use rocket_empty::EmptyResponse;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Pins a message
 ///
@@ -17,6 +19,7 @@ pub async fn message_pin(
     db: &State<Database>,
     amqp: &State<AMQP>,
     user: User,
+    reason: AuditLogReason,
     target: Reference<'_>,
     msg: Reference<'_>,
 ) -> Result<EmptyResponse> {
@@ -65,6 +68,22 @@ pub async fn message_pin(
     )
     .await?;
 
+    if let Some(server_id) = channel.server() {
+        AuditLogEntryAction::MessagePin {
+            message: message.id.clone(),
+            author: message.author.clone(),
+            channel: message.channel.clone(),
+        }
+        .insert(
+            db,
+            server_id.to_string(),
+            reason,
+            user.id,
+            Some(message.author),
+        )
+        .await;
+    }
+
     Ok(EmptyResponse)
 }
 
@@ -78,10 +97,11 @@ mod test {
     };
     use revolt_models::v0::{self, SystemMessage};
     use rocket::http::{Header, Status};
+    use crate::util::test::PubSubTestHelper;
 
     #[rocket::async_test]
     async fn pin_message() {
-        let mut harness = TestHarness::new().await;
+        let harness = TestHarness::new().await;
         let (_, session, user) = harness.new_user().await;
 
         let (server, channels) = Server::create(
@@ -100,6 +120,7 @@ mod test {
             .await
             .expect("Failed to create member");
         let channel = &channels[0];
+        let mut pubsub = PubSubTestHelper::new(channel.id()).await;
 
         let message = Message::create_from_api(
             &harness.db,
@@ -140,8 +161,8 @@ mod test {
         assert_eq!(response.status(), Status::NoContent);
         drop(response);
 
-        harness
-            .wait_for_event(channel.id(), |event| match event {
+        pubsub
+            .wait_for_event(|event| match event {
                 EventV1::Message(message) => match &message.system {
                     Some(SystemMessage::MessagePinned { by, .. }) => {
                         assert_eq!(by, &user.id);
@@ -154,8 +175,8 @@ mod test {
             })
             .await;
 
-        harness
-            .wait_for_event(channel.id(), |event| match event {
+        pubsub
+            .wait_for_event(|event| match event {
                 EventV1::MessageUpdate {
                     id,
                     channel: channel_id,

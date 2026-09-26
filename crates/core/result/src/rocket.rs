@@ -14,6 +14,8 @@ impl<'r> Responder<'r, 'static> for Error {
         let status = match self.error_type {
             ErrorType::LabelMe => Status::InternalServerError,
 
+            ErrorType::ContactSupport { .. } => Status::BadRequest,
+
             ErrorType::AlreadyOnboarded => Status::Forbidden,
 
             ErrorType::UnknownUser => Status::NotFound,
@@ -93,6 +95,7 @@ impl<'r> Responder<'r, 'static> for Error {
             ErrorType::NotConnected => Status::BadRequest,
             ErrorType::UnknownNode => Status::BadRequest,
             ErrorType::FeatureDisabled { .. } => Status::BadRequest,
+            ErrorType::HeaderTooLarge => Status::BadRequest,
 
             ErrorType::ProxyError => Status::BadRequest,
             ErrorType::FileTooSmall => Status::UnprocessableEntity,

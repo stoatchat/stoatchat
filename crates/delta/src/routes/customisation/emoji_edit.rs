@@ -1,12 +1,14 @@
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    Database, EmojiParent, PartialEmoji, User,
+    AuditLogEntryAction, Database, EmojiParent, PartialEmoji, User,
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 use validator::Validate;
+
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Edit Emoji
 ///
@@ -16,6 +18,7 @@ use validator::Validate;
 pub async fn edit_emoji(
     db: &State<Database>,
     user: User,
+    reason: AuditLogReason,
     emoji_id: Reference<'_>,
     data: Json<v0::DataEditEmoji>,
 ) -> Result<Json<v0::Emoji>> {
@@ -44,8 +47,24 @@ pub async fn edit_emoji(
         return Ok(Json(emoji.into()));
     }
 
-    let partial = PartialEmoji { name: data.name };
-    emoji.update(db, partial).await?;
+    let partial = PartialEmoji {
+        name: data.name,
+        ..Default::default()
+    };
+
+    let before = emoji.generate_diff(&partial);
+
+    emoji.update(db, partial.clone()).await?;
+
+    if let EmojiParent::Server { id: server_id } = emoji.parent.clone() {
+        AuditLogEntryAction::EmojiUpdate {
+            emoji: emoji.id.clone(),
+            before,
+            after: partial,
+        }
+        .insert(db, server_id, reason, user.id, Some(emoji.creator_id.clone()))
+        .await;
+    };
 
     Ok(Json(emoji.into()))
 }

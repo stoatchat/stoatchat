@@ -171,7 +171,6 @@ impl IntoDocumentPath for FieldsServer {
     fn as_path(&self) -> Option<&'static str> {
         Some(match self {
             FieldsServer::Banner => "banner",
-            FieldsServer::Categories => "categories",
             FieldsServer::Description => "description",
             FieldsServer::Icon => "icon",
             FieldsServer::SystemMessages => "system_messages",
@@ -258,6 +257,13 @@ impl MongoDb {
             "used_for.id": &server_id
         })
         .await?;
+
+        self.col::<Document>("audit_logs")
+            .delete_many(doc! {
+                "server": &server_id
+            })
+            .await
+            .map_err(|_| create_database_error!("delete_many", "audit_logs"))?;
 
         Ok(())
     }

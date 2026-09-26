@@ -3,7 +3,7 @@ extern crate log;
 
 use once_cell::sync::Lazy;
 use rand::Rng;
-use redis_kiss::{get_connection, AsyncCommands};
+use redis_kiss::{AsyncCommands, get_connection};
 use std::collections::HashSet;
 
 mod operations;
@@ -30,16 +30,16 @@ pub async fn create_session(user_id: &str, flags: u8) -> (bool, u32) {
 
     if let Ok(mut conn) = get_connection().await {
         // Check whether this is the first session
-        let was_empty = __get_set_size(&mut conn, user_id).await == 0;
+        let was_empty = __get_set_size(&mut conn, &format!("sessions:{user_id}")).await == 0;
 
         // A session ID is comprised of random data and any flags ORed to the end
         let session_id = {
             let mut rng = rand::thread_rng();
-            (rng.gen::<u32>() & !FLAG_BITS) | (flags as u32 & FLAG_BITS)
+            (rng.r#gen::<u32>() & !FLAG_BITS) | (flags as u32 & FLAG_BITS)
         };
 
         // Add session to user's sessions and to the region
-        __add_to_set_u32(&mut conn, user_id, session_id).await;
+        __add_to_set_u32(&mut conn, &format!("sessions:{user_id}"), session_id).await;
         __add_to_set_string(&mut conn, ONLINE_SET, user_id).await;
         __add_to_set_string(&mut conn, &REGION_KEY, &format!("{user_id}:{session_id}")).await;
         info!("Created session for {user_id}, assigned them a session ID of {session_id}.");
@@ -62,7 +62,7 @@ async fn delete_session_internal(user_id: &str, session_id: u32, skip_region: bo
 
     if let Ok(mut conn) = get_connection().await {
         // Remove the session
-        __remove_from_set_u32(&mut conn, user_id, session_id).await;
+        __remove_from_set_u32(&mut conn, &format!("sessions:{user_id}"), session_id).await;
 
         // Remove from the region
         if !skip_region {
@@ -71,7 +71,7 @@ async fn delete_session_internal(user_id: &str, session_id: u32, skip_region: bo
         }
 
         // Return whether this was the last session
-        let is_empty = __get_set_size(&mut conn, user_id).await == 0;
+        let is_empty = __get_set_size(&mut conn, &format!("sessions:{user_id}")).await == 0;
         if is_empty {
             __remove_from_set_string(&mut conn, ONLINE_SET, user_id).await;
             info!("User ID {} just went offline.", &user_id);
@@ -87,7 +87,9 @@ async fn delete_session_internal(user_id: &str, session_id: u32, skip_region: bo
 /// Check whether a given user ID is online
 pub async fn is_online(user_id: &str) -> bool {
     if let Ok(mut conn) = get_connection().await {
-        conn.exists(user_id).await.unwrap_or(false)
+        conn.exists(format!("sessions:{user_id}"))
+            .await
+            .unwrap_or(false)
     } else {
         false
     }
@@ -203,8 +205,8 @@ mod tests {
         clear_region(None).await;
 
         // Generate some data we'll use:
-        let user_id = rand::thread_rng().gen::<u32>().to_string();
-        let other_id = rand::thread_rng().gen::<u32>().to_string();
+        let user_id = rand::thread_rng().r#gen::<u32>().to_string();
+        let other_id = rand::thread_rng().r#gen::<u32>().to_string();
         let flags = 1;
 
         // Create a session

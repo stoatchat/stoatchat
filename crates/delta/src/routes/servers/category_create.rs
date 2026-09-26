@@ -16,7 +16,7 @@ use validator::Validate;
 pub async fn create(
     db: &State<Database>,
     user: User,
-    target: Reference,
+    target: Reference<'_>,
     data: Json<v0::DataCreateCategory>,
 ) -> Result<Json<v0::Category>> {
     let data = data.into_inner();

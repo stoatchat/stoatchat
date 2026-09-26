@@ -16,7 +16,7 @@ use validator::Validate;
 pub async fn edit(
     db: &State<Database>,
     user: User,
-    server: Reference,
+    server: Reference<'_>,
     category: String,
     data: Json<v0::DataEditCategory>,
 ) -> Result<Json<v0::Category>> {
@@ -96,8 +96,8 @@ pub async fn edit(
 
     // update all channels to have the parent set
     for channel in channels {
-        if let Channel::TextChannel { ref parent, .. } | Channel::VoiceChannel { ref parent, .. } = channel {
-            if parent.as_ref() != Some(&category.id) {
+        if let Some(parent) = channel.parent() {
+            if parent != &category.id {
                 db.update_channel(channel.id(), &PartialChannel { parent: Some(category.id.clone()), ..Default::default() }, Vec::new()).await?;
             };
         };

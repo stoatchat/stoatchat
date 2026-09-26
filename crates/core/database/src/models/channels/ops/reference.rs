@@ -1,8 +1,8 @@
 use std::collections::hash_map::Entry;
 
 use super::AbstractChannels;
-use crate::ReferenceDb;
 use crate::util::ChunkedDatabaseGenerator;
+use crate::ReferenceDb;
 use crate::{Channel, FieldsChannel, PartialChannel};
 use revolt_permissions::OverrideField;
 use revolt_result::Result;
@@ -53,7 +53,10 @@ impl AbstractChannels for ReferenceDb {
     }
 
     // Fetch all group dms for a user
-    async fn find_group_message_channels(&self, user_id: &str) -> Result<ChunkedDatabaseGenerator<Channel>> {
+    async fn find_group_message_channels(
+        &self,
+        user_id: &str,
+    ) -> Result<ChunkedDatabaseGenerator<Channel>> {
         let channels = self.channels.lock().await;
         let groups = channels
             .values()
@@ -168,7 +171,7 @@ impl AbstractChannels for ReferenceDb {
             if let Some(Channel::Group { recipients, .. }) = channels.get_mut(&channel_id) {
                 recipients.retain(|recipient| recipient != user_id);
             }
-        };
+        }
 
         Ok(())
     }
@@ -181,5 +184,42 @@ impl AbstractChannels for ReferenceDb {
         } else {
             Err(create_error!(NotFound))
         }
+    }
+
+    async fn fetch_last_message(&self, channel_id: &str) -> Result<Option<String>> {
+        let messages = self.messages.lock().await;
+        let mut channel_messages: Vec<&crate::Message> = messages
+            .iter()
+            .filter(|(_, msg)| msg.channel == channel_id)
+            .map(|(_, msg)| msg)
+            .collect();
+
+        channel_messages.sort_unstable_by_key(|msg| &msg.id);
+        Ok(channel_messages.last().map(|msg| msg.id.clone()).or(None))
+    }
+
+    async fn update_last_messsage_id(
+        &self,
+        channel_id: &str,
+        message_id: Option<&str>,
+    ) -> Result<()> {
+        let mut channels = self.channels.lock().await;
+        let channel = channels
+            .get_mut(channel_id)
+            .ok_or_else(|| create_error!(NotFound))?;
+
+        match channel {
+            Channel::DirectMessage {
+                last_message_id, ..
+            }
+            | Channel::Group {
+                last_message_id, ..
+            }
+            | Channel::TextChannel {
+                last_message_id, ..
+            } => *last_message_id = message_id.map(|id| id.to_string()),
+            _ => (),
+        };
+        Ok(())
     }
 }

@@ -307,7 +307,7 @@ impl State {
         Ok(EventV1::Ready {
             users: if fields.users { Some(users) } else { None },
             servers: if fields.servers {
-                Some(servers.into_iter().map(Into::into).collect())
+                Some(join_all(servers.into_iter().map(|server| server.into(db))).await)
             } else {
                 None
             },
@@ -567,6 +567,7 @@ impl State {
             EventV1::ServerMemberLeave { id, user, .. } => {
                 if user == &self.cache.user_id {
                     self.remove_subscription(id).await;
+                    self.remove_active_server(id).await;
 
                     if let Some(server) = self.cache.servers.remove(id) {
                         for channel in &server.channels {

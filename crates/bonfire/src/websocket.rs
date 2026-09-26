@@ -1,4 +1,4 @@
-use std::{collections::HashSet, net::SocketAddr, sync::Arc};
+use std::{collections::HashSet, net::SocketAddr, num::NonZeroUsize, sync::Arc};
 
 use async_tungstenite::WebSocketStream;
 use fred::{
@@ -21,21 +21,22 @@ use revolt_database::{
 };
 use revolt_presence::{create_session, delete_session};
 
+use revolt_result::create_error;
+use sentry::Level;
 use tokio::{
     net::TcpStream,
     sync::{Mutex, RwLock},
     task::spawn,
 };
-use tokio_util::compat::{TokioAsyncReadCompatExt, Compat};
-use revolt_result::create_error;
-use sentry::Level;
+use tokio_util::compat::{Compat, TokioAsyncReadCompatExt};
 
 use crate::config::{ProtocolConfiguration, WebsocketHandshakeCallback};
 use crate::events::state::{State, SubscriptionStateChange};
 use revolt_models::v0;
 
 type WsReader = SplitStream<WebSocketStream<Compat<TcpStream>>>;
-type WsWriter = SplitSink<WebSocketStream<Compat<TcpStream>>, async_tungstenite::tungstenite::Message>;
+type WsWriter =
+    SplitSink<WebSocketStream<Compat<TcpStream>>, async_tungstenite::tungstenite::Message>;
 
 /// Start a new WebSocket client worker given access to the database,
 /// the relevant TCP stream and the remote address of the client.
@@ -106,8 +107,15 @@ pub async fn client(db: &'static Database, stream: TcpStream, addr: SocketAddr) 
         .await
         .ok();
 
+    let backend_config = revolt_config::config().await;
+
     // Create local state.
-    let mut state = State::from(user, session_id);
+    let mut state = State::from(
+        user,
+        session_id,
+        NonZeroUsize::new(backend_config.features.advanced.seen_events_cache_size as usize)
+            .expect("config.features.advanced.seen_events_cache_size cannot be 0!"),
+    );
     let user_id = state.cache.user_id.clone();
 
     // Notify socket we have authenticated.
@@ -181,6 +189,7 @@ pub async fn client(db: &'static Database, stream: TcpStream, addr: SocketAddr) 
             read,
             &write,
             kill_signal_1_s,
+            db,
         );
 
         join!(listener, worker);
@@ -412,6 +421,7 @@ async fn worker_with_kill_signal(
     read: WsReader,
     write: &Mutex<WsWriter>,
     kill_signal_s: async_channel::Sender<()>,
+    db: &Database,
 ) {
     worker(
         addr,
@@ -423,6 +433,7 @@ async fn worker_with_kill_signal(
         kill_signal_r,
         read,
         write,
+        db,
     )
     .await;
     kill_signal_s.send(()).await.ok();
@@ -439,9 +450,8 @@ async fn worker(
     kill_signal_r: async_channel::Receiver<()>,
     mut read: WsReader,
     write: &Mutex<WsWriter>,
+    db: &Database,
 ) {
-    let revolt_config = revolt_config::config().await;
-
     loop {
         let t1 = read.try_next().fuse();
         let t2 = kill_signal_r.recv().fuse();
@@ -478,10 +488,6 @@ async fn worker(
 
                 match payload {
                     ClientMessage::BeginTyping { channel } => {
-                        if revolt_config.disable_events_dont_use {
-                            continue;
-                        }
-
                         if !subscribed.read().await.contains(&channel) {
                             continue;
                         }
@@ -494,10 +500,6 @@ async fn worker(
                         .await;
                     }
                     ClientMessage::EndTyping { channel } => {
-                        if revolt_config.disable_events_dont_use {
-                            continue;
-                        }
-
                         if !subscribed.read().await.contains(&channel) {
                             continue;
                         }
@@ -510,13 +512,15 @@ async fn worker(
                         .await;
                     }
                     ClientMessage::Subscribe { server_id } => {
-                        let mut servers = active_servers.lock().await;
-                        let has_item = servers.contains_key(&server_id);
-                        servers.insert(server_id, ());
+                        if db.fetch_member(&server_id, &user_id).await.is_ok() {
+                            let mut servers = active_servers.lock().await;
+                            let has_item = servers.contains_key(&server_id);
+                            servers.insert(server_id, ());
 
-                        if !has_item {
-                            // Poke the listener to adjust subscriptions
-                            topic_signal_s.send(()).await.ok();
+                            if !has_item {
+                                // Poke the listener to adjust subscriptions
+                                topic_signal_s.send(()).await.ok();
+                            }
                         }
                     }
                     ClientMessage::Ping { data, responded } => {

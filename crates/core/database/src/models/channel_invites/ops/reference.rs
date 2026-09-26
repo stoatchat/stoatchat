@@ -1,3 +1,4 @@
+use iso8601_timestamp::Timestamp;
 use revolt_result::Result;
 
 use crate::Invite;
@@ -48,5 +49,59 @@ impl AbstractChannelInvites for ReferenceDb {
         } else {
             Err(create_error!(NotFound))
         }
+    }
+
+    /// Atomically consume one use of an invite, returning the invite's state
+    /// *after* the increment — or `None` if it had no uses remaining (or didn't exist).
+    async fn consume_invite_use(&self, code: &str) -> Result<Option<Invite>> {
+        let mut invites = self.channel_invites.lock().await;
+
+        let Some(invite) = invites.get_mut(code) else {
+            return Ok(None);
+        };
+
+        let (uses, max_uses) = match invite {
+            Invite::Server { uses, max_uses, .. } | Invite::Group { uses, max_uses, .. } => {
+                (uses, max_uses)
+            }
+        };
+
+        if let Some(max_uses) = max_uses {
+            if *uses >= *max_uses {
+                return Ok(None);
+            }
+        }
+
+        *uses += 1;
+        Ok(Some(invite.clone()))
+    }
+
+    async fn delete_expired_invites(&self) -> Result<u64> {
+        let mut invites = self.channel_invites.lock().await;
+        let now = Timestamp::now_utc();
+
+        let expired_codes: Vec<String> = invites
+            .iter()
+            .filter(|(_, invite)| {
+                let (expires, uses, max_uses) = match invite {
+                    Invite::Server { expires, uses, max_uses, .. }
+                    | Invite::Group { expires, uses, max_uses, .. } => (expires, uses, max_uses),
+                };
+
+                let is_time_expired = matches!(expires, Some(expires) if *expires <= now);
+                let is_use_exhausted = matches!(max_uses, Some(max_uses) if uses >= max_uses);
+
+                is_time_expired || is_use_exhausted
+            })
+            .map(|(code, _)| code.clone())
+            .collect();
+
+        let count = expired_codes.len() as u64;
+
+        for code in expired_codes {
+            invites.remove(&code);
+        }
+
+        Ok(count)
     }
 }
