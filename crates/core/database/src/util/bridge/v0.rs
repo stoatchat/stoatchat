@@ -223,6 +223,7 @@ impl From<crate::Channel> for Channel {
                 last_message_id,
                 permissions,
                 nsfw,
+                e2e,
             } => Channel::Group {
                 id,
                 name,
@@ -233,6 +234,7 @@ impl From<crate::Channel> for Channel {
                 last_message_id,
                 permissions,
                 nsfw,
+                e2e,
             },
             crate::Channel::TextChannel {
                 id,
@@ -246,6 +248,7 @@ impl From<crate::Channel> for Channel {
                 nsfw,
                 voice,
                 slowmode,
+                e2e,
             } => Channel::TextChannel {
                 id,
                 server,
@@ -258,6 +261,7 @@ impl From<crate::Channel> for Channel {
                 nsfw,
                 voice: voice.map(|voice| voice.into()),
                 slowmode,
+                e2e,
             },
         }
     }
@@ -289,6 +293,7 @@ impl From<Channel> for crate::Channel {
                 last_message_id,
                 permissions,
                 nsfw,
+                e2e,
             } => crate::Channel::Group {
                 id,
                 name,
@@ -299,6 +304,7 @@ impl From<Channel> for crate::Channel {
                 last_message_id,
                 permissions,
                 nsfw,
+                e2e,
             },
             Channel::TextChannel {
                 id,
@@ -312,6 +318,7 @@ impl From<Channel> for crate::Channel {
                 nsfw,
                 voice,
                 slowmode,
+                e2e,
             } => crate::Channel::TextChannel {
                 id,
                 server,
@@ -324,6 +331,7 @@ impl From<Channel> for crate::Channel {
                 nsfw,
                 voice: voice.map(|voice| voice.into()),
                 slowmode,
+                e2e,
             },
         }
     }
@@ -344,6 +352,7 @@ impl From<crate::PartialChannel> for PartialChannel {
             last_message_id: value.last_message_id,
             voice: value.voice.map(|voice| voice.into()),
             slowmode: value.slowmode,
+            e2e: value.e2e,
         }
     }
 }
@@ -363,6 +372,7 @@ impl From<PartialChannel> for crate::PartialChannel {
             last_message_id: value.last_message_id,
             voice: value.voice.map(|voice| voice.into()),
             slowmode: value.slowmode,
+            e2e: value.e2e,
         }
     }
 }
@@ -437,6 +447,7 @@ impl From<crate::File> for File {
             user_id: value.user_id,
             server_id: value.server_id,
             object_id: value.object_id,
+            e2e_id: value.e2e_id,
         }
     }
 }
@@ -460,6 +471,7 @@ impl From<File> for crate::File {
             uploaded_at: None,
             uploader_id: None,
             used_for: None,
+            e2e_id: value.e2e_id,
         }
     }
 }
