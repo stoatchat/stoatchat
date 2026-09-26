@@ -572,7 +572,6 @@ pub async fn setup_logging(release: &'static str, dsn: String) -> Option<sentry:
         }
     }
 
-    pretty_env_logger::init();
     log::info!("Starting {release}");
 
     if dsn.is_empty() {
