@@ -33,6 +33,9 @@ pub trait AbstractChannels: Sync + Send {
     // Fetch direct message channel (DM or Saved Messages)
     async fn find_direct_message_channel(&self, user_a: &str, user_b: &str) -> Result<Channel>;
 
+    /// Fetch all channels inside a category
+    async fn find_category_channels(&self, category_id: &str) -> Result<Vec<Channel>>;
+
     /// Insert a user to a group
     async fn add_user_to_group(&self, channel_id: &str, user_id: &str) -> Result<()>;
 

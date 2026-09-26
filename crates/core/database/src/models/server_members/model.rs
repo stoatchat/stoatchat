@@ -174,19 +174,23 @@ impl Member {
         .p(server.id.clone())
         .await;
 
-        EventV1::ServerCreate {
-            id: server.id.clone(),
-            server: server.clone().into(db).await,
-            channels: channels
+        {
+            let channels = channels
                 .clone()
                 .into_iter()
                 .map(|channel| channel.into())
-                .collect(),
-            emojis: emojis.into_iter().map(|emoji| emoji.into()).collect(),
-            voice_states,
-        }
-        .p(user.id.clone())
-        .await;
+                .collect::<Vec<_>>();
+
+            EventV1::ServerCreate {
+                id: server.id.clone(),
+                server: server.clone().into(db, &channels).await,
+                channels,
+                emojis: emojis.into_iter().map(|emoji| emoji.into()).collect(),
+                voice_states,
+            }
+            .p(user.id.clone())
+            .await;
+        };
 
         if let Some(id) = server
             .system_messages

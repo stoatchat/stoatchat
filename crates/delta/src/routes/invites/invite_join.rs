@@ -30,10 +30,11 @@ pub async fn join(
         Invite::Server { server, .. } => {
             let server = db.fetch_server(server).await?;
             let (_, channels) = Member::create(db, &server, &user, None).await?;
+            let channels = channels.into_iter().map(|c| c.into()).collect::<Vec<_>>();
 
             Ok(Json(InviteJoinResponse::Server {
-                channels: channels.into_iter().map(|c| c.into()).collect(),
-                server: server.into(db).await,
+                server: server.into(db, &channels).await,
+                channels,
             }))
         }
         Invite::Group {

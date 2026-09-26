@@ -1,5 +1,3 @@
-use std::collections::{HashMap, HashSet};
-
 use revolt_database::{
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     AuditLogEntryAction, Database, FieldsServer, File, PartialServer, User, ValidatedTicket,
@@ -36,6 +34,8 @@ pub async fn edit(
     let mut query = DatabasePermissionQuery::new(db, &user).server(&server);
     let permissions = calculate_server_permissions(&mut query).await;
 
+    let channels = db.fetch_channels(&server.channels).await?.into_iter().map(Into::into).collect::<Vec<_>>();
+
     // Check permissions
     if data.name.is_none()
         && data.description.is_none()
@@ -49,7 +49,7 @@ pub async fn edit(
         && data.owner.is_none()
         && data.remove.is_empty()
     {
-        return Ok(Json(server.into(db).await));
+        return Ok(Json(server.into(db, &channels).await));
     } else if data.name.is_some()
         || data.description.is_some()
         || data.icon.is_some()
@@ -169,5 +169,5 @@ pub async fn edit(
     .insert(db, server.id.clone(), reason, user.id, None)
     .await;
 
-    Ok(Json(server.into(db).await))
+    Ok(Json(server.into(db, &channels).await))
 }

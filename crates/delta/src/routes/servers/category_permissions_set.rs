@@ -1,5 +1,5 @@
 use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference}, Database, User
+    Database, User, util::{permissions::DatabasePermissionQuery, reference::Reference}, voice::{VoiceClient, sync_voice_permissions}
 };
 use revolt_models::v0;
 use revolt_permissions::{calculate_category_permissions, ChannelPermission, Override};
@@ -8,13 +8,12 @@ use rocket::{serde::json::Json, State};
 
 /// # Set Role Permission
 ///
-/// Sets permissions for the specified role in this channel.
-///
-/// Channel must be a `TextChannel` or `VoiceChannel`.
+/// Sets permissions for the specified role in this category.
 #[openapi(tag = "Channel Permissions")]
 #[put("/<server>/categories/<category>/permissions/<role_id>", data = "<data>", rank = 2)]
-pub async fn set_role_permissions(
+pub async fn set_role_category_permissions(
     db: &State<Database>,
+    voice_client: &State<VoiceClient>,
     user: User,
     server: Reference<'_>,
     category: String,
@@ -29,22 +28,32 @@ pub async fn set_role_permissions(
 
     permissions.throw_if_lacking_channel_permission(ChannelPermission::ManagePermissions)?;
 
-    if let Some(role) = server.roles.get(&role_id) {
-        if role.rank <= query.get_member_rank().unwrap_or(i64::MIN) {
-            return Err(create_error!(NotElevated));
-        }
+    let Some(role) = server.roles.get(&role_id) else { return Err(create_error!(NotFound)) };
 
-        let current_value: Override = role.permissions.into();
-        permissions
-            .throw_permission_override(current_value, &data.permissions)
-            .await?;
-
-        category
-            .set_role_permission(db, &mut server, role_id, data.permissions.clone().into())
-            .await?;
-
-        Ok(Json(category.into()))
-    } else {
-        Err(create_error!(NotFound))
+    if role.rank <= query.get_member_rank().unwrap_or(i64::MIN) {
+        return Err(create_error!(NotElevated));
     }
+
+    let current_value: Override = role.permissions.into();
+    permissions
+        .throw_permission_override(current_value, &data.permissions)
+        .await?;
+
+    category
+        .set_role_permission(db, &mut server, role_id, data.permissions.clone().into())
+        .await?;
+
+    for channel in db.find_category_channels(&category.id).await? {
+        sync_voice_permissions(db, voice_client, &channel, Some(&server), None).await?;
+    };
+
+    let channels = db
+        .find_category_channels(&category.id)
+        .await?
+        .into_iter()
+        .map(|c| c.id().to_string())
+        .collect::<Vec<_>>();
+
+    Ok(Json(category.into(channels)))
+
 }

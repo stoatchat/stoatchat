@@ -119,6 +119,8 @@ auto_derived!(
             /// The channel's slowmode delay in seconds
             #[serde(skip_serializing_if = "Option::is_none")]
             slowmode: Option<u64>,
+
+            position: u32,
         },
     }
 
@@ -159,6 +161,8 @@ auto_derived!(
         pub voice: Option<VoiceInformation>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub slowmode: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub position: Option<u32>,
     }
 
     /// Optional fields on channel object
@@ -168,6 +172,7 @@ auto_derived!(
         DefaultPermissions,
         Voice,
         Slowmode,
+        Parent,
     }
 );
 
@@ -222,6 +227,7 @@ impl Channel {
                 parent: None,
                 voice: data.voice.map(|voice| voice.into()),
                 slowmode: None,
+                position: 0,
             },
             v0::LegacyServerChannelType::Voice => Channel::TextChannel {
                 id: id.clone(),
@@ -236,6 +242,7 @@ impl Channel {
                 parent: None,
                 voice: Some(data.voice.unwrap_or_default().into()),
                 slowmode: None,
+                position: 0,
             },
         };
 
@@ -571,6 +578,11 @@ impl Channel {
                 }
                 _ => {}
             },
+            FieldsChannel::Parent => {
+                if let Self::TextChannel { parent, .. } = self {
+                    parent.take();
+                }
+            }
         }
     }
 
@@ -911,6 +923,7 @@ impl IntoDocumentPath for FieldsChannel {
             FieldsChannel::DefaultPermissions => "default_permissions",
             FieldsChannel::Voice => "voice",
             FieldsChannel::Slowmode => "slowmode",
+            FieldsChannel::Parent => "parent",
         })
     }
 }

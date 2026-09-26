@@ -1,14 +1,14 @@
 use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference},
-    voice::{sync_voice_permissions, VoiceClient},
     AuditLogEntryAction, Database, PartialRole, User,
+    util::{permissions::DatabasePermissionQuery, reference::Reference},
+    voice::{VoiceClient, sync_voice_permissions},
 };
 use revolt_models::v0;
 use revolt_permissions::{
-    calculate_server_permissions, ChannelPermission, Override, OverrideField,
+    ChannelPermission, Override, OverrideField, calculate_server_permissions,
 };
-use revolt_result::{create_error, Result};
-use rocket::{serde::json::Json, State};
+use revolt_result::{Result, create_error};
+use rocket::{State, serde::json::Json};
 
 use crate::util::audit_log_reason::AuditLogReason;
 
@@ -17,7 +17,7 @@ use crate::util::audit_log_reason::AuditLogReason;
 /// Sets permissions for the specified role in the server.
 #[openapi(tag = "Server Permissions")]
 #[put("/<target>/permissions/<role_id>", data = "<data>", rank = 2)]
-pub async fn set_role_permission(
+pub async fn set_role_server_permissions(
     db: &State<Database>,
     voice_client: &State<VoiceClient>,
     user: User,
@@ -72,11 +72,18 @@ pub async fn set_role_permission(
     .insert(db, server.id.clone(), reason, user.id, None)
     .await;
 
-    for channel_id in &server.channels {
-        let channel = Reference::from_unchecked(channel_id).as_channel(db).await?;
+    let channels = db.fetch_channels(&server.channels).await?;
 
+    for channel in &channels {
         sync_voice_permissions(db, voice_client, &channel, Some(&server), Some(&role_id)).await?;
     }
 
-    Ok(Json(server.into(db).await))
+    Ok(Json(
+        server
+            .into(
+                &db,
+                &channels.into_iter().map(Into::into).collect::<Vec<_>>(),
+            )
+            .await,
+    ))
 }

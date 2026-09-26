@@ -5,7 +5,7 @@ use revolt_database::{
     User, AMQP,
 };
 use revolt_models::v0;
-use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
+use revolt_permissions::{ChannelPermission, calculate_category_permissions, calculate_channel_permissions};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 use validator::Validate;
@@ -35,9 +35,12 @@ pub async fn edit(
 
     let mut channel = target.as_channel(db).await?;
     let mut query = DatabasePermissionQuery::new(db, &user).channel(&channel);
-    calculate_channel_permissions(&mut query)
-        .await
-        .throw_if_lacking_channel_permission(ChannelPermission::ManageChannel)?;
+    let permissions = calculate_channel_permissions(&mut query)
+        .await;
+
+    permissions.throw_if_lacking_channel_permission(ChannelPermission::ManageChannel)?;
+
+    let server = query.server_ref().clone().map(|s| s.into_owned());
 
     if data.name.is_none()
         && data.description.is_none()
@@ -214,12 +217,18 @@ pub async fn edit(
             nsfw,
             voice,
             slowmode,
+            parent,
             ..
         } => {
             if data.remove.contains(&v0::FieldsChannel::Icon) {
                 if let Some(icon) = &icon {
                     db.mark_attachment_as_deleted(&icon.id).await?;
                 }
+            }
+
+            // TODO
+            if data.remove.contains(&v0::FieldsChannel::Parent) {
+                return Err(create_error!(InvalidOperation))
             }
 
             for field in &data.remove {

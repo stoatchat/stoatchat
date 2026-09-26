@@ -1,13 +1,10 @@
-use revolt_config::config;
 use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference}, Category, Database, PartialCategory, Role, User
+    util::{permissions::DatabasePermissionQuery, reference::Reference}, Database, User
 };
-use revolt_models::v0::{self, DataEditCategory};
 use revolt_permissions::{calculate_server_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
-use rocket::{serde::json::Json, State};
+use rocket::State;
 use rocket_empty::EmptyResponse;
-use validator::Validate;
 
 /// # Edits a category
 ///

@@ -269,6 +269,7 @@ mod test {
             parent: None,
             voice: None,
             slowmode: None,
+            position: None,
         };
         locked_channel
             .update(&harness.db, partial, vec![])

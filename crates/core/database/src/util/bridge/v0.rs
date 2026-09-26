@@ -246,6 +246,7 @@ impl From<crate::Channel> for Channel {
                 nsfw,
                 voice,
                 slowmode,
+                position,
             } => Channel::TextChannel {
                 id,
                 server,
@@ -259,6 +260,7 @@ impl From<crate::Channel> for Channel {
                 nsfw,
                 voice: voice.map(|voice| voice.into()),
                 slowmode,
+                position
             },
         }
     }
@@ -314,6 +316,7 @@ impl From<Channel> for crate::Channel {
                 nsfw,
                 voice,
                 slowmode,
+                position,
             } => crate::Channel::TextChannel {
                 id,
                 server,
@@ -327,6 +330,7 @@ impl From<Channel> for crate::Channel {
                 nsfw,
                 voice: voice.map(|voice| voice.into()),
                 slowmode,
+                position,
             },
         }
     }
@@ -348,6 +352,7 @@ impl From<crate::PartialChannel> for PartialChannel {
             parent: value.parent,
             voice: value.voice.map(|voice| voice.into()),
             slowmode: value.slowmode,
+            position: value.position,
         }
     }
 }
@@ -368,6 +373,7 @@ impl From<PartialChannel> for crate::PartialChannel {
             parent: value.parent,
             voice: value.voice.map(|voice| voice.into()),
             slowmode: value.slowmode,
+            position: value.position,
         }
     }
 }
@@ -380,6 +386,7 @@ impl From<FieldsChannel> for crate::FieldsChannel {
             FieldsChannel::DefaultPermissions => crate::FieldsChannel::DefaultPermissions,
             FieldsChannel::Voice => crate::FieldsChannel::Voice,
             FieldsChannel::Slowmode => crate::FieldsChannel::Slowmode,
+            FieldsChannel::Parent => crate::FieldsChannel::Parent,
         }
     }
 }
@@ -392,6 +399,7 @@ impl From<crate::FieldsChannel> for FieldsChannel {
             crate::FieldsChannel::DefaultPermissions => FieldsChannel::DefaultPermissions,
             crate::FieldsChannel::Voice => FieldsChannel::Voice,
             crate::FieldsChannel::Slowmode => FieldsChannel::Slowmode,
+            crate::FieldsChannel::Parent => FieldsChannel::Parent,
         }
     }
 }
@@ -812,7 +820,7 @@ impl From<crate::RemovalIntention> for RemovalIntention {
 }
 
 impl crate::Server {
-    pub async fn into(self, db: &Database) -> Server {
+    pub async fn into(self, db: &Database, channels: &[Channel]) -> Server {
         let approximate_member_count = self.get_approximate_member_count(db).await;
 
         Server {
@@ -824,7 +832,14 @@ impl crate::Server {
             categories: self
                 .categories
                 .into_iter()
-                .map(|(k, v)| (k, v.into()))
+                .map(|(k, v)| {
+                    let channels = channels
+                        .iter()
+                        .filter(|c| c.parent() == Some(&k))
+                        .map(|c| c.id().to_string())
+                        .collect();
+                    (k, v.into(channels))
+                })
                 .collect(),
             system_messages: self.system_messages.map(|v| v.into()),
             roles: self.roles.into_iter().map(|(k, v)| (k, v.into())).collect(),
@@ -870,28 +885,37 @@ impl From<Server> for crate::Server {
     }
 }
 
-impl From<crate::PartialServer> for PartialServer {
-    fn from(value: crate::PartialServer) -> Self {
+impl crate::PartialServer {
+    pub fn into(self, channels: &[Channel]) -> PartialServer {
         PartialServer {
-            id: value.id,
-            owner: value.owner,
-            name: value.name,
-            description: value.description,
-            channels: value.channels,
-            categories: value
-                .categories
-                .map(|x| x.into_iter().map(|(k, v)| (k, v.into())).collect()),
-            system_messages: value.system_messages.map(|v| v.into()),
-            roles: value
+            id: self.id,
+            owner: self.owner,
+            name: self.name,
+            description: self.description,
+            channels: self.channels,
+            categories: self.categories.map(|x| {
+                x.into_iter()
+                    .map(|(k, v)| {
+                        let channels = channels
+                            .iter()
+                            .filter(|c| c.parent() == Some(&k))
+                            .map(|c| c.id().to_string())
+                            .collect();
+                        (k, v.into(channels))
+                    })
+                    .collect()
+            }),
+            system_messages: self.system_messages.map(|v| v.into()),
+            roles: self
                 .roles
                 .map(|roles| roles.into_iter().map(|(k, v)| (k, v.into())).collect()),
-            default_permissions: value.default_permissions,
-            icon: value.icon.map(|f| f.into()),
-            banner: value.banner.map(|f| f.into()),
-            flags: value.flags.map(|v| v as u32),
-            nsfw: value.nsfw,
-            analytics: value.analytics,
-            discoverable: value.discoverable,
+            default_permissions: self.default_permissions,
+            icon: self.icon.map(|f| f.into()),
+            banner: self.banner.map(|f| f.into()),
+            flags: self.flags.map(|v| v as u32),
+            nsfw: self.nsfw,
+            analytics: self.analytics,
+            discoverable: self.discoverable,
             approximate_member_count: None,
         }
     }
@@ -945,14 +969,14 @@ impl From<FieldsServer> for crate::FieldsServer {
     }
 }
 
-impl From<crate::Category> for Category {
-    fn from(value: crate::Category) -> Self {
+impl crate::Category {
+    pub fn into(self, channels: Vec<String>) -> Category {
         Category {
-            id: value.id,
-            title: value.title,
-            channels: value.channels,
-            role_permissions: value.role_permissions,
-            default_permissions: value.default_permissions,
+            id: self.id,
+            title: self.title,
+            default_permissions: self.default_permissions,
+            role_permissions: self.role_permissions,
+            channels,
         }
     }
 }
@@ -962,7 +986,6 @@ impl From<Category> for crate::Category {
         crate::Category {
             id: value.id,
             title: value.title,
-            channels: value.channels,
             role_permissions: value.role_permissions,
             default_permissions: value.default_permissions,
         }
@@ -1550,8 +1573,8 @@ impl From<crate::AuditLogEntryAction> for AuditLogEntryAction {
             }
             crate::AuditLogEntryAction::ServerEdit { before, after } => {
                 AuditLogEntryAction::ServerEdit {
-                    before: before.into(),
-                    after: after.into(),
+                    before: before.into(&[]),
+                    after: after.into(&[]),
                 }
             }
             crate::AuditLogEntryAction::RoleEdit {

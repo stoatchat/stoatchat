@@ -162,16 +162,12 @@ auto_derived!(
     pub struct DataCreateCategory {
         #[cfg_attr(feature = "validator", validate(length(min = 1, max = 32)))]
         pub title: String,
-        /// Channels in this category
-        pub channels: Option<Vec<String>>,
     }
 
     #[cfg_attr(feature = "validator", derive(Validate))]
     pub struct DataEditCategory {
         #[cfg_attr(feature = "validator", validate(length(min = 1, max = 32)))]
         pub title: Option<String>,
-        /// Channels in this category
-        pub channels: Option<Vec<String>>,
         /// Fields to remove from category object
         pub remove: Option<Vec<FieldsCategory>>,
     }

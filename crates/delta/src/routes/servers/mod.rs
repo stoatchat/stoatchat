@@ -31,6 +31,7 @@ mod category_edit;
 mod category_delete;
 mod category_permissions_set_default;
 mod category_permissions_set;
+mod channels_reposition;
 
 pub fn routes() -> (Vec<Route>, OpenApi) {
     openapi_get_routes_spec![
@@ -53,18 +54,19 @@ pub fn routes() -> (Vec<Route>, OpenApi) {
         roles_edit::edit,
         roles_fetch::fetch,
         roles_delete::delete,
-        permissions_set::set_role_permission,
-        permissions_set_default::set_default_permissions,
+        permissions_set::set_role_server_permissions,
+        permissions_set_default::set_default_server_permissions,
         emoji_list::list_emoji,
         roles_edit_positions::edit_role_ranks,
         category_create::create,
         category_edit::edit,
         category_delete::delete,
-        category_permissions_set_default::set_default_permissions,
-        category_permissions_set::set_role_permissions,
         audit_log_query::query,
         discover::discover_add::discover_add,
         discover::discover_get::discover_get,
         discover::discover_remove::discover_remove,
+        category_permissions_set_default::set_default_category_permissions,
+        category_permissions_set::set_role_category_permissions,
+        channels_reposition::reposition_channels,
     ]
 }

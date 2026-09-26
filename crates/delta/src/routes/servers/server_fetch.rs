@@ -1,11 +1,11 @@
 use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference},
     Database, User,
+    util::{permissions::DatabasePermissionQuery, reference::Reference},
 };
 use revolt_models::v0;
-use revolt_permissions::{calculate_channel_permissions, ChannelPermission, PermissionQuery};
-use revolt_result::{create_error, Result};
-use rocket::{serde::json::Json, State};
+use revolt_permissions::{ChannelPermission, PermissionQuery, calculate_channel_permissions};
+use revolt_result::{Result, create_error};
+use rocket::{State, serde::json::Json};
 
 /// # Fetch Server
 ///
@@ -24,27 +24,38 @@ pub async fn fetch(
         return Err(create_error!(NotFound));
     }
 
+    let all_channels = db.fetch_channels(&server.channels).await?;
+
     if let Some(true) = options.include_channels {
-        let all_channels = db.fetch_channels(&server.channels).await?;
         let mut visible_channels: Vec<v0::Channel> = vec![];
 
-        for channel in all_channels {
-            let mut channel_query = query.clone().channel(&channel);
+        for channel in &all_channels {
+            let mut channel_query = query.clone().channel(channel);
             if calculate_channel_permissions(&mut channel_query)
                 .await
                 .has_channel_permission(ChannelPermission::ViewChannel)
             {
-                visible_channels.push(channel.into());
+                visible_channels.push(channel.clone().into());
             }
         }
 
         Ok(Json(v0::FetchServerResponse::ServerWithChannels {
-            server: server.into(db).await,
+            server: server
+                .into(
+                    db,
+                    &all_channels.into_iter().map(Into::into).collect::<Vec<_>>(),
+                )
+                .await,
             channels: visible_channels,
         }))
     } else {
         Ok(Json(v0::FetchServerResponse::JustServer(
-            server.into(db).await,
+            server
+                .into(
+                    db,
+                    &all_channels.into_iter().map(Into::into).collect::<Vec<_>>(),
+                )
+                .await,
         )))
     }
 }

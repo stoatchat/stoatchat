@@ -5,12 +5,14 @@ use redis_kiss::{
     redis::{SetExpiry, SetOptions},
     AsyncCommands,
 };
-use revolt_models::v0::{self, DataCreateCategory, DataCreateServerChannel, DataEditCategory};
+use revolt_models::v0;
 use revolt_permissions::{OverrideField, DEFAULT_PERMISSION_SERVER};
 use revolt_result::Result;
 use ulid::Ulid;
 
-use crate::{events::client::EventV1, Channel, Database, File, User};
+use crate::{
+    events::client::EventV1, Channel, Database, FieldsChannel, File, PartialChannel, User,
+};
 
 auto_derived_partial!(
     /// Server
@@ -31,7 +33,7 @@ auto_derived_partial!(
         // TODO: investigate if this is redundant and can be removed
         pub channels: Vec<String>,
         /// Categories for this server
-        #[serde(skip_serializing_if = "HashMap::is_empty")]
+        #[serde(skip_serializing_if = "HashMap::is_empty", default)]
         pub categories: HashMap<String, Category>,
         /// Configuration for sending system event messages
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -121,8 +123,6 @@ auto_derived_partial!(
             skip_serializing_if = "HashMap::<String, OverrideField>::is_empty"
         )]
         pub role_permissions: HashMap<String, OverrideField>,
-        /// Channels in this category
-        pub channels: Vec<String>,
     },
     "PartialCategory"
 );
@@ -159,7 +159,7 @@ auto_derived!(
     }
 
     pub enum FieldsCategory {
-        DefaultPermissions
+        DefaultPermissions,
     }
 );
 
@@ -196,7 +196,7 @@ impl Server {
                 Channel::create_server_channel(
                     db,
                     &mut server,
-                    DataCreateServerChannel {
+                    v0::DataCreateServerChannel {
                         channel_type: v0::LegacyServerChannelType::Text,
                         name: "General".to_string(),
                         ..Default::default()
@@ -229,9 +229,16 @@ impl Server {
 
         db.update_server(&self.id, &partial, remove.clone()).await?;
 
+        let channels = db
+            .fetch_channels(&self.channels)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect::<Vec<_>>();
+
         EventV1::ServerUpdate {
             id: self.id.clone(),
-            data: partial.into(),
+            data: partial.into(&channels),
             clear: remove.into_iter().map(|v| v.into()).collect(),
         }
         .p(self.id.clone())
@@ -527,33 +534,44 @@ impl Role {
 impl Category {
     pub fn remove_field(&mut self, field: FieldsCategory) {
         match field {
-            FieldsCategory::DefaultPermissions => self.default_permissions = None
+            FieldsCategory::DefaultPermissions => self.default_permissions = None,
         };
     }
 
-    pub async fn create(db: &Database, server: &mut Server, data: DataCreateCategory) -> Result<Category> {
-        let channels = data.channels.clone().unwrap_or_default()
-            .into_iter()
-            .filter(|c| server.channels.contains(&c))
-            .collect();
-
+    pub async fn create(
+        db: &Database,
+        server: &mut Server,
+        data: v0::DataCreateCategory,
+    ) -> Result<Category> {
         let category = Category {
             id: Ulid::new().to_string(),
             title: data.title,
-            channels: channels,
             default_permissions: None,
-            role_permissions: HashMap::new()
+            role_permissions: HashMap::new(),
         };
 
-        server.categories.insert(category.id.clone(), category.clone());
+        server
+            .categories
+            .insert(category.id.clone(), category.clone());
 
-        let partial_server = PartialServer { categories: Some(server.categories.clone()), ..Default::default() };
+        let partial_server = PartialServer {
+            categories: Some(server.categories.clone()),
+            ..Default::default()
+        };
 
-        db.update_server(&server.id, &partial_server, Vec::new()).await?;
+        db.update_server(&server.id, &partial_server, Vec::new())
+            .await?;
+
+        let channels = db
+            .fetch_channels(&server.channels)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect::<Vec<_>>();
 
         EventV1::ServerUpdate {
             id: server.id.clone(),
-            data: partial_server.into(),
+            data: partial_server.into(&channels),
             clear: Vec::new(),
         }
         .p(server.id.clone())
@@ -564,15 +582,36 @@ impl Category {
 
     pub async fn delete(&self, db: &Database, server: &mut Server) -> Result<()> {
         // update the parent server model with the new category
-        server.categories.remove(&self.id);
+        if let Some(category) = server.categories.remove(&self.id) {
+            let channels = db.fetch_channels(&server.channels).await?;
 
-        let partial_server = PartialServer { categories: Some(server.categories.clone()), ..Default::default() };
+            for mut channel in channels {
+                if channel.parent() == Some(&category.id) {
+                    channel
+                        .update(db, PartialChannel::default(), vec![FieldsChannel::Parent])
+                        .await?;
+                };
+            }
+        };
 
-        db.update_server(&server.id, &partial_server, Vec::new()).await?;
+        let partial_server = PartialServer {
+            categories: Some(server.categories.clone()),
+            ..Default::default()
+        };
+
+        db.update_server(&server.id, &partial_server, Vec::new())
+            .await?;
+
+        let channels = db
+            .fetch_channels(&server.channels)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect::<Vec<_>>();
 
         EventV1::ServerUpdate {
             id: server.id.clone(),
-            data: partial_server.into(),
+            data: partial_server.into(&channels),
             clear: Vec::new(),
         }
         .p(server.id.clone())
@@ -581,23 +620,40 @@ impl Category {
         Ok(())
     }
 
-    pub async fn update(&mut self, db: &Database, server: &mut Server, partial: PartialCategory, remove: Vec<FieldsCategory>) -> Result<()> {
+    pub async fn update(
+        &mut self,
+        db: &Database,
+        server: &mut Server,
+        partial: PartialCategory,
+        remove: Vec<FieldsCategory>,
+    ) -> Result<()> {
         for field in remove {
             self.remove_field(field);
-        };
+        }
 
         self.apply_options(partial);
 
         // update the parent server model with the new category
         server.categories.insert(self.id.clone(), self.clone());
 
-        let partial_server = PartialServer { categories: Some(server.categories.clone()), ..Default::default() };
+        let partial_server = PartialServer {
+            categories: Some(server.categories.clone()),
+            ..Default::default()
+        };
 
-        db.update_server(&server.id, &partial_server, Vec::new()).await?;
+        db.update_server(&server.id, &partial_server, Vec::new())
+            .await?;
+
+        let channels = db
+            .fetch_channels(&server.channels)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect::<Vec<_>>();
 
         EventV1::ServerUpdate {
             id: server.id.clone(),
-            data: partial_server.into(),
+            data: partial_server.into(&channels),
             clear: Vec::new(),
         }
         .p(server.id.clone())
@@ -606,19 +662,36 @@ impl Category {
         Ok(())
     }
 
-    pub async fn set_role_permission(&mut self, db: &Database, server: &mut Server, role_id: String, role_override: OverrideField) -> Result<()> {
+    pub async fn set_role_permission(
+        &mut self,
+        db: &Database,
+        server: &mut Server,
+        role_id: String,
+        role_override: OverrideField,
+    ) -> Result<()> {
         self.role_permissions.insert(role_id, role_override);
 
         // update the parent server model with the new category
         server.categories.insert(self.id.clone(), self.clone());
 
-        let partial_server = PartialServer { categories: Some(server.categories.clone()), ..Default::default() };
+        let partial_server = PartialServer {
+            categories: Some(server.categories.clone()),
+            ..Default::default()
+        };
 
-        db.update_server(&server.id, &partial_server, Vec::new()).await?;
+        db.update_server(&server.id, &partial_server, Vec::new())
+            .await?;
+
+        let channels = db
+            .fetch_channels(&server.channels)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect::<Vec<_>>();
 
         EventV1::ServerUpdate {
             id: server.id.clone(),
-            data: partial_server.into(),
+            data: partial_server.into(&channels),
             clear: Vec::new(),
         }
         .p(server.id.clone())

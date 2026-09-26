@@ -91,6 +91,17 @@ impl AbstractChannels for ReferenceDb {
         }
         Err(create_error!(NotFound))
     }
+
+    /// Fetch all channels inside a category
+    async fn find_category_channels(&self, category_id: &str) -> Result<Vec<Channel>> {
+        let channels = self.channels.lock().await;
+        Ok(channels
+            .values()
+            .filter(|channel| channel.parent() == Some(category_id))
+            .cloned()
+            .collect())
+    }
+
     /// Insert a user to a group
     async fn add_user_to_group(&self, channel_id: &str, user_id: &str) -> Result<()> {
         let mut channels = self.channels.lock().await;

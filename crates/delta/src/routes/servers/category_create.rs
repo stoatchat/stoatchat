@@ -41,5 +41,5 @@ pub async fn create(
 
     let category = Category::create(db, &mut server, data).await?;
 
-    Ok(Json(category.into()))
+    Ok(Json(category.into(Vec::new())))
 }

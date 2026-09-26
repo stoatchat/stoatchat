@@ -304,15 +304,17 @@ impl State {
             self.insert_subscription(channel.id().to_string()).await;
         }
 
+        let channels = channels.into_iter().map(Into::into).collect::<Vec<_>>();
+
         Ok(EventV1::Ready {
             users: if fields.users { Some(users) } else { None },
             servers: if fields.servers {
-                Some(join_all(servers.into_iter().map(|server| server.into(db))).await)
+                Some(join_all(servers.into_iter().map(|server| server.into(db, &channels))).await)
             } else {
                 None
             },
             channels: if fields.channels {
-                Some(channels.into_iter().map(Into::into).collect())
+                Some(channels)
             } else {
                 None
             },

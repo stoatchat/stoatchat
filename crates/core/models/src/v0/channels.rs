@@ -120,6 +120,8 @@ auto_derived!(
             /// The channel's slowmode delay in seconds
             #[serde(skip_serializing_if = "Option::is_none")]
             slowmode: Option<u64>,
+
+            position: u32,
         },
     }
 
@@ -162,6 +164,8 @@ auto_derived!(
         pub voice: Option<VoiceInformation>,
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
         pub slowmode: Option<u64>,
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+        pub position: Option<u32>,
     }
 
     /// Optional fields on channel object
@@ -171,6 +175,7 @@ auto_derived!(
         DefaultPermissions,
         Voice,
         Slowmode,
+        Parent,
     }
 
     /// New webhook information
@@ -327,6 +332,12 @@ auto_derived!(
         pub duration: u64,
         pub retry_after: u64,
     }
+
+    pub struct ChannelReposition {
+        pub id: String,
+        pub position: u32,
+        pub parent: Option<String>,
+    }
 );
 
 impl Channel {
@@ -349,6 +360,15 @@ impl Channel {
             Channel::DirectMessage { .. } => None,
             Channel::SavedMessages { .. } => Some("Saved Messages"),
             Channel::TextChannel { name, .. } | Channel::Group { name, .. } => Some(name),
+        }
+    }
+
+    /// Returns the channels category
+    pub fn parent(&self) -> Option<&str> {
+        if let Self::TextChannel { parent, .. } = self {
+            parent.as_deref()
+        } else {
+            None
         }
     }
 }

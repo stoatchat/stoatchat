@@ -138,6 +138,11 @@ impl AbstractChannels for MongoDb {
         query!(self, find_one, COL, doc)?.ok_or_else(|| create_error!(NotFound))
     }
 
+    /// Fetch all channels inside a category
+    async fn find_category_channels(&self, category_id: &str) -> Result<Vec<Channel>> {
+        query!(self, find, COL, doc! { "parent": category_id })
+    }
+
     /// Insert a user to a group
     async fn add_user_to_group(&self, channel: &str, user: &str) -> Result<()> {
         self.col::<Document>(COL)
