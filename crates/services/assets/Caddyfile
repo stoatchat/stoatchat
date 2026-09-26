@@ -1,0 +1,35 @@
+{
+	admin off
+	auto_https off
+}
+
+:14707 {
+	encode gzip zstd
+
+	route {
+		header Access-Control-Allow-Origin *
+		header Cache-Control "public, max-age=86400"
+
+		respond /health 200
+
+		# Serve from custom/ first if the file exists there, so
+		# self-hosters can add new assets or override shipped ones
+		# just by dropping a file at the same relative path.
+		@custom {
+			file {
+				root /srv/assets/custom
+				try_files {http.request.uri.path}
+			}
+		}
+		handle @custom {
+			root * /srv/assets/custom
+			file_server
+		}
+
+		# Fall back to the assets baked into the image.
+		handle {
+			root * /srv/assets/default
+			file_server
+		}
+	}
+}
