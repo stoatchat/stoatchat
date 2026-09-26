@@ -21,7 +21,7 @@ pub async fn delete(
     target: Reference<'_>,
     msg: Reference<'_>,
 ) -> Result<EmptyResponse> {
-    let message = msg.as_message_in_channel(db, target.id).await?;
+    let message = msg.as_message_in_channel(db, target.id, &user.id).await?;
 
     let channel = if message.author != user.id {
         let channel = target.as_channel(db).await?;

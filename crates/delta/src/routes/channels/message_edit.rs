@@ -42,7 +42,9 @@ pub async fn edit(
 
     permissions.throw_if_lacking_channel_permission(ChannelPermission::SendMessage)?;
 
-    let mut message = msg.as_message_in_channel(db, channel.id()).await?;
+    let mut message = msg
+        .as_message_in_channel(db, channel.id(), &user.id)
+        .await?;
     if message.author != user.id {
         return Err(create_error!(CannotEditMessage));
     }
