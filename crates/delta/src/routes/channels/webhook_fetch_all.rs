@@ -32,3 +32,48 @@ pub async fn fetch_webhooks(
             .collect::<Vec<Webhook>>(),
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use revolt_database::util::reference::Reference;
+    use revolt_result::ErrorType;
+    use rocket::State;
+
+    #[tokio::test]
+    async fn test_fetch_webhooks_permission_denied() {
+        let harness = crate::util::test::TestHarness::new().await;
+        let (_, _session, user) = harness.new_user().await;
+
+        let result = fetch_webhooks(
+            State::from(&harness.db),
+            user,
+            Reference::from_unchecked("01ARZ3NDEKTSV4RRFFQ69G5FAV"),
+        )
+        .await;
+
+        assert!(matches!(
+            result.as_ref().unwrap_err().error_type,
+            ErrorType::MissingPermission { .. } | ErrorType::NotFound
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_fetch_webhooks_success() {
+        let harness = crate::util::test::TestHarness::new().await;
+        let (_, _session, user) = harness.new_user().await;
+        let (server, _) = harness.new_server(&user).await;
+        let channel = harness.new_channel(&server).await;
+
+        let result = fetch_webhooks(
+            State::from(&harness.db),
+            user,
+            Reference::from_unchecked(&channel.id()),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let Json(webhooks) = result.unwrap();
+        assert_eq!(webhooks.len(), 0);
+    }
+}
