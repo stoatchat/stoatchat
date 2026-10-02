@@ -4,13 +4,14 @@ use axum::Router;
 
 use tokio::net::TcpListener;
 use utoipa::{
-    openapi::security::{Http, HttpAuthScheme, SecurityScheme},
     Modify, OpenApi,
+    openapi::security::{Http, HttpAuthScheme, SecurityScheme},
 };
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 
 mod api;
 pub mod requests;
+pub mod site_models;
 pub mod specialty;
 pub mod website_embed;
 
@@ -65,5 +66,9 @@ async fn main() -> Result<(), std::io::Error> {
     tracing::info!("Play around with the API: http://localhost:14705/scalar");
     let address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, 14705));
     let listener = TcpListener::bind(&address).await?;
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
 }
