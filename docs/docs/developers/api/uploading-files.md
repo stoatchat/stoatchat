@@ -28,7 +28,7 @@ const data = await fetch(`${endpoint}/${tag}`, {
   method: "POST",
   body,
   headers: {
-    "X-Session-Token": "...", // or X-Bot-Token
+    "X-Bot-Token": "...",
   },
 }).then((res) => res.json());
 

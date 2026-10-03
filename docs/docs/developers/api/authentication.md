@@ -1,15 +1,17 @@
 # Authentication
 
-To authenticate with the API, you must first acquire a bot token or user token:
+To authenticate with the API, you must first acquire a bot token.
 
-- **Bot:** create one from user settings in the client
-- **User:** copy one from client or authenticate through API
 
-Then you may provide these through either:
+## Create a Bot
+Create a bot user by navigating to **Settings** > **My Bots** > **Create Bot** and type in a username. Populate other fields as you like.
 
-| Type  |      Header       |
-| :---: | :---------------: |
-|  Bot  |   `X-Bot-Token`   |
-| User  | `X-Session-Token` |
+At the very bottom of the page, you'll find **Copy Token**.
 
-When dealing with an authenticated route.
+> Tip: Bot tokens are 62 characters long!
+
+Then you may provide the bot token when working with an authenticated route.
+
+|     Header      |        Value       |
+| :-------------: | :----------------: |
+|  `X-Bot-Token`  |   `qPWLwPTB3-...`  |
