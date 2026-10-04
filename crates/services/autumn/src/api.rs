@@ -139,6 +139,7 @@ pub struct UploadPayload {
     #[allow(dead_code)]
     #[form_data(limit = "unlimited")] // handled by axum
     file: FieldData<NamedTempFile>,
+    e2e_id: Option<String>,
 }
 
 /// Successful upload response
@@ -179,7 +180,7 @@ async fn upload_file(
     State(db): State<Database>,
     user: User,
     Path(tag): Path<Tag>,
-    TypedMultipart(UploadPayload { mut file }): TypedMultipart<UploadPayload>,
+    TypedMultipart(UploadPayload { mut file, e2e_id }): TypedMultipart<UploadPayload>,
 ) -> Result<Json<UploadResponse>> {
     // Fetch configuration
     let config = config().await;
@@ -241,7 +242,11 @@ async fn upload_file(
     }
 
     // Determine metadata for the file
-    let metadata = generate_metadata(&file.contents, mime_type);
+    let metadata = if e2e_id.is_some() {
+        Metadata::File
+    } else {
+        generate_metadata(&file.contents, mime_type)
+    };
 
     // Block non-images for non-attachment uploads
     if !matches!(tag, Tag::attachments) && !matches!(metadata, Metadata::Image { .. }) {
@@ -260,6 +265,7 @@ async fn upload_file(
                 tag.to_owned(),
                 filename,
                 user.id,
+                e2e_id,
             ))
             .await?;
 
@@ -327,8 +333,14 @@ async fn upload_file(
 
     // Finally, create the file and return its ID
     let tag: &'static str = tag.into();
-    db.insert_attachment(&file_hash.into_file(id.clone(), tag.to_owned(), filename, user.id))
-        .await?;
+    db.insert_attachment(&file_hash.into_file(
+        id.clone(),
+        tag.to_owned(),
+        filename,
+        user.id,
+        e2e_id,
+    ))
+    .await?;
 
     Ok(Json(UploadResponse { id }))
 }

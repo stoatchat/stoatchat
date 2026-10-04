@@ -35,6 +35,10 @@ auto_derived!(
         /// Id of the object this file is associated with
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
         pub object_id: Option<String>,
+
+/// Key's channel id, if encrypted
+#[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+     pub   e2e_id: Option<String>,
     }
 
     /// Metadata associated with a file

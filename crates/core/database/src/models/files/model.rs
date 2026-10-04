@@ -54,6 +54,10 @@ auto_derived_partial!(
         /// Id of the object this file is associated with
         #[serde(skip_serializing_if = "Option::is_none")]
         pub object_id: Option<String>,
+
+        /// Key's channel id, if encrypted
+       #[serde(skip_serializing_if = "Option::is_none")]
+     pub   e2e_id: Option<String>,
     },
     "PartialFile"
 );
