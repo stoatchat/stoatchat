@@ -16,7 +16,7 @@ use validator::Validate;
 use crate::{events::client::EventV1, util::{
     bulk_permissions::BulkDatabasePermissionQuery, idempotency::IdempotencyKey,
     permissions::DatabasePermissionQuery,
-}, Channel, Database, Emoji, EmojiParent, File, User, AMQP};
+}, Channel, Database, Emoji, EmojiParent, File, User, AMQP, Notification};
 
 #[cfg(feature = "tasks")]
 use crate::tasks::{self, ack::AckEvent};
@@ -622,6 +622,25 @@ impl Message {
             .send(db, amqp, author, user, member, &channel, generate_embeds)
             .await?;
 
+        // Create inbox notifications for mentioned users
+        if !suppress_notifications {
+            if let Some(mentions) = &message.mentions {
+                if let Err(err) = Notification::create_for_mentions(
+                    db,
+                    &message.author,
+                    &message.id,
+                    &message.channel,
+                    server_id.as_deref(),
+                    mentions,
+                )
+                .await
+                {
+                    // Never fail the send over the inbox
+                    revolt_config::capture_error(&err);
+                }
+            }
+        }
+
         Ok(message)
     }
 
@@ -800,6 +819,10 @@ impl Message {
         partial: PartialMessage,
         remove: Vec<FieldsMessage>,
     ) -> Result<()> {
+        let mentions_updated = partial.mentions.is_some();
+        let old_mentions = self.mentions.clone().unwrap_or_default();
+        let new_mentions = partial.mentions.clone().unwrap_or_default();
+
         self.apply_options(partial.clone());
 
         for field in &remove {
@@ -808,6 +831,30 @@ impl Message {
 
         db.update_message(&self.id, &partial, remove.clone())
             .await?;
+
+        if mentions_updated && !self.has_suppressed_notifications() {
+            let server_id = if let Ok(channel) = db.fetch_channel(&self.channel).await {
+                match channel {
+                    Channel::TextChannel { server, .. } => Some(server),
+                    _ => None,
+                }
+            } else {
+                None
+            };
+            if let Err(err) = Notification::update_for_edit(
+                db,
+                &self.author,
+                &self.id,
+                &self.channel,
+                server_id.as_deref(),
+                &old_mentions,
+                &new_mentions,
+            )
+            .await
+            {
+            revolt_config::capture_error(&err);
+            }
+        }
 
         EventV1::MessageUpdate {
             id: self.id.clone(),
@@ -1065,6 +1112,10 @@ impl Message {
 
         db.delete_message(&self.id).await?;
 
+        if let Err(err) = Notification::delete_for_message(db, &self.id).await {
+            revolt_config::capture_error(&err);
+        }
+
         if let Ok(mut channel) = db.fetch_channel(&self.channel).await {
             match &channel {
                 Channel::DirectMessage {
@@ -1121,6 +1172,13 @@ impl Message {
             .collect::<Vec<String>>();
 
         db.delete_messages(channel, &valid_ids).await?;
+
+        if !valid_ids.is_empty() {
+            if let Err(err) = Notification::delete_for_messages(db, &valid_ids).await {
+                revolt_config::capture_error(&err);
+            }
+        }
+
         EventV1::BulkMessageDelete {
             channel: channel.to_string(),
             ids: valid_ids,
