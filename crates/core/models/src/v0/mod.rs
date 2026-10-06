@@ -19,6 +19,7 @@ mod servers;
 mod sessions;
 mod user_settings;
 mod users;
+mod notifications;
 
 pub use accounts::*;
 pub use audit_logs::*;
@@ -41,3 +42,4 @@ pub use servers::*;
 pub use sessions::*;
 pub use user_settings::*;
 pub use users::*;
+pub use notifications::*;
