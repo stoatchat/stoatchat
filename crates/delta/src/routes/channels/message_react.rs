@@ -30,7 +30,7 @@ pub async fn react_message(
 
     // Add the reaction
     message
-        .add_reaction(db, &user, emoji.id)
+        .add_reaction(db, &user, &mut query, emoji.id)
         .await
         .map(|_| EmptyResponse)
 }

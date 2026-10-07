@@ -1,7 +1,8 @@
 use std::env;
 
-use tokio::net::TcpListener;
+use revolt_database::AMQP;
 use revolt_presence::clear_region;
+use tokio::net::TcpListener;
 
 #[macro_use]
 extern crate log;
@@ -23,6 +24,8 @@ async fn main() {
     if !no_clear_region {
         clear_region(None).await;
     }
+
+    AMQP::new_auto().await;
 
     // Setup a TCP listener to accept WebSocket connections on.
     // By default, we bind to port 14703 on all interfaces.

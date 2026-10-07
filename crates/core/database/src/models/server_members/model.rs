@@ -185,7 +185,7 @@ impl Member {
             emojis: emojis.into_iter().map(|emoji| emoji.into()).collect(),
             voice_states,
         }
-        .private(user.id.clone())
+        .p(user.id.clone())
         .await;
 
         if let Some(id) = server
@@ -343,7 +343,7 @@ impl Member {
 mod tests {
     use iso8601_timestamp::{Duration, Timestamp};
     use revolt_models::v0::DataCreateServer;
-
+    use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
     use crate::{Member, PartialMember, RemovalIntention, Server, User};
 
     #[tokio::test]

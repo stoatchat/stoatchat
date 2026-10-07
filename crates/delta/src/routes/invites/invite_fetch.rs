@@ -74,9 +74,7 @@ pub async fn fetch(db: &State<Database>, target: Reference<'_>) -> Result<Json<v
 mod test {
     use crate::{rocket, util::test::TestHarness};
     use revolt_database::{Channel, Server};
-    use revolt_models::v0::{
-        DataCreateGroup, DataCreateServerChannel, Invite, InviteResponse, LegacyServerChannelType,
-    };
+    use revolt_models::v0::{DataCreateGroup, DataCreateInvite, DataCreateServerChannel, Invite, InviteResponse, LegacyServerChannelType};
     use rocket::http::Status;
 
     #[rocket::async_test]
@@ -97,7 +95,11 @@ mod test {
             session,
             harness
                 .client
-                .post(format!("/channels/{}/invites", group.id())),
+                .post(format!("/channels/{}/invites", group.id()))
+                .json(&DataCreateInvite {
+                    max_uses: None,
+                    expires: None,
+                }),
         )
         .await;
         assert_eq!(create_response.status(), Status::Ok);
@@ -149,7 +151,11 @@ mod test {
             session,
             harness
                 .client
-                .post(format!("/channels/{}/invites", channel.id())),
+                .post(format!("/channels/{}/invites", channel.id()))
+                .json(&DataCreateInvite {
+                    max_uses: None,
+                    expires: None,
+                }),
         )
         .await;
         assert_eq!(create_response.status(), Status::Ok);
@@ -205,7 +211,11 @@ mod test {
             session,
             harness
                 .client
-                .post(format!("/channels/{}/invites", channel.id())),
+                .post(format!("/channels/{}/invites", channel.id()))
+                .json(&DataCreateInvite {
+                    max_uses: None,
+                    expires: None,
+                }),
         )
         .await;
         assert_eq!(create_response.status(), Status::Ok);

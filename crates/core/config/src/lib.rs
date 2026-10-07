@@ -126,6 +126,7 @@ pub struct Database {
 #[derive(Deserialize, Debug, Clone)]
 pub struct RabbitQueues {
     pub acks: String,
+    pub events: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -146,6 +147,7 @@ pub struct Hosts {
     pub autumn: String,
     pub january: String,
     pub livekit: HashMap<String, String>,
+    pub assets: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -386,6 +388,8 @@ pub struct GlobalLimits {
     pub body_limit_size: usize,
 
     pub restrict_server_creation: Vec<String>,
+
+    pub max_invite_duration_days: usize,
 }
 
 #[derive(Deserialize, Debug, Clone)]

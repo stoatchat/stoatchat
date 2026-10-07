@@ -21,6 +21,7 @@ api = "http://local.revolt.chat/api"
 events = "ws://local.revolt.chat/ws"
 autumn = "http://local.revolt.chat/autumn"
 january = "http://local.revolt.chat/january"
+assets = ""
 voso_legacy = ""
 voso_legacy_ws = ""
 
@@ -35,6 +36,7 @@ default_exchange = "revolt.default"
 
 [rabbit.queues]
 acks = "internal.ack"
+events = "internal.event"
 
 [api]
 
@@ -250,6 +252,9 @@ body_limit_size = 20_000_000
 # If any userids are entered here, only those users will be able to create servers.
 # Leave empty to allow all users to create servers
 restrict_server_creation = []
+
+# Number of days after creation before an invite expires
+max_invite_duration_days = 30
 
 [features.limits.new_user]
 # Limits imposed on new users

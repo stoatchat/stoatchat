@@ -150,7 +150,7 @@ impl Bot {
         db.update_bot(&self.id, &partial, remove).await?;
 
         if partial.token.is_some() {
-            EventV1::Logout.private(self.id.clone()).await;
+            EventV1::Logout.p(self.id.clone()).await;
         }
 
         self.apply_options(partial);
@@ -176,7 +176,9 @@ impl Bot {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Bot, FieldsBot, PartialBot, User};
+
+use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
+use crate::{Bot, FieldsBot, PartialBot, User};
 
     #[tokio::test]
     async fn crud() {

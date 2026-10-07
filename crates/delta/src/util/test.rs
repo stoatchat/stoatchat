@@ -6,10 +6,10 @@ use redis_kiss::redis::aio::PubSub;
 use revolt_database::util::email::normalise_email;
 use revolt_database::util::password::hash_password;
 use revolt_database::{
-    events::client::EventV1, Channel, Database, Member, Message, PartialRole, Server, User, AMQP,
+    AMQP, Bot, Channel, Database, Member, Message, PartialRole, Server, User, events::client::EventV1,
 };
-use revolt_database::{util::idempotency::IdempotencyKey, Role};
 use revolt_database::{Account, EmailVerification, Session};
+use revolt_database::{Role, util::idempotency::IdempotencyKey};
 use revolt_models::v0;
 use revolt_permissions::OverrideField;
 use rocket::http::Header;
@@ -36,12 +36,7 @@ impl TestHarness {
             .clone();
 
         let amqp = AMQP::new_auto().await;
-
-        TestHarness {
-            client,
-            db,
-            amqp,
-        }
+        TestHarness { client, db, amqp }
     }
 
     pub fn rand_string() -> String {
@@ -223,6 +218,14 @@ impl TestHarness {
 
         panic!("Email not found.")
     }
+
+    pub async fn new_bot(&self, user: &User,) -> (Bot, User) {
+        let (bot, bot_user) = Bot::create(&self.db, TestHarness::rand_string(), user, None)
+            .await
+            .expect("`Bot`");
+
+        (bot, bot_user)
+    }
 }
 
 pub struct PubSubTestHelper {
@@ -231,7 +234,7 @@ pub struct PubSubTestHelper {
 }
 
 impl PubSubTestHelper {
-    pub async fn new (topic: &str) -> Self {
+    pub async fn new(topic: &str) -> Self {
         let mut sub = redis_kiss::open_pubsub_connection()
             .await
             .expect("`PubSub`");

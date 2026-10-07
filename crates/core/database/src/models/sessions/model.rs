@@ -60,7 +60,7 @@ impl Session {
             user_id: self.user_id.clone(),
             session_id: self.id,
         }
-        .private(self.user_id)
+        .p(self.user_id)
         .await;
 
         Ok(())

@@ -1090,6 +1090,9 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
                     server,
                     creator,
                     channel,
+                    max_uses: None,
+                    uses: 0,
+                    expires: None,
                 },
                 OldInvite::Group {
                     code,
@@ -1099,6 +1102,9 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
                     code,
                     creator,
                     channel,
+                    max_uses: None,
+                    uses: 0,
+                    expires: None,
                 },
             })
             .collect::<Vec<Invite>>();

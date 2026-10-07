@@ -48,8 +48,7 @@ Before getting started, you'll want to install:
 - Git
 - mold (optional, faster compilation)
 
-> A **default.nix** is available for Nix users!
-> Run `nix-shell` to activate mise.
+> **Flake** is available for Nix users! Run `nix develop` to enter the dev shell.
 
 As a heads-up, the development environment uses the following ports:
 

@@ -59,6 +59,8 @@ pub struct RevoltFeatures {
     pub limits: LimitsConfig,
     /// Legal links
     pub legal_links: LegalLinks,
+    /// Asset link
+    pub assets: String,
 }
 
 /// # Limits For Users
@@ -107,6 +109,9 @@ pub struct GlobalLimits {
     pub restrict_server_creation: Vec<String>,
     /// New user hours
     new_user_hours: i64,
+
+    /// Number of days after creation before an invite expires
+    max_invite_duration_days: i64,
 }
 
 /// # User Limits
@@ -216,6 +221,7 @@ pub async fn root() -> Result<Json<RevoltConfig>> {
                     })
                     .collect(),
             },
+            assets: config.hosts.assets.clone(),
             limits: LimitsConfig {
                 global: GlobalLimits {
                     group_size: config.features.limits.global.group_size as i64,
@@ -232,6 +238,7 @@ pub async fn root() -> Result<Json<RevoltConfig>> {
                         .global
                         .restrict_server_creation,
                     new_user_hours: config.features.limits.global.new_user_hours as i64,
+                    max_invite_duration_days: config.features.limits.global.max_invite_duration_days as i64,
                 },
                 new_user: UserLimits::from_feature_limits(config.features.limits.new_user),
                 default: UserLimits::from_feature_limits(config.features.limits.default),

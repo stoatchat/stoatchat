@@ -527,14 +527,14 @@ impl User {
             id: target.id.clone(),
             user: self.clone().into(db, Some(&*target)).await,
         }
-        .private(target.id.clone())
+        .p(target.id.clone())
         .await;
 
         EventV1::UserRelationship {
             id: self.id.clone(),
             user: target.clone().into(db, Some(&*self)).await,
         }
-        .private(self.id.clone())
+        .p(self.id.clone())
         .await;
 
         Ok(())
@@ -693,7 +693,7 @@ impl User {
             clear: remove.into_iter().map(|v| v.into()).collect(),
             event_id: Some(Ulid::new().to_string()),
         }
-        .p_user(self.id.clone(), db)
+        .p(self.id.clone())
         .await;
 
         Ok(())
@@ -972,6 +972,7 @@ mod tests {
     #[tokio::test]
     async fn create_user() {
         use revolt_result::Result;
+        use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
 
         database_test!(|db| async move {
             let mut created_clean = User::create(&db, "Test".to_string(), None, None)
@@ -1007,6 +1008,7 @@ mod tests {
     #[tokio::test]
     async fn remove_profile_background() {
         use crate::{FieldsUser, File, Metadata, PartialUser, UserProfile};
+        use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
 
         database_test!(|db| async move {
             let mut user = User::create(&db, "Test".to_string(), None, None)

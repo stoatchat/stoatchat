@@ -11,6 +11,7 @@ auto_derived!(
 
 #[cfg(test)]
 mod tests {
+    use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
     #[tokio::test]
     async fn migrate() {
         database_test!(|db| async move {
