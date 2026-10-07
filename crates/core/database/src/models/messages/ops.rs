@@ -52,4 +52,25 @@ pub trait AbstractMessages: Sync + Send {
     ) -> Result<HashMap<String, Vec<String>>>;
 
     async fn delete_messages_by_user(&self, user_id: &str) -> Result<()>;
+
+    /// Messages in the given channels that mention any of the given roles
+    async fn fetch_role_mention_messages(
+        &self,
+        channel_ids: &[String],
+        role_ids: &[String],
+        exclude_author: &str,
+        after: &str,
+        before: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Message>>;
+
+    /// Messages in the given channels that carry the mention-everyone flag
+    async fn fetch_everyone_mention_messages(
+        &self,
+        channel_ids: &[String],
+        exclude_author: &str,
+        after: &str,
+        before: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Message>>;
 }

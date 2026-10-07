@@ -1,4 +1,4 @@
-use revolt_database::{Database, Notification, User};
+use revolt_database::{Database, Notification, User, InboxOptions};
 use revolt_models::v0;
 use revolt_result::Result;
 use rocket::{serde::json::Json, State};
@@ -13,15 +13,18 @@ pub async fn fetch_notifications(
     user: User,
     options: v0::OptionsFetchNotifications,
 ) -> Result<Json<Vec<v0::Notification>>> {
-    let notifications = Notification::fetch(
+    let items = Notification::fetch_inbox(
         db,
-        &user.id,
-        options.before.as_deref(),
-        options.limit.unwrap_or(50),
+        &user,
+        InboxOptions {
+            limit: options.limit.unwrap_or(50),
+            before: options.before,
+            mentions: options.mentions.unwrap_or(true),
+            roles: options.roles.unwrap_or(true),
+            everyone: options.everyone.unwrap_or(true),
+        },
     )
     .await?;
 
-    // TODO: drop rows whose channel the user can no longer view
-
-    Ok(Json(notifications.into_iter().map(Into::into).collect()))
+    Ok(Json(items.into_iter().map(Into::into).collect()))
 }

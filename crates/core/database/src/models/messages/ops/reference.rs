@@ -362,4 +362,14 @@ impl AbstractMessages for ReferenceDb {
 
         Ok(())
     }
+
+    async fn fetch_role_mention_messages(&self, _channel_ids: &[String], _role_ids: &[String],
+        _exclude_author: &str, _after: &str, _before: Option<&str>, _limit: i64) -> Result<Vec<Message>> {
+        todo!()
+    }
+
+    async fn fetch_everyone_mention_messages(&self, _channel_ids: &[String],
+        _exclude_author: &str, _after: &str, _before: Option<&str>, _limit: i64) -> Result<Vec<Message>> {
+        todo!()
+    }
 }
