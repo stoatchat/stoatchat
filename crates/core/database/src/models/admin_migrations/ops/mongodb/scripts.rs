@@ -1638,25 +1638,42 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     };
 
     if revision <= 55 {
-        info!("Running migration [revision 55]: create notifications indexes.");
+        info!("Running migration [revision 55]: create notifications and inbox indexes.");
 
         db.db()
             .run_command(doc! {
                 "createIndexes": "notifications",
                 "indexes": [
-                            {
-                                "key": { "user_id": 1, "message_id": 1 },
-                                "name": "user_message_unique",
-                                "unique": true
-                            },
-                            {
-                                "key": { "user_id": 1, "_id": -1 },
-                                "name": "user_inbox"
-                            }
-                        ]
+                    {
+                        "key": { "user_id": 1, "message_id": 1 },
+                        "name": "user_message_unique",
+                        "unique": true
+                    },
+                    {
+                        "key": { "user_id": 1, "_id": -1 },
+                        "name": "user_inbox"
+                    },
+                    {
+                        "key": { "message_id": 1 },
+                        "name": "message_id"
+                    }
+                ]
             })
             .await
             .expect("Failed to create notifications indexes");
+
+        db.db()
+            .run_command(doc! {
+                "createIndexes": "messages",
+                "indexes": [
+                    {
+                        "key": { "role_mentions": 1, "_id": -1 },
+                        "name": "role_mentions_id"
+                    }
+                ]
+            })
+            .await
+            .expect("Failed to create messages role_mentions index");
     }
 
     // Reminder to update LATEST_REVISION when adding new migrations.

@@ -1199,14 +1199,24 @@ impl Message {
             .delete_messages_by_author_since(channels, author, since)
             .await?;
 
+        let mut all_deleted_ids = Vec::new();
+
         for (channel_id, message_ids) in deleted_groups {
             if !message_ids.is_empty() {
+                all_deleted_ids.extend(message_ids.clone());
+
                 EventV1::BulkMessageDelete {
                     channel: channel_id.clone(),
                     ids: message_ids,
                 }
                 .p(channel_id)
                 .await;
+            }
+        }
+
+        if !all_deleted_ids.is_empty() {
+            if let Err(err) = Notification::delete_for_messages(db, &all_deleted_ids).await {
+                revolt_config::capture_error(&err);
             }
         }
 

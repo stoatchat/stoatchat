@@ -101,7 +101,7 @@ expires_after = 2592000  # 30d
 min_username_length = 2
 
 [pushd]
-# this changes the names of the queues to not overlap 
+# this changes the names of the queues to not overlap
 # prod/beta if they happen to be on the same exchange/instance.
 # Usually they have to be, so that messages sent from one or the other get sent to everyone
 production = true
@@ -111,7 +111,7 @@ production = true
 mass_mention_chunk_size = 200
 
 # How long pushd will cache resolved names for rendered message notifications.
-# Increasing this will result in lower database usage, but may result in a situation where a user/channel/role name changes 
+# Increasing this will result in lower database usage, but may result in a situation where a user/channel/role name changes
 # and the notifications still resolve to the old name.
 render_cache_time = 60
 
@@ -255,6 +255,9 @@ restrict_server_creation = []
 
 # Number of days after creation before an invite expires
 max_invite_duration_days = 30
+
+# Number of days before notifications stop showing up
+notification_retention_days = 30
 
 [features.limits.new_user]
 # Limits imposed on new users
