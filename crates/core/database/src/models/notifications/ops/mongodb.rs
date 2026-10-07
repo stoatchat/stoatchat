@@ -32,13 +32,13 @@ impl AbstractNotifications for MongoDb {
     ) -> Result<Vec<Notification>> {
         let mut filter = doc! { "user_id": user_id };
         if let Some(before) = before {
-            filter.insert("_id", doc! { "$lt": before });
+            filter.insert("message_id", doc! { "$lt": before });
         }
 
         Ok(self
             .col::<Notification>(COL)
             .find(filter)
-            .sort(doc! { "_id": -1 })
+            .sort(doc! { "message_id": -1 })
             .limit(limit)
             .await
             .map_err(|_| create_database_error!("find", COL))?

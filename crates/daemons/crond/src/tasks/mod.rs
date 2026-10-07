@@ -5,3 +5,4 @@ pub mod prune_dangling_files;
 pub mod prune_members;
 pub mod prune_mfa_tickets;
 pub mod delete_expired_invites;
+pub mod prune_notifications;

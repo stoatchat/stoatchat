@@ -1,3 +1,4 @@
+use crate::v0;
 #[cfg(feature = "validator")]
 use validator::Validate;
 
@@ -7,9 +8,8 @@ use rocket::FromForm;
 auto_derived!(
     /// Notification
     pub struct Notification {
-        /// Unique Id
-        #[cfg_attr(feature = "serde", serde(rename = "_id"))]
-        pub id: String,
+        /// Why this notification exists
+        pub kind: NotificationKind,
         /// Message ID
         pub message_id: String,
         /// Channel ID
@@ -20,6 +20,8 @@ auto_derived!(
             serde(skip_serializing_if = "Option::is_none")
         )]
         pub server_id: Option<String>,
+        /// The full message object
+        pub message: v0::Message,
     }
 
     /// Options for fetching notifications
@@ -31,5 +33,13 @@ auto_derived!(
         pub limit: Option<i64>,
         /// Fetch notifications older than this ID
         pub before: Option<String>,
+        /// Include direct mentions and replies
+        pub mentions: Option<bool>,
+        /// Include role mentions
+        pub roles: Option<bool>,
+        /// Include @everyone
+        pub everyone: Option<bool>,
     }
+
+    pub enum NotificationKind { Mention, Role, Everyone }
 );
