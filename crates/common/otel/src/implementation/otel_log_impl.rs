@@ -38,6 +38,16 @@ impl HttpRequestEvent {
             record.add_attribute("outcome", outcome);
             record.add_attribute("duration_ms", duration_ms);
 
+            if let Some(error) = self.error {
+                let kind: &'static str = (&error.error_type).into();
+                record.add_attribute("error.type", kind);
+                record.add_attribute("error.message", format!("{:?}", error.error_type));
+
+                if let Some(location) = error.location {
+                    record.add_attribute("error.location", location);
+                }
+            }
+
             record.add_attributes(attributes);
             logger.emit(record);
         }

@@ -1,6 +1,8 @@
 use std::fmt::Display;
 use std::panic::Location;
 
+use strum_macros::IntoStaticStr;
+
 #[cfg(feature = "serde")]
 #[macro_use]
 extern crate serde;
@@ -81,7 +83,7 @@ impl serde::Serialize for Error {
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 #[cfg_attr(feature = "schemas", derive(JsonSchema))]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, IntoStaticStr)]
 pub enum ErrorType {
     /// This error was not labeled :(
     LabelMe,

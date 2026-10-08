@@ -7814,6 +7814,7 @@ dependencies = [
  "sentry",
  "serde",
  "serde_json",
+ "strum_macros",
  "utoipa",
 ]
 
@@ -9224,6 +9225,7 @@ dependencies = [
  "opentelemetry-appender-tracing",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
+ "revolt-result",
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",

@@ -31,12 +31,14 @@ impl HttpRequestEvent {
             start: Instant::now(),
             status: 0,
             duration: Duration::ZERO,
+            error: None,
         }
     }
 
     fn finish_axum(&mut self, response: &Response) {
         self.status = response.status().as_u16();
         self.duration = self.start.elapsed();
+        self.error = response.extensions().get::<revolt_result::Error>().cloned();
     }
 }
 

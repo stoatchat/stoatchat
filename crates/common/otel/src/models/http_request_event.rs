@@ -12,6 +12,7 @@ pub(crate) struct HttpRequestEvent {
     pub start: Instant,
     pub status: u16,
     pub duration: Duration,
+    pub error: Option<revolt_result::Error>,
 }
 
 impl HttpRequestEvent {
@@ -38,7 +39,14 @@ impl HttpRequestEvent {
     }
 
     pub(crate) fn summary(&self) -> String {
-        let outcome = if self.rejected() { "ERROR" } else { "OK" };
+        let outcome = match &self.error {
+            Some(error) => {
+                let kind: &str = (&error.error_type).into();
+                format!("ERROR {kind}")
+            }
+            None if self.rejected() => "ERROR".to_owned(),
+            None => "OK".to_owned(),
+        };
         let slow = if self.slow() { "[SLOW] " } else { "" };
 
         let Self { method, route, .. } = self;
