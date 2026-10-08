@@ -67,7 +67,7 @@ impl serde::Serialize for Error {
                 | ErrorType::UnverifiedAccount
                 | ErrorType::LockedOut
                 | ErrorType::DisallowedMFAMethod => None,
-            _ => Some(self.location.as_deref().unwrap()),
+            _ => self.location.as_deref(),
         };
 
         Body {
