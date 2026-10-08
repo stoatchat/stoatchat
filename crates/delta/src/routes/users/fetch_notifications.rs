@@ -1,4 +1,4 @@
-use revolt_database::{Database, Notification, User, InboxOptions};
+use revolt_database::{Database, NotificationCenter, User, InboxOptions};
 use revolt_models::v0;
 use revolt_result::Result;
 use rocket::{serde::json::Json, State};
@@ -12,8 +12,8 @@ pub async fn fetch_notifications(
     db: &State<Database>,
     user: User,
     options: v0::OptionsFetchNotifications,
-) -> Result<Json<Vec<v0::Notification>>> {
-    let items = Notification::fetch_inbox(
+) -> Result<Json<Vec<v0::NotificationCenter>>> {
+    let items = NotificationCenter::fetch_inbox(
         db,
         &user,
         InboxOptions {

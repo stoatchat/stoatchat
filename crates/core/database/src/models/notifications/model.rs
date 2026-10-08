@@ -11,7 +11,7 @@ use crate::{Database, Message, User};
 
 auto_derived!(
     /// Notification hub
-    pub struct Notification {
+    pub struct NotificationCenter {
         /// Why this notification exists
         pub kind: InboxKind,
         /// The mentioned user ID
@@ -54,7 +54,7 @@ fn ulid_at(ms: u64) -> String {
 }
 
 #[allow(clippy::disallowed_methods)]
-impl Notification {
+impl NotificationCenter {
     /// Build a notification for one user
     fn new(
         kind: InboxKind,
@@ -62,8 +62,8 @@ impl Notification {
         message_id: &str,
         channel_id: &str,
         server_id: Option<&str>,
-    ) -> Notification {
-        Notification {
+    ) -> NotificationCenter {
+        NotificationCenter {
             kind,
             user_id,
             message_id: message_id.to_string(),
@@ -81,10 +81,10 @@ impl Notification {
         server_id: Option<&str>,
         mentions: &[String],
     ) -> Result<()> {
-        let notifications: Vec<Notification> = mentions
+        let notifications: Vec<NotificationCenter> = mentions
             .iter()
             .filter(|id| id.as_str() != author_id)
-            .map(|id| Notification::new(InboxKind::Mention, id.clone(), message_id, channel_id, server_id))
+            .map(|id| NotificationCenter::new(InboxKind::Mention, id.clone(), message_id, channel_id, server_id))
             .collect();
 
         db.insert_notifications(notifications).await
@@ -112,7 +112,7 @@ impl Notification {
             .collect();
 
         db.delete_notifications_for_users(message_id, &removed).await?;
-        Notification::create_for_mentions(db, author_id, message_id, channel_id, server_id, &added)
+        NotificationCenter::create_for_mentions(db, author_id, message_id, channel_id, server_id, &added)
             .await
     }
 
@@ -132,7 +132,7 @@ impl Notification {
         user_id: &str,
         before: Option<&str>,
         limit: i64,
-    ) -> Result<Vec<Notification>> {
+    ) -> Result<Vec<NotificationCenter>> {
         db.fetch_notifications(user_id, before, limit).await
     }
 
@@ -294,9 +294,9 @@ impl Notification {
         }
 }
 
-impl From<InboxItem> for revolt_models::v0::Notification {
+impl From<InboxItem> for revolt_models::v0::NotificationCenter {
     fn from(item: InboxItem) -> Self {
-        revolt_models::v0::Notification {
+        revolt_models::v0::NotificationCenter {
             kind: match item.kind {
                 InboxKind::Mention => revolt_models::v0::NotificationKind::Mention,
                 InboxKind::Role => revolt_models::v0::NotificationKind::Role,
