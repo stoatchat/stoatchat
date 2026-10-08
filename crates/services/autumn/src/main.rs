@@ -61,7 +61,7 @@ async fn main() -> Result<(), std::io::Error> {
             )
         ),
         tags(
-            // (name = "Files", description = "File uploads API")
+            (name = "Files", description = "File uploads API")
         )
     )]
     struct ApiDoc;

@@ -107,6 +107,7 @@ static CRATE_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[utoipa::path(
     get,
     path = "/",
+    tag = "Files",
     responses(
         (status = 200, description = "Echo response", body = RootResponse)
     )
@@ -164,6 +165,7 @@ pub struct UploadResponse {
 #[utoipa::path(
     post,
     path = "/{tag}",
+    tag = "Files",
     responses(
         (status = 200, description = "Upload was successful", body = UploadResponse)
     ),
@@ -362,6 +364,7 @@ pub static CACHE_CONTROL: &str = "public, max-age=604800, must-revalidate";
 #[utoipa::path(
     get,
     path = "/{tag}/{file_id}",
+    tag = "Files",
     responses(
         (status = 200, description = "Generated preview", body = Vec<u8>)
     ),
@@ -456,6 +459,7 @@ async fn fetch_preview(
 #[utoipa::path(
     get,
     path = "/{tag}/{file_id}/{file_name}",
+    tag = "Files",
     responses(
         (status = 200, description = "Original file", body = Vec<u8>)
     ),
