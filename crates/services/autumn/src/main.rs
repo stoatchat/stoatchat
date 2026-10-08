@@ -1,6 +1,9 @@
 use std::net::{Ipv4Addr, SocketAddr};
 
-use axum::{middleware::from_fn_with_state, Router};
+use axum::{
+    middleware::{from_fn, from_fn_with_state},
+    Router,
+};
 
 use axum_macros::FromRef;
 use revolt_database::{Database, DatabaseInfo};
@@ -9,7 +12,6 @@ use tokio::{
     net::TcpListener,
     signal::unix::{signal, SignalKind},
 };
-use tower_http::trace::TraceLayer;
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
     Modify, OpenApi,
@@ -97,7 +99,7 @@ async fn main() -> Result<(), std::io::Error> {
             state.clone(),
             ratelimiter::ratelimit_middleware,
         ))
-        .layer(TraceLayer::new_for_http())
+        .layer(from_fn(stoat_otel::middleware::axum::wide_events))
         .with_state(state);
 
     let address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, 14704));

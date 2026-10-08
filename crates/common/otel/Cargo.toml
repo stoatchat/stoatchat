@@ -7,6 +7,9 @@ authors = ["izzy <me@insrt.uk>"]
 description = "Common OpenTelemetry configuration"
 publish = false
 
+[features]
+axum = ["dep:axum", "dep:uuid"]
+
 [dependencies]
 # Logging
 tracing = { workspace = true }
@@ -19,3 +22,6 @@ opentelemetry-otlp = { workspace = true }
 opentelemetry-appender-tracing = { workspace = true }
 tracing-opentelemetry = { workspace = true }
 
+# HTTP
+axum = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true, features = ["v4"] }

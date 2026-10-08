@@ -1,3 +1,4 @@
+pub mod middleware;
 mod telemetry;
 
 pub use telemetry::Telemetry;
