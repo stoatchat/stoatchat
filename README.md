@@ -179,6 +179,19 @@ When signing up, go to http://localhost:14080 to find confirmation/password rese
 To stop all services, hit (CTRL + c) in the terminal you ran `mise start` and run `mise docker:stop`
 
 
+## Environment Variables
+
+This list is non-exhaustive right now.
+
+| Variable                              | Default                 | Purpose                                                               |
+| ------------------------------------- | ----------------------- | --------------------------------------------------------------------- |
+| `RUST_LOG`                            | `info`                  | Log filter, e.g. `info,revolt_autumn=debug`                           |
+| `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`    |                         | OTLP/HTTP endpoint for logs                                           |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`  |                         | OTLP/HTTP endpoint for traces                                         |
+| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` |                         | OTLP/HTTP endpoint for metrics                                        |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`         | `http://localhost:4318` | Base URL for a single collector; appends `/v1/{logs,traces,metrics}`  |
+| `OTEL_RESOURCE_ATTRIBUTES`            |                         | Extra resource attributes, e.g. `deployment.environment.name=staging` |
+
 ## Deployment Guide
 
 ### Cutting new crate releases

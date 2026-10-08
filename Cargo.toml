@@ -6,7 +6,7 @@ members = [
     "crates/bonfire",
     "crates/core/*",
     "crates/services/*",
-    "crates/daemons/*",
+    "crates/daemons/*", "crates/common/otel",
 ]
 
 [patch.crates-io]
@@ -204,3 +204,6 @@ revolt-permissions = { version = "0.15.5", path = "crates/core/permissions" }
 revolt-presence = { version = "0.15.5", path = "crates/core/presence" }
 revolt-ratelimits = { version = "0.15.5", path = "crates/core/ratelimits" }
 revolt-result = { version = "0.15.5", path = "crates/core/result" }
+
+# Local packages (unpublished)
+stoat-otel = { path = "crates/common/otel" }

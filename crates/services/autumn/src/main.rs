@@ -5,13 +5,17 @@ use axum::{middleware::from_fn_with_state, Router};
 use axum_macros::FromRef;
 use revolt_database::{Database, DatabaseInfo};
 use revolt_ratelimits::axum as ratelimiter;
-use tokio::net::TcpListener;
+use tokio::{
+    net::TcpListener,
+    signal::unix::{signal, SignalKind},
+};
 use tower_http::trace::TraceLayer;
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
     Modify, OpenApi,
 };
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
+use tracing::info;
 
 mod api;
 pub mod clamav;
@@ -29,30 +33,10 @@ struct AppState {
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
-    let logger_provider = init_logs();
+    let _telemetry = stoat_otel::init(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+    info!(version = env!("CARGO_PKG_VERSION"), awawa = true, "Starting the Stoat file server!");
 
-    let otel_layer = OpenTelemetryTracingBridge::new(&logger_provider);
-
-    let filter_otel = EnvFilter::new("info")
-        .add_directive("hyper=off".parse().unwrap())
-        .add_directive("tonic=off".parse().unwrap())
-        .add_directive("h2=off".parse().unwrap())
-        .add_directive("reqwest=off".parse().unwrap());
-
-    let otel_layer = otel_layer.with_filter(filter_otel);
-
-    let filter_fmt = EnvFilter::new("info");
-
-    let fmt_layer = tracing_subscriber::fmt::layer()
-        .with_thread_names(true)
-        .with_filter(filter_fmt);
-
-    tracing_subscriber::registry()
-        .with(otel_layer)
-        .with(fmt_layer)
-        .init();
-
-    revolt_config::configure!(files);
+    revolt_config::config().await;
     clamav::init().await;
 
     #[derive(OpenApi)]
@@ -118,55 +102,24 @@ async fn main() -> Result<(), std::io::Error> {
 
     let address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, 14704));
     let listener = TcpListener::bind(&address).await?;
+    info!(address = %listener.local_addr()?, "Listening for requests 🍂");
+
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
+    .with_graceful_shutdown(async {
+        let mut terminate =
+            signal(SignalKind::terminate()).expect("sigterm handler");
+
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {}
+            _ = terminate.recv() => {}
+        }
+
+        info!("Service going offline, bye bye");
+    })
     .await?;
 
-    if let Err(e) = logger_provider.shutdown() {
-        panic!("logger provider failed to shut down");
-    }
-
     Ok(())
-}
-
-use opentelemetry::trace::{TraceContextExt, Tracer};
-use opentelemetry::KeyValue;
-use opentelemetry::{global, InstrumentationScope};
-use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
-use opentelemetry_otlp::{LogExporter, MetricExporter, Protocol, SpanExporter, WithExportConfig};
-use opentelemetry_sdk::logs::SdkLoggerProvider;
-use opentelemetry_sdk::metrics::SdkMeterProvider;
-use opentelemetry_sdk::trace::SdkTracerProvider;
-use opentelemetry_sdk::Resource;
-use std::error::Error;
-use std::sync::OnceLock;
-use tracing::info;
-use tracing_subscriber::prelude::*;
-use tracing_subscriber::EnvFilter;
-
-fn get_resource() -> Resource {
-    static RESOURCE: OnceLock<Resource> = OnceLock::new();
-    RESOURCE
-        .get_or_init(|| {
-            Resource::builder()
-                .with_service_name("basic-otlp-example-grpc")
-                .build()
-        })
-        .clone()
-}
-
-fn init_logs() -> SdkLoggerProvider {
-    let exporter = LogExporter::builder()
-        .with_http()
-        .with_endpoint("http://localhost:19428/insert/opentelemetry/v1/logs")
-        .with_protocol(Protocol::HttpBinary)
-        .build()
-        .expect("Failed to create log exporter");
-
-    SdkLoggerProvider::builder()
-        .with_resource(get_resource())
-        .with_batch_exporter(exporter)
-        .build()
 }

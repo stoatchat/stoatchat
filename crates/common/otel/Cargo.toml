@@ -1,0 +1,20 @@
+[package]
+name = "stoat-otel"
+version = "0.0.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+authors = ["izzy <me@insrt.uk>"]
+description = "Common OpenTelemetry configuration"
+publish = false
+
+[dependencies]
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# OpenTelemetry
+opentelemetry = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+opentelemetry-appender-tracing = { workspace = true }
+

@@ -47,12 +47,15 @@ tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
-# Core crates
+# Core
 revolt-files = { workspace = true }
 revolt-config = { workspace = true }
 revolt-database = { workspace = true, features = ["axum-impl"] }
 revolt-result = { workspace = true, features = ["utoipa", "axum"] }
 revolt-ratelimits = { workspace = true, features = ["axum"] }
+
+# Common
+stoat-otel = { workspace = true }
 
 # Axum / web server
 tempfile = { workspace = true }
@@ -64,9 +67,3 @@ tower-http = { workspace = true, features = ["cors", "trace"] }
 # OpenAPI & documentation generation
 utoipa-scalar = { workspace = true, features = ["axum"] }
 utoipa = { workspace = true, features = ["axum_extras", "ulid"] }
-
-# OpenTelemetry
-opentelemetry = { workspace = true }
-opentelemetry_sdk = { workspace = true }
-opentelemetry-otlp = { workspace = true }
-opentelemetry-appender-tracing = { workspace = true }
