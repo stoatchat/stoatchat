@@ -1614,10 +1614,6 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
                         "unique": true
                     },
                     {
-                        "key": { "user_id": 1, "_id": -1 },
-                        "name": "user_inbox"
-                    },
-                    {
                         "key": { "message_id": 1 },
                         "name": "message_id"
                     }
