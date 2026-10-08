@@ -11,9 +11,9 @@ impl AbstractNotifications for ReferenceDb {
 
         let mut store = self.notifications.lock().await;
         for notification in notifications {
-            // Mirrors `insert_many(...).ordered(false)` with duplicate keys ignored
+            // Duplicate (user_id, message_id) is ignored, like the Mongo unique index
             store
-                .entry(notification.message_id.clone())
+                .entry((notification.user_id.clone(), notification.message_id.clone()))
                 .or_insert(notification);
         }
 
@@ -46,7 +46,7 @@ impl AbstractNotifications for ReferenceDb {
 
         let mut store = self.notifications.lock().await;
         let before_len = store.len();
-        store.retain(|id, _| id.as_str() >= cutoff.as_str());
+        store.retain(|_, n| n.message_id.as_str() >= cutoff.as_str());
 
         Ok((before_len - store.len()) as u64)
     }
