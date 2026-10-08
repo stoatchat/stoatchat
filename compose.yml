@@ -90,21 +90,9 @@ services:
     volumes:
       - ./livekit.yml:/etc/livekit.yml
 
-  # VM
-  victoria-metrics:
-    image: victoriametrics/victoria-metrics:latest
+  # Grafana LGTM (OTel Collector + Loki + Tempo + Prometheus + Grafana)
+  otel-lgtm:
+    image: grafana/otel-lgtm:0.35.0
     ports:
-      - 8428:8428
-
-  # VL
-  victoria-logs:
-    image: docker.io/victoriametrics/victoria-logs:v1.43.1
-    ports:
-      - 9428:9428
-    command: -storageDataPath=victoria-logs-data
-
-  # VT
-  victoria-traces:
-    image: docker.io/victoriametrics/victoria-traces:latest
-    ports:
-      - 10428:10428
+      - "13000:3000" # Grafana UI
+      - "4318:4318" # OTLP/HTTP

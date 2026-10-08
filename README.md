@@ -60,6 +60,7 @@ As a heads-up, the development environment uses the following ports:
 | Maildev                   | 14025<br>14080 |
 | Revolt Web App            |     14701      |
 | RabbitMQ                  | 5672<br>15672  |
+| Grafana LGTM (OTLP)       | 13000<br>4318  |
 | `crates/delta`            |     14702      |
 | `crates/bonfire`          |     14703      |
 | `crates/services/autumn`  |     14704      |
