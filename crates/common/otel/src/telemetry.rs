@@ -68,6 +68,22 @@ impl Telemetry {
             .with(fmt_layer)
             .init();
 
+        let default_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            let message = info.payload_as_str().unwrap_or_default();
+            let location = info.location();
+
+            tracing::error!(
+                exception.type = "panic",
+                exception.message = message,
+                code.file.path = location.map(|location| location.file()),
+                code.line.number = location.map(|location| location.line()),
+                "panicked: {message}"
+            );
+
+            default_hook(info);
+        }));
+
         debug!("hai i'm a log :3 (initialised OTLP successfully)");
 
         Telemetry {
