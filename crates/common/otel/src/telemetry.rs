@@ -1,4 +1,6 @@
 use opentelemetry::KeyValue;
+#[cfg(feature = "axum")]
+use opentelemetry::logs::LoggerProvider;
 use opentelemetry::trace::TracerProvider;
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use opentelemetry_otlp::{LogExporter, Protocol, SpanExporter, WithExportConfig};
@@ -8,6 +10,9 @@ use opentelemetry_sdk::trace::SdkTracerProvider;
 use tracing::debug;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::prelude::*;
+
+#[cfg(feature = "axum")]
+use crate::implementation::WIDE_LOGGER;
 
 pub struct Telemetry {
     logger_provider: SdkLoggerProvider,
@@ -42,6 +47,9 @@ impl Telemetry {
             .with_resource(resource)
             .with_batch_exporter(span_exporter)
             .build();
+
+        #[cfg(feature = "axum")]
+        let _ = WIDE_LOGGER.set(logger_provider.logger("stoat_otel::wide"));
 
         let otel_layer =
             OpenTelemetryTracingBridge::new(&logger_provider).with_filter(export_filter());
@@ -79,6 +87,7 @@ fn export_filter() -> EnvFilter {
         .add_directive("tonic=off".parse().unwrap())
         .add_directive("h2=off".parse().unwrap())
         .add_directive("reqwest=off".parse().unwrap())
+        .add_directive("http_request=off".parse().unwrap())
 }
 
 impl Drop for Telemetry {

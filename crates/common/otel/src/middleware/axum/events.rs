@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 use ::axum::{
     extract::{MatchedPath, Request},
     middleware::Next,
@@ -6,40 +8,62 @@ use ::axum::{
 use tracing::{Instrument, field::Empty, info_span};
 use uuid::Uuid;
 
-pub async fn wide_events(request: Request, next: Next) -> Response {
-    let request_id = request
-        .headers()
-        .get("x-request-id")
-        .and_then(|value| value.to_str().ok())
-        .map(str::to_owned)
-        .unwrap_or_else(|| Uuid::new_v4().to_string());
-    let method = request.method().to_string();
-    let path = request.uri().path().to_owned();
-    let route = request
-        .extensions()
-        .get::<MatchedPath>()
-        .map(|matched| matched.as_str().to_owned())
-        .unwrap_or_else(|| path.clone());
+use crate::{WideContextRepository, models::HttpRequestEvent};
 
+impl HttpRequestEvent {
+    fn from_axum_request(request: &Request) -> Self {
+        let path = request.uri().path().to_owned();
+
+        HttpRequestEvent {
+            request_id: request
+                .headers()
+                .get("x-request-id")
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_owned)
+                .unwrap_or_else(|| Uuid::new_v4().to_string()),
+            method: request.method().to_string(),
+            route: request
+                .extensions()
+                .get::<MatchedPath>()
+                .map(|matched| matched.as_str().to_owned())
+                .unwrap_or_else(|| path.clone()),
+            path,
+            start: Instant::now(),
+            status: 0,
+            duration: Duration::ZERO,
+        }
+    }
+
+    fn finish_axum(&mut self, response: &Response) {
+        self.status = response.status().as_u16();
+        self.duration = self.start.elapsed();
+    }
+}
+
+pub async fn wide_events(request: Request, next: Next) -> Response {
+    let context = WideContextRepository::default();
+
+    let mut event = HttpRequestEvent::from_axum_request(&request);
     let span = info_span!(
         "http.request",
-        otel.name = format!("{method} {route}"),
+        otel.name = format!("{} {}", event.method, event.route),
         otel.kind = "server",
-        request_id,
-        http.request.method = method,
-        http.route = route,
-        url.path = path,
+        request_id = event.request_id,
+        http.request.method = event.method,
+        http.route = event.route,
+        url.path = event.path,
         http.response.status_code = Empty,
         otel.status_code = Empty,
     );
 
     let response = next.run(request).instrument(span.clone()).await;
-    let status = response.status().as_u16();
-    span.record("http.response.status_code", status);
+    event.finish_axum(&response);
+    span.record("http.response.status_code", event.status);
 
-    if status >= 500 {
+    if event.failed() {
         span.record("otel.status_code", "error");
     }
 
+    span.in_scope(|| event.emit(context.take()));
     response
 }
