@@ -96,3 +96,9 @@ services:
     ports:
       - "13000:3000" # Grafana UI
       - "4318:4318" # OTLP/HTTP
+
+  # Waits for dependencies, used by `mise docker:start`
+  wait:
+    image: dokku/wait
+    command: -c rabbit:5672,database:27017,redis:6379
+    profiles: [tools]
