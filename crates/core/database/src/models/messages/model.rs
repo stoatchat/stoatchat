@@ -16,7 +16,7 @@ use validator::Validate;
 use crate::{events::client::EventV1, util::{
     bulk_permissions::BulkDatabasePermissionQuery, idempotency::IdempotencyKey,
     permissions::DatabasePermissionQuery,
-}, Channel, Database, Emoji, EmojiParent, File, User, AMQP, Notification};
+}, Channel, Database, Emoji, EmojiParent, File, User, AMQP, NotificationCenter};
 
 #[cfg(feature = "tasks")]
 use crate::tasks::{self, ack::AckEvent};
@@ -625,7 +625,7 @@ impl Message {
         // Create inbox notifications for mentioned users
         if !suppress_notifications {
             if let Some(mentions) = &message.mentions {
-                if let Err(err) = Notification::create_for_mentions(
+                if let Err(err) = NotificationCenter::create_for_mentions(
                     db,
                     &message.author,
                     &message.id,
@@ -841,7 +841,7 @@ impl Message {
             } else {
                 None
             };
-            if let Err(err) = Notification::update_for_edit(
+            if let Err(err) = NotificationCenter::update_for_edit(
                 db,
                 &self.author,
                 &self.id,
@@ -1112,7 +1112,7 @@ impl Message {
 
         db.delete_message(&self.id).await?;
 
-        if let Err(err) = Notification::delete_for_message(db, &self.id).await {
+        if let Err(err) = NotificationCenter::delete_for_message(db, &self.id).await {
             revolt_config::capture_error(&err);
         }
 
@@ -1174,7 +1174,7 @@ impl Message {
         db.delete_messages(channel, &valid_ids).await?;
 
         if !valid_ids.is_empty() {
-            if let Err(err) = Notification::delete_for_messages(db, &valid_ids).await {
+            if let Err(err) = NotificationCenter::delete_for_messages(db, &valid_ids).await {
                 revolt_config::capture_error(&err);
             }
         }
@@ -1215,7 +1215,7 @@ impl Message {
         }
 
         if !all_deleted_ids.is_empty() {
-            if let Err(err) = Notification::delete_for_messages(db, &all_deleted_ids).await {
+            if let Err(err) = NotificationCenter::delete_for_messages(db, &all_deleted_ids).await {
                 revolt_config::capture_error(&err);
             }
         }
