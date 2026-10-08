@@ -7566,6 +7566,7 @@ dependencies = [
  "sha1 0.10.6",
  "tokio",
  "totp-lite",
+ "tracing",
  "ulid",
  "unicode-segmentation",
  "url-escape",
