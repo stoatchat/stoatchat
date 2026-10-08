@@ -21,6 +21,7 @@ use revolt_files::{
 use revolt_result::{create_error, Error, Result, ToRevoltError};
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
+use stoat_otel::WideContextRepository;
 use tempfile::NamedTempFile;
 use tokio::time::Instant;
 use tower_http::cors::{AllowHeaders, Any, CorsLayer};
@@ -177,10 +178,13 @@ pub struct UploadResponse {
 )]
 async fn upload_file(
     State(db): State<Database>,
+    wide_context: WideContextRepository,
     user: User,
     Path(tag): Path<Tag>,
     TypedMultipart(UploadPayload { mut file }): TypedMultipart<UploadPayload>,
 ) -> Result<Json<UploadResponse>> {
+    wide_context.add("user_id", user.id.clone());
+
     // Fetch configuration
     let config = config().await;
 

@@ -46,8 +46,9 @@ impl HttpRequestEvent {
     }
 }
 
-pub async fn wide_events(request: Request, next: Next) -> Response {
+pub async fn wide_events(mut request: Request, next: Next) -> Response {
     let context = WideContextRepository::default();
+    request.extensions_mut().insert(context.clone());
 
     let mut event = HttpRequestEvent::from_axum_request(&request);
     let span = info_span!(
