@@ -5,11 +5,11 @@ use std::{
 };
 
 use crate::{
-    AbstractServers, DISCRIMINATOR_SEARCH_SPACE, Invite, MongoDb, User,
     mongodb::{
-        bson::{Bson, DateTime, Document, doc, from_bson, from_document, to_document},
+        bson::{doc, from_bson, from_document, to_document, Bson, DateTime, Document},
         options::FindOptions,
     },
+    AbstractServers, Invite, MongoDb, User, DISCRIMINATOR_SEARCH_SPACE,
 };
 use bson::{oid::ObjectId, to_bson};
 use futures::StreamExt;
@@ -101,9 +101,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     }
 
     if revision <= 3 {
-        info!(
-            "Running migration [revision 3 / 2021-05-25]: Support multiple file uploads, add channel_unreads and user_settings."
-        );
+        info!("Running migration [revision 3 / 2021-05-25]: Support multiple file uploads, add channel_unreads and user_settings.");
 
         let messages = db.col::<Document>("messages");
         let mut cursor = messages
@@ -286,9 +284,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     }
 
     if revision <= 9 {
-        info!(
-            "Running migration [revision 9 / 2021-09-14]: Switch from last_message to last_message_id."
-        );
+        info!("Running migration [revision 9 / 2021-09-14]: Switch from last_message to last_message_id.");
 
         let mut cursor = db.col::<Document>("channels").find(doc! {}).await.unwrap();
 
@@ -340,9 +336,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     }
 
     if revision <= 10 {
-        info!(
-            "Running migration [revision 10 / 2021-11-01]: Remove nonce values on channels and servers."
-        );
+        info!("Running migration [revision 10 / 2021-11-01]: Remove nonce values on channels and servers.");
 
         db.col::<Document>("servers")
             .update_many(
@@ -455,9 +449,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     if revision <= 13 {
         info!("Running migration [revision 13 / 22-02-2022]: Wipe legacy permission values.");
 
-        warn!(
-            "This is a destructive operation and will wipe existing permission data (excl. defaults for SendMessage)."
-        );
+        warn!("This is a destructive operation and will wipe existing permission data (excl. defaults for SendMessage).");
         warn!("Taking a backup is advised.");
         warn!("Continuing in 10 seconds...");
         tokio::time::sleep(Duration::from_secs(10)).await;
@@ -560,9 +552,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     }
 
     if revision <= 14 {
-        info!(
-            "Running migration [revision 14 / 21-04-2022]: Split content into content and system fields."
-        );
+        info!("Running migration [revision 14 / 21-04-2022]: Split content into content and system fields.");
 
         db.col::<Document>("messages")
             .update_many(
@@ -698,9 +688,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     }
 
     if revision <= 16 {
-        info!(
-            "Running migration [revision 16 / 07-07-2022]: Add `emojis` collection and Authifier migration."
-        );
+        info!("Running migration [revision 16 / 07-07-2022]: Add `emojis` collection and Authifier migration.");
 
         if !db
             .db()
@@ -748,9 +736,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     }
 
     if revision <= 17 {
-        info!(
-            "Running migration [revision 17 / 15-07-2022]: Initialise `joined_at` property on server members."
-        );
+        info!("Running migration [revision 17 / 15-07-2022]: Initialise `joined_at` property on server members.");
 
         db.col::<Document>("server_members")
             .update_many(
@@ -766,9 +752,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     }
 
     if revision <= 18 {
-        info!(
-            "Running migration [revision 18 / 27-02-2022]: Create author index on messages. Drop plain channel index if exists."
-        );
+        info!("Running migration [revision 18 / 27-02-2022]: Create author index on messages. Drop plain channel index if exists.");
 
         if db
             .db()
@@ -779,9 +763,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             .await
             .is_err()
         {
-            info!(
-                "Failed to drop `messages.channel` index but this is ok since that means it's probably gone."
-            );
+            info!("Failed to drop `messages.channel` index but this is ok since that means it's probably gone.");
         }
 
         db.db()
@@ -980,9 +962,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     }
 
     if revision <= 24 {
-        info!(
-            "Running migration [revision 24 / 09-06-2023]: Add collection `channel_webhooks` if not exists, update users index."
-        );
+        info!("Running migration [revision 24 / 09-06-2023]: Add collection `channel_webhooks` if not exists, update users index.");
 
         db.db().create_collection("channel_webhooks").await.ok();
 
@@ -1036,9 +1016,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     }
 
     if revision <= 25 {
-        info!(
-            "Running migration [revision 25 / 15-06-2023]: Add collection `ratelimit_events` with index."
-        );
+        info!("Running migration [revision 25 / 15-06-2023]: Add collection `ratelimit_events` with index.");
 
         db.db().create_collection("ratelimit_events").await.ok();
 
@@ -1062,9 +1040,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
 
     if revision <= 26 {
         // Need to migrate fields on attachments, change `user_id`, `object_id`, etc to `parent`.
-        info!(
-            "Running migration [revision 26 / 15-05-2024]: fix invites being incorrectly serialized with wrong enum tagging."
-        );
+        info!("Running migration [revision 26 / 15-05-2024]: fix invites being incorrectly serialized with wrong enum tagging.");
 
         auto_derived!(
             pub enum OldInvite {
@@ -1209,9 +1185,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     // Revision 29 omitted due to bug.
 
     if revision <= 30 {
-        info!(
-            "Running migration [revision 30 / 29-09-2024]: Add index for used_for.id to attachments."
-        );
+        info!("Running migration [revision 30 / 29-09-2024]: Add index for used_for.id to attachments.");
 
         db.db()
             .run_command(doc! {
@@ -1230,9 +1204,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     }
 
     if revision <= 31 {
-        info!(
-            "Running migration [revision 31 / 31-10-2024]: Add creator_id to webhooks and delete those whose channels don't exist."
-        );
+        info!("Running migration [revision 31 / 31-10-2024]: Add creator_id to webhooks and delete those whose channels don't exist.");
 
         #[derive(serde::Serialize, serde::Deserialize)]
         struct WebhookShell {
@@ -1438,9 +1410,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     }
 
     if revision <= 46 {
-        info!(
-            "Running migration [revision 46 / 29-04-2025]: Convert all `VoiceChannel`'s into `TextChannel`"
-        );
+        info!("Running migration [revision 46 / 29-04-2025]: Convert all `VoiceChannel`'s into `TextChannel`");
 
         db.col::<Document>("channels")
             .update_many(
@@ -1457,9 +1427,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     };
 
     if revision <= 48 {
-        info!(
-            "Running migration [revision 48 / 22-10-2025]: Add Video + Listen to default permissions"
-        );
+        info!("Running migration [revision 48 / 22-10-2025]: Add Video + Listen to default permissions");
 
         db.col::<Document>("servers")
             .update_many(
@@ -1516,9 +1484,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     };
 
     if revision <= 50 {
-        info!(
-            "Running migration [revision 50 / 13-04-2026]: Rename invites collection to account_invites"
-        );
+        info!("Running migration [revision 50 / 13-04-2026]: Rename invites collection to account_invites");
 
         let result = db
             .db()
@@ -1618,20 +1584,18 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     }
 
     if revision <= 54 {
-        info!(
-            "Running migration [revision 54 / 14-09-2026]: Add UseExternalEmojis to default permissions"
-        );
+        info!("Running migration [revision 54 / 14-09-2026]: Add UseExternalEmojis to default permissions");
 
         db.col::<Document>("servers")
             .update_many(
                 doc! {},
                 doc! {
-                    "$bit": {
-                        "default_permissions": {
-                            "or": ChannelPermission::UseExternalEmojis as i64
-                        },
+                "$bit": {
+                    "default_permissions": {
+                        "or": ChannelPermission::UseExternalEmojis as i64
                     },
                 },
+            },
             )
             .await
             .expect("Failed to update default_permissions");
