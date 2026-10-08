@@ -25,4 +25,4 @@ tracing-opentelemetry = { workspace = true }
 # HTTP
 axum = { workspace = true, optional = true }
 uuid = { workspace = true, optional = true, features = ["v4"] }
-revolt-result = { workspace = true, optional = true }
+revolt-result = { workspace = true, optional = true, features = ["axum"] }

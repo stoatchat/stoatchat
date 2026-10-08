@@ -105,6 +105,7 @@ fn export_filter() -> EnvFilter {
         .add_directive("reqwest=off".parse().unwrap())
         .add_directive("aws_smithy_runtime=off".parse().unwrap())
         .add_directive("aws_sdk_s3=off".parse().unwrap())
+        .add_directive("tower_http::catch_panic=off".parse().unwrap())
         .add_directive("http_request=off".parse().unwrap())
 }
 

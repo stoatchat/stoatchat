@@ -12,6 +12,7 @@ use tokio::{
     net::TcpListener,
     signal::unix::{signal, SignalKind},
 };
+use tower_http::catch_panic::CatchPanicLayer;
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
     Modify, OpenApi,
@@ -99,6 +100,7 @@ async fn main() -> Result<(), std::io::Error> {
             state.clone(),
             ratelimiter::ratelimit_middleware,
         ))
+        .layer(CatchPanicLayer::custom(stoat_otel::middleware::axum::panic_response))
         .layer(from_fn(stoat_otel::middleware::axum::wide_events))
         .with_state(state);
 
