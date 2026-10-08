@@ -87,6 +87,8 @@ fn export_filter() -> EnvFilter {
         .add_directive("tonic=off".parse().unwrap())
         .add_directive("h2=off".parse().unwrap())
         .add_directive("reqwest=off".parse().unwrap())
+        .add_directive("aws_smithy_runtime=off".parse().unwrap())
+        .add_directive("aws_sdk_s3=off".parse().unwrap())
         .add_directive("http_request=off".parse().unwrap())
 }
 
