@@ -1,10 +1,10 @@
 use super::AbstractNotifications;
-use crate::{Notification, ReferenceDb};
+use crate::{NotificationCenter, ReferenceDb};
 use revolt_result::Result;
 
 #[async_trait]
 impl AbstractNotifications for ReferenceDb {
-    async fn insert_notifications(&self, notifications: Vec<Notification>) -> Result<()> {
+    async fn insert_notifications(&self, notifications: Vec<NotificationCenter>) -> Result<()> {
         todo!()
     }
 
@@ -13,7 +13,7 @@ impl AbstractNotifications for ReferenceDb {
         user_id: &str,
         before: Option<&str>,
         limit: i64,
-    ) -> Result<Vec<Notification>> {
+    ) -> Result<Vec<NotificationCenter>> {
         todo!()
     }
 

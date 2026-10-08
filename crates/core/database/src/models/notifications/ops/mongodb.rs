@@ -1,5 +1,5 @@
 use super::AbstractNotifications;
-use crate::{MongoDb, Notification};
+use crate::{MongoDb, NotificationCenter};
 use futures::StreamExt;
 use revolt_result::Result;
 
@@ -7,13 +7,13 @@ static COL: &str = "notifications";
 
 #[async_trait]
 impl AbstractNotifications for MongoDb {
-    async fn insert_notifications(&self, notifications: Vec<Notification>) -> Result<()> {
+    async fn insert_notifications(&self, notifications: Vec<NotificationCenter>) -> Result<()> {
         if notifications.is_empty() {
             return Ok(());
         }
 
         match self
-            .col::<Notification>(COL)
+            .col::<NotificationCenter>(COL)
             .insert_many(notifications)
             .ordered(false)
             .await
@@ -29,14 +29,14 @@ impl AbstractNotifications for MongoDb {
         user_id: &str,
         before: Option<&str>,
         limit: i64,
-    ) -> Result<Vec<Notification>> {
+    ) -> Result<Vec<NotificationCenter>> {
         let mut filter = doc! { "user_id": user_id };
         if let Some(before) = before {
             filter.insert("message_id", doc! { "$lt": before });
         }
 
         Ok(self
-            .col::<Notification>(COL)
+            .col::<NotificationCenter>(COL)
             .find(filter)
             .sort(doc! { "message_id": -1 })
             .limit(limit)
@@ -56,7 +56,7 @@ impl AbstractNotifications for MongoDb {
     async fn delete_notifications_before(&self, before_ms: i64) -> Result<u64> {
         let cutoff = ulid::Ulid::from_parts(before_ms.max(0) as u64, 0).to_string();
 
-        self.col::<Notification>(COL)
+        self.col::<NotificationCenter>(COL)
             .delete_many(doc! { "_id": { "$lt": cutoff } })
             .await
             .map(|result| result.deleted_count)
@@ -64,7 +64,7 @@ impl AbstractNotifications for MongoDb {
     }
 
     async fn delete_notifications_for_message(&self, message_id: &str) -> Result<()> {
-        self.col::<Notification>(COL)
+        self.col::<NotificationCenter>(COL)
             .delete_many(doc! { "message_id": message_id })
             .await
             .map(|_| ())
@@ -76,7 +76,7 @@ impl AbstractNotifications for MongoDb {
             return Ok(());
         }
 
-        self.col::<Notification>(COL)
+        self.col::<NotificationCenter>(COL)
             .delete_many(doc! { "message_id": { "$in": message_ids } })
             .await
             .map(|_| ())
@@ -92,7 +92,7 @@ impl AbstractNotifications for MongoDb {
             return Ok(());
         }
 
-        self.col::<Notification>(COL)
+        self.col::<NotificationCenter>(COL)
             .delete_many(doc! {
                 "message_id": message_id,
                 "user_id": { "$in": user_ids },

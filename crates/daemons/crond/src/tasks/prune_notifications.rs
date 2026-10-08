@@ -1,11 +1,11 @@
 use std::time::Duration;
-use revolt_database::{Database, Notification};
+use revolt_database::{Database, NotificationCenter};
 use revolt_result::Result;
 use tokio::time::sleep;
 
 pub async fn task(db: Database, _: revolt_database::AMQP) -> Result<()> {
     loop {
-        let count = Notification::prune(&db).await?;
+        let count = NotificationCenter::prune(&db).await?;
 
         log::info!("Deleted {count} notifications.");
 

@@ -1,4 +1,4 @@
-use crate::Notification;
+use crate::NotificationCenter;
 use revolt_result::Result;
 
 #[cfg(feature = "mongodb")]
@@ -8,7 +8,7 @@ mod reference;
 #[async_trait]
 pub trait AbstractNotifications: Sync + Send {
     /// Insert a new notification to the database
-    async fn insert_notifications(&self, notifications: Vec<Notification>) -> Result<()>;
+    async fn insert_notifications(&self, notifications: Vec<NotificationCenter>) -> Result<()>;
 
     /// Fetch notifications from the database
     async fn fetch_notifications(
@@ -16,7 +16,7 @@ pub trait AbstractNotifications: Sync + Send {
         user_id: &str,
         before: Option<&str>,
         limit: i64,
-    ) -> Result<Vec<Notification>>;
+    ) -> Result<Vec<NotificationCenter>>;
 
     /// Delete notifications created before the given time, returns how many were removed
     async fn delete_notifications_before(&self, before_ms: i64) -> Result<u64>;

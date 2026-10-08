@@ -7,7 +7,7 @@ use rocket::FromForm;
 
 auto_derived!(
     /// Notification
-    pub struct Notification {
+    pub struct NotificationCenter {
         /// Why this notification exists
         pub kind: NotificationKind,
         /// Message ID
