@@ -9227,6 +9227,7 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry_sdk",
  "revolt-result",
+ "serde",
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
