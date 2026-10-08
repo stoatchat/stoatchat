@@ -4,7 +4,6 @@ pnpm = "10.28.1"
 
 gh = "2.25.0"
 
-mold = "3.0.0"
 rust = "1.92.0"
 "cargo:cargo-nextest" = "0.9.122"
 
@@ -25,10 +24,6 @@ RUST_LOG = "debug,opentelemetry=info,hyper=info,reqwest=info,mobc=info"
 
 BUILDER = "cargo"
 SYSTEM_DEPS_DAV1D_BUILD_INTERNAL = "auto" # enable building dav1d iff the system doesn't have a new enough version
-CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER = "clang"
-CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS = "-C link-arg=-fuse-ld=mold"
-CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER = "clang"
-CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS = "-C link-arg=-fuse-ld=mold"
 
 # ... note: clean this up
 DOCKER_NETWORK_NAME = "stoatchat_default"

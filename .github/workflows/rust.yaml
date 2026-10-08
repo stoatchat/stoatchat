@@ -36,9 +36,6 @@ jobs:
             sudo apt-get install --yes meson ninja-build nasm
           fi
 
-      - name: Install clang
-        run: sudo apt-get install --yes clang
-
       - name: Setup Mise
         uses: immich-app/devtools/actions/use-mise@cd24790a7f5f6439ac32cc94f5523cb2de8bfa8c # use-mise-action-v1.1.0
         with:
