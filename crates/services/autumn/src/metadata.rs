@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
 use crate::utils::apply_icc_profile;
-use image::{GenericImageView, ImageError, ImageReader};
+use image::{GenericImageView, ImageReader};
 use revolt_database::Metadata;
 use revolt_files::{image_size, is_animated, video_size};
 use tempfile::NamedTempFile;
