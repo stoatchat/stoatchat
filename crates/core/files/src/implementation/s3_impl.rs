@@ -45,6 +45,7 @@ impl<ER: EncryptionRepository> S3Storage<ER> {
 
 #[async_trait::async_trait]
 impl<ER: EncryptionRepository> FileStorageRepository for S3Storage<ER> {
+    #[tracing::instrument(skip(self), err)]
     async fn create_bucket(&self, bucket_id: &str) -> anyhow::Result<()> {
         self.client
             .create_bucket()
@@ -56,6 +57,7 @@ impl<ER: EncryptionRepository> FileStorageRepository for S3Storage<ER> {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self, iv), err)]
     async fn fetch_and_decrypt_file(
         &self,
         bucket_id: &str,
@@ -84,6 +86,7 @@ impl<ER: EncryptionRepository> FileStorageRepository for S3Storage<ER> {
         }
     }
 
+    #[tracing::instrument(skip(self, buf), fields(size = buf.len()), err)]
     async fn encrypt_and_upload_file(
         &self,
         bucket_id: &str,
@@ -104,6 +107,7 @@ impl<ER: EncryptionRepository> FileStorageRepository for S3Storage<ER> {
         Ok(iv)
     }
 
+    #[tracing::instrument(skip(self), err)]
     async fn delete_file(&self, bucket_id: &str, path: &str) -> anyhow::Result<()> {
         self.client
             .delete_object()
