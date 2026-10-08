@@ -38,6 +38,6 @@ database_derived!(
         pub account_invites: Arc<Mutex<HashMap<String, AccountInvite>>>,
         pub sessions: Arc<Mutex<HashMap<String, Session>>>,
         pub tickets: Arc<Mutex<HashMap<String, MFATicket>>>,
-        pub notifications: Arc<Mutex<HashMap<String, NotificationCenter>>>,
+        pub notifications: Arc<Mutex<HashMap<(String, String), NotificationCenter>>>,
     }
 );

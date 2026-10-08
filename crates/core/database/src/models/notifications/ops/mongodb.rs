@@ -57,7 +57,7 @@ impl AbstractNotifications for MongoDb {
         let cutoff = ulid::Ulid::from_parts(before_ms.max(0) as u64, 0).to_string();
 
         self.col::<NotificationCenter>(COL)
-            .delete_many(doc! { "_id": { "$lt": cutoff } })
+            .delete_many(doc! { "message_id": { "$lt": cutoff } })
             .await
             .map(|result| result.deleted_count)
             .map_err(|_| create_database_error!("delete_many", COL))
