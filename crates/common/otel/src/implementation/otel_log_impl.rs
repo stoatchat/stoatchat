@@ -18,7 +18,11 @@ impl HttpRequestEvent {
         let outcome = if self.rejected() { "error" } else { "success" };
         let duration_ms = self.duration.as_millis() as i64;
 
-        if let Some(logger) = WIDE_LOGGER.get() {
+        let logger = WIDE_LOGGER
+            .get()
+            .filter(|_| self.sampled || level == Level::ERROR);
+
+        if let Some(logger) = logger {
             let (severity, severity_text) = match level {
                 Level::ERROR => (Severity::Error, "ERROR"),
                 Level::WARN => (Severity::Warn, "WARN"),

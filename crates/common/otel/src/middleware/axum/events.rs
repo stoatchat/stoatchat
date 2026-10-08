@@ -5,7 +5,9 @@ use ::axum::{
     middleware::Next,
     response::Response,
 };
-use tracing::{Instrument, field::Empty, info_span};
+use opentelemetry::trace::TraceContextExt;
+use tracing::{Instrument, Span, field::Empty, info_span};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
 use crate::{WideContextRepository, models::HttpRequestEvent};
@@ -31,13 +33,15 @@ impl HttpRequestEvent {
             start: Instant::now(),
             status: 0,
             duration: Duration::ZERO,
+            sampled: false,
             error: None,
         }
     }
 
-    fn finish_axum(&mut self, response: &Response) {
+    fn finish_axum(&mut self, response: &Response, span: &Span) {
         self.status = response.status().as_u16();
         self.duration = self.start.elapsed();
+        self.sampled = span.context().span().span_context().is_sampled();
         self.error = response.extensions().get::<revolt_result::Error>().cloned();
     }
 }
@@ -59,7 +63,7 @@ pub async fn wide_events(request: Request, next: Next) -> Response {
     );
 
     let response = next.run(request).instrument(span.clone()).await;
-    event.finish_axum(&response);
+    event.finish_axum(&response, &span);
     span.record("http.response.status_code", event.status);
 
     if event.failed() {

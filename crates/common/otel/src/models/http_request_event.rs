@@ -12,6 +12,7 @@ pub(crate) struct HttpRequestEvent {
     pub start: Instant,
     pub status: u16,
     pub duration: Duration,
+    pub sampled: bool,
     pub error: Option<revolt_result::Error>,
 }
 
