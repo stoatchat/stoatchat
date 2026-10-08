@@ -119,17 +119,10 @@ If you'd like to change anything, create a `Revolt.overrides.toml` file and spec
 >       - "14072:5672"
 >       - "14672:15672"
 >
->   victoria-metrics:
+>   otel-lgtm:
 >     ports: !override
->       - "18428:8428"
->
->   victoria-logs:
->     ports: !override
->       - "19428:9428"
->
->   victoria-traces:
->     ports: !override
->       - "14428:10428"
+>       - "13000:3000"
+>       - "14318:4318"
 > ```
 >
 > With the corresponding Revolt configuration:
@@ -138,20 +131,18 @@ If you'd like to change anything, create a `Revolt.overrides.toml` file and spec
 > #     Revolt.overrides.toml
 > # and Revolt.test-overrides.toml
 > [database]
-> mongodb = "mongodb://127.0.0.1:14017"
+> mongodb = "mongodb://127.0.0.1:14017/?directConnection=true"
 > redis = "redis://127.0.0.1:14079/"
 >
 > [rabbit]
 > port = 14072
 > ```
 >
-> And mise configuration
+> And the OTLP endpoint:
 >
 > ```bash
 > #.env
-> DATABASE_PORT = "14017"
-> RABBIT_PORT = "14072"
-> REDIS_PORT = "14079"
+> OTEL_EXPORTER_OTLP_ENDPOINT = "http://localhost:14318"
 > ```
 
 Then continue:
