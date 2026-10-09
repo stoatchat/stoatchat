@@ -7,7 +7,7 @@ services:
 
   # MongoDB
   database:
-    image: mirror.gcr.io/mongo:7
+    image: mirror.gcr.io/mongo
     command: mongod --replSet rs0
     ports:
       - "27017:27017"
