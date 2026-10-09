@@ -42,10 +42,8 @@ mod test {
     use serde_json::json;
     use ulid::Ulid;
 
-    // NOTE: adjust to wherever this route is mounted in delta
     const ROUTE: &str = "/users/notifications";
 
-    /// A logged-in test user: session token + user
     struct Actor {
         token: String,
         user: User,
@@ -59,8 +57,6 @@ mod test {
         }
     }
 
-    /// Owner + member in a group DM. Enough for direct-mention tests,
-    /// since those are read straight from the notifications collection.
     async fn group_setup(harness: &TestHarness) -> (Actor, Actor, Channel) {
         let owner = actor(harness).await;
         let member = actor(harness).await;
@@ -79,8 +75,6 @@ mod test {
         (owner, member, group)
     }
 
-    /// Owner + member in a server. Needed for @everyone / role tests,
-    /// which resolve channels through server membership.
     async fn server_setup(harness: &TestHarness) -> (Actor, Actor, Channel) {
         let owner = actor(harness).await;
         let member = actor(harness).await;
