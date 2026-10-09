@@ -17,6 +17,9 @@ impl crate::Bot {
                 .profile
                 .and_then(|profile| profile.content)
                 .unwrap_or_default(),
+            privacy_policy_url: self.privacy_policy_url,
+            terms_of_service_url: self.terms_of_service_url,
+            default_permissions: self.default_permissions,
         }
     }
 }
