@@ -1,6 +1,6 @@
 use revolt_database::{Database, NotificationCenter, User, InboxOptions};
 use revolt_models::v0;
-use revolt_result::Result;
+use revolt_result::{Result, create_error};
 use rocket::{serde::json::Json, State};
 
 /// # Fetch User Notifications
@@ -13,6 +13,10 @@ pub async fn fetch_notifications(
     user: User,
     options: v0::OptionsFetchNotifications,
 ) -> Result<Json<Vec<v0::NotificationCenter>>> {
+    if user.bot.is_some() {
+        return Err(create_error!(IsBot));
+    }
+
     let items = NotificationCenter::fetch_inbox(
         db,
         &user,
