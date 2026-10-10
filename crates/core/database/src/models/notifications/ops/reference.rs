@@ -23,6 +23,7 @@ impl AbstractNotifications for ReferenceDb {
     async fn fetch_notifications(
         &self,
         user_id: &str,
+        after: &str,
         before: Option<&str>,
         limit: i64,
     ) -> Result<Vec<NotificationCenter>> {
@@ -31,6 +32,7 @@ impl AbstractNotifications for ReferenceDb {
         let mut results: Vec<NotificationCenter> = store
             .values()
             .filter(|n| n.user_id == user_id)
+            .filter(|n| n.message_id.as_str() > after)
             .filter(|n| before.map_or(true, |b| n.message_id.as_str() < b))
             .cloned()
             .collect();
@@ -80,6 +82,48 @@ impl AbstractNotifications for ReferenceDb {
 
         let mut store = self.notifications.lock().await;
         store.retain(|_, n| !(n.message_id == message_id && user_ids.contains(&n.user_id)));
+
+        Ok(())
+    }
+
+    async fn delete_notifications_for_channels(&self, channel_ids: &[String]) -> Result<()> {
+        if channel_ids.is_empty() {
+            return Ok(());
+        }
+
+        let mut store = self.notifications.lock().await;
+        store.retain(|_, n| !channel_ids.contains(&n.channel_id));
+
+        Ok(())
+    }
+
+    async fn delete_notifications_for_user(&self, user_id: &str) -> Result<()> {
+        let mut store = self.notifications.lock().await;
+        store.retain(|_, n| n.user_id != user_id);
+
+        Ok(())
+    }
+
+    async fn delete_notifications_for_user_in_channel(
+        &self,
+        user_id: &str,
+        channel_id: &str,
+    ) -> Result<()> {
+        let mut store = self.notifications.lock().await;
+        store.retain(|_, n| !(n.user_id == user_id && n.channel_id == channel_id));
+
+        Ok(())
+    }
+
+    async fn delete_notifications_for_user_in_server(
+        &self,
+        user_id: &str,
+        server_id: &str,
+    ) -> Result<()> {
+        let mut store = self.notifications.lock().await;
+        store.retain(|_, n| {
+            !(n.user_id == user_id && n.server_id.as_deref() == Some(server_id))
+        });
 
         Ok(())
     }

@@ -14,6 +14,7 @@ pub trait AbstractNotifications: Sync + Send {
     async fn fetch_notifications(
         &self,
         user_id: &str,
+        after: &str,
         before: Option<&str>,
         limit: i64,
     ) -> Result<Vec<NotificationCenter>>;
@@ -32,5 +33,25 @@ pub trait AbstractNotifications: Sync + Send {
         &self,
         message_id: &str,
         user_ids: &[String],
+    ) -> Result<()>;
+
+    /// Delete every notification in the given channels (channel or server deletion)
+    async fn delete_notifications_for_channels(&self, channel_ids: &[String]) -> Result<()>;
+
+    /// Delete every notification addressed to a user (account deletion)
+    async fn delete_notifications_for_user(&self, user_id: &str) -> Result<()>;
+
+    /// Delete a user's notifications in one channel (leaving or being removed from a group)
+    async fn delete_notifications_for_user_in_channel(
+        &self,
+        user_id: &str,
+        channel_id: &str,
+    ) -> Result<()>;
+
+    /// Delete a user's notifications in one server (leaving, kick or ban)
+    async fn delete_notifications_for_user_in_server(
+        &self,
+        user_id: &str,
+        server_id: &str,
     ) -> Result<()>;
 }
