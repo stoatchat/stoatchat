@@ -390,6 +390,8 @@ pub struct GlobalLimits {
     pub restrict_server_creation: Vec<String>,
 
     pub max_invite_duration_days: usize,
+
+    pub notification_retention_days: usize,
 }
 
 #[derive(Deserialize, Debug, Clone)]

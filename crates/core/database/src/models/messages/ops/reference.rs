@@ -362,4 +362,82 @@ impl AbstractMessages for ReferenceDb {
 
         Ok(())
     }
+
+    async fn fetch_role_mention_messages(
+        &self,
+        channel_ids: &[String],
+        role_ids: &[String],
+        exclude_author: &str,
+        after: &str,
+        before: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Message>> {
+        if channel_ids.is_empty() || role_ids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let messages = self.messages.lock().await;
+        Ok(collect_mentions(
+            messages.values(),
+            channel_ids,
+            exclude_author,
+            after,
+            before,
+            limit,
+            |m| {
+                m.role_mentions
+                    .as_ref()
+                    .is_some_and(|roles| roles.iter().any(|r| role_ids.contains(r)))
+            },
+        ))
+    }
+
+    async fn fetch_everyone_mention_messages(
+        &self,
+        channel_ids: &[String],
+        exclude_author: &str,
+        after: &str,
+        before: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Message>> {
+        if channel_ids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let messages = self.messages.lock().await;
+        Ok(collect_mentions(
+            messages.values(),
+            channel_ids,
+            exclude_author,
+            after,
+            before,
+            limit,
+            // Mirrors `$bitsAllSet: 4`
+            |m| m.flags.unwrap_or(0) & 4 == 4,
+        ))
+    }
+}
+
+/// Shared filter for the inbox queries: channel, author, `_id` range, newest first, limited
+fn collect_mentions<'a>(
+    messages: impl Iterator<Item = &'a Message>,
+    channel_ids: &[String],
+    exclude_author: &str,
+    after: &str,
+    before: Option<&str>,
+    limit: i64,
+    matches: impl Fn(&Message) -> bool,
+) -> Vec<Message> {
+    let mut found: Vec<Message> = messages
+        .filter(|m| channel_ids.contains(&m.channel))
+        .filter(|m| m.author != exclude_author)
+        .filter(|m| m.id.as_str() > after)
+        .filter(|m| before.map_or(true, |b| m.id.as_str() < b))
+        .filter(|m| matches(m))
+        .cloned()
+        .collect();
+
+    found.sort_by(|a, b| b.id.cmp(&a.id));
+    found.truncate(limit.max(0) as usize);
+    found
 }

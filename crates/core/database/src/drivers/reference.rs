@@ -6,7 +6,7 @@ use crate::{
     Account, AccountInvite, AuditLogEntry, Bot, Channel, ChannelCompositeKey, ChannelUnread,
     DiscoverBan, DiscoverRequest, DiscoverRequestType, Emoji, File, FileHash, Invite, MFATicket,
     Member, MemberCompositeKey, Message, PolicyChange, RatelimitEvent, Report, Server, ServerBan,
-    Session, Snapshot, User, UserSettings, Webhook,
+    Session, Snapshot, User, UserSettings, Webhook, NotificationCenter
 };
 
 database_derived!(
@@ -38,5 +38,6 @@ database_derived!(
         pub account_invites: Arc<Mutex<HashMap<String, AccountInvite>>>,
         pub sessions: Arc<Mutex<HashMap<String, Session>>>,
         pub tickets: Arc<Mutex<HashMap<String, MFATicket>>>,
+        pub notifications: Arc<Mutex<HashMap<(String, String), NotificationCenter>>>,
     }
 );
