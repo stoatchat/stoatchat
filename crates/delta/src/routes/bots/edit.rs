@@ -38,6 +38,7 @@ pub async fn edit_bot(
         && data.analytics.is_none()
         && data.interactions_url.is_none()
         && data.remove.is_empty()
+        && data.default_permissions.is_none()
     {
         return Ok(Json(v0::BotWithUserResponse {
             bot: bot.into(),
@@ -50,6 +51,7 @@ pub async fn edit_bot(
         analytics,
         interactions_url,
         remove,
+        default_permissions,
         ..
     } = data;
 
@@ -57,6 +59,7 @@ pub async fn edit_bot(
         public,
         analytics,
         interactions_url,
+        default_permissions,
         ..Default::default()
     };
 

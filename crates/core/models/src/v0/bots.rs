@@ -92,6 +92,24 @@ auto_derived!(
             serde(skip_serializing_if = "String::is_empty", default)
         )]
         pub description: String,
+        /// URL for privacy policy
+        #[cfg_attr(
+            feature = "serde",
+            serde(skip_serializing_if = "String::is_empty", default)
+        )]
+        pub privacy_policy_url: String,
+        /// URL for terms of service
+        #[cfg_attr(
+            feature = "serde",
+            serde(skip_serializing_if = "String::is_empty", default)
+        )]
+        pub terms_of_service_url: String,
+        /// Permissions the bot will ask for
+        #[cfg_attr(
+            feature = "serde",
+            serde(skip_serializing_if = "Option::is_none", default)
+        )]
+        pub default_permissions: Option<i64>
     }
 
     /// Bot Response
