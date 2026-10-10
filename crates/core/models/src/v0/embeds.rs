@@ -85,7 +85,7 @@ auto_derived!(
             author_name: String,
             author_handle: String,
             author_url: String,
-            author_avatar_url: String,
+            author_avatar_url: Option<String>,
             created_timestamp: usize,
 
             quote_id: Option<String>,
@@ -189,35 +189,58 @@ auto_derived!(
     }
 );
 
+/// Truncate a string to at most `max_len` bytes without splitting a character
+fn truncate_on_char_boundary(s: &mut String, max_len: usize) {
+    if s.len() > max_len {
+        let mut end = max_len;
+        while !s.is_char_boundary(end) {
+            end -= 1;
+        }
+
+        s.truncate(end);
+    }
+}
+
 impl WebsiteMetadata {
     /// Truncate strings in metadata
     pub fn truncate(&mut self) {
         if let Some(s) = self.url.as_mut() {
-            s.truncate(256);
+            truncate_on_char_boundary(s, 256);
         }
 
         if let Some(s) = self.original_url.as_mut() {
-            s.truncate(256);
+            truncate_on_char_boundary(s, 256);
         }
 
         if let Some(s) = self.title.as_mut() {
-            s.truncate(100);
+            truncate_on_char_boundary(s, 100);
         }
 
         if let Some(s) = self.description.as_mut() {
-            s.truncate(1000);
+            truncate_on_char_boundary(s, 1000);
         }
 
         if let Some(s) = self.site_name.as_mut() {
-            s.truncate(32);
+            truncate_on_char_boundary(s, 32);
         }
 
         if let Some(s) = self.icon_url.as_mut() {
-            s.truncate(256);
+            truncate_on_char_boundary(s, 256);
         }
 
         if let Some(s) = self.colour.as_mut() {
-            s.truncate(32);
+            truncate_on_char_boundary(s, 32);
+        }
+
+        if let Some(Special::XApp {
+            text, quote_text, ..
+        }) = self.special.as_mut()
+        {
+            truncate_on_char_boundary(text, 1000);
+
+            if let Some(s) = quote_text.as_mut() {
+                truncate_on_char_boundary(s, 1000);
+            }
         }
     }
 

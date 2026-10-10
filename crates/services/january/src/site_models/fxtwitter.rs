@@ -21,7 +21,6 @@ pub struct FxTwitterStatusText {
 #[allow(unused)]
 #[derive(Debug, Deserialize, Clone)]
 pub struct FxTwitterStatus {
-    pub r#type: String,
     pub url: String,
     pub id: String,
     pub text: String,
@@ -29,15 +28,43 @@ pub struct FxTwitterStatus {
     pub author: FxTwitterAuthor,
     pub media: FxTwitterMediaAll,
 
-    pub replies: usize,
-    pub reposts: usize,
-    pub likes: usize,
-    pub bookmarks: usize,
-    pub quotes: usize,
-    pub views: usize,
+    pub replies: Option<usize>,
+    pub reposts: Option<usize>,
+    pub likes: Option<usize>,
+    pub bookmarks: Option<usize>,
+    pub quotes: Option<usize>,
+    pub views: Option<usize>,
     pub created_timestamp: usize,
 
-    pub quote: Option<Box<FxTwitterStatus>>,
+    pub quote: Option<FxTwitterQuote>,
+}
+
+impl FxTwitterStatus {
+    /// The quoted status, if there is one and it is available
+    pub fn quoted_status(&self) -> Option<&FxTwitterStatus> {
+        match &self.quote {
+            Some(FxTwitterQuote::Status(status)) => Some(status),
+            _ => None,
+        }
+    }
+}
+
+#[allow(unused)]
+#[derive(Debug, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum FxTwitterQuote {
+    Status(Box<FxTwitterStatus>),
+    /// Placeholder for a quoted status that is deleted, suspended, private, etc.
+    Tombstone(FxTwitterTombstone),
+}
+
+#[allow(unused)]
+#[derive(Debug, Deserialize, Clone)]
+pub struct FxTwitterTombstone {
+    pub reason: String,
+    pub message: String,
+    pub id: Option<String>,
+    pub url: Option<String>,
 }
 
 #[allow(unused)]
@@ -47,8 +74,8 @@ pub struct FxTwitterAuthor {
     pub name: String,
     pub url: String,
     pub id: String,
-    pub banner_url: String,
-    pub avatar_url: String,
+    pub banner_url: Option<String>,
+    pub avatar_url: Option<String>,
     pub joined: String,
 }
 
@@ -87,6 +114,7 @@ pub struct FxTwitterMediaVideoElement {
 #[derive(Debug, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum FxTwitterMediaElement {
+    #[serde(alias = "gif")]
     Video(FxTwitterMediaVideoElement),
     Photo(FxTwitterMediaPhotoElement),
 }

@@ -40,7 +40,7 @@ lazy_static! {
     static ref RE_URL_NEW_REDDIT: Regex = Regex::new("^(?:(?:new\\.|www\\.)?reddit).com").expect("valid regex");
 
     /// Regex for matching twitter URLs (and fixers)
-    static ref RE_URL_TWITTER: Regex = Regex::new("^(?:(?:https?:)?//)?(?:(?:vx|fx)?twitter|(?:fixv|fixup|girlcock|stupidpenis|hotyurise)?x)\\.com/[^/]+/status/(\\d+)\\??(?:s=\\d+)?&?(?:lang=([a-z\\-]{2,5}))?").expect("valid regex");
+    static ref RE_URL_TWITTER: Regex = Regex::new("^(?:(?:https?:)?//)?(?:(?:www|mobile)\\.)?(?:(?:vx|fx)?twitter|(?:fixv|fixup|girlcock|stupidpenis|hotyurise)?x)\\.com/(?:[^/?#]+/){1,2}status/(\\d+)(?:/[^?#]*)?(?:\\?(?:[^#]*?&)?lang=([A-Za-z\\-]{2,10})(?:[&#]|$))?").expect("valid regex");
 
     /// Regex for matching YouTube Shorts URLs
     pub static ref RE_URL_YOUTUBE_SHORTS: Regex = Regex::new("^(?:(?:https?:)?//)?(?:(?:www\\.)?youtube\\.com)/shorts/([a-zA-Z0-9_-]+)").expect("valid regex");

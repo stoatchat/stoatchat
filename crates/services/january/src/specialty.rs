@@ -3,7 +3,7 @@ use revolt_models::v0::{Embed, Image, Special, Video, WebsiteMetadata};
 use revolt_result::{Result, create_error};
 
 use crate::requests::{RE_URL_YOUTUBE, Request};
-use crate::site_models::fxtwitter::FxTwitterMediaElement;
+use crate::site_models::fxtwitter::{FxTwitterMediaElement, FxTwitterQuote};
 pub struct SpecialtySitesGenerator {}
 
 impl SpecialtySitesGenerator {
@@ -62,29 +62,33 @@ impl SpecialtySitesGenerator {
 
         let mut maintext = twitter.status.text.clone();
 
-        if let Some(ref quote) = twitter.status.quote {
-            maintext = maintext
-                + &format!(
-                    "\n\nQuoting @{}\n>>> {}",
-                    &quote.author.screen_name, &quote.text
-                )
+        match twitter.status.quote {
+            Some(FxTwitterQuote::Status(ref quote)) => {
+                maintext = maintext
+                    + &format!(
+                        "\n\nQuoting @{}\n>>> {}",
+                        &quote.author.screen_name, &quote.text
+                    )
+            }
+            Some(FxTwitterQuote::Tombstone(ref tombstone)) => {
+                maintext = maintext + &format!("\n\n>>> {}", &tombstone.message)
+            }
+            None => {}
         }
+
+        let quote = twitter.status.quoted_status();
 
         let mut image: Option<Image> = None;
         let mut video: Option<Video> = None;
 
         let target_element = if twitter.status.media.all.is_some() {
-            Some(twitter.status.media)
+            Some(&twitter.status.media)
         } else {
-            twitter
-                .status
-                .quote
-                .as_ref()
-                .map(|quote| quote.media.clone())
+            quote.map(|quote| &quote.media)
         };
 
         if let Some(media) = target_element
-            && let Some(all) = media.all
+            && let Some(all) = &media.all
             && let Some(first) = all.first()
         {
             match first {
@@ -106,37 +110,31 @@ impl SpecialtySitesGenerator {
             }
         }
 
-        Ok(Embed::Website(WebsiteMetadata {
-            url: None,
-            original_url: Some(format!(
-                "https://x.com/{}/status/{id}",
-                twitter.author.screen_name.clone()
-            )),
+        let url = format!(
+            "https://x.com/{}/status/{id}",
+            twitter.author.screen_name.clone()
+        );
+
+        let mut metadata = WebsiteMetadata {
+            url: Some(url.clone()),
+            original_url: Some(url),
             special: Some(Special::XApp {
-                id: twitter.status.id,
-                text: twitter.status.text,
+                id: twitter.status.id.clone(),
+                text: twitter.status.text.clone(),
                 author_name: twitter.author.name.clone(),
                 author_url: twitter.author.url,
                 author_handle: twitter.author.screen_name.clone(),
                 author_avatar_url: twitter.author.avatar_url.clone(),
                 created_timestamp: twitter.status.created_timestamp,
-                quote_id: twitter.status.quote.as_ref().map(|q| q.id.clone()),
-                quote_text: twitter.status.quote.as_ref().map(|q| q.text.clone()),
-                quote_author_name: twitter
-                    .status
-                    .quote
-                    .as_ref()
-                    .map(|q| q.author.screen_name.clone()),
-                quote_author_handle: twitter
-                    .status
-                    .quote
-                    .as_ref()
-                    .map(|q| q.author.screen_name.clone()),
-                quote_author_url: twitter.status.quote.as_ref().map(|q| q.author.url.clone()),
-                replies: twitter.status.replies,
-                reposts: twitter.status.reposts,
-                likes: twitter.status.likes,
-                views: twitter.status.views,
+                quote_id: quote.map(|q| q.id.clone()),
+                quote_text: quote.map(|q| q.text.clone()),
+                quote_author_name: quote.map(|q| q.author.name.clone()),
+                quote_author_handle: quote.map(|q| q.author.screen_name.clone()),
+                quote_author_url: quote.map(|q| q.author.url.clone()),
+                replies: twitter.status.replies.unwrap_or(0),
+                reposts: twitter.status.reposts.unwrap_or(0),
+                likes: twitter.status.likes.unwrap_or(0),
+                views: twitter.status.views.unwrap_or(0),
             }),
             title: Some(format!(
                 "{} (@{})",
@@ -146,8 +144,12 @@ impl SpecialtySitesGenerator {
             image,
             video,
             site_name: Some("X".to_string()),
-            icon_url: Some(twitter.author.avatar_url),
+            icon_url: twitter.author.avatar_url,
             colour: Some("#1DA1F2".to_string()),
-        }))
+        };
+
+        metadata.truncate();
+
+        Ok(Embed::Website(metadata))
     }
 }
