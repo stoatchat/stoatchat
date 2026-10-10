@@ -125,6 +125,8 @@ impl IntoResponse for Error {
             ErrorType::IncorrectData { .. } => StatusCode::BAD_REQUEST,
         };
 
-        (status, Json(&self)).into_response()
+        let mut response = (status, Json(&self)).into_response();
+        response.extensions_mut().insert(self);
+        response
     }
 }

@@ -36,6 +36,7 @@ revolt_okapi = { workspace = true, optional = true }
 
 # utilities
 log = { workspace = true }
+strum_macros = { workspace = true }
 # Axum
 axum = { workspace = true, optional = true }
 

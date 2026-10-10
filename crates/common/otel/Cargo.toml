@@ -1,0 +1,29 @@
+[package]
+name = "stoat-otel"
+version = "0.0.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+authors = ["izzy <me@insrt.uk>"]
+description = "Common OpenTelemetry configuration"
+publish = false
+
+[features]
+axum = ["dep:axum", "dep:uuid", "dep:revolt-result", "dep:serde"]
+
+[dependencies]
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# OpenTelemetry
+opentelemetry = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+opentelemetry-appender-tracing = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+
+# HTTP
+axum = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true, features = ["v4"] }
+revolt-result = { workspace = true, optional = true, features = ["axum"] }
+serde = { workspace = true, optional = true }

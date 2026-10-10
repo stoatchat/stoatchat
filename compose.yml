@@ -1,3 +1,5 @@
+name: stoat-backend
+
 services:
   # Redis
   redis:
@@ -80,9 +82,23 @@ services:
       MAILDEV_INCOMING_USER: smtp
       MAILDEV_INCOMING_PASS: smtp
 
+  # LiveKit
   livekit:
     image: ghcr.io/stoatchat/livekit-server:v1.9.13
     command: --config /etc/livekit.yml
     network_mode: "host"
     volumes:
       - ./livekit.yml:/etc/livekit.yml
+
+  # Grafana LGTM (OTel Collector + Loki + Tempo + Prometheus + Grafana)
+  otel-lgtm:
+    image: grafana/otel-lgtm:0.35.0
+    ports:
+      - "13000:3000" # Grafana UI
+      - "4318:4318" # OTLP/HTTP
+
+  # Waits for dependencies, used by `mise docker:start`
+  wait:
+    image: dokku/wait
+    command: -c rabbit:5672,database:27017,redis:6379
+    profiles: [tools]

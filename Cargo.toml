@@ -6,7 +6,7 @@ members = [
     "crates/bonfire",
     "crates/core/*",
     "crates/services/*",
-    "crates/daemons/*",
+    "crates/daemons/*", "crates/common/otel",
 ]
 
 [patch.crates-io]
@@ -152,10 +152,11 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = [
     "env-filter",
 ] } # consider https://crates.io/crates/better-tracing
-opentelemetry = { version = "0.31.0", features = ["logs"] }
-opentelemetry_sdk = { version = "0.31.0", features = ["logs"] }
-opentelemetry-otlp = { version = "0.31.0", features = ["logs"] }
-opentelemetry-appender-tracing = "0.31.1"
+opentelemetry = { version = "0.33.0", features = ["logs"] }
+opentelemetry_sdk = { version = "0.33.0", features = ["logs"] }
+opentelemetry-otlp = { version = "0.33.0", features = ["logs"] }
+opentelemetry-appender-tracing = "0.33.0"
+tracing-opentelemetry = "0.34.0"
 
 # RabbitMQ
 lapin = "4.7.1"
@@ -204,3 +205,6 @@ revolt-permissions = { version = "0.15.5", path = "crates/core/permissions" }
 revolt-presence = { version = "0.15.5", path = "crates/core/presence" }
 revolt-ratelimits = { version = "0.15.5", path = "crates/core/ratelimits" }
 revolt-result = { version = "0.15.5", path = "crates/core/result" }
+
+# Local packages (unpublished)
+stoat-otel = { path = "crates/common/otel" }
