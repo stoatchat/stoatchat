@@ -27,10 +27,15 @@ impl AbstractNotifications for MongoDb {
     async fn fetch_notifications(
         &self,
         user_id: &str,
+        after: &str,
         before: Option<&str>,
         limit: i64,
     ) -> Result<Vec<NotificationCenter>> {
-        let mut filter = doc! { "user_id": user_id };
+        let mut id_range = doc! { "$gt": after };
+        if let Some(before) = before {
+            id_range.insert("$lt", before);
+        }
+        let mut filter = doc! { "user_id": user_id, "message_id": id_range };
         if let Some(before) = before {
             filter.insert("message_id", doc! { "$lt": before });
         }
@@ -97,6 +102,50 @@ impl AbstractNotifications for MongoDb {
                 "message_id": message_id,
                 "user_id": { "$in": user_ids },
             })
+            .await
+            .map(|_| ())
+            .map_err(|_| create_database_error!("delete_many", COL))
+    }
+
+    async fn delete_notifications_for_channels(&self, channel_ids: &[String]) -> Result<()> {
+        if channel_ids.is_empty() {
+            return Ok(());
+        }
+
+        self.col::<NotificationCenter>(COL)
+            .delete_many(doc! { "channel_id": { "$in": channel_ids } })
+            .await
+            .map(|_| ())
+            .map_err(|_| create_database_error!("delete_many", COL))
+    }
+
+    async fn delete_notifications_for_user(&self, user_id: &str) -> Result<()> {
+        self.col::<NotificationCenter>(COL)
+            .delete_many(doc! { "user_id": user_id })
+            .await
+            .map(|_| ())
+            .map_err(|_| create_database_error!("delete_many", COL))
+    }
+
+    async fn delete_notifications_for_user_in_channel(
+        &self,
+        user_id: &str,
+        channel_id: &str,
+    ) -> Result<()> {
+        self.col::<NotificationCenter>(COL)
+            .delete_many(doc! { "user_id": user_id, "channel_id": channel_id })
+            .await
+            .map(|_| ())
+            .map_err(|_| create_database_error!("delete_many", COL))
+    }
+
+    async fn delete_notifications_for_user_in_server(
+        &self,
+        user_id: &str,
+        server_id: &str,
+    ) -> Result<()> {
+        self.col::<NotificationCenter>(COL)
+            .delete_many(doc! { "user_id": user_id, "server_id": server_id })
             .await
             .map(|_| ())
             .map_err(|_| create_database_error!("delete_many", COL))

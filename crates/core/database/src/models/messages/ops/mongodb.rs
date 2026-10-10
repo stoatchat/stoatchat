@@ -424,9 +424,9 @@ impl AbstractMessages for MongoDb {
     }
 
 
-    async fn fetch_role_mention_messages(&self, channel_ids: &[String], role_ids: &[String],
+    async fn fetch_role_mention_messages(&self, role_ids: &[String],
         exclude_author: &str, after: &str, before: Option<&str>, limit: i64) -> Result<Vec<Message>> {
-        if channel_ids.is_empty() || role_ids.is_empty() {
+        if role_ids.is_empty() {
             return Ok(vec![]);
         }
 
@@ -438,7 +438,6 @@ impl AbstractMessages for MongoDb {
         Ok(self
             .col::<Message>(COL)
             .find(doc! {
-                "channel": { "$in": channel_ids },
                 "role_mentions": { "$in": role_ids },
                 "author": { "$ne": exclude_author },
                 "_id": id_range,
@@ -473,7 +472,7 @@ impl AbstractMessages for MongoDb {
             .col::<Message>(COL)
             .find(doc! {
                 "channel": { "$in": channel_ids },
-                "flags": { "$bitsAllSet": 4 },
+                "flags": { "$gte": 4, "$bitsAnySet": 12 },
                 "author": { "$ne": exclude_author },
                 "_id": id_range,
             })

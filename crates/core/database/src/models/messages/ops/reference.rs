@@ -365,21 +365,20 @@ impl AbstractMessages for ReferenceDb {
 
     async fn fetch_role_mention_messages(
         &self,
-        channel_ids: &[String],
         role_ids: &[String],
         exclude_author: &str,
         after: &str,
         before: Option<&str>,
         limit: i64,
     ) -> Result<Vec<Message>> {
-        if channel_ids.is_empty() || role_ids.is_empty() {
+        if role_ids.is_empty() {
             return Ok(vec![]);
         }
 
         let messages = self.messages.lock().await;
         Ok(collect_mentions(
             messages.values(),
-            channel_ids,
+            None,
             exclude_author,
             after,
             before,
@@ -407,13 +406,12 @@ impl AbstractMessages for ReferenceDb {
         let messages = self.messages.lock().await;
         Ok(collect_mentions(
             messages.values(),
-            channel_ids,
+            Some(channel_ids),
             exclude_author,
             after,
             before,
             limit,
-            // Mirrors `$bitsAllSet: 4`
-            |m| m.flags.unwrap_or(0) & 4 == 4,
+            |m| m.flags.unwrap_or(0) & 12 != 0,
         ))
     }
 }
@@ -421,7 +419,7 @@ impl AbstractMessages for ReferenceDb {
 /// Shared filter for the inbox queries: channel, author, `_id` range, newest first, limited
 fn collect_mentions<'a>(
     messages: impl Iterator<Item = &'a Message>,
-    channel_ids: &[String],
+    channel_ids: Option<&[String]>,
     exclude_author: &str,
     after: &str,
     before: Option<&str>,
@@ -429,7 +427,7 @@ fn collect_mentions<'a>(
     matches: impl Fn(&Message) -> bool,
 ) -> Vec<Message> {
     let mut found: Vec<Message> = messages
-        .filter(|m| channel_ids.contains(&m.channel))
+        .filter(|m| channel_ids.map_or(true, |ids| ids.contains(&m.channel)))
         .filter(|m| m.author != exclude_author)
         .filter(|m| m.id.as_str() > after)
         .filter(|m| before.map_or(true, |b| m.id.as_str() < b))

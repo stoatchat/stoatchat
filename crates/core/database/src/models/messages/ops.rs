@@ -56,7 +56,6 @@ pub trait AbstractMessages: Sync + Send {
     /// Messages in the given channels that mention any of the given roles
     async fn fetch_role_mention_messages(
         &self,
-        channel_ids: &[String],
         role_ids: &[String],
         exclude_author: &str,
         after: &str,

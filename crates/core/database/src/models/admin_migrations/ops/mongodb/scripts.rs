@@ -1616,6 +1616,10 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
                     {
                         "key": { "message_id": 1 },
                         "name": "message_id"
+                    },
+                    {
+                        "key": { "channel_id": 1 },
+                        "name": "channel_id"
                     }
                 ]
             })
@@ -1629,7 +1633,12 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
                     {
                         "key": { "role_mentions": 1, "_id": -1 },
                         "name": "role_mentions_id"
-                    }
+                    },
+                    {
+                        "key": { "channel": 1_i32, "_id": -1_i32 },
+                        "name": "mass_mentions",
+                        "partialFilterExpression": { "flags": { "$gte": 4 } }
+                    },
                 ]
             })
             .await
