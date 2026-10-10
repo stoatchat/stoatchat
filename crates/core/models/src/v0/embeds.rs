@@ -79,7 +79,7 @@ auto_derived!(
             id: String,
         },
         /// X/Twitter post
-        XTheEverythingApp {
+        XApp {
             id: String,
             text: String,
             author_name: String,
