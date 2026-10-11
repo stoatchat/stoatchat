@@ -471,7 +471,7 @@ pub struct GithubTeam {
     id: u32,
     node_id: String,
     url: String,
-    hmtl_url: String,
+    html_url: String,
     name: String,
     slug: String,
     description: Option<String>,
@@ -999,7 +999,7 @@ pub async fn webhook_execute_github(
                 title: Some(event.sender.login),
                 description: Some(format!(
                     "#### [[{}] Issue Reopened #{}: {}]({})",
-                    event.repository.full_name, issue.number, issue.html_url, issue.title
+                    event.repository.full_name, issue.number, issue.title, issue.html_url
                 )),
                 colour: Some(GREEN.to_string()),
                 ..Default::default()
