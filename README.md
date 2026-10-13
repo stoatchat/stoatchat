@@ -60,6 +60,7 @@ As a heads-up, the development environment uses the following ports:
 | Maildev                   | 14025<br>14080 |
 | Revolt Web App            |     14701      |
 | RabbitMQ                  | 5672<br>15672  |
+| Grafana LGTM (OTLP)       | 13000<br>4318  |
 | `crates/delta`            |     14702      |
 | `crates/bonfire`          |     14703      |
 | `crates/services/autumn`  |     14704      |
@@ -117,6 +118,11 @@ If you'd like to change anything, create a `Revolt.overrides.toml` file and spec
 >     ports: !override
 >       - "14072:5672"
 >       - "14672:15672"
+>
+>   otel-lgtm:
+>     ports: !override
+>       - "13000:3000"
+>       - "14318:4318"
 > ```
 >
 > With the corresponding Revolt configuration:
@@ -125,20 +131,18 @@ If you'd like to change anything, create a `Revolt.overrides.toml` file and spec
 > #     Revolt.overrides.toml
 > # and Revolt.test-overrides.toml
 > [database]
-> mongodb = "mongodb://127.0.0.1:14017"
+> mongodb = "mongodb://127.0.0.1:14017/?directConnection=true"
 > redis = "redis://127.0.0.1:14079/"
 >
 > [rabbit]
 > port = 14072
 > ```
 >
-> And mise configuration
+> And the OTLP endpoint:
 >
 > ```bash
 > #.env
-> DATABASE_PORT = "14017"
-> RABBIT_PORT = "14072"
-> REDIS_PORT = "14079"
+> OTEL_EXPORTER_OTLP_ENDPOINT = "http://localhost:14318"
 > ```
 
 Then continue:
@@ -165,6 +169,21 @@ When signing up, go to http://localhost:14080 to find confirmation/password rese
 
 To stop all services, hit (CTRL + c) in the terminal you ran `mise start` and run `mise docker:stop`
 
+
+## Environment Variables
+
+This list is non-exhaustive right now.
+
+| Variable                              | Default                 | Purpose                                                               |
+| ------------------------------------- | ----------------------- | --------------------------------------------------------------------- |
+| `RUST_LOG`                            | `info`                  | Log filter, e.g. `info,revolt_autumn=debug`                           |
+| `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`    |                         | OTLP/HTTP endpoint for logs                                           |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`  |                         | OTLP/HTTP endpoint for traces                                         |
+| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` |                         | OTLP/HTTP endpoint for metrics                                        |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`         | `http://localhost:4318` | Base URL for a single collector; appends `/v1/{logs,traces,metrics}`  |
+| `OTEL_RESOURCE_ATTRIBUTES`            |                         | Extra resource attributes, e.g. `deployment.environment.name=staging` |
+| `OTEL_TRACES_SAMPLER`                 | `parentbased_always_on` | Trace sampler, e.g. `parentbased_traceidratio`                       |
+| `OTEL_TRACES_SAMPLER_ARG`             | `1.0`                   | Sampling ratio, e.g. `0.1`                                            |
 
 ## Deployment Guide
 

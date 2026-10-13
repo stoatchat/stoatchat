@@ -29,6 +29,7 @@ impl EncryptionKey {
 }
 
 impl EncryptionRepository for EncryptionKey {
+    #[tracing::instrument(skip_all, fields(size = buf.len()))]
     fn decrypt_buffer(&self, mut buf: Vec<u8>, iv: &str) -> anyhow::Result<Vec<u8>> {
         let iv = &BASE64_STANDARD.decode(iv).unwrap()[..];
         let iv: &Nonce<typenum::consts::U12> = iv.into();
@@ -43,6 +44,7 @@ impl EncryptionRepository for EncryptionKey {
         Ok(buf)
     }
 
+    #[tracing::instrument(skip_all, fields(size = buf.len()))]
     fn encrypt_buffer(&self, buf: &[u8]) -> anyhow::Result<(Vec<u8>, String)> {
         let iv = Aes256Gcm::generate_nonce(&mut OsRng);
 

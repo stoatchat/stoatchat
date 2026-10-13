@@ -36,6 +36,7 @@ revolt-coalesced = { workspace = true }
 
 # Utility
 log = { workspace = true }
+tracing = { workspace = true }
 lru = { workspace = true }
 rand = { workspace = true }
 ulid = { workspace = true }

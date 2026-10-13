@@ -29,10 +29,30 @@ extern crate bson;
 compile_error!("tokio-runtime feature must be enabled.");
 
 #[macro_export]
+#[doc(hidden)]
+macro_rules! query_span {
+    ( $type: ident, $collection: expr ) => {
+        ::tracing::info_span!(
+            "mongodb",
+            otel.name = format!("{} {}", stringify!($type), $collection),
+            otel.kind = "client",
+            db.system = "mongodb",
+            db.collection.name = $collection,
+            db.operation.name = stringify!($type),
+        )
+    };
+}
+
+#[macro_export]
 #[cfg(debug_assertions)]
 macro_rules! query {
     ( $self: ident, $type: ident, $collection: expr, $($rest:expr),+ ) => {
-        Ok($self.$type($collection, $($rest),+).await.unwrap())
+        Ok(::tracing::Instrument::instrument(
+            $self.$type($collection, $($rest),+),
+            $crate::query_span!($type, $collection),
+        )
+        .await
+        .unwrap())
     };
 }
 
@@ -40,11 +60,15 @@ macro_rules! query {
 #[cfg(not(debug_assertions))]
 macro_rules! query {
     ( $self: ident, $type: ident, $collection: expr, $($rest:expr),+ ) => {
-        $self.$type($collection, $($rest),+).await
-            .map_err(|err| {
-                revolt_config::capture_internal_error!(err);
-                create_database_error!(stringify!($type), $collection)
-            })
+        ::tracing::Instrument::instrument(
+            $self.$type($collection, $($rest),+),
+            $crate::query_span!($type, $collection),
+        )
+        .await
+        .map_err(|err| {
+            revolt_config::capture_internal_error!(err);
+            create_database_error!(stringify!($type), $collection)
+        })
     };
 }
 

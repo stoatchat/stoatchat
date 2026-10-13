@@ -1,16 +1,24 @@
 use std::net::{Ipv4Addr, SocketAddr};
 
-use axum::{middleware::from_fn_with_state, Router};
+use axum::{
+    middleware::{from_fn, from_fn_with_state},
+    Router,
+};
 
 use axum_macros::FromRef;
 use revolt_database::{Database, DatabaseInfo};
 use revolt_ratelimits::axum as ratelimiter;
-use tokio::net::TcpListener;
+use tokio::{
+    net::TcpListener,
+    signal::unix::{signal, SignalKind},
+};
+use tower_http::catch_panic::CatchPanicLayer;
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
     Modify, OpenApi,
 };
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
+use tracing::info;
 
 mod api;
 pub mod clamav;
@@ -28,13 +36,12 @@ struct AppState {
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
-    // Configure logging and environment
-    revolt_config::configure!(files);
+    let _telemetry = stoat_otel::init(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+    info!(version = env!("CARGO_PKG_VERSION"), awawa = true, "Starting the Stoat file server!");
 
-    // Wait for ClamAV
+    revolt_config::config().await;
     clamav::init().await;
 
-    // Configure API schema
     #[derive(OpenApi)]
     #[openapi(
         modifiers(&SecurityAddon),
@@ -55,7 +62,7 @@ async fn main() -> Result<(), std::io::Error> {
             )
         ),
         tags(
-            // (name = "Files", description = "File uploads API")
+            (name = "Files", description = "File uploads API")
         )
     )]
     struct ApiDoc;
@@ -77,7 +84,6 @@ async fn main() -> Result<(), std::io::Error> {
         }
     }
 
-    // Connect to the database
     let db = DatabaseInfo::Auto.connect().await.unwrap();
     let ratelimits = ratelimiter::RatelimitStorage::new(ratelimits::AutumnRatelimits);
 
@@ -86,7 +92,6 @@ async fn main() -> Result<(), std::io::Error> {
         ratelimit_storage: ratelimits,
     };
 
-    // Configure Axum and router
     let app = Router::new()
         .merge(Scalar::with_url("/scalar", ApiDoc::openapi()))
         .nest("/", api::router().await)
@@ -95,10 +100,30 @@ async fn main() -> Result<(), std::io::Error> {
             state.clone(),
             ratelimiter::ratelimit_middleware,
         ))
+        .layer(CatchPanicLayer::custom(stoat_otel::middleware::axum::panic_response))
+        .layer(from_fn(stoat_otel::middleware::axum::wide_events))
         .with_state(state);
 
-    // Configure TCP listener and bind
     let address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, 14704));
     let listener = TcpListener::bind(&address).await?;
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await
+    info!(address = %listener.local_addr()?, "Listening for requests 🍂");
+
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(async {
+        let mut terminate =
+            signal(SignalKind::terminate()).expect("sigterm handler");
+
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {}
+            _ = terminate.recv() => {}
+        }
+
+        info!("Service going offline, bye bye");
+    })
+    .await?;
+
+    Ok(())
 }

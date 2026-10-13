@@ -2,4 +2,4 @@
 #MISE description="Stop Docker containers"
 set -e
 
-docker compose down
+docker compose down "$@"
