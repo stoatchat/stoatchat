@@ -2,4 +2,4 @@
 #MISE description="Print the current version"
 set -euo pipefail
 
-cargo metadata --no-deps --format-version 1 | jq -r '[.packages[].version] | unique | if length == 1 then .[0] else "crate versions differ: \(join(", "))\n" | halt_error end'
+cargo metadata --no-deps --format-version 1 | jq -r '[.packages[].version | select(. != "0.0.0")] | unique | if length == 1 then .[0] else "crate versions differ: \(join(", "))\n" | halt_error end'
