@@ -41,6 +41,7 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
           persist-credentials: true
 
@@ -59,6 +60,12 @@ jobs:
           version=$(mise run release:bump "$RELEASE_TYPE")
           echo "version=$version" >> "$GITHUB_OUTPUT"
           git push origin HEAD
+
+      - name: Create release notes
+        env:
+          OUTLINE_API_KEY: ${{ secrets.OUTLINE_API_KEY }}
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: mise run release:notes "$VERSION"
 
       - name: Cut the release branch
         if: ${{ github.ref_name == 'main' }}
