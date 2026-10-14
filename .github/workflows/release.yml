@@ -30,18 +30,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          prerelease=false
-          if [[ "$TAG" =~ -rc\.[0-9]+$ ]]; then
-            prerelease=true
-          fi
-
           git fetch -q --force origin "refs/tags/$TAG:refs/tags/$TAG"
-          {
-            if $prerelease; then
-              printf '> [!WARNING]\n> This is a release candidate and the code changelog below is not necessarily complete or accurate.\n\n'
-            fi
-            git tag -l --format='%(contents:body)' "$TAG"
-          } > "$RUNNER_TEMP/notes.md"
+          git tag -l --format='%(contents:body)' "$TAG" > "$RUNNER_TEMP/notes.md"
           newest=$(git -c versionsort.suffix=-rc tag --list 'v*' --sort=-v:refname | grep -v -- '-rc\.' | head -n1)
 
           gh release create "$TAG" \
@@ -49,5 +39,4 @@ jobs:
             --verify-tag \
             --title "$TAG" \
             --notes-file "$RUNNER_TEMP/notes.md" \
-            --prerelease="$prerelease" \
             --latest="$([[ "$TAG" == "$newest" ]] && echo true || echo false)"

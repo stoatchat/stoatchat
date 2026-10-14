@@ -1,0 +1,71 @@
+name: Prepare release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: "major or minor from main, patch from release/vX.Y"
+        required: true
+        default: minor
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+
+permissions: {}
+
+jobs:
+  bump:
+    name: Bump version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the release type suits this branch
+        env:
+          BRANCH: ${{ github.ref_name }}
+          RELEASE_TYPE: ${{ inputs.release_type }}
+        run: |
+          case "$BRANCH:$RELEASE_TYPE" in
+            main:major | main:minor | release/*:patch) ;;
+            *)
+              echo "::error::$RELEASE_TYPE cannot be released from $BRANCH"
+              exit 1
+              ;;
+          esac
+
+      - id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        with:
+          app-id: ${{ secrets.GH_STOAT_RELEASE_APP_ID }}
+          private-key: ${{ secrets.GH_STOAT_RELEASE_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true
+
+      - name: Setup Mise
+        uses: immich-app/devtools/actions/use-mise@cd24790a7f5f6439ac32cc94f5523cb2de8bfa8c # use-mise-action-v1.1.0
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+
+      - name: Bump version
+        id: bump
+        env:
+          RELEASE_TYPE: ${{ inputs.release_type }}
+        run: |
+          git config user.name 'stoat-release[bot]'
+          git config user.email '245062572+stoat-release[bot]@users.noreply.github.com'
+          version=$(mise run release:bump "$RELEASE_TYPE")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          git push origin HEAD
+
+      - name: Cut the release branch
+        if: ${{ github.ref_name == 'main' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          line="release/v${VERSION%.*}"
+          git push origin "HEAD:refs/heads/$line"
+          gh label create "backport:$line" --force --color 5319e7

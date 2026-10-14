@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+#MISE description="Create or refresh the Outline release notes for a version from the commits since the last release, or print them"
+#USAGE flag "--print" help="Print the notes as markdown instead of creating them"
+#USAGE arg "<version>" help="Version the notes are for"
+set -euo pipefail
+error() { echo "$1" >&2; exit 1; }
+
+OUTLINE_URL="${RELEASE_OUTLINE_URL:-https://outline.stoatinternal.com}"
+COLLECTION="${RELEASE_OUTLINE_COLLECTION:-Code Changelogs}"
+PROJECT="${RELEASE_PROJECT:-$(basename "$(git remote get-url origin)" .git)}"
+REPO_URL="${RELEASE_REPO_URL:-https://github.com/stoatchat/$PROJECT}"
+
+outline() {
+  curl -sS -X POST "$OUTLINE_URL/api/$1" \
+    -H "Authorization: Bearer ${OUTLINE_API_KEY:?OUTLINE_API_KEY is required}" \
+    -H 'Content-Type: application/json' -d "$2" \
+    | jq 'if .error then "Outline: \(.message)\n" | halt_error else . end'
+}
+
+print=false
+if [[ "$1" == --print ]]; then
+  print=true
+  shift
+fi
+version="v${1#v}"
+
+collection=$(outline collections.list '{"limit": 100}' | jq -r --arg name "$COLLECTION" '.data[] | select(.name == $name) | .id')
+[[ -n "$collection" ]] || error "There's no '$COLLECTION' collection in Outline"
+tree=$(outline collections.documents "$(jq -n --arg id "$collection" '{id: $id}')")
+project=$(jq -c --arg title "$PROJECT" '.data[] | select(.title == $title)' <<<"$tree")
+doc=$(jq -c --arg title "$version" '.children[]? | select(.title == $title)' <<<"$project")
+
+export_doc() {
+  outline documents.export "$(jq -n --arg id "$(jq -r .id <<<"$doc")" '{id: $id}')" \
+    | jq -r '.data | sub("^# [^\n]*\n+"; "") | sub("\n+:::info\n[^:]*auto-generated[^:]*:::\n+"; "\n\n")'
+}
+
+if $print; then
+  [[ -n "$doc" ]] || error "There are no $version release notes in Outline"
+  export_doc
+  exit
+fi
+
+git fetch -q --tags origin
+previous=$({ git tag -l 'v*' | grep -v -- '-rc\.'; echo "$version"; } | sort -uV | grep -B1 -xF "$version" | head -n1)
+[[ "$previous" != "$version" ]] || error "There's no release before $version"
+
+changes=$(git log --reverse --left-right --no-merges --format='%m%x1f%s%x1f%(trailers:key=Change-Id,valueonly,separator=)' "$previous...HEAD" \
+  | awk -F $'\x1f' -v repo="$REPO_URL" '
+    {
+      key = $3
+      if (match($2, /\(#[0-9]+\)$/)) key = substr($2, RSTART + 2, RLENGTH - 3)
+    }
+    $1 == "<" { if (key != "") shipped[key] = 1; next }
+    $2 !~ /^chore\(release\)/ { keys[++n] = key; subjects[n] = $2 }
+    END {
+      for (i = 1; i <= n; i++) {
+        if (keys[i] != "" && keys[i] in shipped) continue
+        line = subjects[i]
+        if (match(line, /\(#[0-9]+\)$/)) {
+          pr = substr(line, RSTART + 2, RLENGTH - 3)
+          line = substr(line, 1, RSTART - 1) "([#" pr "](" repo "/pull/" pr "))"
+        }
+        section = line ~ /^feat[(!:]/ ? "Features" : line ~ /^fix[(!:]/ ? "Fixes" : "Other"
+        changes[section] = changes[section] "- " line "\n"
+      }
+      split("Features Fixes Other", order, " ")
+      for (i = 1; i <= 3; i++) if (changes[order[i]] != "") printf "### %s\n\n%s\n", order[i], changes[order[i]]
+    }')
+
+changes="## Changes
+
+:::info
+Contents below are auto-generated and will be overwritten.
+:::
+
+$changes"
+
+if [[ -n "$doc" ]]; then
+  written=$(export_doc | jq -Rrs 'sub("(^|\n)## Changes\n[\\s\\S]*"; "") | sub("\\s+$"; "")')
+  url=$(outline documents.update "$(jq -n --arg id "$(jq -r .id <<<"$doc")" --arg text "${written:+$written$'\n\n'}$changes" \
+    '{id: $id, text: $text}')" | jq -r .data.url)
+  printf 'Updated the %s release notes from %s: \e[90m%s\e[0m\n' "$version" "$previous" "$OUTLINE_URL$url"
+  exit
+fi
+
+if [[ -z "$project" ]]; then
+  project=$(outline documents.create "$(jq -n --arg title "$PROJECT" --arg collection "$collection" \
+    '{title: $title, text: "", collectionId: $collection, publish: true}')" | jq -c .data)
+fi
+url=$(outline documents.create "$(jq -n --arg title "$version" --arg text "$changes" --arg collection "$collection" --arg parent "$(jq -r .id <<<"$project")" \
+  '{title: $title, text: $text, collectionId: $collection, parentDocumentId: $parent, publish: true}')" | jq -r .data.url)
+printf 'Created the %s release notes from %s: \e[90m%s\e[0m\n' "$version" "$previous" "$OUTLINE_URL$url"

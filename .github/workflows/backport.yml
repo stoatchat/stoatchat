@@ -1,0 +1,37 @@
+name: Backport
+
+on:
+  pull_request_target:
+    types: [closed, labeled]
+
+permissions: {}
+
+jobs:
+  backport:
+    name: Backport pull request
+    if: >-
+      ${{ github.event.pull_request.merged
+      && contains(join(github.event.pull_request.labels.*.name, ' '), 'backport:release/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        with:
+          app-id: ${{ secrets.GH_STOAT_RELEASE_APP_ID }}
+          private-key: ${{ secrets.GH_STOAT_RELEASE_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true
+
+      - name: Create backport pull requests
+        uses: korthout/backport-action@8560fb503c275d433c56f05a2f64850093baa9f7 # v4.7.0
+        with:
+          github_token: ${{ steps.app-token.outputs.token }}
+          label_pattern: '^backport:(release/.+)$'
+          add_labels: backport
+          pull_title: '${pull_title}'
+          pull_description: 'Backport of #${pull_number} to `${target_branch}`.'
+          git_committer_name: 'stoat-release[bot]'
+          git_committer_email: '245062572+stoat-release[bot]@users.noreply.github.com'

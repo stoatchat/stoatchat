@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+#MISE description="Bump the version, commit it and print the new version"
+#USAGE arg "<release_type>" help="major | minor (on main), patch (on release/vX.Y)" {
+#USAGE   choices "major" "minor" "patch"
+#USAGE }
+set -euo pipefail
+tasks=$(dirname "$(realpath "$0")")
+
+current=$("$tasks/version")
+IFS=.- read -r major minor patch _ <<<"$current"
+
+case "$usage_release_type" in
+  major) version="$((major + 1)).0.0" ;;
+  minor) version="$major.$((minor + 1)).0" ;;
+  patch) version="$major.$minor.$((patch + 1))" ;;
+esac
+
+"$tasks/set-version" "$version"
+git commit -q -am "chore(release): $version"
+echo "$version"

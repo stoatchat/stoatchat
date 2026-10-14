@@ -2,6 +2,8 @@ name: Docker Test & Publish
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "*"
   pull_request:

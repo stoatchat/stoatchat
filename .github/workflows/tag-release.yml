@@ -1,0 +1,50 @@
+name: Tag release
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  tag:
+    name: Tag release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check this is a release branch
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          case "$BRANCH" in
+            release/*) ;;
+            *)
+              echo "::error::releases are tagged from a release branch, not $BRANCH"
+              exit 1
+              ;;
+          esac
+
+      - id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        with:
+          app-id: ${{ secrets.GH_STOAT_RELEASE_APP_ID }}
+          private-key: ${{ secrets.GH_STOAT_RELEASE_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true
+
+      - name: Setup Mise
+        uses: immich-app/devtools/actions/use-mise@cd24790a7f5f6439ac32cc94f5523cb2de8bfa8c # use-mise-action-v1.1.0
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+
+      - name: Tag
+        env:
+          OUTLINE_API_KEY: ${{ secrets.OUTLINE_API_KEY }}
+        run: |
+          git config user.name 'stoat-release[bot]'
+          git config user.email '245062572+stoat-release[bot]@users.noreply.github.com'
+          mise run release:notes "$(mise run release:version)"
+          tag=$(mise run release:tag)
+          git push origin "refs/tags/$tag"

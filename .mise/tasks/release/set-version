@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #MISE description="Set the version of every crate"
-#USAGE arg "<version>" help="Version to set, e.g. 0.16.0-rc.0"
+#USAGE arg "<version>" help="Version to set, e.g. 0.16.0"
 set -euo pipefail
 
 cargo set-version --workspace "$1"

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#MISE description="Tag HEAD with the current version and its Outline release notes"
+set -euo pipefail
+tasks=$(dirname "$(realpath "$0")")
+
+version=$("$tasks/version")
+release_notes=$("$tasks/notes" --print "$version")
+
+git tag --cleanup=verbatim -F - "v$version" <<<"v$version"$'\n\n'"$release_notes"
+echo "v$version"
