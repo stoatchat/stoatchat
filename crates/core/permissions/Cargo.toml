@@ -3,7 +3,7 @@ name = "revolt-permissions"
 version = "0.16.0-rc.0"
 edition = "2024"
 license = "MIT"
-authors = ["Paul Makles <me@insrt.uk>"]
+authors = ["izzy <me@insrt.uk>"]
 description = "Revolt Backend: Permission Logic"
 repository = "https://github.com/stoatchat/stoatchat"
 

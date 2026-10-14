@@ -3,7 +3,7 @@ name = "revolt-coalesced"
 version = "0.16.0-rc.0"
 edition = "2024"
 license = "MIT"
-authors = ["Paul Makles <me@insrt.uk>", "Zomatree <me@zomatree.live>"]
+authors = ["izzy <me@insrt.uk>", "Zomatree <me@zomatree.live>"]
 description = "Revolt Backend: Coalescion service"
 repository = "https://github.com/stoatchat/stoatchat"
 
