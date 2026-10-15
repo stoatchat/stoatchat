@@ -10,6 +10,7 @@ use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 use revolt_config::config;
 use crate::util::audit_log_reason::AuditLogReason;
+use validator::Validate;
 
 /// # Create Invite
 ///
@@ -23,9 +24,19 @@ pub async fn create_invite(
     user: User,
     reason: AuditLogReason,
     target: Reference<'_>,
-    data: Json<v0::DataCreateInvite>,
+    // TODO[v1]: make this non-optional; currently silently ignores malformed body
+    data: Option<Json<v0::DataCreateInvite>>,
 ) -> Result<Json<v0::Invite>> {
-    let data = data.into_inner();
+    let data = data.map(Json::into_inner).unwrap_or(v0::DataCreateInvite {
+        max_uses: None,
+        expires: None,
+    });
+
+    data.validate().map_err(|error| {
+        create_error!(FailedValidation {
+            error: error.to_string()
+        })
+    })?;
 
     if user.bot.is_some() {
         return Err(create_error!(IsBot));
