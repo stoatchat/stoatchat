@@ -4,6 +4,15 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**"
+      - "scripts/build-image-layer.sh"
+      - "Dockerfile"
+      - "**/Dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/docker.yaml"
     tags:
       - "*"
   pull_request:
@@ -64,7 +73,7 @@ jobs:
 
   publish:
     runs-on: arc-runner-set
-    if: ${{ github.event_name != 'pull_request' }}
+    if: ${{ github.event_name != 'pull_request' && !(github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'chore(release):')) }}
     name: Publish Docker images
     steps:
       # Configure build environment
