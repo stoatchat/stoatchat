@@ -1,6 +1,6 @@
 [package]
 name = "revolt-delta"
-version = "0.16.0"
+version = "0.16.1"
 license = "AGPL-3.0-or-later"
 authors = ["izzy <me@insrt.uk>"]
 edition = "2024"
