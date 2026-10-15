@@ -1,11 +1,7 @@
-use revolt_database::{
-    util::{permissions::DatabasePermissionQuery, reference::Reference},
-    voice::{
-        delete_voice_channel, is_in_voice_channel, remove_user_from_voice_channel,
-        UserVoiceChannel, VoiceClient,
-    },
-    AuditLogEntryAction, Channel, Database, PartialChannel, User, AMQP,
-};
+use revolt_database::{util::{permissions::DatabasePermissionQuery, reference::Reference}, voice::{
+    delete_voice_channel, is_in_voice_channel, remove_user_from_voice_channel,
+    UserVoiceChannel, VoiceClient,
+}, AuditLogEntryAction, Channel, Database, PartialChannel, User, AMQP, ValidatedTicket, Account};
 use revolt_models::v0;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
@@ -23,10 +19,12 @@ pub async fn delete(
     db: &State<Database>,
     voice_client: &State<VoiceClient>,
     amqp: &State<AMQP>,
+    account: Account,
     user: User,
     reason: AuditLogReason,
     target: Reference<'_>,
     options: v0::OptionsChannelDelete,
+    validated_ticket: Option<ValidatedTicket>,
 ) -> Result<EmptyResponse> {
     let mut channel = target.as_channel(db).await?;
     let mut query = DatabasePermissionQuery::new(db, &user).channel(&channel);
@@ -50,6 +48,10 @@ pub async fn delete(
                 .await?
         }
         Channel::Group { .. } => {
+            if account.mfa.is_active() && validated_ticket.is_none() {
+                return Err(create_error!(InvalidCredentials));
+            }
+
             channel
                 .remove_user_from_group(
                     db,
@@ -67,6 +69,10 @@ pub async fn delete(
             };
         }
         Channel::TextChannel { name, server, .. } => {
+            if account.mfa.is_active() && validated_ticket.is_none() {
+                return Err(create_error!(InvalidCredentials));
+            }
+
             permissions.throw_if_lacking_channel_permission(ChannelPermission::ManageChannel)?;
             channel.delete(db).await?;
 
@@ -87,7 +93,7 @@ pub async fn delete(
 #[cfg(test)]
 mod test {
     use crate::{rocket, util::test::TestHarness};
-    use revolt_database::{events::client::EventV1, Channel};
+    use revolt_database::{events::client::EventV1, Channel, Totp, MFATicket};
     use revolt_models::v0::DataCreateGroup;
     use rocket::http::{Header, Status};
     use crate::util::test::PubSubTestHelper;
@@ -95,7 +101,7 @@ mod test {
     #[rocket::async_test]
     async fn success_delete_group() {
         let harness = TestHarness::new().await;
-        let (_, session, user) = harness.new_user().await;
+        let (mut account, session, user) = harness.new_user().await;
 
         let group = Channel::create_group(
             &harness.db,
@@ -109,10 +115,22 @@ mod test {
 
         let mut pubsub = PubSubTestHelper::new(group.id()).await;
 
+        let totp = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+
+        account.mfa.totp_token = totp.clone();
+        account.email = "delete_group_channel@smtp.test".to_string();
+        account.save(&harness.db).await.unwrap();
+
+        let ticket = MFATicket::new(account.id.to_string(), true);
+        ticket.save(&harness.db).await.unwrap();
+
         let response = harness
             .client
             .delete(format!("/channels/{}", group.id()))
             .header(Header::new("x-session-token", session.token.to_string()))
+            .header(Header::new("X-MFA-Ticket", ticket.token))
             .dispatch()
             .await;
 
@@ -134,14 +152,27 @@ mod test {
     #[rocket::async_test]
     async fn success_delete_channel() {
         let harness = TestHarness::new().await;
-        let (_, session, user) = harness.new_user().await;
+        let (mut account, session, user) = harness.new_user().await;
         let (_, channels) = harness.new_server(&user).await;
         let mut pubsub = PubSubTestHelper::new(channels[0].id()).await;
+
+        let totp = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+
+        account.mfa.totp_token = totp.clone();
+        account.email = "delete_channel@smtp.test".to_string();
+        account.save(&harness.db).await.unwrap();
+
+        let ticket = MFATicket::new(account.id.to_string(), true);
+        ticket.save(&harness.db).await.unwrap();
+
         let response = TestHarness::with_session(
             session,
             harness
                 .client
-                .delete(format!("/channels/{}", channels[0].id())),
+                .delete(format!("/channels/{}", channels[0].id()))
+                .header(Header::new("X-MFA-Ticket", ticket.token)),
         )
         .await;
         assert_eq!(response.status(), Status::NoContent);
