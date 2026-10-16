@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
 use crate::{
-    events::client::EventV1, Database, File, PartialServer, Server, SystemMessage, User, AMQP,
+    AMQP, Database, File, NotificationCenter, PartialServer, Server, SystemMessage, User, events::client::EventV1
 };
 
 #[cfg(feature = "mongodb")]
@@ -834,6 +834,10 @@ impl Channel {
 
                 db.remove_user_from_group(id, &user.id).await?;
 
+                if let Err(err) = NotificationCenter::delete_for_user_in_channel(db, &user.id, id).await {
+                    revolt_config::capture_error(&err);
+                }
+
                 EventV1::ChannelGroupLeave {
                     id: id.to_string(),
                     user: user.id.to_string(),
@@ -879,11 +883,18 @@ impl Channel {
     /// Delete a channel
     pub async fn delete(&self, db: &Database) -> Result<()> {
         let id = self.id().to_string();
-        EventV1::ChannelDelete { id: id.clone() }.p(id).await;
+
+        EventV1::ChannelDelete { id: id.clone() }.p(id.clone()).await;
         // TODO: missing functionality:
         // - group invites
         // - channels list / categories list on server
-        db.delete_channel(self).await
+        db.delete_channel(self).await?;
+
+        if let Err(err) = NotificationCenter::delete_for_channels(db, &[id]).await {
+            revolt_config::capture_error(&err);
+        }
+
+        Ok(())
     }
 }
 

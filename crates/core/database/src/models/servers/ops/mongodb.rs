@@ -165,6 +165,19 @@ impl AbstractServers for MongoDb {
             .map(|_| ())
             .map_err(|_| create_database_error!("update_one", "servers"))
     }
+
+    async fn fetch_servers_channel_ids(&self, server_ids: &[String]) -> Result<Vec<(String, Vec<String>)>> {
+        Ok(self
+            .col::<Row>("servers")
+            .find(doc! { "_id": { "$in": server_ids } })
+            .projection(doc! { "channels": 1 })
+            .await
+            .map_err(|_| create_database_error!("find", "servers"))?
+            .filter_map(|r| async { r.ok() })
+            .map(|r| (r.id, r.channels))
+            .collect()
+            .await)
+    }
 }
 
 impl IntoDocumentPath for FieldsServer {
@@ -186,6 +199,14 @@ impl IntoDocumentPath for FieldsRole {
             FieldsRole::Icon => "icon",
         })
     }
+}
+
+#[derive(serde::Deserialize)]
+struct Row {
+    #[serde(rename = "_id")]
+    id: String,
+    #[serde(default)]
+    channels: Vec<String>,
 }
 
 impl MongoDb {

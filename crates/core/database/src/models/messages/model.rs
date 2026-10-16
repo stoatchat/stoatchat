@@ -16,7 +16,7 @@ use validator::Validate;
 use crate::{events::client::EventV1, util::{
     bulk_permissions::BulkDatabasePermissionQuery, idempotency::IdempotencyKey,
     permissions::DatabasePermissionQuery,
-}, Channel, Database, Emoji, EmojiParent, File, User, AMQP};
+}, Channel, Database, Emoji, EmojiParent, File, User, AMQP, NotificationCenter};
 
 #[cfg(feature = "tasks")]
 use crate::tasks::{self, ack::AckEvent};
@@ -488,46 +488,11 @@ impl Message {
 
         // Validate the mentions go to users in the channel/server
         if !user_mentions.is_empty() {
-            #[allow(deprecated)]
-            match channel {
-                Channel::DirectMessage { ref recipients, .. }
-                | Channel::Group { ref recipients, .. } => {
-                    let recipients_hash = HashSet::<&String, RandomState>::from_iter(recipients);
-                    user_mentions.retain(|m| recipients_hash.contains(m));
-                    role_mentions.clear();
-                }
-                Channel::TextChannel { ref server, .. } => {
-                    let mentions_vec = Vec::from_iter(user_mentions.iter().cloned());
+            Message::retain_valid_mentions(db, &channel, &mut user_mentions).await?;
 
-                    let valid_members = db.fetch_members(server.as_str(), &mentions_vec[..]).await;
-                    if let Ok(valid_members) = valid_members {
-                        let valid_mentions = HashSet::<&String, RandomState>::from_iter(
-                            valid_members.iter().map(|m| &m.id.user),
-                        );
-
-                        user_mentions.retain(|m| valid_mentions.contains(m)); // quick pass, validate mentions are in the server
-
-                        if !user_mentions.is_empty() {
-                            // if there are still mentions, drill down to a channel-level
-                            let member_channel_view_perms =
-                                BulkDatabasePermissionQuery::from_server_id(db, server)
-                                    .await
-                                    .channel(&channel)
-                                    .members(&valid_members)
-                                    .members_can_see_channel()
-                                    .await;
-
-                            user_mentions
-                                .retain(|m| *member_channel_view_perms.get(m).unwrap_or(&false));
-                        }
-                    } else {
-                        revolt_config::capture_error(&valid_members.unwrap_err());
-                        return Err(create_error!(InternalError));
-                    }
-                }
-                Channel::SavedMessages { .. } => {
-                    user_mentions.clear();
-                }
+            // Groups and DMs have no roles
+            if matches!(channel, Channel::DirectMessage { .. } | Channel::Group { .. }) {
+                role_mentions.clear();
             }
         }
 
@@ -621,6 +586,25 @@ impl Message {
         message
             .send(db, amqp, author, user, member, &channel, generate_embeds)
             .await?;
+
+        // Create inbox notifications for mentioned users
+        if !suppress_notifications {
+            if let Some(mentions) = &message.mentions {
+                if let Err(err) = NotificationCenter::create_for_mentions(
+                    db,
+                    &message.author,
+                    &message.id,
+                    &message.channel,
+                    server_id.as_deref(),
+                    mentions,
+                )
+                .await
+                {
+                    // Never fail the send over the inbox
+                    revolt_config::capture_error(&err);
+                }
+            }
+        }
 
         Ok(message)
     }
@@ -797,9 +781,25 @@ impl Message {
     pub async fn update(
         &mut self,
         db: &Database,
-        partial: PartialMessage,
+        mut partial: PartialMessage,
         remove: Vec<FieldsMessage>,
     ) -> Result<()> {
+        if partial.mentions.is_none() {
+            if let Some(content) = &partial.content {
+                match self.resolve_edit_mentions(db, content).await {
+                    Ok(Some(mentions)) => partial.mentions = Some(mentions),
+                    Ok(None) => {}
+                    Err(err) => {
+                        revolt_config::capture_error(&err);
+                    }
+                }
+            }
+        }
+
+        let mentions_updated = partial.mentions.is_some();
+        let old_mentions = self.mentions.clone().unwrap_or_default();
+        let new_mentions = partial.mentions.clone().unwrap_or_default();
+
         self.apply_options(partial.clone());
 
         for field in &remove {
@@ -808,6 +808,28 @@ impl Message {
 
         db.update_message(&self.id, &partial, remove.clone())
             .await?;
+
+        if mentions_updated && !self.has_suppressed_notifications() {
+            let server_id = db
+                .fetch_channel(&self.channel)
+                .await
+                .ok()
+                .and_then(|c| c.server().map(str::to_owned));
+
+            if let Err(err) = NotificationCenter::update_for_edit(
+                db,
+                &self.author,
+                &self.id,
+                &self.channel,
+                server_id.as_deref(),
+                &old_mentions,
+                &new_mentions,
+            )
+            .await
+            {
+                revolt_config::capture_error(&err);
+            }
+        }
 
         EventV1::MessageUpdate {
             id: self.id.clone(),
@@ -819,6 +841,104 @@ impl Message {
         .await;
 
         Ok(())
+    }
+
+    /// Keep only mentions of users who are in the channel (and can see it)
+    async fn retain_valid_mentions(
+        db: &Database,
+        channel: &Channel,
+        mentions: &mut HashSet<String>,
+    ) -> Result<()> {
+        if mentions.is_empty() {
+            return Ok(());
+        }
+
+        #[allow(deprecated)]
+        match channel {
+            Channel::DirectMessage { recipients, .. } | Channel::Group { recipients, .. } => {
+                let recipients_hash = HashSet::<&String, RandomState>::from_iter(recipients);
+                mentions.retain(|m| recipients_hash.contains(m));
+            }
+            Channel::TextChannel { server, .. } => {
+                let mentions_vec = Vec::from_iter(mentions.iter().cloned());
+
+                let valid_members = db.fetch_members(server.as_str(), &mentions_vec[..]).await;
+                let Ok(valid_members) = valid_members else {
+                    revolt_config::capture_error(&valid_members.unwrap_err());
+                    return Err(create_error!(InternalError));
+                };
+
+                let valid_mentions = HashSet::<&String, RandomState>::from_iter(
+                    valid_members.iter().map(|m| &m.id.user),
+                );
+                mentions.retain(|m| valid_mentions.contains(m));
+
+                if !mentions.is_empty() {
+                    let member_channel_view_perms =
+                        BulkDatabasePermissionQuery::from_server_id(db, server)
+                            .await
+                            .channel(channel)
+                            .members(&valid_members)
+                            .members_can_see_channel()
+                            .await;
+
+                    mentions.retain(|m| *member_channel_view_perms.get(m).unwrap_or(&false));
+                }
+            }
+            Channel::SavedMessages { .. } => mentions.clear(),
+        }
+
+        Ok(())
+    }
+
+    /// Work out the new mentions list for an edit, or None if nothing changed.
+    async fn resolve_edit_mentions(
+        &self,
+        db: &Database,
+        new_content: &str,
+    ) -> Result<Option<Vec<String>>> {
+        let old_parsed = self
+            .content
+            .as_deref()
+            .map(|c| revolt_parser::parse_message(c).user_mentions)
+            .unwrap_or_default();
+        let new_parsed = revolt_parser::parse_message(new_content).user_mentions;
+        let current: HashSet<String> = self.mentions.clone().unwrap_or_default().into_iter().collect();
+
+        // Newly @mentioned users, validated like a fresh message
+        let mut added: HashSet<String> = new_parsed
+            .iter()
+            .filter(|m| !current.contains(*m))
+            .cloned()
+            .collect();
+        if !added.is_empty() {
+            let channel = db.fetch_channel(&self.channel).await?;
+            Message::retain_valid_mentions(db, &channel, &mut added).await?;
+        }
+
+        // Users whose @mention was deleted, unless they are still mentioned via a reply
+        let mut removed: HashSet<String> = old_parsed
+            .iter()
+            .filter(|m| !new_parsed.contains(*m) && current.contains(*m))
+            .cloned()
+            .collect();
+        if !removed.is_empty() {
+            if let Some(replies) = &self.replies {
+                for replied in db.fetch_messages_by_id(replies).await.unwrap_or_default() {
+                    removed.remove(&replied.author);
+                }
+            }
+        }
+
+        if added.is_empty() && removed.is_empty() {
+            return Ok(None);
+        }
+
+        let mut updated: HashSet<String> = current;
+        updated.retain(|m| !removed.contains(m));
+        updated.extend(added);
+
+        Ok(Some(updated.into_iter().collect()))
     }
 
     /// Helper function to fetch many messages with users
@@ -1065,6 +1185,10 @@ impl Message {
 
         db.delete_message(&self.id).await?;
 
+        if let Err(err) = NotificationCenter::delete_for_message(db, &self.id).await {
+            revolt_config::capture_error(&err);
+        }
+
         if let Ok(mut channel) = db.fetch_channel(&self.channel).await {
             match &channel {
                 Channel::DirectMessage {
@@ -1121,6 +1245,13 @@ impl Message {
             .collect::<Vec<String>>();
 
         db.delete_messages(channel, &valid_ids).await?;
+
+        if !valid_ids.is_empty() {
+            if let Err(err) = NotificationCenter::delete_for_messages(db, &valid_ids).await {
+                revolt_config::capture_error(&err);
+            }
+        }
+
         EventV1::BulkMessageDelete {
             channel: channel.to_string(),
             ids: valid_ids,
@@ -1141,14 +1272,24 @@ impl Message {
             .delete_messages_by_author_since(channels, author, since)
             .await?;
 
+        let mut all_deleted_ids = Vec::new();
+
         for (channel_id, message_ids) in deleted_groups {
             if !message_ids.is_empty() {
+                all_deleted_ids.extend(message_ids.clone());
+
                 EventV1::BulkMessageDelete {
                     channel: channel_id.clone(),
                     ids: message_ids,
                 }
                 .p(channel_id)
                 .await;
+            }
+        }
+
+        if !all_deleted_ids.is_empty() {
+            if let Err(err) = NotificationCenter::delete_for_messages(db, &all_deleted_ids).await {
+                revolt_config::capture_error(&err);
             }
         }
 
