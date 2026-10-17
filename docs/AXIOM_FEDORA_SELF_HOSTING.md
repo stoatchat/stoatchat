@@ -115,3 +115,9 @@ the app without accepting public user data.
 The GitHub connector cannot operate your Fedora desktop or provision your
 router, tunnel, DNS, SMTP provider or backups. These must be configured and
 verified with the host operator before the final launch sign-off.
+
+## Voice and screen sharing are mandatory at launch
+
+Axiom must support **messaging, voice calls, and screen sharing** from the first public release. The detailed staging and transport requirements are in [AXIOM_VOICE_SCREENSHARE_LAUNCH.md](AXIOM_VOICE_SCREENSHARE_LAUNCH.md).
+
+The public HTTP/WSS tunnel choice does not answer whether WebRTC voice and screen sharing will work. Prior to release, verify LiveKit media connectivity and network fallback using two separate external networks. Do not turn off these requirements to ship earlier without explicit product approval. Existing frontend CI does not exercise these live media paths.
