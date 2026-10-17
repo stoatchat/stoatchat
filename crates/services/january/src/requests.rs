@@ -51,6 +51,10 @@ lazy_static! {
     /// Url for YouTube oembed
     pub static ref OEMBED_URL: Url = Url::parse("https://www.youtube.com/oembed").unwrap();
 
+    /// Url for Gifbox
+    pub static ref RE_URL_GIFBOX: Regex =
+    Regex::new(r"^https?://(?:www\.)?gifbox\.me/view/[\w-]+").expect("valid regex");
+
     /// Cache for proxy results
     static ref PROXY_CACHE: moka::future::Cache<String, Result<(String, Vec<u8>)>> = moka::future::Cache::builder()
         .weigher(|_key, value: &Result<(String, Vec<u8>)>| -> u32 {
@@ -318,7 +322,13 @@ impl Request {
             EMBED_CACHE.insert(url.to_owned(), embed.clone()).await;
 
             Ok(embed)
-        } else {
+        } else if RE_URL_GIFBOX.is_match(&url) {
+            let embed = specialty::SpecialtySitesGenerator::gifbox(&url).await?;
+
+            EMBED_CACHE.insert(url.to_owned(), embed.clone()).await;
+
+            Ok(embed)
+        }  else {
             let request = Request::new_from_str(&url).await?;
             let embed = match (request.mime.type_(), request.mime.subtype()) {
                 (_, mime::HTML) => {

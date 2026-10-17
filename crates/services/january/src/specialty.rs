@@ -1,9 +1,13 @@
+use scraper::{Html, Selector};
+use url::Url;
 use crate::site_models::{fxtwitter::FxTwitterResult, youtube::YoutubeOEmbed};
 use revolt_models::v0::{Embed, Image, Special, Video, WebsiteMetadata};
 use revolt_result::{Result, create_error};
 
 use crate::requests::{RE_URL_YOUTUBE, Request};
 use crate::site_models::fxtwitter::{FxTwitterMediaElement, FxTwitterQuote};
+use crate::site_models::gifbox::GifboxOEmbed;
+
 pub struct SpecialtySitesGenerator {}
 
 impl SpecialtySitesGenerator {
@@ -150,6 +154,63 @@ impl SpecialtySitesGenerator {
 
         metadata.truncate();
 
+        Ok(Embed::Website(metadata))
+    }
+
+    pub async fn gifbox(view_url: &str) -> Result<Embed> {
+        let api = Url::parse_with_params(
+            "https://embed.gifbox.me/embed/oembed",
+            &[("format", "json"), ("url", view_url)],
+        )
+            .map_err(|_| create_error!(ProxyError))?;
+
+        let body = Request::new(api)
+            .await?
+            .response
+            .text()
+            .await
+            .map_err(|_| create_error!(ProxyError))?;
+
+        let oembed: GifboxOEmbed =
+            serde_json::from_str(&body).map_err(|_| create_error!(ProxyError))?;
+
+        if oembed.kind != "video" || oembed.width == 0 || oembed.height == 0 {
+            return Err(create_error!(ProxyError));
+        }
+
+        let src = {
+            let fragment = Html::parse_fragment(&oembed.html);
+            let selector =
+                Selector::parse("video source").map_err(|_| create_error!(ProxyError))?;
+            fragment
+                .select(&selector)
+                .next()
+                .and_then(|el| el.value().attr("src"))
+                .and_then(|s| Url::parse(s).ok())
+                .filter(|u| u.scheme() == "https")
+                .ok_or_else(|| create_error!(ProxyError))?
+        };
+
+        let mut metadata = WebsiteMetadata {
+            url: Some(view_url.to_owned()),
+            original_url: Some(view_url.to_owned()),
+            special: Some(Special::Gifbox {
+                poster_url: oembed.thumbnail_url,
+            }),
+            title: oembed.title,
+            description: None,
+            image: None,
+            video: Some(Video {
+                url: src.to_string(),
+                width: oembed.width,
+                height: oembed.height,
+            }),
+            site_name: Some("Gifbox".to_owned()),
+            icon_url: None,
+            colour: None,
+        };
+
+        metadata.truncate();
         Ok(Embed::Website(metadata))
     }
 }
