@@ -1,0 +1,45 @@
+name: Axiom Production Preflight
+
+on:
+  pull_request:
+    paths:
+      - "scripts/axiom_production_preflight.py"
+      - "tests/test_axiom_preflight.py"
+      - ".github/workflows/axiom-production-preflight.yml"
+  push:
+    branches:
+      - "feature/axiom-*"
+    paths:
+      - "scripts/axiom_production_preflight.py"
+      - "tests/test_axiom_preflight.py"
+      - ".github/workflows/axiom-production-preflight.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  config-safety:
+    name: Reject development production defaults
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run configuration validation unit tests
+        run: python -m unittest discover -s tests -p "test_axiom_preflight.py" -v
+      - name: Verify checked-in development config is rejected
+        shell: bash
+        run: |
+          set +e
+          python scripts/axiom_production_preflight.py Revolt.toml > /tmp/axiom-preflight-result.log 2>&1
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "ERROR: Development configuration unexpectedly passed."
+            exit 1
+          fi
+          echo "Confirmed: development configuration cannot pass production preflight."
