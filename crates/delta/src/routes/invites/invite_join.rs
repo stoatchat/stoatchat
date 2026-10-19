@@ -22,7 +22,11 @@ pub async fn join(
 
     let invite = target.as_invite(db).await?;
 
-    if db.consume_invite_use(invite.code()).await?.is_none() {
+    // Joining a discoverable server by its ID uses an unstored invite, so there's no use to consume
+    let is_discoverable_server =
+        matches!(&invite, Invite::Server { code, server, .. } if code == server);
+
+    if !is_discoverable_server && db.consume_invite_use(invite.code()).await?.is_none() {
         return Err(create_error!(NotFound));
     }
 
@@ -49,6 +53,47 @@ pub async fn join(
             } else {
                 unreachable!()
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_database::PartialServer;
+    use revolt_models::v0::InviteJoinResponse;
+    use rocket::http::Status;
+
+    #[rocket::async_test]
+    async fn success_join_discoverable_server_by_id() {
+        let harness = TestHarness::new().await;
+        let (_, _, owner) = harness.new_user().await;
+        let (_, session, _) = harness.new_user().await;
+        let (server, _) = harness.new_server(&owner).await;
+
+        harness
+            .db
+            .update_server(
+                &server.id,
+                &PartialServer {
+                    discoverable: Some(true),
+                    ..Default::default()
+                },
+                vec![],
+            )
+            .await
+            .expect("Failed to make server discoverable");
+
+        let response = TestHarness::with_session(
+            session,
+            harness.client.post(format!("/invites/{}", server.id)),
+        )
+        .await;
+        assert_eq!(response.status(), Status::Ok);
+        let join: InviteJoinResponse = response.into_json().await.expect("`InviteJoinResponse`");
+        match join {
+            InviteJoinResponse::Server { server: joined, .. } => assert_eq!(joined.id, server.id),
+            _ => unreachable!(),
         }
     }
 }
