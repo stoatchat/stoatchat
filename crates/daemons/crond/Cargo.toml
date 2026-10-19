@@ -1,6 +1,6 @@
 [package]
 name = "revolt-crond"
-version = "0.16.1"
+version = "0.16.2"
 license = "AGPL-3.0-or-later"
 authors = ["izzy <me@insrt.uk>"]
 edition = "2024"
