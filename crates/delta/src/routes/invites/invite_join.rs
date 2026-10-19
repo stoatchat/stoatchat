@@ -1,7 +1,9 @@
-use revolt_database::{util::reference::Reference, Channel, Database, Invite, Member, User, AMQP};
+use std::str::FromStr;
+
+use revolt_database::{AMQP, Channel, Database, Invite, Member, User, util::reference::Reference};
 use revolt_models::v0::{self, InviteJoinResponse};
-use revolt_result::{create_error, Result};
-use rocket::{serde::json::Json, State};
+use revolt_result::{Result, create_error};
+use rocket::{State, serde::json::Json};
 
 /// # Join Invite
 ///
@@ -22,7 +24,9 @@ pub async fn join(
 
     let invite = target.as_invite(db).await?;
 
-    if db.consume_invite_use(invite.code()).await?.is_none() {
+    if ulid::Ulid::from_str(invite.code()).is_err()
+        && db.consume_invite_use(invite.code()).await?.is_none()
+    {
         return Err(create_error!(NotFound));
     }
 
