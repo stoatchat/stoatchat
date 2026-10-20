@@ -1547,6 +1547,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+ "serde",
  "wasm-bindgen",
  "windows-link",
 ]
@@ -1967,33 +1968,6 @@ dependencies = [
  "pkg-config",
  "vcpkg",
  "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "curve25519-dalek"
-version = "4.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97fb8b7c4503de7d6ae7b42ab72a5a59857b4c937ec27a3d4539dba95b5ab2be"
-dependencies = [
- "cfg-if",
- "cpufeatures 0.2.17",
- "curve25519-dalek-derive",
- "digest 0.10.7",
- "fiat-crypto",
- "rustc_version",
- "subtle",
- "zeroize",
-]
-
-[[package]]
-name = "curve25519-dalek-derive"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f46882e17999c6cc590af592290432be3bce0428cb0d5f8b6715e4dc7b383eb3"
-dependencies = [
- "proc-macro2",
- "quote 1.0.46",
- "syn 2.0.118",
 ]
 
 [[package]]
@@ -2516,16 +2490,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ed25519"
-version = "2.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "115531babc129696a58c64a4fef0a8bf9e9698629fb97e9e40767d235cfbcd53"
-dependencies = [
- "pkcs8 0.10.2",
- "signature 2.2.0",
-]
-
-[[package]]
 name = "ed25519-compact"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2533,20 +2497,6 @@ checksum = "5c24599140dc39d7a81e4476e7573d41bbc18e07c803900298e522a5fbcfbfb6"
 dependencies = [
  "ct-codecs",
  "getrandom 0.4.3",
-]
-
-[[package]]
-name = "ed25519-dalek"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70e796c081cee67dc755e1a36a0a172b897fab85fc3f6bc48307991f64e4eca9"
-dependencies = [
- "curve25519-dalek",
- "ed25519",
- "serde",
- "sha2 0.10.9",
- "subtle",
- "zeroize",
 ]
 
 [[package]]
@@ -2846,12 +2796,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fiat-crypto"
-version = "0.2.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
-
-[[package]]
 name = "figment"
 version = "0.10.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2888,6 +2832,12 @@ name = "fixedbitset"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
+
+[[package]]
+name = "fixedbitset"
+version = "0.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99"
 
 [[package]]
 name = "flagset"
@@ -2930,6 +2880,12 @@ name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
+
+[[package]]
+name = "foldhash"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
 [[package]]
 name = "foldhash"
@@ -3447,13 +3403,22 @@ checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 
 [[package]]
 name = "hashbrown"
+version = "0.15.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
+dependencies = [
+ "foldhash 0.1.5",
+]
+
+[[package]]
+name = "hashbrown"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
 dependencies = [
  "allocator-api2",
  "equivalent",
- "foldhash",
+ "foldhash 0.2.0",
 ]
 
 [[package]]
@@ -4403,17 +4368,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eba32bfb4ffdeaca3e34431072faf01745c9b26d25504aa7a6cf5684334fc4fc"
 dependencies = [
  "base64 0.22.1",
- "ed25519-dalek",
  "getrandom 0.2.17",
- "hmac 0.12.1",
  "js-sys",
- "p256",
- "p384",
- "rand 0.8.6",
- "rsa 0.9.10",
  "serde",
  "serde_json",
- "sha2 0.10.9",
  "signature 2.2.0",
  "zeroize",
 ]
@@ -4436,7 +4394,7 @@ dependencies = [
  "p256",
  "p384",
  "rand 0.8.6",
- "rsa 0.7.2",
+ "rsa",
  "serde",
  "serde_json",
  "spki 0.6.0",
@@ -4838,28 +4796,53 @@ checksum = "92daf443525c4cce67b150400bc2316076100ce0b3686209eb8cf3c31612e6f0"
 
 [[package]]
 name = "livekit-api"
-version = "0.4.23"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6479ff15fd0108f8ebd698b4458dce5091686b8c11e130e08e99a925f1cc1881"
+checksum = "d23c1fcba4837f75f9e3596c60527dac6f0eec2f660118ef65c5b0da0488bbeb"
 dependencies = [
  "base64 0.21.7",
- "device-info",
+ "chrono",
  "http 1.4.2",
- "jsonwebtoken",
- "livekit-protocol",
+ "livekit-protocol 0.8.2",
+ "livekit-region",
+ "livekit-signaling",
+ "livekit-token",
  "log",
- "os_info",
- "parking_lot",
- "pbjson-types",
- "prost 0.12.6",
+ "pbjson-types 0.9.0",
+ "progenitor-client",
+ "prost 0.14.4",
  "rand 0.9.4",
- "reqwest 0.12.28",
+ "reqwest 0.13.4",
+ "rustls 0.23.41",
  "rustls-native-certs 0.8.4",
- "scopeguard",
  "serde",
  "serde_json",
  "sha2 0.10.9",
  "thiserror 2.0.18",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "livekit-common"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "728a0e2cc2991a3392e2a1c9321b92f3f49d35f02ffc3e071ec75ea66fa9a5bc"
+dependencies = [
+ "livekit-protocol 0.8.2",
+]
+
+[[package]]
+name = "livekit-net"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92ee1131d54701875cf3d0a1ef5ea09f8e328c93afc8845ac65b36cdadf80422"
+dependencies = [
+ "async-trait",
+ "http 1.4.2",
+ "log",
+ "reqwest 0.12.28",
+ "rustls-native-certs 0.8.4",
  "tokio-rustls 0.26.4",
  "tokio-tungstenite",
  "url",
@@ -4871,9 +4854,30 @@ version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd59f3759f1a14e60b6bc6d4d415414e1aed686c8e4d2c7862542d95301cdc70"
 dependencies = [
- "pbjson",
- "pbjson-types",
+ "pbjson 0.6.0",
+ "pbjson-types 0.6.0",
  "prost 0.12.6",
+ "serde",
+]
+
+[[package]]
+name = "livekit-protocol"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1329f59d49f876eb15aae91b1a6bb72b8d75ea4f9eceba606191af468c2c231d"
+dependencies = [
+ "pbjson 0.9.0",
+ "pbjson-types 0.9.0",
+ "prost 0.14.4",
+ "serde",
+]
+
+[[package]]
+name = "livekit-region"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e94621b7d7cbb4544cd568c8e632852cc174d383055b0e77f4638eb91e43d3b"
+dependencies = [
  "serde",
 ]
 
@@ -4885,6 +4889,45 @@ checksum = "532e84c6cdc5fe774f2b5d9912597b5f3bea561927a48296d03e24549d21c3f6"
 dependencies = [
  "tokio",
  "tokio-stream",
+]
+
+[[package]]
+name = "livekit-signaling"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52fb8712633820ca0d186fadd7ca76c373d1cb3b555d143d7fee232b2493794b"
+dependencies = [
+ "base64 0.21.7",
+ "device-info",
+ "flate2",
+ "http 1.4.2",
+ "livekit-common",
+ "livekit-net",
+ "livekit-protocol 0.8.2",
+ "livekit-region",
+ "log",
+ "os_info",
+ "parking_lot",
+ "prost 0.14.4",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "livekit-token"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce13289c46aab01eb50e29ca98544c703101b02a0d0a4caae416a441ee631c9b"
+dependencies = [
+ "hmac 0.12.1",
+ "jsonwebtoken",
+ "livekit-protocol 0.8.2",
+ "serde",
+ "sha2 0.10.9",
+ "signature 2.2.0",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -6026,6 +6069,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pbjson"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8edd1efdd8ab23ba9cb9ace3d9987a72663d5d7c9f74fa00b51d6213645cf6c"
+dependencies = [
+ "base64 0.22.1",
+ "serde",
+]
+
+[[package]]
 name = "pbjson-build"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6034,7 +6087,19 @@ dependencies = [
  "heck 0.4.1",
  "itertools 0.11.0",
  "prost 0.12.6",
- "prost-types",
+ "prost-types 0.12.6",
+]
+
+[[package]]
+name = "pbjson-build"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ed4d5c6ae95e08ac768883c8401cf0e8deb4e6e1d6a4e1fd3d2ec4f0ec63200"
+dependencies = [
+ "heck 0.5.0",
+ "itertools 0.14.0",
+ "prost 0.14.4",
+ "prost-types 0.14.4",
 ]
 
 [[package]]
@@ -6045,10 +6110,25 @@ checksum = "18f596653ba4ac51bdecbb4ef6773bc7f56042dc13927910de1684ad3d32aa12"
 dependencies = [
  "bytes",
  "chrono",
- "pbjson",
- "pbjson-build",
+ "pbjson 0.6.0",
+ "pbjson-build 0.6.2",
  "prost 0.12.6",
- "prost-build",
+ "prost-build 0.12.6",
+ "serde",
+]
+
+[[package]]
+name = "pbjson-types"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a14e2757d877c0f607a82ce1b8560e224370f159d66c5d52eb55ea187ef0350e"
+dependencies = [
+ "bytes",
+ "chrono",
+ "pbjson 0.9.0",
+ "pbjson-build 0.9.0",
+ "prost 0.14.4",
+ "prost-build 0.14.4",
  "serde",
 ]
 
@@ -6278,7 +6358,18 @@ version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4c5cc86750666a3ed20bdaf5ca2a0344f9c67674cae0515bec2da16fbaa47db"
 dependencies = [
- "fixedbitset",
+ "fixedbitset 0.4.2",
+ "indexmap 2.14.0",
+]
+
+[[package]]
+name = "petgraph"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8701b58ea97060d5e5b155d383a69952a60943f0e6dfe30b04c287beb0b27455"
+dependencies = [
+ "fixedbitset 0.5.7",
+ "hashbrown 0.15.5",
  "indexmap 2.14.0",
 ]
 
@@ -6431,17 +6522,6 @@ dependencies = [
  "pkcs8 0.9.0",
  "spki 0.6.0",
  "zeroize",
-]
-
-[[package]]
-name = "pkcs1"
-version = "0.7.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8ffb9f10fa047879315e6625af03c164b16962a5368d724ed16323b68ace47f"
-dependencies = [
- "der 0.7.10",
- "pkcs8 0.10.2",
- "spki 0.7.3",
 ]
 
 [[package]]
@@ -6704,6 +6784,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "progenitor-client"
+version = "0.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6aa13eb6d9499a851512ec8fa3280f586be059682da4f05d953924be45d736f0"
+dependencies = [
+ "bytes",
+ "futures-core",
+ "percent-encoding",
+ "reqwest 0.13.4",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+]
+
+[[package]]
 name = "prometheus"
 version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6749,10 +6844,29 @@ dependencies = [
  "log",
  "multimap",
  "once_cell",
- "petgraph",
+ "petgraph 0.6.5",
  "prettyplease",
  "prost 0.12.6",
- "prost-types",
+ "prost-types 0.12.6",
+ "regex",
+ "syn 2.0.118",
+ "tempfile",
+]
+
+[[package]]
+name = "prost-build"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03da047801ff44bb6a4d407d4860c05fd70bb81714e6b2f3812603d5b145b042"
+dependencies = [
+ "heck 0.5.0",
+ "itertools 0.14.0",
+ "log",
+ "multimap",
+ "petgraph 0.8.3",
+ "prettyplease",
+ "prost 0.14.4",
+ "prost-types 0.14.4",
  "regex",
  "syn 2.0.118",
  "tempfile",
@@ -6791,6 +6905,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9091c90b0a32608e984ff2fa4091273cbdd755d54935c51d520887f4a1dbd5b0"
 dependencies = [
  "prost 0.12.6",
+]
+
+[[package]]
+name = "prost-types"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f94967dc7688f3054c7fac87473ffae4cc4c3904800e2d9f5b857246d8963b0a"
+dependencies = [
+ "prost 0.14.4",
 ]
 
 [[package]]
@@ -7363,12 +7486,14 @@ dependencies = [
  "sync_wrapper 1.0.2",
  "tokio",
  "tokio-rustls 0.26.4",
+ "tokio-util",
  "tower",
  "tower-http 0.6.11",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-streams",
  "web-sys",
 ]
 
@@ -7537,7 +7662,7 @@ dependencies = [
  "lettre",
  "linkify",
  "livekit-api",
- "livekit-protocol",
+ "livekit-protocol 0.7.7",
  "livekit-runtime",
  "log",
  "lru",
@@ -7589,7 +7714,7 @@ dependencies = [
  "lettre",
  "linkify",
  "livekit-api",
- "livekit-protocol",
+ "livekit-protocol 0.7.7",
  "log",
  "lru",
  "nanoid",
@@ -7826,7 +7951,7 @@ dependencies = [
  "chrono",
  "futures",
  "livekit-api",
- "livekit-protocol",
+ "livekit-protocol 0.7.7",
  "livekit-runtime",
  "log",
  "lru",
@@ -8127,31 +8252,11 @@ dependencies = [
  "num-integer",
  "num-iter",
  "num-traits",
- "pkcs1 0.4.1",
+ "pkcs1",
  "pkcs8 0.9.0",
  "rand_core 0.6.4",
  "signature 1.6.4",
  "smallvec",
- "subtle",
- "zeroize",
-]
-
-[[package]]
-name = "rsa"
-version = "0.9.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8573f03f5883dcaebdfcf4725caa1ecb9c15b2ef50c43a07b816e06799bb12d"
-dependencies = [
- "const-oid 0.9.6",
- "digest 0.10.7",
- "num-bigint-dig",
- "num-integer",
- "num-traits",
- "pkcs1 0.7.5",
- "pkcs8 0.10.2",
- "rand_core 0.6.4",
- "signature 2.2.0",
- "spki 0.7.3",
  "subtle",
  "zeroize",
 ]
@@ -10638,6 +10743,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23939e44bb9a5d7576fa2b563dc2e136628f1224e88a8deed09e04858b77871f"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "wasm-streams"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d1ec4f6517c9e11ae630e200b2b65d193279042e28edd4a2cda233e46670bbb"
+dependencies = [
+ "futures-util",
+ "js-sys",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
