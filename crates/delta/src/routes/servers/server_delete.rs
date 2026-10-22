@@ -35,8 +35,7 @@ pub async fn delete(
             )
             .await?;
         }
-
-        let channel_ids = server.channels.clone();
+        
         server.delete(db).await?;
 
         Ok(())

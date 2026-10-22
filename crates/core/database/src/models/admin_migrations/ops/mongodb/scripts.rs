@@ -1603,7 +1603,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
 
     if revision <= 55 {
         info!("Running migration [revision 55]: create notifications and inbox indexes.");
-
+        db.db().create_collection("notifications").await.ok();
         db.db()
             .run_command(doc! {
                 "createIndexes": "notifications",

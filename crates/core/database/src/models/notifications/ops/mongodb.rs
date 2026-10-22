@@ -36,9 +36,6 @@ impl AbstractNotifications for MongoDb {
             id_range.insert("$lt", before);
         }
         let mut filter = doc! { "user_id": user_id, "message_id": id_range };
-        if let Some(before) = before {
-            filter.insert("message_id", doc! { "$lt": before });
-        }
 
         Ok(self
             .col::<NotificationCenter>(COL)
