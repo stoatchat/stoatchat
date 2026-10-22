@@ -10,10 +10,10 @@ use crate::util::permissions::DatabasePermissionQuery;
 use crate::{Channel, Database, Member, Message, Server, User};
 
 auto_derived!(
-    /// Inbox item
-    pub struct Inbox {
-        /// Why this inbox item exists
-        pub kind: InboxKind,
+    /// Inbox entry
+    pub struct InboxEntry {
+        /// Why this inbox entry exists
+        pub entry_kind: InboxKind,
         /// The mentioned user ID
         pub user_id: String,
         /// Message ID
@@ -41,7 +41,7 @@ auto_derived!(
     }
 
     pub struct InboxItem {
-        pub kind: InboxKind,
+        pub entry_kind: InboxKind,
         pub message_id: String,
         pub channel_id: String,
         pub server_id: Option<String>,
@@ -51,7 +51,7 @@ auto_derived!(
     pub struct InboxPage {
         pub items: Vec<InboxItem>,
         /// Pass as `before` to continue; None when nothing older exists
-        pub next_before: Option<String>,
+        pub pagination: Option<String>,
     }
 );
 
@@ -62,17 +62,17 @@ fn ulid_at(ms: u64) -> String {
 }
 
 #[allow(clippy::disallowed_methods)]
-impl Inbox {
-    /// Build an inbox item for one user
+impl InboxEntry {
+    /// Build an inbox entry for one user
     fn new(
-        kind: InboxKind,
+        entry_kind: InboxKind,
         user_id: String,
         message_id: &str,
         channel_id: &str,
         server_id: Option<&str>,
-    ) -> Inbox {
-        Inbox {
-            kind,
+    ) -> InboxEntry {
+        InboxEntry {
+            entry_kind,
             user_id,
             message_id: message_id.to_string(),
             channel_id: channel_id.to_string(),
@@ -80,7 +80,7 @@ impl Inbox {
         }
     }
 
-    /// Create inbox items for everyone in a message's (already permission-filtered) mentions
+    /// Create inbox entries for everyone in a message's (already permission-filtered) mentions
     pub async fn create_for_mentions(
         db: &Database,
         author_id: &str,
@@ -89,16 +89,16 @@ impl Inbox {
         server_id: Option<&str>,
         mentions: &[String],
     ) -> Result<()> {
-        let items: Vec<Inbox> = mentions
+        let items: Vec<InboxEntry> = mentions
             .iter()
             .filter(|id| id.as_str() != author_id)
-            .map(|id| Inbox::new(InboxKind::Mention, id.clone(), message_id, channel_id, server_id))
+            .map(|id| InboxEntry::new(InboxKind::Mention, id.clone(), message_id, channel_id, server_id))
             .collect();
 
         db.insert_inbox(items).await
     }
 
-    /// Sync inbox items after a message edit: drop removed mentions, add new ones
+    /// Sync inbox entries after a message edit: drop removed mentions, add new ones
     pub async fn update_for_edit(
         db: &Database,
         author_id: &str,
@@ -120,16 +120,11 @@ impl Inbox {
             .collect();
 
         db.delete_inbox_for_users(message_id, &removed).await?;
-        Inbox::create_for_mentions(db, author_id, message_id, channel_id, server_id, &added)
+        InboxEntry::create_for_mentions(db, author_id, message_id, channel_id, server_id, &added)
             .await
     }
 
-    /// Delete all inbox items for a message
-    pub async fn delete_for_message(db: &Database, message_id: &str) -> Result<()> {
-        db.delete_inbox_for_message(message_id).await
-    }
-
-    /// Delete all inbox items for multiple messages
+    /// Delete all inbox entries for multiple messages
     pub async fn delete_for_messages(db: &Database, message_ids: &[String]) -> Result<()> {
         db.delete_inbox_for_messages(message_ids).await
     }
@@ -239,7 +234,7 @@ impl Inbox {
             if opts.mentions {
                 for n in db.fetch_inbox_items(&user.id, &cutoff, before, limit).await? {
                     raw.push(InboxItem {
-                        kind: InboxKind::Mention,
+                        entry_kind: InboxKind::Mention,
                         message_id: n.message_id,
                         channel_id: n.channel_id,
                         server_id: n.server_id,
@@ -272,7 +267,7 @@ impl Inbox {
             }
 
             // Newest first, one entry per message (Mention beats Role beats Everyone)
-            raw.sort_by(|a, b| b.message_id.cmp(&a.message_id).then(a.kind.cmp(&b.kind)));
+            raw.sort_by(|a, b| b.message_id.cmp(&a.message_id).then(a.entry_kind.cmp(&b.entry_kind)));
             raw.dedup_by(|a, b| a.message_id == b.message_id);
 
             // Fewer than `limit` distinct candidates means every source ran dry
@@ -306,7 +301,7 @@ impl Inbox {
             raw.retain(|i| match &i.message {
                 None => false,
                 Some(message) => {
-                    i.kind == InboxKind::Mention || !message.has_suppressed_notifications()
+                    i.entry_kind == InboxKind::Mention || !message.has_suppressed_notifications()
                 }
             });
 
@@ -331,7 +326,7 @@ impl Inbox {
                     .and_then(|c| c.server().map(str::to_string));
             }
             raw.retain(|i| {
-                if i.kind == InboxKind::Mention {
+                if i.entry_kind == InboxKind::Mention {
                     return true;
                 }
                 i.server_id
@@ -383,9 +378,12 @@ impl Inbox {
                                         .channel(channel)
                                         .server(server)
                                         .member(member);
-                                    calculate_channel_permissions(&mut query)
-                                        .await
+                                    let permissions = calculate_channel_permissions(&mut query).await;
+                                    permissions
                                         .has_channel_permission(ChannelPermission::ViewChannel)
+                                        && permissions.has_channel_permission(
+                                            ChannelPermission::ReadMessageHistory,
+                                        )
                                 }
                                 _ => false,
                             }
@@ -393,9 +391,10 @@ impl Inbox {
                         // Group / DM: decided by recipients, no server involved
                         None => {
                             let mut query = DatabasePermissionQuery::new(db, user).channel(channel);
-                            calculate_channel_permissions(&mut query)
-                                .await
-                                .has_channel_permission(ChannelPermission::ViewChannel)
+                            let permissions = calculate_channel_permissions(&mut query).await;
+                            permissions.has_channel_permission(ChannelPermission::ViewChannel)
+                                && permissions
+                                    .has_channel_permission(ChannelPermission::ReadMessageHistory)
                         }
                     },
                 };
@@ -410,7 +409,7 @@ impl Inbox {
             }
         }
 
-        let next_before = if out.len() >= limit as usize {
+        let pagination = if out.len() >= limit as usize {
             out.truncate(limit as usize);
             out.last().map(|i| i.message_id.clone())
         } else if exhausted {
@@ -419,14 +418,18 @@ impl Inbox {
             cursor // hit MAX_ROUNDS with a short page: resume where the scan stopped
         };
 
-        Ok(InboxPage { items: out, next_before })
+        Ok(InboxPage { items: out, pagination })
     }
 }
 
 impl InboxItem {
-    fn from_message(kind: InboxKind, message: Message, channel_to_server: &HashMap<String, String>) -> Self {
+    fn from_message(
+        entry_kind: InboxKind,
+        message: Message,
+        channel_to_server: &HashMap<String, String>,
+    ) -> Self {
         InboxItem {
-            kind,
+            entry_kind,
             message_id: message.id.clone(),
             channel_id: message.channel.clone(),
             server_id: channel_to_server.get(&message.channel).cloned(),
@@ -435,10 +438,10 @@ impl InboxItem {
     }
 }
 
-impl From<InboxItem> for revolt_models::v0::Inbox {
+impl From<InboxItem> for revolt_models::v0::InboxEntry {
     fn from(item: InboxItem) -> Self {
-        revolt_models::v0::Inbox {
-            kind: match item.kind {
+        revolt_models::v0::InboxEntry {
+            entry_kind: match item.entry_kind {
                 InboxKind::Mention => revolt_models::v0::InboxKind::Mention,
                 InboxKind::Role => revolt_models::v0::InboxKind::Role,
                 InboxKind::Everyone => revolt_models::v0::InboxKind::Everyone,

@@ -3,7 +3,7 @@ use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 
 use crate::{
-    Channel, Database, File, Inbox, Server, SystemMessage, User, events::client::EventV1, util::permissions::DatabasePermissionQuery
+    Channel, Database, File, InboxEntry, Server, SystemMessage, User, events::client::EventV1, util::permissions::DatabasePermissionQuery
 };
 
 fn default_true() -> bool {
@@ -298,7 +298,7 @@ impl Member {
         db.soft_delete_member(&self.id).await?;
 
         if let Err(err) =
-            Inbox::delete_for_user_in_server(db, &self.id.user, &self.id.server).await
+            InboxEntry::delete_for_user_in_server(db, &self.id.user, &self.id.server).await
         {
             revolt_config::capture_error(&err);
         }

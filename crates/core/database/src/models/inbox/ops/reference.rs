@@ -1,10 +1,10 @@
 use super::AbstractInbox;
-use crate::{Inbox, ReferenceDb};
+use crate::{InboxEntry, ReferenceDb};
 use revolt_result::Result;
 
 #[async_trait]
 impl AbstractInbox for ReferenceDb {
-    async fn insert_inbox(&self, items: Vec<Inbox>) -> Result<()> {
+    async fn insert_inbox(&self, items: Vec<InboxEntry>) -> Result<()> {
         if items.is_empty() {
             return Ok(());
         }
@@ -26,10 +26,10 @@ impl AbstractInbox for ReferenceDb {
         after: &str,
         before: Option<&str>,
         limit: i64,
-    ) -> Result<Vec<Inbox>> {
+    ) -> Result<Vec<InboxEntry>> {
         let store = self.inbox.lock().await;
 
-        let mut results: Vec<Inbox> = store
+        let mut results: Vec<InboxEntry> = store
             .values()
             .filter(|n| n.user_id == user_id)
             .filter(|n| n.message_id.as_str() > after)
@@ -51,13 +51,6 @@ impl AbstractInbox for ReferenceDb {
         store.retain(|_, n| n.message_id.as_str() >= cutoff.as_str());
 
         Ok((before_len - store.len()) as u64)
-    }
-
-    async fn delete_inbox_for_message(&self, message_id: &str) -> Result<()> {
-        let mut store = self.inbox.lock().await;
-        store.retain(|_, n| n.message_id != message_id);
-
-        Ok(())
     }
 
     async fn delete_inbox_for_messages(&self, message_ids: &[String]) -> Result<()> {

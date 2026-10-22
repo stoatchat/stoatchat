@@ -1,5 +1,5 @@
 use revolt_database::{
-    AMQP, AuditLogEntryAction, Channel, Database, Inbox, PartialChannel, User, util::{permissions::DatabasePermissionQuery, reference::Reference}, voice::{
+    AMQP, AuditLogEntryAction, Channel, Database, PartialChannel, User, util::{permissions::DatabasePermissionQuery, reference::Reference}, voice::{
         UserVoiceChannel, VoiceClient, delete_voice_channel, is_in_voice_channel, remove_user_from_voice_channel
     }
 };
@@ -47,10 +47,6 @@ pub async fn delete(
                 .await?
         }
         Channel::Group { .. } => {
-            if let Err(err) = Inbox::delete_for_channels(db, &[channel.id().to_string()]).await
-            {
-                revolt_config::capture_error(&err);
-            }
             channel
                 .remove_user_from_group(
                     db,

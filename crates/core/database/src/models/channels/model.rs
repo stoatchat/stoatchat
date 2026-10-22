@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
 use crate::{
-    AMQP, Database, File, Inbox, PartialServer, Server, SystemMessage, User, events::client::EventV1
+    AMQP, Database, File, InboxEntry, PartialServer, Server, SystemMessage, User, events::client::EventV1
 };
 
 #[cfg(feature = "mongodb")]
@@ -834,7 +834,7 @@ impl Channel {
 
                 db.remove_user_from_group(id, &user.id).await?;
 
-                if let Err(err) = Inbox::delete_for_user_in_channel(db, &user.id, id).await {
+                if let Err(err) = InboxEntry::delete_for_user_in_channel(db, &user.id, id).await {
                     revolt_config::capture_error(&err);
                 }
 
@@ -890,7 +890,7 @@ impl Channel {
         // - channels list / categories list on server
         db.delete_channel(self).await?;
 
-        if let Err(err) = Inbox::delete_for_channels(db, &[id]).await {
+        if let Err(err) = InboxEntry::delete_for_channels(db, &[id]).await {
             revolt_config::capture_error(&err);
         }
 

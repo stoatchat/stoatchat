@@ -16,7 +16,7 @@ use validator::Validate;
 use crate::{events::client::EventV1, util::{
     bulk_permissions::BulkDatabasePermissionQuery, idempotency::IdempotencyKey,
     permissions::DatabasePermissionQuery,
-}, Channel, Database, Emoji, EmojiParent, File, User, AMQP, Inbox};
+}, Channel, Database, Emoji, EmojiParent, File, User, AMQP, InboxEntry};
 
 #[cfg(feature = "tasks")]
 use crate::tasks::{self, ack::AckEvent};
@@ -590,7 +590,7 @@ impl Message {
         // Create inbox notifications for mentioned users
         if !suppress_notifications {
             if let Some(mentions) = &message.mentions {
-                if let Err(err) = Inbox::create_for_mentions(
+                if let Err(err) = InboxEntry::create_for_mentions(
                     db,
                     &message.author,
                     &message.id,
@@ -796,6 +796,15 @@ impl Message {
             }
         }
 
+        // Reconcile mass mentions (role / everyone / online) against the edited
+        // content, so the inbox does not keep serving notifications for mentions
+        // that were removed. Explicit flags set outside of content are preserved.
+        if let Some(content) = partial.content.clone() {
+            if let Err(err) = self.resolve_edit_mass_mentions(db, &content, &mut partial).await {
+                revolt_config::capture_error(&err);
+            }
+        }
+
         let mentions_updated = partial.mentions.is_some();
         let old_mentions = self.mentions.clone().unwrap_or_default();
         let new_mentions = partial.mentions.clone().unwrap_or_default();
@@ -816,7 +825,7 @@ impl Message {
                 .ok()
                 .and_then(|c| c.server().map(str::to_owned));
 
-            if let Err(err) = Inbox::update_for_edit(
+            if let Err(err) = InboxEntry::update_for_edit(
                 db,
                 &self.author,
                 &self.id,
@@ -939,6 +948,94 @@ impl Message {
         updated.extend(added);
 
         Ok(Some(updated.into_iter().collect()))
+    }
+
+    /// Reconcile role and mass mentions against an edited message body.
+    ///
+    /// Removed mentions are dropped, newly added ones are validated the same way
+    /// a fresh message would be (server role membership and channel permissions).
+    /// Flags explicitly set outside of the content are preserved.
+    async fn resolve_edit_mass_mentions(
+        &self,
+        db: &Database,
+        new_content: &str,
+        partial: &mut PartialMessage,
+    ) -> Result<()> {
+        let config = config().await;
+        let parsed = revolt_parser::parse_message(new_content);
+
+        let channel = db.fetch_channel(&self.channel).await?;
+        let server_id = channel.server().map(str::to_string);
+
+        let allow_mass_mentions =
+            config.features.mass_mentions_enabled && server_id.is_some();
+
+        // Roles that remain valid: those still in the content and (if in a server)
+        // still present on the server.
+        let mut role_mentions = parsed.role_mentions;
+        if allow_mass_mentions {
+            if let Some(server_id) = &server_id {
+                let server_data = db.fetch_server(server_id).await?;
+                role_mentions.retain(|role_id| server_data.roles.contains_key(role_id));
+            }
+        } else {
+            role_mentions.clear();
+        }
+
+        // Groups and DMs have no roles
+        if matches!(
+            channel,
+            Channel::DirectMessage { .. } | Channel::Group { .. }
+        ) {
+            role_mentions.clear();
+        }
+
+        // Newly added mass mentions need the same permission as sending them fresh.
+        let old_flags = MessageFlagsValue(self.flags.unwrap_or(0));
+        let mut new_flags = MessageFlagsValue(partial.flags.unwrap_or(self.flags.unwrap_or(0)));
+
+        // The edited body is the source of truth for content-derived mass mentions.
+        let mut mentions_everyone = parsed.mentions_everyone;
+        let mut mentions_online = parsed.mentions_online;
+
+        let adding_everyone = parsed.mentions_everyone && !old_flags.has(MessageFlags::MentionsEveryone);
+        let adding_online = parsed.mentions_online && !old_flags.has(MessageFlags::MentionsOnline);
+        let adding_roles = !role_mentions.is_empty()
+            && self
+                .role_mentions
+                .as_ref()
+                .is_none_or(|old| role_mentions.iter().any(|r| !old.contains(r)));
+
+        if adding_everyone || adding_online || adding_roles {
+            if !allow_mass_mentions {
+                mentions_everyone = false;
+                mentions_online = false;
+                role_mentions.clear();
+            } else if let Ok(user) = db.fetch_user(&self.author).await {
+                let mut query = DatabasePermissionQuery::new(db, &user).channel(&channel);
+                let perms = calculate_channel_permissions(&mut query).await;
+
+                if (adding_everyone || adding_online)
+                    && !perms.has_channel_permission(ChannelPermission::MentionEveryone)
+                {
+                    mentions_everyone = false;
+                    mentions_online = false;
+                }
+
+                if adding_roles && !perms.has_channel_permission(ChannelPermission::MentionRoles) {
+                    role_mentions.clear();
+                }
+            }
+        }
+
+        new_flags
+            .set(MessageFlags::MentionsEveryone, mentions_everyone)
+            .set(MessageFlags::MentionsOnline, mentions_online);
+
+        partial.role_mentions = Some(role_mentions.into_iter().collect());
+        partial.flags = Some(new_flags.0);
+
+        Ok(())
     }
 
     /// Helper function to fetch many messages with users
@@ -1185,7 +1282,7 @@ impl Message {
 
         db.delete_message(&self.id).await?;
 
-        if let Err(err) = Inbox::delete_for_message(db, &self.id).await {
+        if let Err(err) = InboxEntry::delete_for_messages(db, &[self.id.clone()]).await {
             revolt_config::capture_error(&err);
         }
 
@@ -1247,7 +1344,7 @@ impl Message {
         db.delete_messages(channel, &valid_ids).await?;
 
         if !valid_ids.is_empty() {
-            if let Err(err) = Inbox::delete_for_messages(db, &valid_ids).await {
+            if let Err(err) = InboxEntry::delete_for_messages(db, &valid_ids).await {
                 revolt_config::capture_error(&err);
             }
         }
@@ -1288,7 +1385,7 @@ impl Message {
         }
 
         if !all_deleted_ids.is_empty() {
-            if let Err(err) = Inbox::delete_for_messages(db, &all_deleted_ids).await {
+            if let Err(err) = InboxEntry::delete_for_messages(db, &all_deleted_ids).await {
                 revolt_config::capture_error(&err);
             }
         }

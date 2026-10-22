@@ -6,10 +6,10 @@ use validator::Validate;
 use rocket::FromForm;
 
 auto_derived!(
-    /// Inbox item
-    pub struct Inbox {
-        /// Why this inbox item exists
-        pub kind: InboxKind,
+    /// Inbox entry
+    pub struct InboxEntry {
+        /// Why this inbox entry exists
+        pub entry_kind: InboxKind,
         /// Message ID
         pub message_id: String,
         /// Channel ID
@@ -24,22 +24,22 @@ auto_derived!(
         pub message: v0::Message,
     }
 
-    /// Page of inbox items
+    /// Page of inbox entries
     pub struct InboxResponse {
-        pub items: Vec<Inbox>,
+        pub items: Vec<InboxEntry>,
         /// Pass as `before` to fetch the next page; absent when nothing older exists
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-        pub next_before: Option<String>,
+        pub pagination: Option<String>,
     }
 
-    /// Options for fetching inbox items
+    /// Options for fetching inbox entries
     #[cfg_attr(feature = "validator", derive(Validate))]
     #[cfg_attr(feature = "rocket", derive(FromForm))]
     pub struct OptionsFetchInbox {
-        /// Maximum number of inbox items to fetch (default 50)
+        /// Maximum number of inbox entries to fetch (default 50)
         #[cfg_attr(feature = "validator", validate(range(min = 1, max = 100)))]
         pub limit: Option<i64>,
-        /// Message ID to fetch inbox items older than; use next_before from the previous page
+        /// Message ID to fetch inbox entries older than; use pagination from the previous page
         pub before: Option<String>,
         /// Include direct mentions and replies
         pub mentions: Option<bool>,
