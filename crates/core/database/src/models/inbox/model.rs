@@ -10,7 +10,7 @@ use crate::util::permissions::DatabasePermissionQuery;
 use crate::{Channel, Database, Member, Message, Server, User};
 
 auto_derived!(
-    /// Inbox entry
+    /// Inbox entry, stored in the database.
     pub struct InboxEntry {
         /// Why this inbox entry exists
         pub entry_kind: InboxKind,
@@ -40,6 +40,8 @@ auto_derived!(
         Everyone,
     }
 
+    /// Internal inbox item used while assembling a page; carries the resolved
+    /// message body. Converted to `v0::InboxEntry` for the API response.
     pub struct InboxItem {
         pub entry_kind: InboxKind,
         pub message_id: String,
