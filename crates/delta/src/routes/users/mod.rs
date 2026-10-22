@@ -16,7 +16,7 @@ mod open_dm;
 mod remove_friend;
 mod send_friend_request;
 mod unblock_user;
-mod fetch_notifications;
+mod fetch_inbox;
 
 pub fn routes() -> (Vec<Route>, OpenApi) {
     openapi_get_routes_spec![
@@ -38,6 +38,6 @@ pub fn routes() -> (Vec<Route>, OpenApi) {
         block_user::block,
         unblock_user::unblock,
         send_friend_request::send_friend_request,
-        fetch_notifications::fetch_notifications,
+        fetch_inbox::fetch_inbox,
     ]
 }

@@ -259,7 +259,7 @@ restrict_server_creation = []
 max_invite_duration_days = 30
 
 # Number of days before notifications stop showing up
-notification_retention_days = 30
+inbox_retention_days = 30
 
 [features.limits.new_user]
 # Limits imposed on new users

@@ -10,9 +10,9 @@ use crate::util::permissions::DatabasePermissionQuery;
 use crate::{Channel, Database, Member, Message, Server, User};
 
 auto_derived!(
-    /// Notification hub
-    pub struct NotificationCenter {
-        /// Why this notification exists
+    /// Inbox item
+    pub struct Inbox {
+        /// Why this inbox item exists
         pub kind: InboxKind,
         /// The mentioned user ID
         pub user_id: String,
@@ -62,16 +62,16 @@ fn ulid_at(ms: u64) -> String {
 }
 
 #[allow(clippy::disallowed_methods)]
-impl NotificationCenter {
-    /// Build a notification for one user
+impl Inbox {
+    /// Build an inbox item for one user
     fn new(
         kind: InboxKind,
         user_id: String,
         message_id: &str,
         channel_id: &str,
         server_id: Option<&str>,
-    ) -> NotificationCenter {
-        NotificationCenter {
+    ) -> Inbox {
+        Inbox {
             kind,
             user_id,
             message_id: message_id.to_string(),
@@ -80,7 +80,7 @@ impl NotificationCenter {
         }
     }
 
-    /// Create notifications for everyone in a message's (already permission-filtered) mentions
+    /// Create inbox items for everyone in a message's (already permission-filtered) mentions
     pub async fn create_for_mentions(
         db: &Database,
         author_id: &str,
@@ -89,16 +89,16 @@ impl NotificationCenter {
         server_id: Option<&str>,
         mentions: &[String],
     ) -> Result<()> {
-        let notifications: Vec<NotificationCenter> = mentions
+        let items: Vec<Inbox> = mentions
             .iter()
             .filter(|id| id.as_str() != author_id)
-            .map(|id| NotificationCenter::new(InboxKind::Mention, id.clone(), message_id, channel_id, server_id))
+            .map(|id| Inbox::new(InboxKind::Mention, id.clone(), message_id, channel_id, server_id))
             .collect();
 
-        db.insert_notifications(notifications).await
+        db.insert_inbox(items).await
     }
 
-    /// Sync notifications after a message edit: drop removed mentions, add new ones
+    /// Sync inbox items after a message edit: drop removed mentions, add new ones
     pub async fn update_for_edit(
         db: &Database,
         author_id: &str,
@@ -119,27 +119,27 @@ impl NotificationCenter {
             .cloned()
             .collect();
 
-        db.delete_notifications_for_users(message_id, &removed).await?;
-        NotificationCenter::create_for_mentions(db, author_id, message_id, channel_id, server_id, &added)
+        db.delete_inbox_for_users(message_id, &removed).await?;
+        Inbox::create_for_mentions(db, author_id, message_id, channel_id, server_id, &added)
             .await
     }
 
-    /// Delete all notifications for a message
+    /// Delete all inbox items for a message
     pub async fn delete_for_message(db: &Database, message_id: &str) -> Result<()> {
-        db.delete_notifications_for_message(message_id).await
+        db.delete_inbox_for_message(message_id).await
     }
 
-    /// Delete all notifications for multiple messages
+    /// Delete all inbox items for multiple messages
     pub async fn delete_for_messages(db: &Database, message_ids: &[String]) -> Result<()> {
-        db.delete_notifications_for_messages(message_ids).await
+        db.delete_inbox_for_messages(message_ids).await
     }
 
     pub async fn delete_for_channels(db: &Database, channel_ids: &[String]) -> Result<()> {
-        db.delete_notifications_for_channels(channel_ids).await
+        db.delete_inbox_for_channels(channel_ids).await
     }
 
     pub async fn delete_for_user(db: &Database, user_id: &str) -> Result<()> {
-        db.delete_notifications_for_user(user_id).await
+        db.delete_inbox_for_user(user_id).await
     }
 
     pub async fn delete_for_user_in_channel(
@@ -147,7 +147,7 @@ impl NotificationCenter {
         user_id: &str,
         channel_id: &str,
     ) -> Result<()> {
-        db.delete_notifications_for_user_in_channel(user_id, channel_id).await
+        db.delete_inbox_for_user_in_channel(user_id, channel_id).await
     }
 
     pub async fn delete_for_user_in_server(
@@ -155,26 +155,26 @@ impl NotificationCenter {
         user_id: &str,
         server_id: &str
     ) -> Result<()> {
-        db.delete_notifications_for_user_in_server(user_id, server_id).await
+        db.delete_inbox_for_user_in_server(user_id, server_id).await
     }
 
-    /// Delete notifications older than the retention window, returns how many were removed
+    /// Delete inbox items older than the retention window, returns how many were removed
     pub async fn prune(db: &Database) -> Result<u64> {
-        let retention_days = config().await.features.limits.global.notification_retention_days;
+        let retention_days = config().await.features.limits.global.inbox_retention_days;
         if retention_days == 0 {
             return Ok(0);
         }
 
         let cutoff =
             bson::DateTime::now().timestamp_millis() - retention_days as i64 * 86_400_000;
-        db.delete_notifications_before(cutoff).await
+        db.delete_inbox_before(cutoff).await
     }
 
     pub async fn fetch_inbox(db: &Database, user: &User, opts: InboxOptions) -> Result<InboxPage> {
         let limit = opts.limit.clamp(1, 100);
 
         // Retention window: older rows are hidden whether or not the prune has run yet
-        let days = config().await.features.limits.global.notification_retention_days;
+        let days = config().await.features.limits.global.inbox_retention_days;
         let cutoff = if days == 0 {
             ulid_at(0)
         } else {
@@ -237,7 +237,7 @@ impl NotificationCenter {
 
             // Raw candidates: no filtering yet, so the "exhausted" check below stays honest
             if opts.mentions {
-                for n in db.fetch_notifications(&user.id, &cutoff, before, limit).await? {
+                for n in db.fetch_inbox_items(&user.id, &cutoff, before, limit).await? {
                     raw.push(InboxItem {
                         kind: InboxKind::Mention,
                         message_id: n.message_id,
@@ -435,13 +435,13 @@ impl InboxItem {
     }
 }
 
-impl From<InboxItem> for revolt_models::v0::NotificationCenter {
+impl From<InboxItem> for revolt_models::v0::Inbox {
     fn from(item: InboxItem) -> Self {
-        revolt_models::v0::NotificationCenter {
+        revolt_models::v0::Inbox {
             kind: match item.kind {
-                InboxKind::Mention => revolt_models::v0::NotificationKind::Mention,
-                InboxKind::Role => revolt_models::v0::NotificationKind::Role,
-                InboxKind::Everyone => revolt_models::v0::NotificationKind::Everyone,
+                InboxKind::Mention => revolt_models::v0::InboxKind::Mention,
+                InboxKind::Role => revolt_models::v0::InboxKind::Role,
+                InboxKind::Everyone => revolt_models::v0::InboxKind::Everyone,
             },
             channel_id: item.channel_id,
             message_id: item.message_id,

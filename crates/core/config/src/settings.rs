@@ -346,7 +346,7 @@ pub struct GlobalLimits {
 
     pub max_invite_duration_days: usize,
 
-    pub notification_retention_days: usize,
+    pub inbox_retention_days: usize,
 }
 
 #[derive(Deserialize, Debug, Clone)]

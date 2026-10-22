@@ -1602,11 +1602,11 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     };
 
     if revision <= 55 {
-        info!("Running migration [revision 55]: create notifications and inbox indexes.");
-        db.db().create_collection("notifications").await.ok();
+        info!("Running migration [revision 55]: create inbox indexes.");
+        db.db().create_collection("inbox").await.ok();
         db.db()
             .run_command(doc! {
-                "createIndexes": "notifications",
+                "createIndexes": "inbox",
                 "indexes": [
                     {
                         "key": { "user_id": 1, "message_id": 1 },
@@ -1624,7 +1624,7 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
                 ]
             })
             .await
-            .expect("Failed to create notifications indexes");
+            .expect("Failed to create inbox indexes");
 
         db.db()
             .run_command(doc! {

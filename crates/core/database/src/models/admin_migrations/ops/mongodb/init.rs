@@ -433,12 +433,12 @@ pub async fn create_database(db: &MongoDb) {
     .await
     .expect("Failed to create discover_requests index");
 
-    db.create_collection("notifications")
+    db.create_collection("inbox")
         .await
-        .expect("Failed to create notifications collection.");
+        .expect("Failed to create inbox collection.");
 
     db.run_command(doc! {
-        "createIndexes": "notifications",
+        "createIndexes": "inbox",
         "indexes": [
             {
                 "key": { "user_id": 1, "message_id": 1 },
@@ -456,7 +456,7 @@ pub async fn create_database(db: &MongoDb) {
         ]
     })
     .await
-    .expect("Failed to create notifications index");
+    .expect("Failed to create inbox index");
 
     db.run_command(doc! {
         "createIndexes": "messages",

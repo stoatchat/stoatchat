@@ -1,23 +1,23 @@
-use revolt_database::{Database, NotificationCenter, User, InboxOptions};
+use revolt_database::{Database, Inbox, User, InboxOptions};
 use revolt_models::v0;
 use revolt_result::{Result, create_error};
 use rocket::{serde::json::Json, State};
 
-/// # Fetch User Notifications
+/// # Fetch User Inbox
 ///
-/// Retrieve a user's notificationss
+/// Retrieve a user's inbox items
 #[openapi(tag = "User Information")]
-#[get("/notifications?<options..>")]
-pub async fn fetch_notifications(
+#[get("/inbox?<options..>")]
+pub async fn fetch_inbox(
     db: &State<Database>,
     user: User,
-    options: v0::OptionsFetchNotifications,
-) -> Result<Json<v0::NotificationsResponse>> {
+    options: v0::OptionsFetchInbox,
+) -> Result<Json<v0::InboxResponse>> {
     if user.bot.is_some() {
         return Err(create_error!(IsBot));
     }
 
-    let page = NotificationCenter::fetch_inbox(
+    let page = Inbox::fetch_inbox(
         db,
         &user,
         InboxOptions {
@@ -30,8 +30,8 @@ pub async fn fetch_notifications(
     )
     .await?;
 
-    Ok(Json(v0::NotificationsResponse {
-            notifications: page.items.into_iter().map(Into::into).collect(),
+    Ok(Json(v0::InboxResponse {
+            items: page.items.into_iter().map(Into::into).collect(),
             next_before: page.next_before,
         }))
 }
@@ -45,7 +45,7 @@ mod test {
     use serde_json::json;
     use ulid::Ulid;
 
-    const ROUTE: &str = "/users/notifications";
+    const ROUTE: &str = "/users/inbox";
 
     struct Actor {
         token: String,
@@ -127,7 +127,7 @@ mod test {
         harness: &TestHarness,
         as_user: &Actor,
         query: &str,
-    ) -> (Status, Option<v0::NotificationsResponse>) {
+    ) -> (Status, Option<v0::InboxResponse>) {
         let response = harness
             .client
             .get(format!("{ROUTE}{query}"))
@@ -137,16 +137,16 @@ mod test {
 
         let status = response.status();
         let body = if status == Status::Ok {
-            Some(response.into_json().await.expect("`NotificationsResponse`"))
+            Some(response.into_json().await.expect("`InboxResponse`"))
         } else {
             None
         };
         (status, body)
     }
 
-    async fn fetch(harness: &TestHarness, as_user: &Actor, query: &str) -> (Status, Vec<v0::NotificationCenter>) {
+    async fn fetch(harness: &TestHarness, as_user: &Actor, query: &str) -> (Status, Vec<v0::Inbox>) {
         let (status, page) = fetch_page(harness, as_user, query).await;
-        (status, page.map(|p| p.notifications).unwrap_or_default())
+        (status, page.map(|p| p.items).unwrap_or_default())
     }
 
     #[rocket::async_test]
@@ -177,7 +177,7 @@ mod test {
         let (status, items) = fetch(&harness, &member, "").await;
         assert_eq!(status, Status::Ok);
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].kind, v0::NotificationKind::Mention);
+        assert_eq!(items[0].kind, v0::InboxKind::Mention);
         assert_eq!(items[0].message_id, message.id);
         assert_eq!(items[0].channel_id, group.id());
         assert_eq!(items[0].message.id, message.id);
@@ -284,7 +284,7 @@ mod test {
 
         let (_, shown) = fetch(&harness, &member, "?mentions=false&roles=false&everyone=true").await;
         assert_eq!(shown.len(), 1);
-        assert_eq!(shown[0].kind, v0::NotificationKind::Everyone);
+        assert_eq!(shown[0].kind, v0::InboxKind::Everyone);
         assert_eq!(shown[0].message_id, message.id);
 
         let (_, hidden) = fetch(&harness, &member, "?mentions=true&roles=true&everyone=false").await;
@@ -301,7 +301,7 @@ mod test {
         let (_, items) = fetch(&harness, &member, "").await;
         assert_eq!(items.len(), 1);
         // InboxKind orders Mention first, so it wins the dedup
-        assert_eq!(items[0].kind, v0::NotificationKind::Mention);
+        assert_eq!(items[0].kind, v0::InboxKind::Mention);
     }
 
     #[rocket::async_test]
@@ -315,12 +315,12 @@ mod test {
 
         let (_, page) = fetch_page(&harness, &member, "?limit=2").await;
         let page = page.expect("page");
-        assert_eq!(page.notifications.len(), 2);
+        assert_eq!(page.items.len(), 2);
         let cursor = page.next_before.expect("more pages");
 
         let (_, page) = fetch_page(&harness, &member, &format!("?limit=2&before={cursor}")).await;
         let page = page.expect("page");
-        assert_eq!(page.notifications.len(), 1);
+        assert_eq!(page.items.len(), 1);
         assert!(page.next_before.is_none());
     }
 
@@ -333,7 +333,7 @@ mod test {
 
         let (_, items) = fetch(&harness, &member, "?mentions=false&roles=false&everyone=true").await;
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].kind, v0::NotificationKind::Everyone);
+        assert_eq!(items[0].kind, v0::InboxKind::Everyone);
         assert_eq!(items[0].message_id, message.id);
     }
 }
