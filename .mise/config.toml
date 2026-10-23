@@ -6,7 +6,7 @@ gh = "2.25.0"
 
 rust = "1.92.0"
 "github:nextest-rs/nextest" = { version = "0.9.122", version_prefix = "cargo-nextest-" }
-"github:cargo-bins/cargo-quickinstall" = { version = "0.13.13", version_prefix = "cargo-edit-" }
+"github:cargo-bins/cargo-quickinstall" = { version = "0.13.14", version_prefix = "cargo-edit-" }
 
 "github:git-town/git-town" = "22.7.1"
 
