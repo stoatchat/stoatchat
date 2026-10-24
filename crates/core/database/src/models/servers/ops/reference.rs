@@ -133,4 +133,16 @@ impl AbstractServers for ReferenceDb {
             Err(create_error!(NotFound))
         }
     }
+
+    async fn fetch_servers_channel_ids(
+        &self,
+        server_ids: &[String],
+    ) -> Result<Vec<(String, Vec<String>)>> {
+        let servers = self.servers.lock().await;
+        Ok(server_ids
+            .iter()
+            .filter_map(|id| servers.get(id))
+            .map(|server| (server.id.clone(), server.channels.clone()))
+            .collect())
+    }
 }

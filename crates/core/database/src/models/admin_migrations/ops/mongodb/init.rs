@@ -433,5 +433,47 @@ pub async fn create_database(db: &MongoDb) {
     .await
     .expect("Failed to create discover_requests index");
 
+    db.create_collection("inbox")
+        .await
+        .expect("Failed to create inbox collection.");
+
+    db.run_command(doc! {
+        "createIndexes": "inbox",
+        "indexes": [
+            {
+                "key": { "user_id": 1, "message_id": 1 },
+                "name": "user_message_unique",
+                "unique": true
+            },
+            {
+                "key": { "message_id": 1 },
+                "name": "message_id"
+            },
+            {
+                "key": { "channel_id": 1 },
+                "name": "channel_id"
+            }
+        ]
+    })
+    .await
+    .expect("Failed to create inbox index");
+
+    db.run_command(doc! {
+        "createIndexes": "messages",
+        "indexes": [
+            {
+                "key": { "role_mentions": 1, "_id": -1 },
+                "name": "role_mentions_id"
+            },
+            {
+                "key": { "channel": 1_i32, "_id": -1_i32 },
+                "name": "mass_mentions",
+                "partialFilterExpression": { "flags": { "$gte": 4 } }
+            },
+        ]
+    })
+    .await
+    .expect("Failed to create message index.");
+
     info!("Created database.");
 }

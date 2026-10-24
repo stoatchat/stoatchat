@@ -422,6 +422,68 @@ impl AbstractMessages for MongoDb {
             "author": user_id,
         }).await
     }
+
+
+    async fn fetch_role_mention_messages(&self, role_ids: &[String],
+        exclude_author: &str, after: &str, before: Option<&str>, limit: i64) -> Result<Vec<Message>> {
+        if role_ids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut id_range = doc! { "$gt": after };
+        if let Some(before) = before {
+            id_range.insert("$lt", before);
+        }
+
+        Ok(self
+            .col::<Message>(COL)
+            .find(doc! {
+                "role_mentions": { "$in": role_ids },
+                "author": { "$ne": exclude_author },
+                "_id": id_range,
+            })
+            .sort(doc! { "_id": -1 })
+            .limit(limit)
+            .await
+            .map_err(|_| create_database_error!("find", COL))?
+            .filter_map(|s| async { s.ok() })
+            .collect()
+            .await)
+    }
+
+    async fn fetch_everyone_mention_messages(
+        &self,
+        channel_ids: &[String],
+        exclude_author: &str,
+        after: &str,
+        before: Option<&str>,
+        limit: i64
+    ) -> Result<Vec<Message>> {
+        if channel_ids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut id_range = doc! { "$gt": after };
+        if let Some(before) = before {
+            id_range.insert("$lt", before);
+        }
+
+        Ok(self
+            .col::<Message>(COL)
+            .find(doc! {
+                "channel": { "$in": channel_ids },
+                "flags": { "$gte": 4, "$bitsAnySet": 12 },
+                "author": { "$ne": exclude_author },
+                "_id": id_range,
+            })
+            .sort(doc! { "_id": -1 })
+            .limit(limit)
+            .await
+            .map_err(|_| create_database_error!("find", COL))?
+            .filter_map(|s| async { s.ok() })
+            .collect()
+            .await)
+    }
 }
 
 impl IntoDocumentPath for FieldsMessage {

@@ -11,6 +11,7 @@ mod discover_requests;
 mod emojis;
 mod file_hashes;
 mod files;
+mod inbox;
 mod messages;
 mod mfa_tickets;
 mod policy_changes;
@@ -37,6 +38,7 @@ pub use discover_requests::*;
 pub use emojis::*;
 pub use file_hashes::*;
 pub use files::*;
+pub use inbox::*;
 pub use messages::*;
 pub use mfa_tickets::*;
 pub use policy_changes::*;
@@ -83,6 +85,7 @@ pub trait AbstractDatabase:
     + sessions::AbstractSessions
     + mfa_tickets::AbstractMFATickets
     + discover_requests::AbstractDiscoverRequest
+    + inbox::AbstractInbox
 {
 }
 
