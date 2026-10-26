@@ -33,13 +33,6 @@ pub trait AbstractInbox: Sync + Send {
         user_ids: &[String],
     ) -> Result<()>;
 
-    /// Delete a message's inbox entries of one kind (e.g. stored `@online` recipients)
-    async fn delete_inbox_for_message_kind(
-        &self,
-        message_id: &str,
-        kind: InboxKind,
-    ) -> Result<()>;
-
     /// Delete every inbox entry in the given channels (channel or server deletion)
     async fn delete_inbox_for_channels(&self, channel_ids: &[String]) -> Result<()>;
 

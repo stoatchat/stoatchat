@@ -1,11 +1,11 @@
 use crate::{
-    AppendMessage, FieldsMessage, Message, MessageQuery,
-    PartialMessage, ReferenceDb,
+    AbstractInbox, AppendMessage, FieldsMessage, Message, MessageQuery, PartialMessage,
+    ReferenceDb,
 };
 use futures::future::try_join_all;
 use indexmap::IndexSet;
 use revolt_result::Result;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 use ulid::Ulid;
 
@@ -354,9 +354,22 @@ impl AbstractMessages for ReferenceDb {
     }
 
     async fn delete_messages_by_user(&self, user_id: &str) -> Result<()> {
-        let mut messages = self.messages.lock().await;
+        let ids: Vec<String> = {
+            let mut messages = self.messages.lock().await;
+            let ids = messages
+                .values()
+                .filter(|message| message.author == user_id)
+                .map(|message| message.id.clone())
+                .collect();
 
-        messages.retain(|_, message| message.author != user_id);
+            messages.retain(|_, message| message.author != user_id);
+
+            ids
+        };
+
+        if !ids.is_empty() {
+            self.delete_inbox_for_messages(&ids).await?;
+        }
 
         // TODO: remove attachments as well
 
@@ -428,8 +441,15 @@ fn collect_mentions<'a>(
     limit: i64,
     matches: impl Fn(&Message) -> bool,
 ) -> Vec<Message> {
+    let channel_ids: Option<HashSet<&String>> =
+        channel_ids.map(|ids| ids.iter().collect());
+
     let mut found: Vec<Message> = messages
-        .filter(|m| channel_ids.map_or(true, |ids| ids.contains(&m.channel)))
+        .filter(|m| {
+            channel_ids
+                .as_ref()
+                .map_or(true, |ids| ids.contains(&m.channel))
+        })
         .filter(|m| m.author != exclude_author)
         .filter(|m| m.id.as_str() > after)
         .filter(|m| before.map_or(true, |b| m.id.as_str() < b))

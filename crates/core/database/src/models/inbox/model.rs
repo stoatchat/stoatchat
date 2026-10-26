@@ -5,9 +5,7 @@ use std::collections::{HashMap, HashSet};
 use iso8601_timestamp::Timestamp;
 use revolt_config::config;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
-use revolt_presence::filter_online;
 
-use crate::util::bulk_permissions::BulkDatabasePermissionQuery;
 use crate::util::permissions::DatabasePermissionQuery;
 use crate::{Channel, Database, Member, Message, Server, User};
 
@@ -134,73 +132,6 @@ impl InboxEntry {
             .await
     }
 
-    /// Persist the recipients of an `@online` mention.
-    pub async fn create_for_online_mention(db: &Database, message: &Message) -> Result<()> {
-        let channel = db.fetch_channel(&message.channel).await?;
-        let Channel::TextChannel { server, .. } = &channel else {
-            return Ok(());
-        };
-
-        let mut members = db.fetch_all_members_chunked(server).await?;
-        let chunk_size = config().await.pushd.mass_mention_chunk_size as usize;
-        let query = BulkDatabasePermissionQuery::from_server_id(db, server)
-            .await
-            .channel(&channel);
-
-        loop {
-            let mut chunk: Vec<Member> = Vec::with_capacity(chunk_size);
-            while chunk.len() < chunk_size {
-                match members.next().await {
-                    Some(member) => chunk.push(member),
-                    None => break,
-                }
-            }
-            let exhausted = chunk.len() < chunk_size;
-            if chunk.is_empty() {
-                break;
-            }
-
-            // Presence first: it is the cheapest filter and shrinks the permission query
-            let ids: Vec<String> = chunk
-                .iter()
-                .map(|m| m.id.user.clone())
-                .filter(|id| id != &message.author)
-                .collect();
-            let online = filter_online(&ids).await;
-            chunk.retain(|m| online.contains(&m.id.user));
-
-            if !chunk.is_empty() {
-                let can_see = query.clone().members(&chunk).members_can_see_channel().await;
-                let items: Vec<InboxEntry> = chunk
-                    .iter()
-                    .filter(|m| *can_see.get(&m.id.user).unwrap_or(&false))
-                    .map(|m| {
-                        InboxEntry::new(
-                            InboxKind::Everyone,
-                            m.id.user.clone(),
-                            &message.id,
-                            &message.channel,
-                            Some(server),
-                        )
-                    })
-                    .collect();
-                db.insert_inbox(items).await?;
-            }
-
-            if exhausted {
-                break;
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Drop the stored `@online` recipients of a message (mention removed on edit)
-    pub async fn delete_online_mention(db: &Database, message_id: &str) -> Result<()> {
-        db.delete_inbox_for_message_kind(message_id, InboxKind::Everyone)
-            .await
-    }
-
     /// Delete all inbox entries for multiple messages
     pub async fn delete_for_messages(db: &Database, message_ids: &[String]) -> Result<()> {
         db.delete_inbox_for_messages(message_ids).await
@@ -313,12 +244,11 @@ impl InboxEntry {
             let before = cursor.as_deref();
             let mut raw: Vec<InboxItem> = vec![];
 
+            // Only direct mentions are persisted; role / `@everyone` entries are
+            // derived from the message itself when a page is assembled.
             let mut kinds: Vec<InboxKind> = vec![];
             if opts.mentions {
                 kinds.push(InboxKind::Mention);
-            }
-            if opts.everyone {
-                kinds.push(InboxKind::Everyone);
             }
             if !kinds.is_empty() {
                 for n in db
@@ -343,13 +273,15 @@ impl InboxEntry {
                 }
             }
             if opts.everyone {
-                let mut all: Vec<Message> = vec![];
-                for chunk in channel_ids.chunks(500) {
-                    all.extend(
-                        db.fetch_everyone_mention_messages(chunk, &user.id, &cutoff, before, limit)
-                            .await?,
-                    );
-                }
+                let mut all = db
+                    .fetch_everyone_mention_messages(
+                        &channel_ids,
+                        &user.id,
+                        &cutoff,
+                        before,
+                        limit,
+                    )
+                    .await?;
                 all.sort_by(|a, b| b.id.cmp(&a.id));
                 all.truncate(limit as usize);
 
@@ -501,8 +433,13 @@ impl InboxEntry {
             }
         }
 
-        let pagination = if out.len() >= limit as usize {
+        let pagination = if out.len() > limit as usize {
+            // More candidates were scanned than fit in the page: the remaining
+            // ones are older than the page boundary.
             out.truncate(limit as usize);
+            out.last().map(|i| i.message_id.clone())
+        } else if out.len() == limit as usize && !exhausted {
+            // Full page and at least one source may have more.
             out.last().map(|i| i.message_id.clone())
         } else if exhausted {
             None

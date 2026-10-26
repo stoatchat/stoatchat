@@ -9,8 +9,8 @@ use std::time::SystemTime;
 use ulid::Ulid;
 
 use crate::{
-    AppendMessage, DocumentId, FieldsMessage, IntoDocumentPath, Message, MessageQuery,
-    MessageTimePeriod, MongoDb, PartialMessage,
+    AbstractInbox, AppendMessage, DocumentId, FieldsMessage, IntoDocumentPath, Message,
+    MessageQuery, MessageTimePeriod, MongoDb, PartialMessage,
 };
 
 use super::AbstractMessages;
@@ -418,9 +418,31 @@ impl AbstractMessages for MongoDb {
     }
 
     async fn delete_messages_by_user(&self, user_id: &str) -> Result<()> {
-        self.delete_bulk_messages(doc! {
-            "author": user_id,
-        }).await
+        let filter = doc! { "author": user_id };
+
+        // Collect ids first so the inbox entries those messages produced for
+        // other users can be cleaned up alongside the messages themselves.
+        let ids: Vec<String> = self
+            .find_with_options::<_, DocumentId>(
+                COL,
+                filter.clone(),
+                FindOptions::builder()
+                    .projection(doc! { "_id": 1_i32 })
+                    .build(),
+            )
+            .await
+            .map_err(|_| create_database_error!("find_many", COL))?
+            .into_iter()
+            .map(|x| x.id)
+            .collect();
+
+        self.delete_bulk_messages(filter).await?;
+
+        if !ids.is_empty() {
+            self.delete_inbox_for_messages(&ids).await?;
+        }
+
+        Ok(())
     }
 
 

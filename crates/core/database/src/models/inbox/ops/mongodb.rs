@@ -67,13 +67,44 @@ impl AbstractInbox for MongoDb {
     }
 
     async fn delete_inbox_before(&self, before_ms: i64) -> Result<u64> {
-        let cutoff = ulid::Ulid::from_parts(before_ms.max(0) as u64, 0).to_string();
+        // Delete in bounded batches so the hourly prune never issues one
+        // unbounded delete against a large collection.
+        const BATCH: i64 = 1_000;
 
-        self.col::<InboxEntry>(COL)
-            .delete_many(doc! { "message_id": { "$lt": cutoff } })
-            .await
-            .map(|result| result.deleted_count)
-            .map_err(|_| create_database_error!("delete_many", COL))
+        let cutoff = ulid::Ulid::from_parts(before_ms.max(0) as u64, 0).to_string();
+        let mut deleted = 0u64;
+
+        loop {
+            let ids: Vec<bson::Bson> = self
+                .col::<bson::Document>(COL)
+                .find(doc! { "message_id": { "$lt": &cutoff } })
+                .projection(doc! { "_id": 1_i32 })
+                .limit(BATCH)
+                .await
+                .map_err(|_| create_database_error!("find", COL))?
+                .filter_map(|doc| async move { doc.ok().and_then(|d| d.get("_id").cloned()) })
+                .collect()
+                .await;
+
+            if ids.is_empty() {
+                break;
+            }
+
+            let count = ids.len();
+
+            deleted += self
+                .col::<bson::Document>(COL)
+                .delete_many(doc! { "_id": { "$in": ids } })
+                .await
+                .map_err(|_| create_database_error!("delete_many", COL))?
+                .deleted_count;
+
+            if count < BATCH as usize {
+                break;
+            }
+        }
+
+        Ok(deleted)
     }
 
     async fn delete_inbox_for_messages(&self, message_ids: &[String]) -> Result<()> {
@@ -102,20 +133,6 @@ impl AbstractInbox for MongoDb {
                 "message_id": message_id,
                 "user_id": { "$in": user_ids },
             })
-            .await
-            .map(|_| ())
-            .map_err(|_| create_database_error!("delete_many", COL))
-    }
-
-    async fn delete_inbox_for_message_kind(
-        &self,
-        message_id: &str,
-        kind: InboxKind,
-    ) -> Result<()> {
-        let kind = to_bson(&kind).map_err(|_| create_database_error!("to_bson", COL))?;
-
-        self.col::<InboxEntry>(COL)
-            .delete_many(doc! { "message_id": message_id, "entry_kind": kind })
             .await
             .map(|_| ())
             .map_err(|_| create_database_error!("delete_many", COL))

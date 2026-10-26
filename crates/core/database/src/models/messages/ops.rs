@@ -68,9 +68,6 @@ pub trait AbstractMessages: Sync + Send {
     ) -> Result<Vec<Message>>;
 
     /// Messages in the given channels that carry the mention-everyone flag.
-    ///
-    /// `@online` is intentionally excluded: its recipients depend on presence at
-    /// send time and are persisted as inbox rows instead.
     async fn fetch_everyone_mention_messages(
         &self,
         channel_ids: &[String],

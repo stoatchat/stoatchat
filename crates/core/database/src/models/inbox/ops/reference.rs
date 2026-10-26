@@ -81,17 +81,6 @@ impl AbstractInbox for ReferenceDb {
         Ok(())
     }
 
-    async fn delete_inbox_for_message_kind(
-        &self,
-        message_id: &str,
-        kind: InboxKind,
-    ) -> Result<()> {
-        let mut store = self.inbox.lock().await;
-        store.retain(|_, n| !(n.message_id == message_id && n.entry_kind == kind));
-
-        Ok(())
-    }
-
     async fn delete_inbox_for_channels(&self, channel_ids: &[String]) -> Result<()> {
         if channel_ids.is_empty() {
             return Ok(());
