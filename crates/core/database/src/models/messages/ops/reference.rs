@@ -365,13 +365,13 @@ impl AbstractMessages for ReferenceDb {
 
     async fn fetch_role_mention_messages(
         &self,
-        role_ids: &[String],
+        roles: &[(String, String)],
         exclude_author: &str,
         after: &str,
         before: Option<&str>,
         limit: i64,
     ) -> Result<Vec<Message>> {
-        if role_ids.is_empty() {
+        if roles.is_empty() {
             return Ok(vec![]);
         }
 
@@ -384,9 +384,11 @@ impl AbstractMessages for ReferenceDb {
             before,
             limit,
             |m| {
-                m.role_mentions
-                    .as_ref()
-                    .is_some_and(|roles| roles.iter().any(|r| role_ids.contains(r)))
+                m.role_mentions.as_ref().is_some_and(|mentioned| {
+                    roles.iter().any(|(role_id, since)| {
+                        mentioned.contains(role_id) && m.id.as_str() > since.as_str()
+                    })
+                })
             },
         ))
     }
@@ -411,7 +413,7 @@ impl AbstractMessages for ReferenceDb {
             after,
             before,
             limit,
-            |m| m.flags.unwrap_or(0) & 12 != 0,
+            |m| m.flags.unwrap_or(0) & 4 != 0,
         ))
     }
 }

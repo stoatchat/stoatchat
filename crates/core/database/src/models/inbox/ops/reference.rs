@@ -1,5 +1,5 @@
 use super::AbstractInbox;
-use crate::{InboxEntry, ReferenceDb};
+use crate::{InboxEntry, InboxKind, ReferenceDb};
 use revolt_result::Result;
 
 #[async_trait]
@@ -23,6 +23,7 @@ impl AbstractInbox for ReferenceDb {
     async fn fetch_inbox_items(
         &self,
         user_id: &str,
+        kinds: &[InboxKind],
         after: &str,
         before: Option<&str>,
         limit: i64,
@@ -32,6 +33,7 @@ impl AbstractInbox for ReferenceDb {
         let mut results: Vec<InboxEntry> = store
             .values()
             .filter(|n| n.user_id == user_id)
+            .filter(|n| kinds.contains(&n.entry_kind))
             .filter(|n| n.message_id.as_str() > after)
             .filter(|n| before.map_or(true, |b| n.message_id.as_str() < b))
             .cloned()
@@ -75,6 +77,17 @@ impl AbstractInbox for ReferenceDb {
 
         let mut store = self.inbox.lock().await;
         store.retain(|_, n| !(n.message_id == message_id && user_ids.contains(&n.user_id)));
+
+        Ok(())
+    }
+
+    async fn delete_inbox_for_message_kind(
+        &self,
+        message_id: &str,
+        kind: InboxKind,
+    ) -> Result<()> {
+        let mut store = self.inbox.lock().await;
+        store.retain(|_, n| !(n.message_id == message_id && n.entry_kind == kind));
 
         Ok(())
     }

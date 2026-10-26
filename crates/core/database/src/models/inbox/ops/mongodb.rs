@@ -1,5 +1,6 @@
 use super::AbstractInbox;
-use crate::{util::mongodb::is_duplicate_key, InboxEntry, MongoDb};
+use crate::{util::mongodb::is_duplicate_key, InboxEntry, InboxKind, MongoDb};
+use bson::to_bson;
 use futures::StreamExt;
 use revolt_result::Result;
 
@@ -27,15 +28,25 @@ impl AbstractInbox for MongoDb {
     async fn fetch_inbox_items(
         &self,
         user_id: &str,
+        kinds: &[InboxKind],
         after: &str,
         before: Option<&str>,
         limit: i64,
     ) -> Result<Vec<InboxEntry>> {
+        if kinds.is_empty() {
+            return Ok(vec![]);
+        }
+
         let mut id_range = doc! { "$gt": after };
         if let Some(before) = before {
             id_range.insert("$lt", before);
         }
-        let filter = doc! { "user_id": user_id, "message_id": id_range };
+        let kinds = to_bson(kinds).map_err(|_| create_database_error!("to_bson", COL))?;
+        let filter = doc! {
+            "user_id": user_id,
+            "entry_kind": { "$in": kinds },
+            "message_id": id_range,
+        };
 
         Ok(self
             .col::<InboxEntry>(COL)
@@ -91,6 +102,20 @@ impl AbstractInbox for MongoDb {
                 "message_id": message_id,
                 "user_id": { "$in": user_ids },
             })
+            .await
+            .map(|_| ())
+            .map_err(|_| create_database_error!("delete_many", COL))
+    }
+
+    async fn delete_inbox_for_message_kind(
+        &self,
+        message_id: &str,
+        kind: InboxKind,
+    ) -> Result<()> {
+        let kind = to_bson(&kind).map_err(|_| create_database_error!("to_bson", COL))?;
+
+        self.col::<InboxEntry>(COL)
+            .delete_many(doc! { "message_id": message_id, "entry_kind": kind })
             .await
             .map(|_| ())
             .map_err(|_| create_database_error!("delete_many", COL))

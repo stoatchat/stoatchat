@@ -1,5 +1,5 @@
 // Queue Type: Debounced
-use crate::{Database, Message, AMQP};
+use crate::{Database, InboxEntry, Message, AMQP};
 
 use deadqueue::limited::Queue;
 use once_cell::sync::Lazy;
@@ -155,6 +155,13 @@ pub async fn handle_ack_event(
             let mut mass_mentions = vec![];
 
             for (push, message, recipients, silenced) in messages {
+                // Snapshot who is online now as the inbox recipients of an @online ping
+                if !*silenced && message.has_online_mention() {
+                    if let Err(err) = InboxEntry::create_for_online_mention(db, message).await {
+                        revolt_config::capture_error(&err);
+                    }
+                }
+
                 if *silenced
                     || push.is_none()
                     || (recipients.is_empty() && !message.contains_mass_push_mention())
@@ -269,7 +276,9 @@ pub async fn worker(db: Database, amqp: AMQP) {
                         {
                             if let Some(new_event) = new_data.pop() {
                                 // if the message contains a mass mention, do not delay it any further.
-                                if new_event.1.contains_mass_push_mention() {
+                                if new_event.1.contains_mass_push_mention()
+                                    || new_event.1.has_online_mention()
+                                {
                                     // add the new message to the list of messages to be processed.
                                     existing.push(new_event);
                                     task.run_immediately();

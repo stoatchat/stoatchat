@@ -5,7 +5,9 @@ use std::collections::{HashMap, HashSet};
 use iso8601_timestamp::Timestamp;
 use revolt_config::config;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
+use revolt_presence::filter_online;
 
+use crate::util::bulk_permissions::BulkDatabasePermissionQuery;
 use crate::util::permissions::DatabasePermissionQuery;
 use crate::{Channel, Database, Member, Message, Server, User};
 
@@ -61,6 +63,12 @@ const MAX_ROUNDS: usize = 5;
 
 fn ulid_at(ms: u64) -> String {
     Ulid::from_parts(ms, 0).to_string()
+}
+
+fn timestamp_ms(ts: &Timestamp) -> u64 {
+    ts.duration_since(Timestamp::UNIX_EPOCH)
+        .whole_milliseconds()
+        .max(0) as u64
 }
 
 #[allow(clippy::disallowed_methods)]
@@ -126,6 +134,73 @@ impl InboxEntry {
             .await
     }
 
+    /// Persist the recipients of an `@online` mention.
+    pub async fn create_for_online_mention(db: &Database, message: &Message) -> Result<()> {
+        let channel = db.fetch_channel(&message.channel).await?;
+        let Channel::TextChannel { server, .. } = &channel else {
+            return Ok(());
+        };
+
+        let mut members = db.fetch_all_members_chunked(server).await?;
+        let chunk_size = config().await.pushd.mass_mention_chunk_size as usize;
+        let query = BulkDatabasePermissionQuery::from_server_id(db, server)
+            .await
+            .channel(&channel);
+
+        loop {
+            let mut chunk: Vec<Member> = Vec::with_capacity(chunk_size);
+            while chunk.len() < chunk_size {
+                match members.next().await {
+                    Some(member) => chunk.push(member),
+                    None => break,
+                }
+            }
+            let exhausted = chunk.len() < chunk_size;
+            if chunk.is_empty() {
+                break;
+            }
+
+            // Presence first: it is the cheapest filter and shrinks the permission query
+            let ids: Vec<String> = chunk
+                .iter()
+                .map(|m| m.id.user.clone())
+                .filter(|id| id != &message.author)
+                .collect();
+            let online = filter_online(&ids).await;
+            chunk.retain(|m| online.contains(&m.id.user));
+
+            if !chunk.is_empty() {
+                let can_see = query.clone().members(&chunk).members_can_see_channel().await;
+                let items: Vec<InboxEntry> = chunk
+                    .iter()
+                    .filter(|m| *can_see.get(&m.id.user).unwrap_or(&false))
+                    .map(|m| {
+                        InboxEntry::new(
+                            InboxKind::Everyone,
+                            m.id.user.clone(),
+                            &message.id,
+                            &message.channel,
+                            Some(server),
+                        )
+                    })
+                    .collect();
+                db.insert_inbox(items).await?;
+            }
+
+            if exhausted {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Drop the stored `@online` recipients of a message (mention removed on edit)
+    pub async fn delete_online_mention(db: &Database, message_id: &str) -> Result<()> {
+        db.delete_inbox_for_message_kind(message_id, InboxKind::Everyone)
+            .await
+    }
+
     /// Delete all inbox entries for multiple messages
     pub async fn delete_for_messages(db: &Database, message_ids: &[String]) -> Result<()> {
         db.delete_inbox_for_messages(message_ids).await
@@ -182,7 +257,7 @@ impl InboxEntry {
         // Only loaded when role / everyone mentions are requested
         let mut members_by_server: HashMap<String, Member> = HashMap::new();
         let mut joined: HashMap<String, String> = HashMap::new();
-        let mut role_ids: Vec<String> = vec![];
+        let mut role_windows: Vec<(String, String)> = vec![];
         let mut channel_to_server: HashMap<String, String> = HashMap::new();
         let mut channel_ids: Vec<String> = vec![];
 
@@ -191,17 +266,23 @@ impl InboxEntry {
 
             joined = members
                 .iter()
-                .map(|m| {
-                    let ms = m
-                        .joined_at
-                        .duration_since(Timestamp::UNIX_EPOCH)
-                        .whole_milliseconds()
-                        .max(0) as u64;
-                    (m.id.server.clone(), ulid_at(ms))
-                })
+                .map(|m| (m.id.server.clone(), ulid_at(timestamp_ms(&m.joined_at))))
                 .collect();
 
-            role_ids = members.iter().flat_map(|m| m.roles.clone()).collect();
+            role_windows = members
+                .iter()
+                .flat_map(|m| {
+                    let joined_ms = timestamp_ms(&m.joined_at);
+                    m.roles.iter().map(move |role| {
+                        let since_ms = m
+                            .role_since(role)
+                            .map(|ts| timestamp_ms(&ts))
+                            .unwrap_or(joined_ms)
+                            .max(joined_ms);
+                        (role.clone(), ulid_at(since_ms))
+                    })
+                })
+                .collect();
 
             if opts.everyone {
                 let server_ids: Vec<String> = members.iter().map(|m| m.id.server.clone()).collect();
@@ -232,11 +313,20 @@ impl InboxEntry {
             let before = cursor.as_deref();
             let mut raw: Vec<InboxItem> = vec![];
 
-            // Raw candidates: no filtering yet, so the "exhausted" check below stays honest
+            let mut kinds: Vec<InboxKind> = vec![];
             if opts.mentions {
-                for n in db.fetch_inbox_items(&user.id, &cutoff, before, limit).await? {
+                kinds.push(InboxKind::Mention);
+            }
+            if opts.everyone {
+                kinds.push(InboxKind::Everyone);
+            }
+            if !kinds.is_empty() {
+                for n in db
+                    .fetch_inbox_items(&user.id, &kinds, &cutoff, before, limit)
+                    .await?
+                {
                     raw.push(InboxItem {
-                        entry_kind: InboxKind::Mention,
+                        entry_kind: n.entry_kind,
                         message_id: n.message_id,
                         channel_id: n.channel_id,
                         server_id: n.server_id,
@@ -246,7 +336,7 @@ impl InboxEntry {
             }
             if opts.roles {
                 for m in db
-                    .fetch_role_mention_messages(&role_ids, &user.id, &cutoff, before, limit)
+                    .fetch_role_mention_messages(&role_windows, &user.id, &cutoff, before, limit)
                     .await?
                 {
                     raw.push(InboxItem::from_message(InboxKind::Role, m, &channel_to_server));

@@ -53,17 +53,24 @@ pub trait AbstractMessages: Sync + Send {
 
     async fn delete_messages_by_user(&self, user_id: &str) -> Result<()>;
 
-    /// Messages in the given channels that mention any of the given roles
+    /// Messages that mention any of the given roles.
+    ///
+    /// Each entry is `(role_id, since)` where `since` is a message id lower bound
+    /// for that role (the point the user was given the role), so mentions that
+    /// predate the assignment are not returned. `after` is a global lower bound.
     async fn fetch_role_mention_messages(
         &self,
-        role_ids: &[String],
+        roles: &[(String, String)],
         exclude_author: &str,
         after: &str,
         before: Option<&str>,
         limit: i64,
     ) -> Result<Vec<Message>>;
 
-    /// Messages in the given channels that carry the mention-everyone flag
+    /// Messages in the given channels that carry the mention-everyone flag.
+    ///
+    /// `@online` is intentionally excluded: its recipients depend on presence at
+    /// send time and are persisted as inbox rows instead.
     async fn fetch_everyone_mention_messages(
         &self,
         channel_ids: &[String],

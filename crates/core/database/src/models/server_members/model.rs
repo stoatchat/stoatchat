@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use iso8601_timestamp::Timestamp;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
@@ -37,6 +39,16 @@ auto_derived_partial!(
         /// Member's roles
         #[serde(skip_serializing_if = "Vec::is_empty", default)]
         pub roles: Vec<String>,
+        /// When each currently held role was assigned (role id -> timestamp).
+        ///
+        /// Database-only, used by the inbox so that role mentions sent before
+        /// the member was given the role are not surfaced retroactively. Roles
+        /// without an entry fall back to [`Member::joined_at`].
+        ///
+        /// Invariant: the key set always equals [`Member::roles`]. Do not write
+        /// this field directly; call [`Member::set_roles`].
+        #[serde(skip_serializing_if = "HashMap::is_empty", default)]
+        pub role_since: HashMap<String, Timestamp>,
         /// Timestamp this member is timed out until
         #[serde(skip_serializing_if = "Option::is_none")]
         pub timeout: Option<Timestamp>,
@@ -94,6 +106,7 @@ impl Default for Member {
             pronouns: None,
             avatar: None,
             roles: vec![],
+            role_since: HashMap::new(),
             timeout: None,
             can_publish: true,
             can_receive: true,
@@ -208,9 +221,21 @@ impl Member {
     pub async fn update(
         &mut self,
         db: &Database,
-        partial: PartialMember,
+        mut partial: PartialMember,
         remove: Vec<FieldsMember>,
     ) -> Result<()> {
+        // Track when roles were granted so the inbox can window role mentions.
+        // `set_roles` is the only place that touches `roles` / `role_since`, and
+        // the persisted partial mirrors whatever it produced.
+        if remove.contains(&FieldsMember::Roles) {
+            // `roles` itself is cleared by the `$unset`; only mirror the timestamps.
+            self.set_roles(Vec::new());
+            partial.role_since = Some(HashMap::new());
+        } else if let Some(new_roles) = &partial.roles {
+            self.set_roles(new_roles.clone());
+            partial.role_since = Some(self.role_since.clone());
+        }
+
         for field in &remove {
             self.remove_field(field);
         }
@@ -230,13 +255,43 @@ impl Member {
         Ok(())
     }
 
+    /// Replace this member's roles, keeping [`Self::role_since`] in lockstep.
+    ///
+    /// Newly granted roles are stamped with the current time; revoked roles drop
+    /// their entry. This is the only supported way to change [`Self::roles`], so
+    /// the two fields cannot drift.
+    pub fn set_roles(&mut self, new_roles: Vec<String>) {
+        let now = Timestamp::now_utc();
+        let mut since = std::mem::take(&mut self.role_since);
+        since.retain(|role, _| new_roles.contains(role));
+        for role in &new_roles {
+            if !self.roles.contains(role) {
+                since.insert(role.clone(), now);
+            }
+        }
+
+        self.roles = new_roles;
+        self.role_since = since;
+    }
+
+    /// When a role was granted, falling back to the join date when unknown.
+    ///
+    /// Returns `None` if the member does not currently hold the role.
+    pub fn role_since(&self, role_id: &str) -> Option<Timestamp> {
+        if !self.roles.contains(&role_id.to_string()) {
+            return None;
+        }
+
+        Some(self.role_since.get(role_id).copied().unwrap_or(self.joined_at))
+    }
+
     pub fn remove_field(&mut self, field: &FieldsMember) {
         match field {
             FieldsMember::JoinedAt => {}
             FieldsMember::Avatar => self.avatar = None,
             FieldsMember::Nickname => self.nickname = None,
             FieldsMember::Pronouns => self.pronouns = None,
-            FieldsMember::Roles => self.roles.clear(),
+            FieldsMember::Roles => self.set_roles(Vec::new()),
             FieldsMember::Timeout => self.timeout = None,
             FieldsMember::CanReceive => self.can_receive = true,
             FieldsMember::CanPublish => self.can_publish = true,
@@ -346,10 +401,12 @@ impl Member {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use iso8601_timestamp::{Duration, Timestamp};
     use revolt_models::v0::DataCreateServer;
     use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
-    use crate::{Member, PartialMember, RemovalIntention, Server, User};
+    use crate::{FieldsMember, Member, PartialMember, RemovalIntention, Server, User};
 
     #[tokio::test]
     async fn muted_member_rejoin() {
@@ -411,6 +468,115 @@ mod tests {
                 .0;
 
             assert!(kickable_member.in_timeout())
+        });
+    }
+
+    #[test]
+    fn set_roles_stamps_grants_and_keeps_existing_timestamps() {
+        let mut member = Member::default();
+
+        member.set_roles(vec!["A".to_string()]);
+        let a_first = member.role_since("A").expect("A is held");
+
+        // Re-assigning the same set must not move the existing timestamp
+        member.set_roles(vec!["A".to_string(), "B".to_string()]);
+        assert_eq!(member.role_since("A"), Some(a_first));
+        assert!(member.role_since("B").is_some());
+
+        // The invariant holds: no entry for a role that is not held
+        assert!(member.role_since.get("A").is_some());
+        assert!(member.role_since.get("B").is_some());
+        assert_eq!(member.role_since.len(), member.roles.len());
+    }
+
+    #[test]
+    fn set_roles_drops_revoked_roles() {
+        let mut member = Member::default();
+        member.set_roles(vec!["A".to_string(), "B".to_string()]);
+
+        member.set_roles(vec!["B".to_string()]);
+
+        assert_eq!(member.roles, vec!["B".to_string()]);
+        assert!(member.role_since("A").is_none());
+        assert!(member.role_since.get("A").is_none());
+        assert_eq!(member.role_since.len(), member.roles.len());
+    }
+
+    #[test]
+    fn role_since_falls_back_to_joined_at() {
+        let member = Member {
+            roles: vec!["A".to_string()],
+            // No tracked grant time, e.g. a member created already holding the role
+            role_since: HashMap::new(),
+            ..Default::default()
+        };
+
+        assert_eq!(member.role_since("A"), Some(member.joined_at));
+        assert!(member.role_since("missing").is_none());
+    }
+
+    #[test]
+    fn remove_field_roles_clears_timestamps_together() {
+        let mut member = Member::default();
+        member.set_roles(vec!["A".to_string()]);
+
+        member.remove_field(&FieldsMember::Roles);
+
+        assert!(member.roles.is_empty());
+        assert!(member.role_since.is_empty());
+    }
+
+    #[tokio::test]
+    async fn set_roles_persists_through_update() {
+        database_test!(|db| async move {
+            let owner = User::create(&db, "Owner".to_string(), None, None)
+                .await
+                .unwrap();
+            let user = User::create(&db, "Member".to_string(), None, None)
+                .await
+                .unwrap();
+
+            let server = Server::create(
+                &db,
+                DataCreateServer {
+                    name: "Roles".to_string(),
+                    description: None,
+                    nsfw: None,
+                },
+                &owner,
+                false,
+            )
+            .await
+            .unwrap()
+            .0;
+
+            Member::create(&db, &server, &owner, None).await.unwrap();
+            let mut member = Member::create(&db, &server, &user, None).await.unwrap().0;
+
+            // Grant the role via update and let it round-trip through the database
+            member
+                .update(
+                    &db,
+                    PartialMember {
+                        roles: Some(vec!["A".to_string()]),
+                        ..Default::default()
+                    },
+                    vec![],
+                )
+                .await
+                .unwrap();
+
+            let fetched = db.fetch_member(&server.id, &user.id).await.unwrap();
+            assert_eq!(fetched.roles, vec!["A".to_string()]);
+            assert_eq!(
+                fetched.role_since.len(),
+                fetched.roles.len(),
+                "role_since drifted from roles across a database round-trip"
+            );
+            assert!(
+                fetched.role_since("A").is_some(),
+                "granted role has no tracked timestamp"
+            );
         });
     }
 }

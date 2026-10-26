@@ -363,6 +363,7 @@ mod test {
             avatar: None,
             timeout: None,
             roles: Some(second_member_roles),
+            role_since: None,
             can_publish: None,
             can_receive: None,
         };
@@ -679,7 +680,7 @@ mod test {
             "Role mentions detected when inside codeblock"
         );
 
-        other_member.roles.push(role.id.clone());
+        other_member.set_roles(vec![role.id.clone()]);
         harness
             .db
             .update_member(
@@ -691,6 +692,7 @@ mod test {
                     nickname: None,
                     pronouns: None,
                     roles: Some(vec![role.id.clone()]),
+                    role_since: None,
                     timeout: None,
                     can_publish: None,
                     can_receive: None,

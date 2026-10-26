@@ -695,7 +695,10 @@ impl Message {
         );
 
         if !self.has_suppressed_notifications()
-            && (is_dm_or_group || self.mentions.is_some() || self.contains_mass_push_mention())
+            && (is_dm_or_group
+                || self.mentions.is_some()
+                || self.contains_mass_push_mention()
+                || self.has_online_mention())
         {
             // send Push notifications
             #[cfg(feature = "tasks")]
@@ -777,6 +780,12 @@ impl Message {
         ping || self.role_mentions.is_some()
     }
 
+    /// Whether this message mentions `@online`
+    pub fn has_online_mention(&self) -> bool {
+        self.flags
+            .is_some_and(|flags| MessageFlagsValue(flags).has(MessageFlags::MentionsOnline))
+    }
+
     /// Update message data
     pub async fn update(
         &mut self,
@@ -808,6 +817,7 @@ impl Message {
         let mentions_updated = partial.mentions.is_some();
         let old_mentions = self.mentions.clone().unwrap_or_default();
         let new_mentions = partial.mentions.clone().unwrap_or_default();
+        let had_online = self.has_online_mention();
 
         self.apply_options(partial.clone());
 
@@ -817,6 +827,19 @@ impl Message {
 
         db.update_message(&self.id, &partial, remove.clone())
             .await?;
+
+        if !self.has_suppressed_notifications() {
+            let has_online = self.has_online_mention();
+            if had_online && !has_online {
+                if let Err(err) = InboxEntry::delete_online_mention(db, &self.id).await {
+                    revolt_config::capture_error(&err);
+                }
+            } else if !had_online && has_online {
+                if let Err(err) = InboxEntry::create_for_online_mention(db, self).await {
+                    revolt_config::capture_error(&err);
+                }
+            }
+        }
 
         if mentions_updated && !self.has_suppressed_notifications() {
             let server_id = db
@@ -925,19 +948,12 @@ impl Message {
             Message::retain_valid_mentions(db, &channel, &mut added).await?;
         }
 
-        // Users whose @mention was deleted, unless they are still mentioned via a reply
-        let mut removed: HashSet<String> = old_parsed
+        // Users whose @mention was deleted from the body.
+        let removed: HashSet<String> = old_parsed
             .iter()
             .filter(|m| !new_parsed.contains(*m) && current.contains(*m))
             .cloned()
             .collect();
-        if !removed.is_empty() {
-            if let Some(replies) = &self.replies {
-                for replied in db.fetch_messages_by_id(replies).await.unwrap_or_default() {
-                    removed.remove(&replied.author);
-                }
-            }
-        }
 
         if added.is_empty() && removed.is_empty() {
             return Ok(None);
@@ -994,12 +1010,22 @@ impl Message {
         let old_flags = MessageFlagsValue(self.flags.unwrap_or(0));
         let mut new_flags = MessageFlagsValue(partial.flags.unwrap_or(self.flags.unwrap_or(0)));
 
-        // The edited body is the source of truth for content-derived mass mentions.
-        let mut mentions_everyone = parsed.mentions_everyone;
-        let mut mentions_online = parsed.mentions_online;
+        let old_parsed = self
+            .content
+            .as_deref()
+            .map(revolt_parser::parse_message)
+            .unwrap_or_default();
 
-        let adding_everyone = parsed.mentions_everyone && !old_flags.has(MessageFlags::MentionsEveryone);
-        let adding_online = parsed.mentions_online && !old_flags.has(MessageFlags::MentionsOnline);
+        let had_everyone = old_flags.has(MessageFlags::MentionsEveryone);
+        let had_online = old_flags.has(MessageFlags::MentionsOnline);
+        let explicit_everyone = had_everyone && !old_parsed.mentions_everyone;
+        let explicit_online = had_online && !old_parsed.mentions_online;
+
+        let mut mentions_everyone = parsed.mentions_everyone || explicit_everyone;
+        let mut mentions_online = parsed.mentions_online || explicit_online;
+
+        let adding_everyone = parsed.mentions_everyone && !had_everyone;
+        let adding_online = parsed.mentions_online && !had_online;
         let adding_roles = !role_mentions.is_empty()
             && self
                 .role_mentions
@@ -1008,8 +1034,8 @@ impl Message {
 
         if adding_everyone || adding_online || adding_roles {
             if !allow_mass_mentions {
-                mentions_everyone = false;
-                mentions_online = false;
+                mentions_everyone = explicit_everyone;
+                mentions_online = explicit_online;
                 role_mentions.clear();
             } else if let Ok(user) = db.fetch_user(&self.author).await {
                 let mut query = DatabasePermissionQuery::new(db, &user).channel(&channel);
@@ -1018,8 +1044,8 @@ impl Message {
                 if (adding_everyone || adding_online)
                     && !perms.has_channel_permission(ChannelPermission::MentionEveryone)
                 {
-                    mentions_everyone = false;
-                    mentions_online = false;
+                    mentions_everyone = explicit_everyone;
+                    mentions_online = explicit_online;
                 }
 
                 if adding_roles && !perms.has_channel_permission(ChannelPermission::MentionRoles) {
