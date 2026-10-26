@@ -221,6 +221,7 @@ pub enum ErrorType {
     },
     FileTypeNotAllowed,
     ImageProcessingFailed,
+    ImageResolutionNotAllowed,
     NoEmbedData,
 
     // ? Legacy errors
