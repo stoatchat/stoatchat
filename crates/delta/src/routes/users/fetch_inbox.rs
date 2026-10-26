@@ -219,6 +219,15 @@ mod test {
         (status, page.map(|p| p.items).unwrap_or_default())
     }
 
+    async fn go_online(user: &Actor) -> u32 {
+        let (_, session_id) = revolt_presence::create_session(&user.user.id, 0).await;
+        session_id
+    }
+
+    async fn go_offline(user: &Actor, session_id: u32) {
+        revolt_presence::delete_session(&user.user.id, session_id).await;
+    }
+
     #[rocket::async_test]
     async fn requires_authentication() {
         let harness = TestHarness::new().await;
@@ -278,6 +287,27 @@ mod test {
         let (status, hidden) = fetch(&harness, &member, "?mentions=false&roles=false&everyone=false").await;
         assert_eq!(status, Status::Ok);
         assert!(hidden.is_empty());
+    }
+
+    /// Poll the inbox until it has `expected` items or the timeout hits.
+    /// Mentions are written by a background task, so a single fetch can race it.
+    async fn wait_for_items(
+        harness: &TestHarness,
+        as_user: &Actor,
+        query: &str,
+        expected: usize,
+    ) -> Vec<v0::InboxEntry> {
+        let mut items = vec![];
+        for _ in 0..40 {
+            let (status, got) = fetch(harness, as_user, query).await;
+            assert_eq!(status, Status::Ok);
+            items = got;
+            if items.len() >= expected {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        items
     }
 
     #[rocket::async_test]
@@ -395,15 +425,52 @@ mod test {
     }
 
     #[rocket::async_test]
-    async fn online_mention_appears_as_everyone() {
+    async fn online_mention_stored_for_online_user() {
         let harness = TestHarness::new().await;
         let (owner, member, channel) = server_setup(&harness).await;
 
+        let session = go_online(&member).await;
         let message = send(&harness, &owner, &channel, "@online standup".to_string()).await;
 
-        let (_, items) = fetch(&harness, &member, "?mentions=false&roles=false&everyone=true").await;
+        let items = wait_for_items(&harness, &member, "?mentions=false&roles=false&everyone=true", 1).await;
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].entry_kind, v0::InboxKind::Everyone);
+        assert_eq!(items[0].message_id, message.id);
+
+        go_offline(&member, session).await;
+    }
+
+    #[rocket::async_test]
+    async fn online_mention_not_stored_for_offline_user() {
+        let harness = TestHarness::new().await;
+        let (owner, member, channel) = server_setup(&harness).await;
+
+        // Offline member gets no @online entry. Send a direct mention afterwards
+        // as a sentinel: once it shows up, earlier queued work has had time to land.
+        send(&harness, &owner, &channel, "@online standup".to_string()).await;
+        send(&harness, &owner, &channel, format!("sentinel <@{}>", member.user.id)).await;
+
+        let items = wait_for_items(&harness, &member, "", 1).await;
+        assert_eq!(items.len(), 1, "only the sentinel mention should be stored");
+        assert_eq!(items[0].entry_kind, v0::InboxKind::Mention);
+    }
+
+    #[rocket::async_test]
+    async fn online_mention_stays_after_user_goes_offline() {
+        let harness = TestHarness::new().await;
+        let (owner, member, channel) = server_setup(&harness).await;
+
+        let session = go_online(&member).await;
+        let message = send(&harness, &owner, &channel, "@online standup".to_string()).await;
+
+        // Wait for it to be stored *before* going offline
+        let items = wait_for_items(&harness, &member, "?mentions=false&roles=false&everyone=true", 1).await;
+        assert_eq!(items.len(), 1);
+
+        go_offline(&member, session).await;
+
+        let items = wait_for_items(&harness, &member, "?mentions=false&roles=false&everyone=true", 1).await;
+        assert_eq!(items.len(), 1);
         assert_eq!(items[0].message_id, message.id);
     }
 
