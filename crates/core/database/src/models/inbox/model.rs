@@ -169,7 +169,7 @@ impl InboxEntry {
         }
 
         let cutoff =
-            bson::DateTime::now().timestamp_millis() - retention_days as i64 * 86_400_000;
+            timestamp_ms(&Timestamp::now_utc()) as i64 - retention_days as i64 * 86_400_000;
         db.delete_inbox_before(cutoff).await
     }
 
@@ -181,7 +181,7 @@ impl InboxEntry {
         let cutoff = if days == 0 {
             ulid_at(0)
         } else {
-            let ms = bson::DateTime::now().timestamp_millis() - days as i64 * 86_400_000;
+            let ms = timestamp_ms(&Timestamp::now_utc()) as i64 - days as i64 * 86_400_000;
             ulid_at(ms.max(0) as u64)
         };
 

@@ -61,6 +61,9 @@ auto_derived_partial!(
         /// Array of message ids this message is replying to
         #[serde(skip_serializing_if = "Option::is_none")]
         pub replies: Option<Vec<String>>,
+        /// User ids added to `mentions` solely because a reply requested a mention
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub reply_mentions: Option<Vec<String>>,
         /// Hashmap of emoji IDs to array of user IDs
         #[serde(skip_serializing_if = "IndexMap::is_empty", default)]
         pub reactions: IndexMap<String, IndexSet<String>>,
@@ -250,6 +253,7 @@ impl Default for Message {
             mentions: None,
             role_mentions: None,
             replies: None,
+            reply_mentions: None,
             reactions: Default::default(),
             interactions: Default::default(),
             masquerade: None,
@@ -439,6 +443,7 @@ impl Message {
 
         // Verify replies are valid.
         let mut replies = Vec::new();
+        let mut reply_mentions: HashSet<String> = HashSet::new();
 
         if let Some(entries) = data.replies {
             if entries.len() > config.features.limits.global.message_replies {
@@ -460,6 +465,7 @@ impl Message {
                     Ok(message) => {
                         if mention && allow_mentions {
                             user_mentions.insert(message.author.to_owned());
+                            reply_mentions.insert(message.author.to_owned());
                         }
 
                         // This is O(n^2), but this is faster than a HashSet
@@ -511,6 +517,10 @@ impl Message {
             }
         }
 
+        // Remember which of the mentions came from a reply (and survived
+        // validation) so an edit can tell them apart from explicit mentions.
+        reply_mentions.retain(|id| user_mentions.contains(id));
+
         if !user_mentions.is_empty() {
             message
                 .mentions
@@ -525,6 +535,12 @@ impl Message {
 
         if !replies.is_empty() {
             message.replies.replace(replies);
+        }
+
+        if !reply_mentions.is_empty() {
+            message
+                .reply_mentions
+                .replace(reply_mentions.into_iter().collect());
         }
 
         // Calculate final message flags
@@ -948,12 +964,15 @@ impl Message {
         let new_parsed = revolt_parser::parse_message(new_content).user_mentions;
         let current: HashSet<String> = self.mentions.clone().unwrap_or_default().into_iter().collect();
 
-        let mut reply_recipients: HashSet<String> = HashSet::new();
-        for id in self.replies.clone().unwrap_or_default() {
-            if let Ok(message) = db.fetch_message(&id).await {
-                reply_recipients.insert(message.author);
-            }
-        }
+        // Only replies that actually requested a mention protect their author
+        // from being dropped; a non-pinging reply must not keep an explicit
+        // mention alive after it is edited out.
+        let reply_recipients: HashSet<String> = self
+            .reply_mentions
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
 
         // Newly @mentioned users, validated like a fresh message
         let mut added: HashSet<String> = new_parsed

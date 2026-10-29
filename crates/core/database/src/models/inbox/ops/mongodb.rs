@@ -112,11 +112,14 @@ impl AbstractInbox for MongoDb {
             return Ok(());
         }
 
-        self.col::<InboxEntry>(COL)
-            .delete_many(doc! { "message_id": { "$in": message_ids } })
-            .await
-            .map(|_| ())
-            .map_err(|_| create_database_error!("delete_many", COL))
+        for chunk in message_ids.chunks(10_000) {
+            self.col::<InboxEntry>(COL)
+                .delete_many(doc! { "message_id": { "$in": chunk } })
+                .await
+                .map_err(|_| create_database_error!("delete_many", COL))?;
+        }
+
+        Ok(())
     }
 
     async fn delete_inbox_for_users(
