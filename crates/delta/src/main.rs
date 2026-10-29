@@ -14,6 +14,7 @@ use revolt_ratelimits::rocket as ratelimiter;
 use rocket::{Build, Rocket};
 use rocket_cors::{AllowedOrigins, CorsOptions};
 use rocket_prometheus::PrometheusMetrics;
+use util::osprey::OspreyClient;
 use std::net::Ipv4Addr;
 use std::str::FromStr;
 
@@ -79,6 +80,13 @@ pub async fn web() -> Rocket<Build> {
     // Ratelimits
     let ratelimits = ratelimiter::RatelimitStorage::new(util::ratelimits::DeltaRatelimits);
 
+    // Osprey
+    let osprey_client = if config.ospreyd.enabled {
+        Some(OspreyClient::connect(config.ospreyd.host.clone()))
+    } else {
+        None
+    };
+
     routes::mount(config, rocket)
         .attach(prometheus.clone())
         .mount("/metrics", prometheus)
@@ -87,6 +95,7 @@ pub async fn web() -> Rocket<Build> {
         .mount("/swagger/", swagger)
         .manage(db)
         .manage(amqp)
+        .manage(osprey_client)
         .manage(cors.clone())
         .manage(voice_client)
         .manage(ratelimits)

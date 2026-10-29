@@ -1,0 +1,31 @@
+[package]
+name = "revolt-ospreyd"
+version = "0.1.0"
+license = "AGPL-3.0-or-later"
+authors = ["Amy Erskine <hello@amyerskine.me>"]
+edition = "2021"
+description = "Revolt Osprey Daemon"
+publish = false
+
+[dependencies]
+# Utility
+tracing = { workspace = true }
+serde = "1.0.228"
+serde_json = "1.0.149"
+ulid = "0.4.1"
+chrono = "0.4.15"
+
+# Async
+tokio = { workspace = true }
+axum = { workspace = true }
+axum-macros = "0.5.0"
+
+# Kafka
+rdkafka = "0.39.0"
+
+
+# Core
+revolt-result = { path = "../../core/result" }
+revolt-config = { path = "../../core/config" }
+revolt-database = { path = "../../core/database" }
+revolt-models = { path = "../../core/models" }

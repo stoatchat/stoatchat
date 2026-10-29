@@ -5,7 +5,7 @@ WORKDIR /home/rust/src
 
 ARG TARGETARCH
 
-ARG CARGO_BUILD_JOBS=10
+ARG CARGO_BUILD_JOBS=5
 ENV CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}
 
 # Install build requirements
@@ -13,6 +13,7 @@ RUN dpkg --add-architecture "${TARGETARCH}"
 RUN apt-get update && \
     apt-get install -y \
     make \
+    g++ \
     pkg-config \
     libdav1d-dev:"${TARGETARCH}" \
     libssl-dev:"${TARGETARCH}"
@@ -39,6 +40,7 @@ COPY crates/services/january/Cargo.toml ./crates/services/january/
 COPY crates/services/gifbox/Cargo.toml ./crates/services/gifbox/
 COPY crates/daemons/crond/Cargo.toml ./crates/daemons/crond/
 COPY crates/daemons/pushd/Cargo.toml ./crates/daemons/pushd/
+COPY crates/daemons/ospreyd/Cargo.toml ./crates/daemons/ospreyd/
 COPY crates/daemons/voice-ingress/Cargo.toml ./crates/daemons/voice-ingress/
 RUN sh /tmp/build-image-layer.sh deps
 

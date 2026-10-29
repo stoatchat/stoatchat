@@ -42,6 +42,7 @@ deps() {
     crates/services/gifbox/src \
     crates/daemons/crond/src \
     crates/daemons/pushd/src \
+    crates/daemons/ospreyd/src \
     crates/daemons/voice-ingress/src
   echo 'fn main() { panic!("stub"); }' |
     tee crates/bonfire/src/main.rs |
@@ -51,6 +52,7 @@ deps() {
     tee crates/services/gifbox/src/main.rs |
     tee crates/daemons/crond/src/main.rs |
     tee crates/daemons/pushd/src/main.rs |
+    tee crates/daemons/ospreyd/src/main.rs \
     tee crates/daemons/voice-ingress/src/main.rs
   echo '' |
     tee crates/core/config/src/lib.rs |
