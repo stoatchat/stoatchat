@@ -948,6 +948,13 @@ impl Message {
         let new_parsed = revolt_parser::parse_message(new_content).user_mentions;
         let current: HashSet<String> = self.mentions.clone().unwrap_or_default().into_iter().collect();
 
+        let mut reply_recipients: HashSet<String> = HashSet::new();
+        for id in self.replies.clone().unwrap_or_default() {
+            if let Ok(message) = db.fetch_message(&id).await {
+                reply_recipients.insert(message.author);
+            }
+        }
+
         // Newly @mentioned users, validated like a fresh message
         let mut added: HashSet<String> = new_parsed
             .iter()
@@ -958,10 +965,13 @@ impl Message {
             Message::retain_valid_mentions(db, channel, &mut added).await?;
         }
 
-        // Users whose @mention was deleted from the body.
         let removed: HashSet<String> = old_parsed
             .iter()
-            .filter(|m| !new_parsed.contains(*m) && current.contains(*m))
+            .filter(|m| {
+                !new_parsed.contains(*m)
+                    && current.contains(*m)
+                    && !reply_recipients.contains(*m)
+            })
             .cloned()
             .collect();
 
@@ -1023,23 +1033,31 @@ impl Message {
 
         let mut mentions_everyone = parsed.mentions_everyone || explicit_everyone;
 
+        let had_online = old_flags.has(MessageFlags::MentionsOnline);
+        let explicit_online = had_online && !old_parsed.mentions_online;
+
+        let mut mentions_online = parsed.mentions_online || explicit_online;
+
         let adding_everyone = parsed.mentions_everyone && !had_everyone;
+        let adding_online = parsed.mentions_online && !had_online;
         let adding_roles = !role_mentions.is_empty()
             && self
                 .role_mentions
                 .as_ref()
                 .is_none_or(|old| role_mentions.iter().any(|r| !old.contains(r)));
 
-        if adding_everyone || adding_roles {
+        if adding_everyone || adding_online || adding_roles {
             if !allow_mass_mentions {
                 mentions_everyone = explicit_everyone;
+                mentions_online = explicit_online;
                 role_mentions.clear();
             } else if let Ok(user) = db.fetch_user(&self.author).await {
                 let (can_mention_everyone, can_mention_roles) =
                     Message::mass_mention_channel_permissions(db, channel, &user).await;
 
-                if adding_everyone && !can_mention_everyone {
+                if (adding_everyone || adding_online) && !can_mention_everyone {
                     mentions_everyone = explicit_everyone;
+                    mentions_online = explicit_online;
                 }
 
                 if adding_roles && !can_mention_roles {
@@ -1048,7 +1066,13 @@ impl Message {
             }
         }
 
-        new_flags.set(MessageFlags::MentionsEveryone, mentions_everyone);
+        if mentions_everyone {
+            mentions_online = false;
+        }
+
+        new_flags
+            .set(MessageFlags::MentionsEveryone, mentions_everyone)
+            .set(MessageFlags::MentionsOnline, mentions_online);
 
         partial.role_mentions = Some(role_mentions.into_iter().collect());
         partial.flags = Some(new_flags.0);

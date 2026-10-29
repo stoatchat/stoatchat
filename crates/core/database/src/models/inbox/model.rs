@@ -351,7 +351,11 @@ impl InboxEntry {
             }
             raw.retain(|i| {
                 if i.entry_kind == InboxKind::Mention {
-                    return true;
+                    return i
+                        .message
+                        .as_ref()
+                        .and_then(|m| m.mentions.as_ref())
+                        .is_some_and(|mentions| mentions.contains(&user.id));
                 }
                 i.server_id
                     .as_ref()
