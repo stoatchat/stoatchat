@@ -12,10 +12,10 @@ use axum::{
 };
 use axum_typed_multipart::{FieldData, TryFromMultipart, TypedMultipart};
 use lazy_static::lazy_static;
-use revolt_config::{config, report_internal_error};
+use revolt_config::{config, report_internal_error, FilesLimit};
 use revolt_database::{iso8601_timestamp::Timestamp, Database, FileHash, Metadata, User};
 use revolt_files::{
-    create_thumbnail, decode_image, fetch_from_s3, is_animated, upload_to_s3,
+    create_thumbnail, decode_image, fetch_from_s3, image_size, is_animated, upload_to_s3,
     AUTHENTICATION_TAG_SIZE_BYTES,
 };
 use revolt_result::{create_error, Error, Result, ToRevoltError};
@@ -246,6 +246,12 @@ async fn upload_file(
         return Err(create_error!(FileTypeNotAllowed));
     }
 
+    if let Some((width, height)) = image_size(&file.contents)
+        && !image_within_limits(width, height, &config.files.limit)
+    {
+        return Err(create_error!(ImageResolutionNotAllowed));
+    }
+
     // Determine metadata for the file
     let metadata = generate_metadata(&file.contents, mime_type);
 
@@ -337,6 +343,15 @@ async fn upload_file(
         .await?;
 
     Ok(Json(UploadResponse { id }))
+}
+
+/// Check whether the given image dimensions satisfy the configured file limits.
+fn image_within_limits(width: usize, height: usize, limits: &FilesLimit) -> bool {
+    width <= limits.max_pixel_side
+        && height <= limits.max_pixel_side
+        && width.saturating_mul(height) <= limits.max_mega_pixels.saturating_mul(1_000_000)
+        && width >= limits.min_resolution[0]
+        && height >= limits.min_resolution[1]
 }
 
 /// Header value used for cache control
@@ -575,4 +590,47 @@ async fn fetch_file_mod(
         )
             .into_response()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::image_within_limits;
+    use revolt_config::FilesLimit;
+
+    fn limits() -> FilesLimit {
+        FilesLimit {
+            min_file_size: 1,
+            min_resolution: [1, 1],
+            max_mega_pixels: 40,
+            max_pixel_side: 10_000,
+        }
+    }
+
+    #[test]
+    fn accepts_images_within_limits() {
+        let limits = limits();
+        assert!(image_within_limits(1920, 1080, &limits));
+        assert!(image_within_limits(10_000, 1, &limits));
+        assert!(image_within_limits(6324, 6324, &limits));
+    }
+
+    #[test]
+    fn rejects_images_exceeding_pixel_side() {
+        assert!(!image_within_limits(10_001, 100, &limits()));
+        assert!(!image_within_limits(100, 10_001, &limits()));
+    }
+
+    #[test]
+    fn rejects_images_exceeding_mega_pixels() {
+        // 40 MP is the limit, anything above must be rejected even if each side
+        // is within max_pixel_side.
+        assert!(!image_within_limits(6325, 6325, &limits()));
+        assert!(!image_within_limits(10_000, 10_000, &limits()));
+    }
+
+    #[test]
+    fn rejects_images_below_min_resolution() {
+        assert!(!image_within_limits(0, 100, &limits()));
+        assert!(!image_within_limits(100, 0, &limits()));
+    }
 }
