@@ -125,40 +125,67 @@ pub async fn handle_ack_event(
                 Ok(TextChannel { .. })
             );
 
-            let current_mentions: HashMap<String, HashSet<String>> = if is_text_channel {
-                let ids: Vec<String> = messages
-                    .iter()
-                    .map(|(_, message, _, _)| message.id.clone())
-                    .collect::<HashSet<_>>()
-                    .into_iter()
-                    .collect();
+            let ids: Vec<String> = messages
+                .iter()
+                .map(|(_, message, _, _)| message.id.clone())
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .collect();
 
-                match db.fetch_messages_by_id(&ids).await {
-                    Ok(fresh) => fresh
-                        .into_iter()
-                        .map(|message| {
-                            (
-                                message.id.clone(),
-                                message.mentions.unwrap_or_default().into_iter().collect(),
-                            )
-                        })
-                        .collect(),
-                    Err(err) => {
-                        revolt_config::capture_error(&err);
-                        HashMap::new()
+            let mut existing: HashSet<String> = HashSet::new();
+            let mut current_mentions: HashMap<String, HashSet<String>> = HashMap::new();
+
+            let original_mentions: HashMap<String, HashSet<String>> = messages
+                .iter()
+                .map(|(_, message, _, _)| {
+                    (
+                        message.id.clone(),
+                        message.mentions.clone().unwrap_or_default().into_iter().collect(),
+                    )
+                })
+                .collect();
+
+            let fetched = match db.fetch_messages_by_id(&ids).await {
+                Ok(fresh) => {
+                    for message in fresh {
+                        existing.insert(message.id.clone());
+                        current_mentions.insert(
+                            message.id.clone(),
+                            message.mentions.unwrap_or_default().into_iter().collect(),
+                        );
                     }
+
+                    true
                 }
-            } else {
-                HashMap::new()
+                Err(err) => {
+                    revolt_config::capture_error(&err);
+                    existing.extend(ids.iter().cloned());
+                    false
+                }
             };
 
             let is_recipient = |message_id: &str, user: &str| -> bool {
-                if !is_text_channel {
-                    return true;
+                if !fetched {
+                    return !is_text_channel;
                 }
-                current_mentions
+
+                if !existing.contains(message_id) {
+                    return false;
+                }
+
+                let now = current_mentions
                     .get(message_id)
-                    .is_some_and(|mentions| mentions.contains(user))
+                    .is_some_and(|mentions| mentions.contains(user));
+
+                if is_text_channel {
+                    return now;
+                }
+
+                let was = original_mentions
+                    .get(message_id)
+                    .is_some_and(|mentions| mentions.contains(user));
+
+                !(was && !now)
             };
 
             let mut users: HashSet<&String> = HashSet::new();

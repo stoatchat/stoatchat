@@ -9,8 +9,8 @@ use std::time::SystemTime;
 use ulid::Ulid;
 
 use crate::{
-    AbstractInbox, AppendMessage, DocumentId, FieldsMessage, InboxFilter, IntoDocumentPath,
-    Message, MessageQuery, MessageTimePeriod, MongoDb, PartialMessage,
+    AbstractChannelUnreads, AbstractInbox, AppendMessage, DocumentId, FieldsMessage, InboxFilter,
+    IntoDocumentPath, Message, MessageQuery, MessageTimePeriod, MongoDb, PartialMessage,
 };
 
 use super::AbstractMessages;
@@ -445,6 +445,10 @@ impl AbstractMessages for MongoDb {
             {
                 revolt_config::capture_error(&err);
             }
+
+            if let Err(err) = self.remove_mentions_for_messages(&ids).await {
+                revolt_config::capture_error(&err);
+            }
         }
 
         Ok(())
@@ -460,24 +464,24 @@ impl AbstractMessages for MongoDb {
         let clauses: Vec<Document> = roles
             .iter()
             .map(|(role_id, since)| {
-                let mut id_range = doc! { "$gt": after };
-                if let Some(before) = before {
-                    id_range.insert("$lt", before);
-                }
-
+                let lower = since.as_str().max(after);
                 let anchor_path = format!("role_mention_ids.{role_id}");
+
                 let mut anchored = Document::new();
-                anchored.insert(anchor_path.clone(), doc! { "$gt": since });
+                anchored.insert(anchor_path.clone(), doc! { "$gt": lower });
 
                 let mut legacy = Document::new();
-                legacy.insert("_id".to_string(), doc! { "$gt": since });
+                legacy.insert("_id".to_string(), doc! { "$gt": lower });
                 legacy.insert(anchor_path, doc! { "$exists": false });
 
-                doc! {
+                let mut clause = doc! {
                     "role_mentions": role_id,
-                    "_id": id_range,
                     "$or": [anchored, legacy],
+                };
+                if let Some(before) = before {
+                    clause.insert("_id", doc! { "$lt": before });
                 }
+                clause
             })
             .collect();
 
@@ -508,19 +512,24 @@ impl AbstractMessages for MongoDb {
             return Ok(vec![]);
         }
 
-        let mut id_range = doc! { "$gt": after };
+        let mut filter = doc! {
+            "channel": { "$in": channel_ids },
+            "flags": { "$gte": 4, "$bitsAllSet": 4 },
+            "author": { "$ne": exclude_author },
+            // Retention uses the moment @everyone was introduced, falling back
+            // to the message id for legacy messages without an anchor.
+            "$or": [
+                { "everyone_mention_id": { "$gt": after } },
+                { "everyone_mention_id": { "$exists": false }, "_id": { "$gt": after } },
+            ],
+        };
         if let Some(before) = before {
-            id_range.insert("$lt", before);
+            filter.insert("_id", doc! { "$lt": before });
         }
 
         Ok(self
             .col::<Message>(COL)
-            .find(doc! {
-                "channel": { "$in": channel_ids },
-                "flags": { "$gte": 4, "$bitsAllSet": 4 },
-                "author": { "$ne": exclude_author },
-                "_id": id_range,
-            })
+            .find(filter)
             .sort(doc! { "_id": -1 })
             .limit(limit)
             .await

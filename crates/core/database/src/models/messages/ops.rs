@@ -54,10 +54,6 @@ pub trait AbstractMessages: Sync + Send {
     async fn delete_messages_by_user(&self, user_id: &str) -> Result<()>;
 
     /// Messages that mention any of the given roles.
-    ///
-    /// Each entry is `(role_id, since)` where `since` is a message id lower bound
-    /// for that role (the point the user was given the role), so mentions that
-    /// predate the assignment are not returned. `after` is a global lower bound.
     async fn fetch_role_mention_messages(
         &self,
         roles: &[(String, String)],

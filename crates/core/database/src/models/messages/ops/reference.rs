@@ -1,6 +1,6 @@
 use crate::{
-    AbstractInbox, AppendMessage, FieldsMessage, InboxFilter, Message, MessageQuery,
-    PartialMessage, ReferenceDb,
+    AbstractChannelUnreads, AbstractInbox, AppendMessage, FieldsMessage, InboxFilter, Message,
+    MessageQuery, PartialMessage, ReferenceDb,
 };
 use futures::future::try_join_all;
 use indexmap::IndexSet;
@@ -370,6 +370,7 @@ impl AbstractMessages for ReferenceDb {
         if !ids.is_empty() {
             self.delete_inbox_where(InboxFilter::new().messages(&ids))
                 .await?;
+            self.remove_mentions_for_messages(&ids).await?;
         }
 
         // TODO: remove attachments as well
@@ -394,7 +395,6 @@ impl AbstractMessages for ReferenceDb {
             messages.values(),
             None,
             exclude_author,
-            after,
             before,
             limit,
             |m| {
@@ -409,7 +409,7 @@ impl AbstractMessages for ReferenceDb {
                             .and_then(|ids| ids.get(role_id))
                             .map(String::as_str)
                             .unwrap_or(m.id.as_str());
-                        anchor > since.as_str()
+                        anchor > since.as_str().max(after)
                     })
                 })
             },
@@ -433,20 +433,25 @@ impl AbstractMessages for ReferenceDb {
             messages.values(),
             Some(channel_ids),
             exclude_author,
-            after,
             before,
             limit,
-            |m| m.flags.unwrap_or(0) & 4 != 0,
+            |m| {
+                m.flags.unwrap_or(0) & 4 != 0
+                    && m
+                        .everyone_mention_id
+                        .as_deref()
+                        .unwrap_or(m.id.as_str())
+                        > after
+            },
         ))
     }
 }
 
-/// Shared filter for the inbox queries: channel, author, `_id` range, newest first, limited
+/// Shared filter for the inbox queries: channel, author, pagination, newest first, limited
 fn collect_mentions<'a>(
     messages: impl Iterator<Item = &'a Message>,
     channel_ids: Option<&[String]>,
     exclude_author: &str,
-    after: &str,
     before: Option<&str>,
     limit: i64,
     matches: impl Fn(&Message) -> bool,
@@ -461,7 +466,6 @@ fn collect_mentions<'a>(
                 .map_or(true, |ids| ids.contains(&m.channel))
         })
         .filter(|m| m.author != exclude_author)
-        .filter(|m| m.id.as_str() > after)
         .filter(|m| before.map_or(true, |b| m.id.as_str() < b))
         .filter(|m| matches(m))
         .cloned()

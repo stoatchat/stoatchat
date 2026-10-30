@@ -1,4 +1,4 @@
-use revolt_result::Result;
+use revolt_result::{ErrorType, Result};
 use ulid::Ulid;
 use std::collections::{HashMap, HashSet};
 
@@ -128,7 +128,39 @@ impl InboxEntry {
             .map(|id| InboxEntry::new(InboxKind::Mention, id.clone(), message_id, channel_id, server_id))
             .collect();
 
-        db.insert_inbox(items).await
+        if items.is_empty() {
+            return Ok(());
+        }
+
+        let mut stale: Vec<String> = items.iter().map(|item| item.user_id.clone()).collect();
+        db.insert_inbox(items).await?;
+
+        match db.fetch_message(message_id).await {
+            Ok(message) => {
+                let valid: HashSet<String> =
+                    message.mentions.unwrap_or_default().into_iter().collect();
+                stale.retain(|user| !valid.contains(user));
+
+                if stale.is_empty() {
+                    return Ok(());
+                }
+
+                db.delete_inbox_where(
+                    InboxFilter::new()
+                        .message(message_id)
+                        .users(&stale),
+                )
+                .await
+            }
+            Err(err) if matches!(err.error_type, ErrorType::NotFound) => {
+                db.delete_inbox_where(InboxFilter::new().message(message_id))
+                    .await
+            }
+            Err(err) => {
+                revolt_config::capture_error(&err);
+                Ok(())
+            }
+        }
     }
 
     /// Sync inbox entries after a message edit: drop removed mentions, add new ones
@@ -155,14 +187,26 @@ impl InboxEntry {
         )
         .await?;
 
+        db.remove_mentions_for_users(channel_id, &removed, &[message_id.to_string()])
+            .await?;
+
         InboxEntry::create_for_mentions(db, author_id, message_id, channel_id, server_id, &added)
             .await
     }
 
     /// Delete all inbox entries for multiple messages
-    pub async fn delete_for_messages(db: &Database, message_ids: &[String]) -> Result<()> {
+    pub async fn delete_for_messages(
+        db: &Database,
+        channel_id: Option<&str>,
+        message_ids: &[String],
+    ) -> Result<()> {
         db.delete_inbox_where(InboxFilter::new().messages(message_ids))
-            .await
+            .await?;
+
+        match channel_id {
+            Some(channel_id) => db.remove_mentions_in_channel(channel_id, message_ids).await,
+            None => db.remove_mentions_for_messages(message_ids).await,
+        }
     }
 
     pub async fn delete_for_channels(db: &Database, channel_ids: &[String]) -> Result<()> {

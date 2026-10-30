@@ -73,6 +73,26 @@ pub trait AbstractChannelUnreads: AbstractInbox + Sync + Send {
         Ok(unreads.into_iter().next())
     }
 
+    /// Remove specific message IDs from stored mention lists.
+    async fn remove_mentions_for_users(
+        &self,
+        channel_id: &str,
+        user_ids: &[String],
+        message_ids: &[String],
+    ) -> Result<()>;
+
+    /// Remove specific message IDs from stored mention lists across all users
+    /// in one channel. Used when messages are deleted.
+    async fn remove_mentions_in_channel(
+        &self,
+        channel_id: &str,
+        message_ids: &[String],
+    ) -> Result<()>;
+
+    /// Remove specific message IDs from stored mention lists across all channels
+    /// and users. Used for account deletion where no single channel is known.
+    async fn remove_mentions_for_messages(&self, message_ids: &[String]) -> Result<()>;
+
     /// Read the unread row without deriving mention state.
     async fn fetch_unreads_raw(&self, user_id: &str) -> Result<Vec<ChannelUnread>>;
 

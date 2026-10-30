@@ -110,6 +110,95 @@ impl AbstractChannelUnreads for ReferenceDb {
         Ok(())
     }
 
+    /// Remove specific message IDs from stored mention lists for the given users.
+    async fn remove_mentions_for_users(
+        &self,
+        channel_id: &str,
+        user_ids: &[String],
+        message_ids: &[String],
+    ) -> Result<()> {
+        if user_ids.is_empty() || message_ids.is_empty() {
+            return Ok(());
+        }
+
+        let mut unreads = self.channel_unreads.lock().await;
+        for unread in unreads.values_mut() {
+            if unread.id.channel != channel_id || !user_ids.contains(&unread.id.user) {
+                continue;
+            }
+
+            let empty = match unread.mentions.as_mut() {
+                Some(mentions) => {
+                    mentions.retain(|id| !message_ids.contains(id));
+                    mentions.is_empty()
+                }
+                None => false,
+            };
+
+            if empty {
+                unread.mentions = None;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Remove specific message IDs from stored mention lists across one channel.
+    async fn remove_mentions_in_channel(
+        &self,
+        channel_id: &str,
+        message_ids: &[String],
+    ) -> Result<()> {
+        if message_ids.is_empty() {
+            return Ok(());
+        }
+
+        let mut unreads = self.channel_unreads.lock().await;
+        for unread in unreads.values_mut() {
+            if unread.id.channel != channel_id {
+                continue;
+            }
+
+            let empty = match unread.mentions.as_mut() {
+                Some(mentions) => {
+                    mentions.retain(|id| !message_ids.contains(id));
+                    mentions.is_empty()
+                }
+                None => false,
+            };
+
+            if empty {
+                unread.mentions = None;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Remove specific message IDs from stored mention lists across all rows.
+    async fn remove_mentions_for_messages(&self, message_ids: &[String]) -> Result<()> {
+        if message_ids.is_empty() {
+            return Ok(());
+        }
+
+        let mut unreads = self.channel_unreads.lock().await;
+        for unread in unreads.values_mut() {
+            let empty = match unread.mentions.as_mut() {
+                Some(mentions) => {
+                    mentions.retain(|id| !message_ids.contains(id));
+                    mentions.is_empty()
+                }
+                None => false,
+            };
+
+            if empty {
+                unread.mentions = None;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Read all channel unreads for a user without deriving mentions.
     async fn fetch_unreads_raw(&self, user_id: &str) -> Result<Vec<ChannelUnread>> {
         let unreads = self.channel_unreads.lock().await;

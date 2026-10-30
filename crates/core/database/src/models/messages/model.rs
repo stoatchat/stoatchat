@@ -1110,8 +1110,11 @@ impl Message {
                 let (can_mention_everyone, can_mention_roles) =
                     Message::mass_mention_channel_permissions(db, channel, &user).await;
 
-                if (adding_everyone || adding_online) && !can_mention_everyone {
+                if adding_everyone && !can_mention_everyone {
                     mentions_everyone = explicit_everyone;
+                }
+
+                if adding_online && !can_mention_everyone {
                     mentions_online = explicit_online;
                 }
 
@@ -1401,7 +1404,9 @@ impl Message {
 
         db.delete_message(&self.id).await?;
 
-        if let Err(err) = InboxEntry::delete_for_messages(db, &[self.id.clone()]).await {
+        if let Err(err) =
+            InboxEntry::delete_for_messages(db, Some(&self.channel), &[self.id.clone()]).await
+        {
             revolt_config::capture_error(&err);
         }
 
@@ -1463,7 +1468,9 @@ impl Message {
         db.delete_messages(channel, &valid_ids).await?;
 
         if !valid_ids.is_empty() {
-            if let Err(err) = InboxEntry::delete_for_messages(db, &valid_ids).await {
+            if let Err(err) =
+                InboxEntry::delete_for_messages(db, Some(channel), &valid_ids).await
+            {
                 revolt_config::capture_error(&err);
             }
         }
@@ -1488,11 +1495,13 @@ impl Message {
             .delete_messages_by_author_since(channels, author, since)
             .await?;
 
-        let mut all_deleted_ids = Vec::new();
-
         for (channel_id, message_ids) in deleted_groups {
             if !message_ids.is_empty() {
-                all_deleted_ids.extend(message_ids.clone());
+                if let Err(err) =
+                    InboxEntry::delete_for_messages(db, Some(&channel_id), &message_ids).await
+                {
+                    revolt_config::capture_error(&err);
+                }
 
                 EventV1::BulkMessageDelete {
                     channel: channel_id.clone(),
@@ -1500,12 +1509,6 @@ impl Message {
                 }
                 .p(channel_id)
                 .await;
-            }
-        }
-
-        if !all_deleted_ids.is_empty() {
-            if let Err(err) = InboxEntry::delete_for_messages(db, &all_deleted_ids).await {
-                revolt_config::capture_error(&err);
             }
         }
 
