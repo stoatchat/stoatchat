@@ -1,9 +1,9 @@
 use std::time::Duration;
 
-use log::info;
+use log::{info, warn};
 use revolt_database::Database;
 use revolt_files::delete_from_s3;
-use revolt_result::Result;
+use revolt_result::{ErrorType, Result};
 use tokio::time::sleep;
 
 pub async fn task(db: Database, _: revolt_database::AMQP) -> Result<()> {
@@ -12,18 +12,25 @@ pub async fn task(db: Database, _: revolt_database::AMQP) -> Result<()> {
 
         for file in files {
             if let Some(hash) = &file.hash {
-                let count = db.count_file_hash_references(hash).await?;
+                match db.fetch_attachment_hash(hash).await {
+                    Ok(file_hash) => {
+                        let count = db.count_file_hash_references(&file_hash).await?;
 
-                // No other files reference this file on disk anymore
-                if count <= 1 {
-                    let file_hash = db.fetch_attachment_hash(hash).await?;
+                        // No other files reference this file on disk anymore
+                        if count <= 1 {
+                            // Delete from S3
+                            delete_from_s3(&file_hash.bucket_id, &file_hash.path).await?;
 
-                    // Delete from S3
-                    delete_from_s3(&file_hash.bucket_id, &file_hash.path).await?;
-
-                    // Delete the hash
-                    db.delete_attachment_hash(&file_hash.id).await?;
-                    info!("Deleted file hash {}", file_hash.id);
+                            // Delete the hash
+                            db.delete_attachment_hash(&file_hash.id).await?;
+                            info!("Deleted file hash {}", file_hash.id);
+                        }
+                    }
+                    // Hash is already gone
+                    Err(error) if matches!(error.error_type, ErrorType::NotFound) => {
+                        warn!("File {} references missing hash {hash}", file.id);
+                    }
+                    Err(error) => return Err(error),
                 }
             }
 

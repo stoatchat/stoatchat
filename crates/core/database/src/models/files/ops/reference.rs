@@ -1,6 +1,7 @@
 use revolt_result::Result;
 
 use crate::File;
+use crate::FileHash;
 use crate::FileUsedFor;
 use crate::ReferenceDb;
 
@@ -58,13 +59,16 @@ impl AbstractAttachments for ReferenceDb {
             .collect())
     }
 
-    /// Count references to a given hash.
-    async fn count_file_hash_references(&self, hash: &str) -> Result<usize> {
+    /// Count references to a given hash, by either its original or processed hash.
+    async fn count_file_hash_references(&self, hash: &FileHash) -> Result<usize> {
         let files = self.files.lock().await;
         Ok(files
             .values()
-            .filter(|file| file.hash.as_ref().is_some_and(|h| h == hash))
-            .cloned()
+            .filter(|file| {
+                file.hash
+                    .as_ref()
+                    .is_some_and(|h| h == &hash.id || h == &hash.processed_hash)
+            })
             .count())
     }
 
