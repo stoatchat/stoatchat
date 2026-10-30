@@ -20,6 +20,34 @@ mod tests {
 
             // Migrate the existing database
             db.migrate_database().await.unwrap();
+
+            // The required inbox indexes must exist after migration.
+            #[cfg(feature = "mongodb")]
+            if let crate::Database::MongoDb(db) = &db {
+                use bson::doc;
+
+                let result = db
+                    .db()
+                    .run_command(doc! { "listIndexes": "inbox" })
+                    .await
+                    .expect("list inbox indexes");
+
+                let indexes = result
+                    .get_document("cursor")
+                    .expect("cursor")
+                    .get_array("firstBatch")
+                    .expect("firstBatch");
+
+                for required in ["user_message", "message", "channel", "server"] {
+                    let found = indexes.iter().any(|index| {
+                        index.as_document().is_some_and(|index| {
+                            index.get_str("name").ok() == Some(required)
+                        })
+                    });
+
+                    assert!(found, "missing required inbox index {required}");
+                }
+            }
         });
     }
 }

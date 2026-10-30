@@ -56,6 +56,7 @@ pub async fn migrate_database(db: &MongoDb) {
             .expect("Failed to commit migration information.");
 
         info!("Migration complete. Currently at revision {}.", revision);
+
     } else {
         panic!("Database was configured incorrectly, possibly because initalization failed.")
     }
@@ -1602,56 +1603,31 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
     };
 
     if revision <= 55 {
-        info!("Running migration [revision 55]: create inbox indexes.");
-        db.db().create_collection("inbox").await.ok();
-        db.db()
-            .run_command(doc! {
-                "createIndexes": "inbox",
-                "indexes": [
-                    {
-                        "key": { "user_id": 1, "message_id": 1 },
-                        "name": "user_message_unique",
-                        "unique": true
-                    },
-                    {
-                        "key": { "message_id": 1 },
-                        "name": "message_id"
-                    },
-                    {
-                        "key": { "channel_id": 1 },
-                        "name": "channel_id"
-                    },
-                    {
-                        "key": { "user_id": 1, "created_at": -1 },
-                        "name": "user_created"
-                    },
-                    {
-                        "key": { "created_at": 1 },
-                        "name": "created_at"
-                    },
-                ]
-            })
+        info!("Running migration [revision 55 / 31/10/2026]: create inbox indexes.");
+        db.db().run_command(doc! {
+        "createIndexes": "inbox",
+        "indexes": [
+            {
+                "key": { "user_id": 1_i32, "message_id": -1_i32 },
+                "name": "user_message"
+            },
+            {
+                "key": { "message_id": 1_i32 },
+                "name": "message"
+            },
+            {
+                "key": { "channel_id": 1_i32 },
+                "name": "channel"
+            },
+            {
+                "key": { "server_id": 1_i32 },
+                "name": "server",
+                "sparse": true
+            }
+        ]
+    })
             .await
-            .expect("Failed to create inbox indexes");
-
-        db.db()
-            .run_command(doc! {
-                "createIndexes": "messages",
-                "indexes": [
-                    {
-                        "key": { "role_mentions": 1, "_id": -1 },
-                        "name": "role_mentions_id",
-                        "partialFilterExpression": { "role_mentions": { "$exists": true } }
-                    },
-                    {
-                        "key": { "channel": 1_i32, "_id": -1_i32 },
-                        "name": "mass_mentions",
-                        "partialFilterExpression": { "flags": { "$gte": 4 } }
-                    },
-                ]
-            })
-            .await
-            .expect("Failed to create messages role_mentions index");
+            .expect("Failed to create inbox indexes.");
     }
 
     // Reminder to update LATEST_REVISION when adding new migrations.

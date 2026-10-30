@@ -112,12 +112,6 @@ pub struct GlobalLimits {
 
     /// Number of days after creation before an invite expires
     max_invite_duration_days: i64,
-
-    /// Number of days a notification will be kept
-    inbox_retention_days: i64,
-
-    /// Maximum number of notifications kept per user
-    inbox_max_per_user: i64,
 }
 
 /// # User Limits
@@ -245,8 +239,6 @@ pub async fn root() -> Result<Json<RevoltConfig>> {
                         .restrict_server_creation,
                     new_user_hours: config.features.limits.global.new_user_hours as i64,
                     max_invite_duration_days: config.features.limits.global.max_invite_duration_days as i64,
-                    inbox_retention_days: config.features.limits.global.inbox_retention_days as i64,
-                    inbox_max_per_user: config.features.limits.global.inbox_max_per_user as i64,
                 },
                 new_user: UserLimits::from_feature_limits(config.features.limits.new_user),
                 default: UserLimits::from_feature_limits(config.features.limits.default),

@@ -433,56 +433,30 @@ pub async fn create_database(db: &MongoDb) {
     .await
     .expect("Failed to create discover_requests index");
 
-    db.create_collection("inbox")
-        .await
-        .expect("Failed to create inbox collection.");
-
     db.run_command(doc! {
         "createIndexes": "inbox",
         "indexes": [
             {
-                "key": { "user_id": 1, "message_id": 1 },
-                "name": "user_message_unique",
-                "unique": true
+                "key": { "user_id": 1_i32, "message_id": -1_i32 },
+                "name": "user_message"
             },
             {
-                "key": { "message_id": 1 },
-                "name": "message_id"
+                "key": { "message_id": 1_i32 },
+                "name": "message"
             },
             {
-                "key": { "channel_id": 1 },
-                "name": "channel_id"
+                "key": { "channel_id": 1_i32 },
+                "name": "channel"
             },
             {
-                "key": { "user_id": 1, "created_at": -1 },
-                "name": "user_created"
-            },
-            {
-                "key": { "created_at": 1 },
-                "name": "created_at"
+                "key": { "server_id": 1_i32 },
+                "name": "server",
+                "sparse": true
             }
         ]
     })
-    .await
-    .expect("Failed to create inbox index");
-
-    db.run_command(doc! {
-        "createIndexes": "messages",
-        "indexes": [
-            {
-                "key": { "role_mentions": 1, "_id": -1 },
-                "name": "role_mentions_id",
-                "partialFilterExpression": { "role_mentions": { "$exists": true } }
-            },
-            {
-                "key": { "channel": 1_i32, "_id": -1_i32 },
-                "name": "mass_mentions",
-                "partialFilterExpression": { "flags": { "$gte": 4 } }
-            },
-        ]
-    })
-    .await
-    .expect("Failed to create message index.");
+        .await
+        .expect("Failed to create inbox indexes.");
 
     info!("Created database.");
 }

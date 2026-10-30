@@ -11,7 +11,6 @@ mod discover_requests;
 mod emojis;
 mod file_hashes;
 mod files;
-mod inbox;
 mod messages;
 mod mfa_tickets;
 mod policy_changes;
@@ -24,6 +23,7 @@ mod servers;
 mod sessions;
 mod user_settings;
 mod users;
+mod inbox;
 
 pub use account_invites::*;
 pub use accounts::*;
@@ -38,7 +38,6 @@ pub use discover_requests::*;
 pub use emojis::*;
 pub use file_hashes::*;
 pub use files::*;
-pub use inbox::*;
 pub use messages::*;
 pub use mfa_tickets::*;
 pub use policy_changes::*;
@@ -51,6 +50,7 @@ pub use servers::*;
 pub use sessions::*;
 pub use user_settings::*;
 pub use users::*;
+pub use inbox::*;
 
 use crate::{Database, ReferenceDb};
 

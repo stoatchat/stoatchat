@@ -1742,3 +1742,13 @@ impl From<crate::PartialEmoji> for PartialEmoji {
         PartialEmoji { name: value.name }
     }
 }
+
+impl From<crate::InboxKind> for InboxKind {
+    fn from(kind: crate::InboxKind) -> Self {
+        match kind {
+            crate::InboxKind::Mention => InboxKind::Mention,
+            crate::InboxKind::Role => InboxKind::Role,
+            crate::InboxKind::Everyone => InboxKind::Everyone,
+        }
+    }
+}

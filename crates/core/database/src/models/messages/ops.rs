@@ -13,6 +13,7 @@ pub trait AbstractMessages: Sync + Send {
     /// Insert a new message into the database
     async fn insert_message(&self, message: &Message) -> Result<()>;
 
+
     /// Fetch a message by its id
     async fn fetch_message(&self, id: &str) -> Result<Message>;
 
@@ -53,10 +54,22 @@ pub trait AbstractMessages: Sync + Send {
 
     async fn delete_messages_by_user(&self, user_id: &str) -> Result<()>;
 
+    /// Messages that directly mention the given user.
+    async fn fetch_direct_mention_messages(
+        &self,
+        user_id: &str,
+        exclude_author: &str,
+        after: &str,
+        before: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Message>>;
+
     /// Messages that mention any of the given roles.
+    ///
+    /// Each tuple is `(role_id, eligible_since_ulid, server_channel_ids)`.
     async fn fetch_role_mention_messages(
         &self,
-        roles: &[(String, String)],
+        roles: &[(String, String, Vec<String>)],
         exclude_author: &str,
         after: &str,
         before: Option<&str>,

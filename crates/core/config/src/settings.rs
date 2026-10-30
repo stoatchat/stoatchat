@@ -346,9 +346,8 @@ pub struct GlobalLimits {
 
     pub max_invite_duration_days: usize,
 
+    /// Number of days an inbox entry is kept before pruning.
     pub inbox_retention_days: usize,
-
-    pub inbox_max_per_user: usize,
 }
 
 #[derive(Deserialize, Debug, Clone)]

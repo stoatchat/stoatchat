@@ -23,10 +23,6 @@ impl<'a> RatelimitResolver<Request<'a>> for DeltaRatelimits {
                         return ("default_avatar", None);
                     }
 
-                    if let Some("inbox") = resource {
-                        return ("inbox", None);
-                    }
-
                     ("users", None)
                 }
                 ("bots", _, _) => ("bots", None),
@@ -61,7 +57,6 @@ impl<'a> RatelimitResolver<Request<'a>> for DeltaRatelimits {
         match bucket {
             "user_edit" => 2,
             "users" => 20,
-            "inbox" => 5,
             "bots" => 10,
             "messaging" => 10,
             "channels" => 15,

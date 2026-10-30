@@ -10,7 +10,7 @@ use revolt_permissions::{OverrideField, DEFAULT_PERMISSION_SERVER};
 use revolt_result::Result;
 use ulid::Ulid;
 
-use crate::{Channel, Database, File, InboxEntry, User, events::client::EventV1};
+use crate::{events::client::EventV1, Channel, Database, File, User};
 
 auto_derived_partial!(
     /// Server
@@ -232,14 +232,10 @@ impl Server {
         }
         .p(self.id.clone())
         .await;
-
-        db.delete_server(&self.id).await?;
-
-        if let Err(err) = InboxEntry::delete_for_channels(db, &self.channels).await {
-            revolt_config::capture_error(&err);
+        if let Err(e) = db.delete_inbox_entries_for_server(&self.id).await {
+            revolt_config::capture_error(&e);
         }
-
-        Ok(())
+        db.delete_server(&self.id).await
     }
 
     /// Remove a field from Server

@@ -667,6 +667,9 @@ impl Account {
         self.deletion = Some(DeletionInfo::Deleted);
 
         self.save(db).await?;
+        if let Err(e) = db.delete_inbox_entries_for_user(&self.id, None).await {
+            revolt_config::capture_error(&e);
+        }
 
         Ok(())
     }

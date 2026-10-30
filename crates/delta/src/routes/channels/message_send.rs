@@ -680,7 +680,7 @@ mod test {
             "Role mentions detected when inside codeblock"
         );
 
-        other_member.set_roles(vec![role.id.clone()]);
+        other_member.roles.push(role.id.clone());
         harness
             .db
             .update_member(

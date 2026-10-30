@@ -1,7 +1,6 @@
 use bson::Document;
 use futures::StreamExt;
 use iso8601_timestamp::Timestamp;
-use mongodb::options::ReadConcern;
 use revolt_result::Result;
 
 use crate::{FieldsMember, Member, MemberCompositeKey, PartialMember};
@@ -95,28 +94,17 @@ impl AbstractServerMembers for MongoDb {
     ) -> Result<ChunkedServerMembersGenerator> {
         let config = revolt_config::config().await;
 
-        let mut session = self
-            .start_session()
-            .await
-            .map_err(|_| create_database_error!("start_session", COL))?;
-
-        session
-            .start_transaction()
-            .read_concern(ReadConcern::snapshot())
-            .await
-            .map_err(|_| create_database_error!("start_transaction", COL))?;
-
         let cursor = self
             .col::<Member>(COL)
             .find(doc! {
-                "_id.server": server_id
+                "_id.server": server_id,
+                "pending_deletion_at": {"$exists": false}
             })
-            .session(&mut session)
             .batch_size(config.pushd.mass_mention_chunk_size as u32)
             .await
             .map_err(|_| create_database_error!("find", COL))?;
 
-        Ok(ChunkedServerMembersGenerator::new_mongo(session, cursor))
+        Ok(ChunkedServerMembersGenerator::new_mongo(cursor))
     }
 
     async fn fetch_all_members_with_roles(
@@ -128,6 +116,7 @@ impl AbstractServerMembers for MongoDb {
             .col::<Member>(COL)
             .find(doc! {
                 "_id.server": server_id,
+                "pending_deletion_at": {"$exists": false},
                 "roles": {"$in": roles}
             })
             .await
@@ -150,29 +139,18 @@ impl AbstractServerMembers for MongoDb {
     ) -> Result<ChunkedServerMembersGenerator> {
         let config = revolt_config::config().await;
 
-        let mut session = self
-            .start_session()
-            .await
-            .map_err(|_| create_database_error!("start_session", COL))?;
-
-        session
-            .start_transaction()
-            .read_concern(ReadConcern::snapshot())
-            .await
-            .map_err(|_| create_database_error!("start_transaction", COL))?;
-
         let cursor = self
             .col::<Member>(COL)
             .find(doc! {
                 "_id.server": server_id,
+                "pending_deletion_at": {"$exists": false},
                 "roles": {"$in": roles}
             })
-            .session(&mut session)
             .batch_size(config.pushd.mass_mention_chunk_size as u32)
             .await
             .map_err(|_| create_database_error!("find", COL))?;
 
-        return Ok(ChunkedServerMembersGenerator::new_mongo(session, cursor));
+        Ok(ChunkedServerMembersGenerator::new_mongo(cursor))
     }
 
     /// Fetch all memberships for a user
@@ -285,7 +263,8 @@ impl AbstractServerMembers for MongoDb {
                                 "joined_at": "",
                                 "avatar": "",
                                 "nickname": "",
-                                "roles": ""
+                                "roles": "",
+                                "role_since": ""
                             }
                         },
                     )

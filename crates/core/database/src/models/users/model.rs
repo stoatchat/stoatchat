@@ -1,6 +1,10 @@
 use std::{collections::HashSet, str::FromStr, time::Duration};
 
-use crate::{events::client::EventV1, util::email::{email_templates, send_email}, Database, File, RatelimitEvent, AMQP, InboxEntry};
+use crate::{
+    events::client::EventV1,
+    util::email::{email_templates, send_email},
+    Database, File, RatelimitEvent, AMQP,
+};
 
 use futures::future::join_all;
 use iso8601_timestamp::Timestamp;
@@ -890,10 +894,6 @@ impl User {
         self.clear_relationships(db).await?;
         db.delete_messages_by_user(&self.id).await?;
         self.mark_deleted(db).await?;
-
-        if let Err(err) = InboxEntry::delete_for_user(db, &self.id).await {
-            revolt_config::capture_error(&err);
-        }
 
         Ok(())
     }

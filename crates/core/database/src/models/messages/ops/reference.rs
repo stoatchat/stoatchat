@@ -1,8 +1,7 @@
 use crate::{
-    AbstractChannelUnreads, AbstractInbox, AppendMessage, FieldsMessage, InboxFilter, Message,
-    MessageQuery, PartialMessage, ReferenceDb,
+    AppendMessage, FieldsMessage, Message, MessageQuery,
+    PartialMessage, ReferenceDb,
 };
-use futures::future::try_join_all;
 use indexmap::IndexSet;
 use revolt_result::Result;
 use std::collections::{HashMap, HashSet};
@@ -190,7 +189,11 @@ impl AbstractMessages for ReferenceDb {
 
     /// Fetch multiple messages by given IDs
     async fn fetch_messages_by_id(&self, ids: &[String]) -> Result<Vec<Message>> {
-        try_join_all(ids.iter().map(|id| self.fetch_message(id))).await
+        let messages = self.messages.lock().await;
+        Ok(ids
+            .iter()
+            .filter_map(|id| messages.get(id).cloned())
+            .collect())
     }
 
     /// Update a given message with new information
@@ -354,33 +357,41 @@ impl AbstractMessages for ReferenceDb {
     }
 
     async fn delete_messages_by_user(&self, user_id: &str) -> Result<()> {
-        let ids: Vec<String> = {
-            let mut messages = self.messages.lock().await;
-            let ids = messages
-                .values()
-                .filter(|message| message.author == user_id)
-                .map(|message| message.id.clone())
-                .collect();
+        let mut messages = self.messages.lock().await;
 
-            messages.retain(|_, message| message.author != user_id);
-
-            ids
-        };
-
-        if !ids.is_empty() {
-            self.delete_inbox_where(InboxFilter::new().messages(&ids))
-                .await?;
-            self.remove_mentions_for_messages(&ids).await?;
-        }
+        messages.retain(|_, message| message.author != user_id);
 
         // TODO: remove attachments as well
 
         Ok(())
     }
 
+    async fn fetch_direct_mention_messages(
+        &self,
+        user_id: &str,
+        exclude_author: &str,
+        after: &str,
+        before: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Message>> {
+        let messages = self.messages.lock().await;
+        Ok(collect_mentions(
+            messages.values(),
+            None,
+            exclude_author,
+            before,
+            limit,
+            |m| {
+                m.mentions.as_ref().is_some_and(|mentions| {
+                    mentions.iter().any(|id| id.as_str() == user_id)
+                }) && m.id.as_str() > after
+            },
+        ))
+    }
+
     async fn fetch_role_mention_messages(
         &self,
-        roles: &[(String, String)],
+        roles: &[(String, String, Vec<String>)],
         exclude_author: &str,
         after: &str,
         before: Option<&str>,
@@ -399,17 +410,10 @@ impl AbstractMessages for ReferenceDb {
             limit,
             |m| {
                 m.role_mentions.as_ref().is_some_and(|mentioned| {
-                    roles.iter().any(|(role_id, since)| {
-                        if !mentioned.contains(role_id) {
-                            return false;
-                        }
-                        let anchor = m
-                            .role_mention_ids
-                            .as_ref()
-                            .and_then(|ids| ids.get(role_id))
-                            .map(String::as_str)
-                            .unwrap_or(m.id.as_str());
-                        anchor > since.as_str().max(after)
+                    roles.iter().any(|(role_id, since, channels)| {
+                        mentioned.contains(role_id)
+                            && channels.contains(&m.channel)
+                            && m.id.as_str() > since.as_str().max(after)
                     })
                 })
             },
@@ -435,14 +439,7 @@ impl AbstractMessages for ReferenceDb {
             exclude_author,
             before,
             limit,
-            |m| {
-                m.flags.unwrap_or(0) & 4 != 0
-                    && m
-                        .everyone_mention_id
-                        .as_deref()
-                        .unwrap_or(m.id.as_str())
-                        > after
-            },
+            |m| m.flags.unwrap_or(0) & 4 != 0 && m.id.as_str() > after,
         ))
     }
 }
@@ -456,17 +453,16 @@ fn collect_mentions<'a>(
     limit: i64,
     matches: impl Fn(&Message) -> bool,
 ) -> Vec<Message> {
-    let channel_ids: Option<HashSet<&String>> =
-        channel_ids.map(|ids| ids.iter().collect());
+    let channel_ids: Option<HashSet<&String>> = channel_ids.map(|ids| ids.iter().collect());
 
     let mut found: Vec<Message> = messages
         .filter(|m| {
             channel_ids
                 .as_ref()
-                .map_or(true, |ids| ids.contains(&m.channel))
+                .is_none_or(|ids| ids.contains(&m.channel))
         })
         .filter(|m| m.author != exclude_author)
-        .filter(|m| before.map_or(true, |b| m.id.as_str() < b))
+        .filter(|m| before.is_none_or(|b| m.id.as_str() < b))
         .filter(|m| matches(m))
         .cloned()
         .collect();

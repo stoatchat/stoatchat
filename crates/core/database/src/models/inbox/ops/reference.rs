@@ -1,104 +1,126 @@
-use super::AbstractInbox;
-use crate::{InboxEntry, InboxFilter, InboxKind, ReferenceDb};
-use iso8601_timestamp::Timestamp;
+use std::time::SystemTime;
+
 use revolt_result::Result;
-use std::collections::HashMap;
+use ulid::Ulid;
+
+use super::AbstractInbox;
+use crate::{InboxEntry, InboxJob, InboxKind, InboxOptions};
+use crate::ReferenceDb;
 
 #[async_trait]
 impl AbstractInbox for ReferenceDb {
-    async fn insert_inbox(&self, items: Vec<InboxEntry>) -> Result<()> {
-        if items.is_empty() {
-            return Ok(());
+    async fn insert_inbox_entries(&self, entries: Vec<InboxEntry>) -> Result<()> {
+        let mut inbox = self.inbox.lock().await;
+        for entry in entries {
+            // Like a unique `_id` in Mongo: a duplicate insert is a no-op.
+            inbox.entry(entry.id.clone()).or_insert(entry);
         }
-
-        let mut store = self.inbox.lock().await;
-        for item in items {
-            // Duplicate (user_id, message_id) is ignored, like the Mongo unique index
-            store
-                .entry((item.user_id.clone(), item.message_id.clone()))
-                .or_insert(item);
-        }
-
         Ok(())
     }
 
-    async fn fetch_inbox_items(
+    async fn insert_inbox_job(&self, job: &InboxJob) -> Result<()> {
+        self.inbox_jobs
+            .lock()
+            .await
+            .entry(job.message_id.clone())
+            .or_insert_with(|| job.clone());
+        Ok(())
+    }
+
+    async fn fetch_inbox_jobs(&self, limit: i64) -> Result<Vec<InboxJob>> {
+        Ok(self
+            .inbox_jobs
+            .lock()
+            .await
+            .values()
+            .take(limit.max(0) as usize)
+            .cloned()
+            .collect())
+    }
+
+    async fn delete_inbox_job(&self, message_id: &str) -> Result<()> {
+        self.inbox_jobs.lock().await.remove(message_id);
+        Ok(())
+    }
+
+    async fn fetch_inbox_entries(
         &self,
         user_id: &str,
-        kinds: &[InboxKind],
-        created_after: Timestamp,
-        channel_id: Option<&str>,
-        before: Option<&str>,
-        limit: i64,
+        options: &InboxOptions,
     ) -> Result<Vec<InboxEntry>> {
-        let store = self.inbox.lock().await;
+        let inbox = self.inbox.lock().await;
 
-        let mut results: Vec<InboxEntry> = store
+        let mut entries: Vec<InboxEntry> = inbox
             .values()
-            .filter(|n| n.user_id == user_id)
-            .filter(|n| kinds.contains(&n.entry_kind))
-            .filter(|n| n.created_at >= created_after)
-            .filter(|n| channel_id.is_none_or(|channel| n.channel_id == channel))
-            .filter(|n| before.is_none_or(|b| n.message_id.as_str() < b))
+            .filter(|e| e.user_id == user_id)
+            .filter(|e| match e.kind {
+                InboxKind::Mention => options.mentions,
+                InboxKind::Role => options.roles,
+                InboxKind::Everyone => options.everyone,
+            })
+            .filter(|e| {
+                options
+                    .before
+                    .as_ref()
+                    .is_none_or(|before| e.message_id.as_str() < before.as_str())
+            })
+            .filter(|e| {
+                options
+                    .server_id
+                    .as_ref()
+                    .is_none_or(|server| e.server_id.as_ref() == Some(server))
+            })
             .cloned()
             .collect();
 
-        results.sort_by(|a, b| b.message_id.cmp(&a.message_id));
-        results.truncate(limit.max(0) as usize);
-
-        Ok(results)
+        entries.sort_by(|a, b| b.message_id.cmp(&a.message_id));
+        entries.truncate(options.limit.max(0) as usize);
+        Ok(entries)
     }
 
-    async fn delete_inbox_before(&self, before_ms: i64) -> Result<u64> {
-        let cutoff = Timestamp::UNIX_EPOCH
-            + iso8601_timestamp::Duration::milliseconds(before_ms.max(0));
-
-        let mut store = self.inbox.lock().await;
-        let before_len = store.len();
-        store.retain(|_, n| n.created_at >= cutoff);
-
-        Ok((before_len - store.len()) as u64)
-    }
-
-    async fn delete_inbox_where(&self, filter: InboxFilter) -> Result<()> {
-        let mut store = self.inbox.lock().await;
-        store.retain(|_, entry| !filter.matches(entry));
-
+    async fn delete_inbox_entries_for_messages(&self, message_ids: &[String]) -> Result<()> {
+        self.inbox
+            .lock()
+            .await
+            .retain(|_, e| !message_ids.contains(&e.message_id));
         Ok(())
     }
 
-    async fn trim_inbox(&self, user_ids: Option<&[String]>, max_per_user: usize) -> Result<u64> {
-        if max_per_user == 0 {
-            return Ok(0);
-        }
+    async fn delete_inbox_entries_for_channel(&self, channel_id: &str) -> Result<()> {
+        self.inbox
+            .lock()
+            .await
+            .retain(|_, e| e.channel_id != channel_id);
+        Ok(())
+    }
 
-        let mut store = self.inbox.lock().await;
-        let mut by_user: HashMap<String, Vec<(String, String)>> = HashMap::new();
+    async fn delete_inbox_entries_for_server(&self, server_id: &str) -> Result<()> {
+        self.inbox
+            .lock()
+            .await
+            .retain(|_, e| e.server_id.as_deref() != Some(server_id));
+        Ok(())
+    }
 
-        for entry in store.values() {
-            if user_ids.is_none_or(|ids| ids.iter().any(|id| id == &entry.user_id)) {
-                by_user
-                    .entry(entry.user_id.clone())
-                    .or_default()
-                    .push((entry.created_at.to_string(), entry.message_id.clone()));
-            }
-        }
+    async fn delete_inbox_entries_for_user(
+        &self,
+        user_id: &str,
+        server_id: Option<&str>,
+    ) -> Result<()> {
+        self.inbox.lock().await.retain(|_, e| {
+            let matches_user = e.user_id == user_id;
+            let matches_server = server_id.is_none_or(|s| e.server_id.as_deref() == Some(s));
+            !(matches_user && matches_server)
+        });
+        Ok(())
+    }
 
-        let mut removed = 0u64;
-        for (user_id, mut entries) in by_user {
-            if entries.len() <= max_per_user {
-                continue;
-            }
+    async fn prune_inbox_entries(&self, older_than: SystemTime) -> Result<u64> {
+        let threshold = Ulid::from_datetime(older_than).to_string();
 
-            entries.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| b.1.cmp(&a.1)));
-
-            for (_, message_id) in entries.into_iter().skip(max_per_user) {
-                if store.remove(&(user_id.clone(), message_id)).is_some() {
-                    removed += 1;
-                }
-            }
-        }
-
-        Ok(removed)
+        let mut inbox = self.inbox.lock().await;
+        let before = inbox.len();
+        inbox.retain(|_, e| e.message_id >= threshold);
+        Ok((before - inbox.len()) as u64)
     }
 }

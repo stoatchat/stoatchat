@@ -1,6 +1,6 @@
 use bson::{to_bson, Document};
 use futures::try_join;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use mongodb::options::FindOptions;
 use revolt_models::v0::MessageSort;
 use revolt_result::Result;
@@ -9,8 +9,8 @@ use std::time::SystemTime;
 use ulid::Ulid;
 
 use crate::{
-    AbstractChannelUnreads, AbstractInbox, AppendMessage, DocumentId, FieldsMessage, InboxFilter,
-    IntoDocumentPath, Message, MessageQuery, MessageTimePeriod, MongoDb, PartialMessage,
+    AppendMessage, DocumentId, FieldsMessage, IntoDocumentPath, Message, MessageQuery,
+    MessageTimePeriod, MongoDb, PartialMessage,
 };
 
 use super::AbstractMessages;
@@ -418,86 +418,99 @@ impl AbstractMessages for MongoDb {
     }
 
     async fn delete_messages_by_user(&self, user_id: &str) -> Result<()> {
-        let filter = doc! { "author": user_id };
-
-        // Collect ids first so the inbox entries those messages produced for
-        // other users can be cleaned up alongside the messages themselves.
-        let ids: Vec<String> = self
-            .find_with_options::<_, DocumentId>(
-                COL,
-                filter.clone(),
-                FindOptions::builder()
-                    .projection(doc! { "_id": 1_i32 })
-                    .build(),
-            )
-            .await
-            .map_err(|_| create_database_error!("find_many", COL))?
-            .into_iter()
-            .map(|x| x.id)
-            .collect();
-
-        self.delete_bulk_messages(filter).await?;
-
-        if !ids.is_empty() {
-            if let Err(err) = self
-                .delete_inbox_where(InboxFilter::new().messages(&ids))
-                .await
-            {
-                revolt_config::capture_error(&err);
-            }
-
-            if let Err(err) = self.remove_mentions_for_messages(&ids).await {
-                revolt_config::capture_error(&err);
-            }
-        }
-
-        Ok(())
+        self.delete_bulk_messages(doc! {
+            "author": user_id,
+        }).await
     }
 
-
-    async fn fetch_role_mention_messages(&self, roles: &[(String, String)],
-        exclude_author: &str, after: &str, before: Option<&str>, limit: i64) -> Result<Vec<Message>> {
-        if roles.is_empty() {
-            return Ok(vec![]);
+    async fn fetch_direct_mention_messages(
+        &self,
+        user_id: &str,
+        exclude_author: &str,
+        after: &str,
+        before: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Message>> {
+        let mut range = doc! { "$gt": after };
+        if let Some(before) = before {
+            range.insert("$lt", before);
         }
 
-        let clauses: Vec<Document> = roles
-            .iter()
-            .map(|(role_id, since)| {
-                let lower = since.as_str().max(after);
-                let anchor_path = format!("role_mention_ids.{role_id}");
-
-                let mut anchored = Document::new();
-                anchored.insert(anchor_path.clone(), doc! { "$gt": lower });
-
-                let mut legacy = Document::new();
-                legacy.insert("_id".to_string(), doc! { "$gt": lower });
-                legacy.insert(anchor_path, doc! { "$exists": false });
-
-                let mut clause = doc! {
-                    "role_mentions": role_id,
-                    "$or": [anchored, legacy],
-                };
-                if let Some(before) = before {
-                    clause.insert("_id", doc! { "$lt": before });
-                }
-                clause
-            })
-            .collect();
-
-        Ok(self
+        let cursor = self
             .col::<Message>(COL)
             .find(doc! {
-                "$or": clauses,
+                "mentions": user_id,
                 "author": { "$ne": exclude_author },
+                "_id": range,
             })
             .sort(doc! { "_id": -1 })
             .limit(limit)
             .await
-            .map_err(|_| create_database_error!("find", COL))?
-            .filter_map(|s| async { s.ok() })
-            .collect()
-            .await)
+            .map_err(|_| create_database_error!("find", COL))?;
+
+        cursor
+            .try_collect::<Vec<Message>>()
+            .await
+            .map_err(|_| create_database_error!("find", COL))
+    }
+
+    async fn fetch_role_mention_messages(
+        &self,
+        roles: &[(String, String, Vec<String>)],
+        exclude_author: &str,
+        after: &str,
+        before: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Message>> {
+        if roles.is_empty() {
+            return Ok(vec![]);
+        }
+
+        const ROLE_QUERY_CHUNK: usize = 32;
+
+        let mut found: Vec<Message> = vec![];
+        for role_chunk in roles.chunks(ROLE_QUERY_CHUNK) {
+            let clauses: Vec<Document> = role_chunk
+                .iter()
+                .map(|(role_id, since, channels)| {
+                    let lower = since.as_str().max(after);
+                    let mut range = doc! { "$gt": lower };
+                    if let Some(before) = before {
+                        range.insert("$lt", before);
+                    }
+
+                    doc! {
+                        "role_mentions": role_id,
+                        "channel": { "$in": channels },
+                        "_id": range,
+                    }
+                })
+                .collect();
+
+            let cursor = self
+                .col::<Message>(COL)
+                .find(doc! {
+                    "$or": clauses,
+                    "author": { "$ne": exclude_author },
+                })
+                .sort(doc! { "_id": -1 })
+                .limit(limit)
+                .await
+                .map_err(|_| create_database_error!("find", COL))?;
+
+            found.extend(
+                cursor
+                    .try_collect::<Vec<Message>>()
+                    .await
+                    .map_err(|_| create_database_error!("find", COL))?,
+            );
+        }
+
+        found.sort_by(|a, b| b.id.cmp(&a.id));
+        found.dedup_by(|a, b| a.id == b.id);
+        found.truncate(limit.max(0) as usize);
+
+        Ok(found)
     }
 
     async fn fetch_everyone_mention_messages(
@@ -506,37 +519,34 @@ impl AbstractMessages for MongoDb {
         exclude_author: &str,
         after: &str,
         before: Option<&str>,
-        limit: i64
+        limit: i64,
     ) -> Result<Vec<Message>> {
         if channel_ids.is_empty() {
             return Ok(vec![]);
         }
 
-        let mut filter = doc! {
-            "channel": { "$in": channel_ids },
-            "flags": { "$gte": 4, "$bitsAllSet": 4 },
-            "author": { "$ne": exclude_author },
-            // Retention uses the moment @everyone was introduced, falling back
-            // to the message id for legacy messages without an anchor.
-            "$or": [
-                { "everyone_mention_id": { "$gt": after } },
-                { "everyone_mention_id": { "$exists": false }, "_id": { "$gt": after } },
-            ],
-        };
+        let mut range = doc! { "$gt": after };
         if let Some(before) = before {
-            filter.insert("_id", doc! { "$lt": before });
+            range.insert("$lt", before);
         }
 
-        Ok(self
+        let cursor = self
             .col::<Message>(COL)
-            .find(filter)
+            .find(doc! {
+                "channel": { "$in": channel_ids },
+                "flags": { "$gte": 4, "$bitsAllSet": 4 },
+                "author": { "$ne": exclude_author },
+                "_id": range,
+            })
             .sort(doc! { "_id": -1 })
             .limit(limit)
             .await
-            .map_err(|_| create_database_error!("find", COL))?
-            .filter_map(|s| async { s.ok() })
-            .collect()
-            .await)
+            .map_err(|_| create_database_error!("find", COL))?;
+
+        cursor
+            .try_collect::<Vec<Message>>()
+            .await
+            .map_err(|_| create_database_error!("find", COL))
     }
 }
 

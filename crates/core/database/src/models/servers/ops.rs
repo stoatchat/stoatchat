@@ -46,10 +46,4 @@ pub trait AbstractServers: Sync + Send {
     ///
     /// Also updates channels and members.
     async fn delete_role(&self, server_id: &str, role_id: &str) -> Result<()>;
-
-    /// Fetch the channel IDs of the given servers, without loading the full documents
-    async fn fetch_servers_channel_ids(
-        &self,
-        server_ids: &[String],
-    ) -> Result<Vec<(String, Vec<String>)>>;
 }

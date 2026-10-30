@@ -96,8 +96,7 @@ pub async fn handle_ack_event(
             let user: &str = user.as_str();
 
             let unread = db.fetch_unread(user, channel).await?;
-            let _ = db.acknowledge_message(channel, user, id).await?;
-            let updated = db.fetch_unread(user, channel).await?;
+            let updated = db.acknowledge_message(channel, user, id).await?;
 
             if let (Some(before), Some(after)) = (unread, updated) {
                 let before_mentions = before.mentions.unwrap_or_default().len();
@@ -120,74 +119,6 @@ pub async fn handle_ack_event(
             }
         }
         AckEvent::ProcessMessage { messages } => {
-            let is_text_channel = matches!(
-                db.fetch_channel(channel).await,
-                Ok(TextChannel { .. })
-            );
-
-            let ids: Vec<String> = messages
-                .iter()
-                .map(|(_, message, _, _)| message.id.clone())
-                .collect::<HashSet<_>>()
-                .into_iter()
-                .collect();
-
-            let mut existing: HashSet<String> = HashSet::new();
-            let mut current_mentions: HashMap<String, HashSet<String>> = HashMap::new();
-
-            let original_mentions: HashMap<String, HashSet<String>> = messages
-                .iter()
-                .map(|(_, message, _, _)| {
-                    (
-                        message.id.clone(),
-                        message.mentions.clone().unwrap_or_default().into_iter().collect(),
-                    )
-                })
-                .collect();
-
-            let fetched = match db.fetch_messages_by_id(&ids).await {
-                Ok(fresh) => {
-                    for message in fresh {
-                        existing.insert(message.id.clone());
-                        current_mentions.insert(
-                            message.id.clone(),
-                            message.mentions.unwrap_or_default().into_iter().collect(),
-                        );
-                    }
-
-                    true
-                }
-                Err(err) => {
-                    revolt_config::capture_error(&err);
-                    existing.extend(ids.iter().cloned());
-                    false
-                }
-            };
-
-            let is_recipient = |message_id: &str, user: &str| -> bool {
-                if !fetched {
-                    return !is_text_channel;
-                }
-
-                if !existing.contains(message_id) {
-                    return false;
-                }
-
-                let now = current_mentions
-                    .get(message_id)
-                    .is_some_and(|mentions| mentions.contains(user));
-
-                if is_text_channel {
-                    return now;
-                }
-
-                let was = original_mentions
-                    .get(message_id)
-                    .is_some_and(|mentions| mentions.contains(user));
-
-                !(was && !now)
-            };
-
             let mut users: HashSet<&String> = HashSet::new();
             info!(
                 "Processing {} messages from channel {}",
@@ -196,12 +127,8 @@ pub async fn handle_ack_event(
             );
 
             // find all the users we'll be notifying
-            messages.iter().for_each(|(_, message, recipients, _)| {
-                users.extend(
-                    recipients
-                        .iter()
-                        .filter(|user| is_recipient(&message.id, user.as_str())),
-                );
+            messages.iter().for_each(|(_, _, recipents, _)| {
+                users.extend(recipents.iter());
             });
 
             info!("Found {} users to notify.", users.len());
@@ -210,7 +137,7 @@ pub async fn handle_ack_event(
                 let message_ids: Vec<String> = messages
                     .iter()
                     .filter_map(|(_, message, recipients, _)| {
-                        if recipients.contains(user) && is_recipient(&message.id, user.as_str()) {
+                        if recipients.contains(user) {
                             Some(message.id.clone())
                         } else {
                             None
@@ -218,7 +145,7 @@ pub async fn handle_ack_event(
                     })
                     .collect();
 
-                if !is_text_channel && !message_ids.is_empty() {
+                if !message_ids.is_empty() {
                     db.add_mention_to_unread(channel, user, &message_ids)
                         .await?;
                 }

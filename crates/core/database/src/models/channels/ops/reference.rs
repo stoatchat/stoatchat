@@ -32,14 +32,10 @@ impl AbstractChannels for ReferenceDb {
     /// Fetch all channels from the database
     async fn fetch_channels<'a>(&self, ids: &'a [String]) -> Result<Vec<Channel>> {
         let channels = self.channels.lock().await;
-        ids.iter()
-            .map(|id| {
-                channels
-                    .get(id)
-                    .cloned()
-                    .ok_or_else(|| create_error!(NotFound))
-            })
-            .collect()
+        Ok(ids
+            .iter()
+            .filter_map(|id| channels.get(id).cloned())
+            .collect())
     }
 
     /// Fetch all direct messages for a user

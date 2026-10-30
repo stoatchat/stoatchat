@@ -7,8 +7,6 @@ pub mod email;
 mod funcs;
 pub mod idempotency;
 pub mod ip;
-#[cfg(feature = "mongodb")]
-pub mod mongodb;
 pub mod password;
 pub mod permissions;
 pub mod reference;

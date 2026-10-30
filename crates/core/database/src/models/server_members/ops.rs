@@ -1,5 +1,7 @@
 #[cfg(feature = "mongodb")]
-use ::mongodb::{ClientSession, SessionCursor};
+use ::mongodb::Cursor;
+#[cfg(feature = "mongodb")]
+use futures::StreamExt;
 
 use revolt_result::Result;
 
@@ -13,10 +15,7 @@ mod reference;
 #[allow(clippy::large_enum_variant)]
 pub enum ChunkedServerMembersGenerator {
     #[cfg(feature = "mongodb")]
-    MongoDb {
-        session: ClientSession,
-        cursor: Option<SessionCursor<Member>>,
-    },
+    MongoDb { cursor: Option<Cursor<Member>> },
 
     Reference {
         offset: i32,
@@ -26,9 +25,8 @@ pub enum ChunkedServerMembersGenerator {
 
 impl ChunkedServerMembersGenerator {
     #[cfg(feature = "mongodb")]
-    pub fn new_mongo(session: ClientSession, cursor: SessionCursor<Member>) -> Self {
+    pub fn new_mongo(cursor: Cursor<Member>) -> Self {
         ChunkedServerMembersGenerator::MongoDb {
-            session,
             cursor: Some(cursor),
         }
     }
@@ -40,30 +38,33 @@ impl ChunkedServerMembersGenerator {
         }
     }
 
-    pub async fn next(&mut self) -> Option<Member> {
+    pub async fn next(&mut self) -> Result<Option<Member>> {
         match self {
             #[cfg(feature = "mongodb")]
-            ChunkedServerMembersGenerator::MongoDb { session, cursor } => {
+            ChunkedServerMembersGenerator::MongoDb { cursor } => {
                 if let Some(cursor) = cursor {
-                    let value = cursor.next(session).await;
-                    value.map(|val| val.expect("Failed to fetch the next member"))
+                    match cursor.next().await {
+                        Some(Ok(member)) => Ok(Some(member)),
+                        Some(Err(_)) => Err(create_database_error!("next", "server_members")),
+                        None => Ok(None),
+                    }
                 } else {
                     warn!("Attempted to access a (MongoDb) server member generator without first setting a cursor");
-                    None
+                    Ok(None)
                 }
             }
             ChunkedServerMembersGenerator::Reference { offset, data } => {
                 if let Some(data) = data {
-                    if data.len() as i32 >= *offset {
-                        None
+                    if *offset as usize >= data.len() {
+                        Ok(None)
                     } else {
                         let resp = &data[*offset as usize];
                         *offset += 1;
-                        Some(resp.clone())
+                        Ok(Some(resp.clone()))
                     }
                 } else {
                     warn!("Attempted to access a (Reference) server member generator without first providing data");
-                    None
+                    Ok(None)
                 }
             }
         }

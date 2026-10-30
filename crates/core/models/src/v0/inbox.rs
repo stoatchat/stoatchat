@@ -15,19 +15,16 @@ auto_derived!(
         /// Channel ID
         pub channel_id: String,
         /// Server ID
-        #[cfg_attr(
-            feature = "serde",
-            serde(skip_serializing_if = "Option::is_none")
-        )]
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
         pub server_id: Option<String>,
         /// The full message object
         pub message: v0::Message,
     }
 
-    /// Page of inbox entries
+    /// Page of inbox entries, newest first
     pub struct InboxResponse {
         pub items: Vec<InboxEntry>,
-        /// Pass as `before` to fetch the next page; absent when nothing older exists
+        /// Pass as `before` to fetch the next (older) page; absent when nothing older exists
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
         pub pagination: Option<String>,
     }
@@ -36,18 +33,24 @@ auto_derived!(
     #[cfg_attr(feature = "validator", derive(Validate))]
     #[cfg_attr(feature = "rocket", derive(FromForm))]
     pub struct OptionsFetchInbox {
-        /// Maximum number of inbox entries to fetch (default 50)
+        /// Maximum number of inbox entries to fetch (default 50, max 100)
         #[cfg_attr(feature = "validator", validate(range(min = 1, max = 100)))]
         pub limit: Option<i64>,
-        /// Message ID to fetch inbox entries older than; use pagination from the previous page
+        /// Fetch entries older than this value; pass `pagination` from the previous page
         pub before: Option<String>,
-        /// Include direct mentions and replies
+        /// Include direct mentions and replies (default true)
         pub mentions: Option<bool>,
-        /// Include role mentions
+        /// Include role mentions (default true)
         pub roles: Option<bool>,
-        /// Include @everyone
+        /// Include @everyone (default true)
         pub everyone: Option<bool>,
+        /// Only include entries from this server
+        pub server_id: Option<String>,
     }
 
-    pub enum InboxKind { Mention, Role, Everyone }
+    pub enum InboxKind {
+        Mention,
+        Role,
+        Everyone,
+    }
 );

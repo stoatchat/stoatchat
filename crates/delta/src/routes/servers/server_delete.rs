@@ -1,7 +1,10 @@
 use revolt_database::{
-    Database, RemovalIntention, User, util::reference::Reference, voice::{
-        UserVoiceChannel, VoiceClient, delete_voice_channel, get_user_voice_channel_in_server, remove_user_from_voice_channel
-    }
+    util::reference::Reference,
+    voice::{
+        delete_voice_channel, get_user_voice_channel_in_server, remove_user_from_voice_channel,
+        UserVoiceChannel, VoiceClient,
+    },
+    Database, RemovalIntention, User,
 };
 use revolt_models::v0;
 use revolt_result::Result;
@@ -35,10 +38,8 @@ pub async fn delete(
             )
             .await?;
         }
-        
-        server.delete(db).await?;
 
-        Ok(())
+        server.delete(db).await
     } else {
         if let Some(channel_id) = get_user_voice_channel_in_server(&user.id, &server.id).await? {
             remove_user_from_voice_channel(

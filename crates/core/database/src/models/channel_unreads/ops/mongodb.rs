@@ -138,103 +138,8 @@ impl AbstractChannelUnreads for MongoDb {
             .map_err(|_| create_database_error!("update_many", COL))
     }
 
-    /// Remove specific message IDs from stored mention lists for the given users.
-    async fn remove_mentions_for_users(
-        &self,
-        channel_id: &str,
-        user_ids: &[String],
-        message_ids: &[String],
-    ) -> Result<()> {
-        if user_ids.is_empty() || message_ids.is_empty() {
-            return Ok(());
-        }
-
-        self.col::<Document>(COL)
-            .update_many(
-                doc! {
-                    "_id.channel": channel_id,
-                    "_id.user": {
-                        "$in": user_ids
-                    },
-                },
-                doc! {
-                    "$pull": {
-                        "mentions": {
-                            "$in": message_ids
-                        }
-                    }
-                },
-            )
-            .await
-            .map(|_| ())
-            .map_err(|_| create_database_error!("update_many", COL))
-    }
-
-    /// Remove specific message IDs from stored mention lists across one channel.
-    async fn remove_mentions_in_channel(
-        &self,
-        channel_id: &str,
-        message_ids: &[String],
-    ) -> Result<()> {
-        if message_ids.is_empty() {
-            return Ok(());
-        }
-
-        for chunk in message_ids.chunks(10_000) {
-            self.col::<Document>(COL)
-                .update_many(
-                    doc! {
-                        "_id.channel": channel_id,
-                        "mentions": {
-                            "$in": chunk
-                        },
-                    },
-                    doc! {
-                        "$pull": {
-                            "mentions": {
-                                "$in": chunk
-                            }
-                        }
-                    },
-                )
-                .await
-                .map_err(|_| create_database_error!("update_many", COL))?;
-        }
-
-        Ok(())
-    }
-
-    /// Remove specific message IDs from stored mention lists across all rows.
-    async fn remove_mentions_for_messages(&self, message_ids: &[String]) -> Result<()> {
-        if message_ids.is_empty() {
-            return Ok(());
-        }
-
-        for chunk in message_ids.chunks(10_000) {
-            self.col::<Document>(COL)
-                .update_many(
-                    doc! {
-                        "mentions": {
-                            "$in": chunk
-                        }
-                    },
-                    doc! {
-                        "$pull": {
-                            "mentions": {
-                                "$in": chunk
-                            }
-                        }
-                    },
-                )
-                .await
-                .map_err(|_| create_database_error!("update_many", COL))?;
-        }
-
-        Ok(())
-    }
-
-    /// Read all channel unreads for a user without deriving mentions.
-    async fn fetch_unreads_raw(&self, user_id: &str) -> Result<Vec<ChannelUnread>> {
+    /// Fetch all channel unreads for a user.
+    async fn fetch_unreads(&self, user_id: &str) -> Result<Vec<ChannelUnread>> {
         query!(
             self,
             find,
@@ -245,12 +150,20 @@ impl AbstractChannelUnreads for MongoDb {
         )
     }
 
-    /// Read one channel unread without deriving mentions.
-    async fn fetch_unread_raw(
-        &self,
-        user_id: &str,
-        channel_id: &str,
-    ) -> Result<Option<ChannelUnread>> {
+    async fn fetch_unread_mentions(&self, user_id: &str) -> Result<Vec<ChannelUnread>> {
+        query! {
+            self,
+            find,
+            COL,
+            doc! {
+                "_id.user": user_id,
+                "mentions": {"$ne": null}
+            }
+        }
+    }
+
+    /// Fetch unread for a specific user in a channel.
+    async fn fetch_unread(&self, user_id: &str, channel_id: &str) -> Result<Option<ChannelUnread>> {
         query!(
             self,
             find_one,
