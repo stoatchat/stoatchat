@@ -139,7 +139,10 @@ async fn process_channel_ack(
 
     if let Some(message_id) = message_id {
         let unread = db.fetch_unread(&user, &channel).await?;
-        let updated = db.acknowledge_message(&channel, &user, &message_id).await?;
+        let _ = db
+            .acknowledge_message(&channel, &user, &message_id)
+            .await?;
+        let updated = db.fetch_unread(&user, &channel).await?;
 
         info!("Set new state for ack: {}:{}:{}", channel, user, message_id);
 

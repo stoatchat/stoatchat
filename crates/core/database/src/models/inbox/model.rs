@@ -7,7 +7,7 @@ use revolt_config::config;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 
 use crate::util::permissions::DatabasePermissionQuery;
-use crate::{Channel, Database, Member, Message, Server, User};
+use crate::{Channel, Database, InboxFilter, Member, Message, Server, User};
 
 auto_derived!(
     /// Inbox entry, stored in the database.
@@ -23,6 +23,9 @@ auto_derived!(
         /// Server ID
         #[serde(skip_serializing_if = "Option::is_none")]
         pub server_id: Option<String>,
+        /// When the entry was created; used for retention and trimming
+        #[serde(default = "Timestamp::now_utc")]
+        pub created_at: Timestamp,
     }
 
     pub struct InboxOptions {
@@ -69,6 +72,25 @@ fn timestamp_ms(ts: &Timestamp) -> u64 {
         .max(0) as u64
 }
 
+pub fn diff_mentions(old: &[String], new: &[String]) -> (Vec<String>, Vec<String>) {
+    let old_set: HashSet<&str> = old.iter().map(String::as_str).collect();
+    let new_set: HashSet<&str> = new.iter().map(String::as_str).collect();
+
+    let mut added: Vec<String> = new_set
+        .difference(&old_set)
+        .map(|id| (*id).to_string())
+        .collect();
+    let mut removed: Vec<String> = old_set
+        .difference(&new_set)
+        .map(|id| (*id).to_string())
+        .collect();
+
+    added.sort_unstable();
+    removed.sort_unstable();
+
+    (added, removed)
+}
+
 #[allow(clippy::disallowed_methods)]
 impl InboxEntry {
     /// Build an inbox entry for one user
@@ -85,6 +107,7 @@ impl InboxEntry {
             message_id: message_id.to_string(),
             channel_id: channel_id.to_string(),
             server_id: server_id.map(str::to_string),
+            created_at: Timestamp::now_utc(),
         }
     }
 
@@ -97,9 +120,11 @@ impl InboxEntry {
         server_id: Option<&str>,
         mentions: &[String],
     ) -> Result<()> {
+        let mut seen = HashSet::new();
         let items: Vec<InboxEntry> = mentions
             .iter()
             .filter(|id| id.as_str() != author_id)
+            .filter(|id| seen.insert(id.as_str()))
             .map(|id| InboxEntry::new(InboxKind::Mention, id.clone(), message_id, channel_id, server_id))
             .collect();
 
@@ -116,33 +141,37 @@ impl InboxEntry {
         old_mentions: &[String],
         new_mentions: &[String],
     ) -> Result<()> {
-        let removed: Vec<String> = old_mentions
-            .iter()
-            .filter(|id| !new_mentions.contains(id))
-            .cloned()
-            .collect();
-        let added: Vec<String> = new_mentions
-            .iter()
-            .filter(|id| !old_mentions.contains(id))
-            .cloned()
+        let (added, removed) = diff_mentions(old_mentions, new_mentions);
+
+        let removed: Vec<String> = removed
+            .into_iter()
+            .filter(|id| id != author_id)
             .collect();
 
-        db.delete_inbox_for_users(message_id, &removed).await?;
+        db.delete_inbox_where(
+            InboxFilter::new()
+                .message(message_id)
+                .users(&removed),
+        )
+        .await?;
+
         InboxEntry::create_for_mentions(db, author_id, message_id, channel_id, server_id, &added)
             .await
     }
 
     /// Delete all inbox entries for multiple messages
     pub async fn delete_for_messages(db: &Database, message_ids: &[String]) -> Result<()> {
-        db.delete_inbox_for_messages(message_ids).await
+        db.delete_inbox_where(InboxFilter::new().messages(message_ids))
+            .await
     }
 
     pub async fn delete_for_channels(db: &Database, channel_ids: &[String]) -> Result<()> {
-        db.delete_inbox_for_channels(channel_ids).await
+        db.delete_inbox_where(InboxFilter::new().channels(channel_ids))
+            .await
     }
 
     pub async fn delete_for_user(db: &Database, user_id: &str) -> Result<()> {
-        db.delete_inbox_for_user(user_id).await
+        db.delete_inbox_where(InboxFilter::new().user(user_id)).await
     }
 
     pub async fn delete_for_user_in_channel(
@@ -150,7 +179,12 @@ impl InboxEntry {
         user_id: &str,
         channel_id: &str,
     ) -> Result<()> {
-        db.delete_inbox_for_user_in_channel(user_id, channel_id).await
+        db.delete_inbox_where(
+            InboxFilter::new()
+                .user(user_id)
+                .channel(channel_id),
+        )
+        .await
     }
 
     pub async fn delete_for_user_in_server(
@@ -158,19 +192,33 @@ impl InboxEntry {
         user_id: &str,
         server_id: &str
     ) -> Result<()> {
-        db.delete_inbox_for_user_in_server(user_id, server_id).await
+        db.delete_inbox_where(
+            InboxFilter::new()
+                .user(user_id)
+                .server(server_id),
+        )
+        .await
     }
 
     /// Delete inbox items older than the retention window, returns how many were removed
     pub async fn prune(db: &Database) -> Result<u64> {
         let retention_days = config().await.features.limits.global.inbox_retention_days;
-        if retention_days == 0 {
-            return Ok(0);
+
+
+        let mut removed = if retention_days == 0 {
+            0
+        } else {
+            let cutoff =
+                timestamp_ms(&Timestamp::now_utc()) as i64 - retention_days as i64 * 86_400_000;
+            db.delete_inbox_before(cutoff).await?
+        };
+
+        let max_per_user = config().await.features.limits.global.inbox_max_per_user;
+        if max_per_user != 0 {
+            removed += db.trim_inbox(None, max_per_user).await?;
         }
 
-        let cutoff =
-            timestamp_ms(&Timestamp::now_utc()) as i64 - retention_days as i64 * 86_400_000;
-        db.delete_inbox_before(cutoff).await
+        Ok(removed)
     }
 
     pub async fn fetch_inbox(db: &Database, user: &User, opts: InboxOptions) -> Result<InboxPage> {
@@ -178,11 +226,15 @@ impl InboxEntry {
 
         // Retention window: older rows are hidden whether or not the prune has run yet
         let days = config().await.features.limits.global.inbox_retention_days;
-        let cutoff = if days == 0 {
-            ulid_at(0)
+        let (cutoff_ts, cutoff_id) = if days == 0 {
+            (Timestamp::UNIX_EPOCH, ulid_at(0))
         } else {
             let ms = timestamp_ms(&Timestamp::now_utc()) as i64 - days as i64 * 86_400_000;
-            ulid_at(ms.max(0) as u64)
+            let ms = ms.max(0);
+            (
+                Timestamp::UNIX_EPOCH + iso8601_timestamp::Duration::milliseconds(ms),
+                ulid_at(ms as u64),
+            )
         };
 
         // Only loaded when role / everyone mentions are requested
@@ -252,7 +304,7 @@ impl InboxEntry {
             }
             if !kinds.is_empty() {
                 for n in db
-                    .fetch_inbox_items(&user.id, &kinds, &cutoff, before, limit)
+                    .fetch_inbox_items(&user.id, &kinds, cutoff_ts, None, before, limit)
                     .await?
                 {
                     raw.push(InboxItem {
@@ -266,7 +318,7 @@ impl InboxEntry {
             }
             if opts.roles {
                 for m in db
-                    .fetch_role_mention_messages(&role_windows, &user.id, &cutoff, before, limit)
+                    .fetch_role_mention_messages(&role_windows, &user.id, &cutoff_id, before, limit)
                     .await?
                 {
                     raw.push(InboxItem::from_message(InboxKind::Role, m, &channel_to_server));
@@ -277,7 +329,7 @@ impl InboxEntry {
                     .fetch_everyone_mention_messages(
                         &channel_ids,
                         &user.id,
-                        &cutoff,
+                        &cutoff_id,
                         before,
                         limit,
                     )
@@ -492,5 +544,41 @@ impl From<InboxItem> for revolt_models::v0::InboxEntry {
             server_id: item.server_id,
             message: item.message.expect("filtered above").into_model(None, None),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::diff_mentions;
+
+    fn ids(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| value.to_string()).collect()
+    }
+
+    #[test]
+    fn diff_reports_added_and_removed() {
+        let (added, removed) = diff_mentions(&ids(&["a", "b"]), &ids(&["b", "c"]));
+
+        assert_eq!(added, ids(&["c"]));
+        assert_eq!(removed, ids(&["a"]));
+    }
+
+    #[test]
+    fn diff_deduplicates_and_sorts_both_sides() {
+        let (added, removed) = diff_mentions(
+            &ids(&["b", "a", "a", "same"]),
+            &ids(&["same", "c", "b", "b"]),
+        );
+
+        assert_eq!(added, ids(&["c"]));
+        assert_eq!(removed, ids(&["a"]));
+    }
+
+    #[test]
+    fn diff_is_empty_for_equal_sets() {
+        let (added, removed) = diff_mentions(&ids(&["a", "b", "b"]), &ids(&["b", "a"]));
+
+        assert!(added.is_empty());
+        assert!(removed.is_empty());
     }
 }

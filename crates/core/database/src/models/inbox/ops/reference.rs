@@ -1,6 +1,8 @@
 use super::AbstractInbox;
-use crate::{InboxEntry, InboxKind, ReferenceDb};
+use crate::{InboxEntry, InboxFilter, InboxKind, ReferenceDb};
+use iso8601_timestamp::Timestamp;
 use revolt_result::Result;
+use std::collections::HashMap;
 
 #[async_trait]
 impl AbstractInbox for ReferenceDb {
@@ -24,7 +26,8 @@ impl AbstractInbox for ReferenceDb {
         &self,
         user_id: &str,
         kinds: &[InboxKind],
-        after: &str,
+        created_after: Timestamp,
+        channel_id: Option<&str>,
         before: Option<&str>,
         limit: i64,
     ) -> Result<Vec<InboxEntry>> {
@@ -34,8 +37,9 @@ impl AbstractInbox for ReferenceDb {
             .values()
             .filter(|n| n.user_id == user_id)
             .filter(|n| kinds.contains(&n.entry_kind))
-            .filter(|n| n.message_id.as_str() > after)
-            .filter(|n| before.map_or(true, |b| n.message_id.as_str() < b))
+            .filter(|n| n.created_at >= created_after)
+            .filter(|n| channel_id.is_none_or(|channel| n.channel_id == channel))
+            .filter(|n| before.is_none_or(|b| n.message_id.as_str() < b))
             .cloned()
             .collect();
 
@@ -46,80 +50,55 @@ impl AbstractInbox for ReferenceDb {
     }
 
     async fn delete_inbox_before(&self, before_ms: i64) -> Result<u64> {
-        let cutoff = ulid::Ulid::from_parts(before_ms.max(0) as u64, 0).to_string();
+        let cutoff = Timestamp::UNIX_EPOCH
+            + iso8601_timestamp::Duration::milliseconds(before_ms.max(0));
 
         let mut store = self.inbox.lock().await;
         let before_len = store.len();
-        store.retain(|_, n| n.message_id.as_str() >= cutoff.as_str());
+        store.retain(|_, n| n.created_at >= cutoff);
 
         Ok((before_len - store.len()) as u64)
     }
 
-    async fn delete_inbox_for_messages(&self, message_ids: &[String]) -> Result<()> {
-        if message_ids.is_empty() {
-            return Ok(());
+    async fn delete_inbox_where(&self, filter: InboxFilter) -> Result<()> {
+        let mut store = self.inbox.lock().await;
+        store.retain(|_, entry| !filter.matches(entry));
+
+        Ok(())
+    }
+
+    async fn trim_inbox(&self, user_ids: Option<&[String]>, max_per_user: usize) -> Result<u64> {
+        if max_per_user == 0 {
+            return Ok(0);
         }
 
         let mut store = self.inbox.lock().await;
-        store.retain(|_, n| !message_ids.contains(&n.message_id));
+        let mut by_user: HashMap<String, Vec<(String, String)>> = HashMap::new();
 
-        Ok(())
-    }
-
-    async fn delete_inbox_for_users(
-        &self,
-        message_id: &str,
-        user_ids: &[String],
-    ) -> Result<()> {
-        if user_ids.is_empty() {
-            return Ok(());
+        for entry in store.values() {
+            if user_ids.is_none_or(|ids| ids.iter().any(|id| id == &entry.user_id)) {
+                by_user
+                    .entry(entry.user_id.clone())
+                    .or_default()
+                    .push((entry.created_at.to_string(), entry.message_id.clone()));
+            }
         }
 
-        let mut store = self.inbox.lock().await;
-        store.retain(|_, n| !(n.message_id == message_id && user_ids.contains(&n.user_id)));
+        let mut removed = 0u64;
+        for (user_id, mut entries) in by_user {
+            if entries.len() <= max_per_user {
+                continue;
+            }
 
-        Ok(())
-    }
+            entries.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| b.1.cmp(&a.1)));
 
-    async fn delete_inbox_for_channels(&self, channel_ids: &[String]) -> Result<()> {
-        if channel_ids.is_empty() {
-            return Ok(());
+            for (_, message_id) in entries.into_iter().skip(max_per_user) {
+                if store.remove(&(user_id.clone(), message_id)).is_some() {
+                    removed += 1;
+                }
+            }
         }
 
-        let mut store = self.inbox.lock().await;
-        store.retain(|_, n| !channel_ids.contains(&n.channel_id));
-
-        Ok(())
-    }
-
-    async fn delete_inbox_for_user(&self, user_id: &str) -> Result<()> {
-        let mut store = self.inbox.lock().await;
-        store.retain(|_, n| n.user_id != user_id);
-
-        Ok(())
-    }
-
-    async fn delete_inbox_for_user_in_channel(
-        &self,
-        user_id: &str,
-        channel_id: &str,
-    ) -> Result<()> {
-        let mut store = self.inbox.lock().await;
-        store.retain(|_, n| !(n.user_id == user_id && n.channel_id == channel_id));
-
-        Ok(())
-    }
-
-    async fn delete_inbox_for_user_in_server(
-        &self,
-        user_id: &str,
-        server_id: &str,
-    ) -> Result<()> {
-        let mut store = self.inbox.lock().await;
-        store.retain(|_, n| {
-            !(n.user_id == user_id && n.server_id.as_deref() == Some(server_id))
-        });
-
-        Ok(())
+        Ok(removed)
     }
 }

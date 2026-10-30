@@ -261,6 +261,9 @@ max_invite_duration_days = 30
 # Number of days before notifications stop showing up
 inbox_retention_days = 30
 
+# Maximum number of inbox entries kept per user (0 disables the cap)
+inbox_max_per_user = 1000
+
 [features.limits.new_user]
 # Limits imposed on new users
 

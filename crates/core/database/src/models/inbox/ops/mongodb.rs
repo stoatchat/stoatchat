@@ -1,10 +1,58 @@
 use super::AbstractInbox;
-use crate::{util::mongodb::is_duplicate_key, InboxEntry, InboxKind, MongoDb};
-use bson::to_bson;
+use crate::{InboxEntry, InboxFilter, InboxKind, MongoDb, util::mongodb::is_duplicate_key};
+use bson::{Document, to_bson};
 use futures::StreamExt;
+use iso8601_timestamp::Timestamp;
 use revolt_result::Result;
 
 static COL: &str = "inbox";
+
+/// Maximum number of ids sent in one `$in` clause.
+const MAX_IN: usize = 10_000;
+
+fn filter_documents(filter: &InboxFilter) -> Vec<Document> {
+    let mut base = Document::new();
+    if let Some(user_id) = &filter.user_id {
+        base.insert("user_id", user_id);
+    }
+    if let Some(message_id) = &filter.message_id {
+        base.insert("message_id", message_id);
+    }
+    if let Some(channel_id) = &filter.channel_id {
+        base.insert("channel_id", channel_id);
+    }
+    if let Some(server_id) = &filter.server_id {
+        base.insert("server_id", server_id);
+    }
+
+    let mut lists: Vec<(&str, Vec<String>)> = vec![];
+    if let Some(user_ids) = &filter.user_ids {
+        lists.push(("user_id", user_ids.clone()));
+    }
+    if let Some(message_ids) = &filter.message_ids {
+        lists.push(("message_id", message_ids.clone()));
+    }
+    if let Some(channel_ids) = &filter.channel_ids {
+        lists.push(("channel_id", channel_ids.clone()));
+    }
+
+    let Some((chunk_field, chunk_values)) = lists.first().cloned() else {
+        return vec![base];
+    };
+
+    for (field, values) in lists.into_iter().skip(1) {
+        base.insert(field, doc! { "$in": values });
+    }
+
+    chunk_values
+        .chunks(MAX_IN)
+        .map(|chunk| {
+            let mut filter = base.clone();
+            filter.insert(chunk_field, doc! { "$in": chunk });
+            filter
+        })
+        .collect()
+}
 
 #[async_trait]
 impl AbstractInbox for MongoDb {
@@ -29,7 +77,8 @@ impl AbstractInbox for MongoDb {
         &self,
         user_id: &str,
         kinds: &[InboxKind],
-        after: &str,
+        created_after: Timestamp,
+        channel_id: Option<&str>,
         before: Option<&str>,
         limit: i64,
     ) -> Result<Vec<InboxEntry>> {
@@ -37,16 +86,20 @@ impl AbstractInbox for MongoDb {
             return Ok(vec![]);
         }
 
-        let mut id_range = doc! { "$gt": after };
-        if let Some(before) = before {
-            id_range.insert("$lt", before);
-        }
+        let cutoff =
+            to_bson(&created_after).map_err(|_| create_database_error!("to_bson", COL))?;
         let kinds = to_bson(kinds).map_err(|_| create_database_error!("to_bson", COL))?;
-        let filter = doc! {
+        let mut filter = doc! {
             "user_id": user_id,
             "entry_kind": { "$in": kinds },
-            "message_id": id_range,
+            "created_at": { "$gte": cutoff },
         };
+        if let Some(channel_id) = channel_id {
+            filter.insert("channel_id", channel_id);
+        }
+        if let Some(before) = before {
+            filter.insert("message_id", doc! { "$lt": before });
+        }
 
         Ok(self
             .col::<InboxEntry>(COL)
@@ -71,13 +124,15 @@ impl AbstractInbox for MongoDb {
         // unbounded delete against a large collection.
         const BATCH: i64 = 1_000;
 
-        let cutoff = ulid::Ulid::from_parts(before_ms.max(0) as u64, 0).to_string();
+        let cutoff = to_bson(&(Timestamp::UNIX_EPOCH
+            + iso8601_timestamp::Duration::milliseconds(before_ms.max(0))))
+        .map_err(|_| create_database_error!("to_bson", COL))?;
         let mut deleted = 0u64;
 
         loop {
             let ids: Vec<bson::Bson> = self
                 .col::<bson::Document>(COL)
-                .find(doc! { "message_id": { "$lt": &cutoff } })
+                .find(doc! { "created_at": { "$lt": &cutoff } })
                 .projection(doc! { "_id": 1_i32 })
                 .limit(BATCH)
                 .await
@@ -107,14 +162,10 @@ impl AbstractInbox for MongoDb {
         Ok(deleted)
     }
 
-    async fn delete_inbox_for_messages(&self, message_ids: &[String]) -> Result<()> {
-        if message_ids.is_empty() {
-            return Ok(());
-        }
-
-        for chunk in message_ids.chunks(10_000) {
-            self.col::<InboxEntry>(COL)
-                .delete_many(doc! { "message_id": { "$in": chunk } })
+    async fn delete_inbox_where(&self, filter: InboxFilter) -> Result<()> {
+        for document in filter_documents(&filter) {
+            self.col::<Document>(COL)
+                .delete_many(document)
                 .await
                 .map_err(|_| create_database_error!("delete_many", COL))?;
         }
@@ -122,66 +173,55 @@ impl AbstractInbox for MongoDb {
         Ok(())
     }
 
-    async fn delete_inbox_for_users(
-        &self,
-        message_id: &str,
-        user_ids: &[String],
-    ) -> Result<()> {
-        if user_ids.is_empty() {
-            return Ok(());
+    async fn trim_inbox(&self, user_ids: Option<&[String]>, max_per_user: usize) -> Result<u64> {
+        if max_per_user == 0 {
+            return Ok(0);
         }
 
-        self.col::<InboxEntry>(COL)
-            .delete_many(doc! {
-                "message_id": message_id,
-                "user_id": { "$in": user_ids },
-            })
-            .await
-            .map(|_| ())
-            .map_err(|_| create_database_error!("delete_many", COL))
-    }
-
-    async fn delete_inbox_for_channels(&self, channel_ids: &[String]) -> Result<()> {
-        if channel_ids.is_empty() {
-            return Ok(());
+        let mut pipeline = vec![];
+        if let Some(user_ids) = user_ids {
+            if user_ids.is_empty() {
+                return Ok(0);
+            }
+            pipeline.push(doc! { "$match": { "user_id": { "$in": user_ids } } });
         }
 
-        self.col::<InboxEntry>(COL)
-            .delete_many(doc! { "channel_id": { "$in": channel_ids } })
-            .await
-            .map(|_| ())
-            .map_err(|_| create_database_error!("delete_many", COL))
-    }
+        pipeline.extend([
+            doc! { "$sort": { "user_id": 1, "created_at": -1, "message_id": -1 } },
+            doc! { "$group": { "_id": "$user_id", "ids": { "$push": "$_id" }, "count": { "$sum": 1 } } },
+            doc! { "$match": { "count": { "$gt": max_per_user as i64 } } },
+            doc! { "$project": { "overflow": { "$slice": [
+                "$ids",
+                max_per_user as i64,
+                { "$subtract": ["$count", max_per_user as i64] }
+            ] } } },
+        ]);
 
-    async fn delete_inbox_for_user(&self, user_id: &str) -> Result<()> {
-        self.col::<InboxEntry>(COL)
-            .delete_many(doc! { "user_id": user_id })
+        let mut cursor = self
+            .col::<Document>(COL)
+            .aggregate(pipeline)
+            .allow_disk_use(true)
             .await
-            .map(|_| ())
-            .map_err(|_| create_database_error!("delete_many", COL))
-    }
+            .map_err(|_| create_database_error!("aggregate", COL))?;
 
-    async fn delete_inbox_for_user_in_channel(
-        &self,
-        user_id: &str,
-        channel_id: &str,
-    ) -> Result<()> {
-        self.col::<InboxEntry>(COL)
-            .delete_many(doc! { "user_id": user_id, "channel_id": channel_id })
-            .await
-            .map(|_| ())
-            .map_err(|_| create_database_error!("delete_many", COL))
-    }
+        let mut overflow = vec![];
+        while let Some(document) = cursor.next().await {
+            let document = document.map_err(|_| create_database_error!("aggregate", COL))?;
+            if let Ok(ids) = document.get_array("overflow") {
+                overflow.extend(ids.iter().cloned());
+            }
+        }
 
-    async fn delete_inbox_for_user_in_server(
-        &self,
-        user_id: &str,
-        server_id: &str,
-    ) -> Result<()> {
-        self.col::<InboxEntry>(COL)
-            .delete_many(doc! { "user_id": user_id, "server_id": server_id })
-            .await
-            .map(|_| ())
-            .map_err(|_| create_database_error!("delete_many", COL))
+        let mut deleted = 0u64;
+        for chunk in overflow.chunks(MAX_IN) {
+            deleted += self
+                .col::<Document>(COL)
+                .delete_many(doc! { "_id": { "$in": chunk } })
+                .await
+                .map_err(|_| create_database_error!("delete_many", COL))?
+                .deleted_count;
+        }
+
+        Ok(deleted)
     }
 }

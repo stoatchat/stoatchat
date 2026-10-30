@@ -895,33 +895,6 @@ impl Message {
             {
                 revolt_config::capture_error(&err);
             }
-
-            // Keep channel unread mention IDs in step with the inbox so removed
-            // mentions stop showing a badge and added ones gain one.
-            let removed_users: Vec<String> = old_mentions
-                .iter()
-                .filter(|id| !new_mentions.contains(*id) && *id != &self.author)
-                .cloned()
-                .collect();
-            let added_users: Vec<String> = new_mentions
-                .iter()
-                .filter(|id| !old_mentions.contains(*id) && *id != &self.author)
-                .cloned()
-                .collect();
-
-            if !removed_users.is_empty() || !added_users.is_empty() {
-                if let Err(err) = db
-                    .reconcile_mention_unreads(
-                        &self.channel,
-                        &added_users,
-                        &removed_users,
-                        &self.id,
-                    )
-                    .await
-                {
-                    revolt_config::capture_error(&err);
-                }
-            }
         }
 
         EventV1::MessageUpdate {
@@ -1076,6 +1049,13 @@ impl Message {
         let config = config().await;
         let parsed = revolt_parser::parse_message(new_content);
 
+        let current_roles: HashSet<String> = self
+            .role_mentions
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
+
         let server_id = channel.server().map(str::to_string);
 
         let allow_mass_mentions =
@@ -1090,7 +1070,7 @@ impl Message {
                 role_mentions.retain(|role_id| server_data.roles.contains_key(role_id));
             }
         } else if !allow_mass_mentions {
-            role_mentions.clear();
+            role_mentions.retain(|role| current_roles.contains(role));
         }
 
         // Newly added mass mentions need the same permission as sending them fresh.
@@ -1125,7 +1105,7 @@ impl Message {
             if !allow_mass_mentions {
                 mentions_everyone = explicit_everyone;
                 mentions_online = explicit_online;
-                role_mentions.clear();
+                role_mentions.retain(|role| current_roles.contains(role));
             } else if let Ok(user) = db.fetch_user(&self.author).await {
                 let (can_mention_everyone, can_mention_roles) =
                     Message::mass_mention_channel_permissions(db, channel, &user).await;
@@ -1136,7 +1116,7 @@ impl Message {
                 }
 
                 if adding_roles && !can_mention_roles {
-                    role_mentions.clear();
+                    role_mentions.retain(|role| current_roles.contains(role));
                 }
             }
         }

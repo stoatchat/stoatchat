@@ -9,8 +9,8 @@ use std::time::SystemTime;
 use ulid::Ulid;
 
 use crate::{
-    AbstractInbox, AppendMessage, DocumentId, FieldsMessage, IntoDocumentPath, Message,
-    MessageQuery, MessageTimePeriod, MongoDb, PartialMessage,
+    AbstractInbox, AppendMessage, DocumentId, FieldsMessage, InboxFilter, IntoDocumentPath,
+    Message, MessageQuery, MessageTimePeriod, MongoDb, PartialMessage,
 };
 
 use super::AbstractMessages;
@@ -439,7 +439,10 @@ impl AbstractMessages for MongoDb {
         self.delete_bulk_messages(filter).await?;
 
         if !ids.is_empty() {
-            if let Err(err) = self.delete_inbox_for_messages(&ids).await {
+            if let Err(err) = self
+                .delete_inbox_where(InboxFilter::new().messages(&ids))
+                .await
+            {
                 revolt_config::capture_error(&err);
             }
         }

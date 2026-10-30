@@ -1620,7 +1620,15 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
                     {
                         "key": { "channel_id": 1 },
                         "name": "channel_id"
-                    }
+                    },
+                    {
+                        "key": { "user_id": 1, "created_at": -1 },
+                        "name": "user_created"
+                    },
+                    {
+                        "key": { "created_at": 1 },
+                        "name": "created_at"
+                    },
                 ]
             })
             .await
@@ -1632,7 +1640,8 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
                 "indexes": [
                     {
                         "key": { "role_mentions": 1, "_id": -1 },
-                        "name": "role_mentions_id"
+                        "name": "role_mentions_id",
+                        "partialFilterExpression": { "role_mentions": { "$exists": true } }
                     },
                     {
                         "key": { "channel": 1_i32, "_id": -1_i32 },

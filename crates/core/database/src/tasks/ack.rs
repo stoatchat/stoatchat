@@ -96,7 +96,8 @@ pub async fn handle_ack_event(
             let user: &str = user.as_str();
 
             let unread = db.fetch_unread(user, channel).await?;
-            let updated = db.acknowledge_message(channel, user, id).await?;
+            let _ = db.acknowledge_message(channel, user, id).await?;
+            let updated = db.fetch_unread(user, channel).await?;
 
             if let (Some(before), Some(after)) = (unread, updated) {
                 let before_mentions = before.mentions.unwrap_or_default().len();
@@ -125,19 +126,28 @@ pub async fn handle_ack_event(
             );
 
             let current_mentions: HashMap<String, HashSet<String>> = if is_text_channel {
-                let mut map = HashMap::new();
-                for (_, message, _, _) in messages {
-                    if map.contains_key(&message.id) {
-                        continue;
-                    }
-                    if let Ok(fresh) = db.fetch_message(&message.id).await {
-                        map.insert(
-                            message.id.clone(),
-                            fresh.mentions.unwrap_or_default().into_iter().collect(),
-                        );
+                let ids: Vec<String> = messages
+                    .iter()
+                    .map(|(_, message, _, _)| message.id.clone())
+                    .collect::<HashSet<_>>()
+                    .into_iter()
+                    .collect();
+
+                match db.fetch_messages_by_id(&ids).await {
+                    Ok(fresh) => fresh
+                        .into_iter()
+                        .map(|message| {
+                            (
+                                message.id.clone(),
+                                message.mentions.unwrap_or_default().into_iter().collect(),
+                            )
+                        })
+                        .collect(),
+                    Err(err) => {
+                        revolt_config::capture_error(&err);
+                        HashMap::new()
                     }
                 }
-                map
             } else {
                 HashMap::new()
             };
@@ -181,7 +191,7 @@ pub async fn handle_ack_event(
                     })
                     .collect();
 
-                if !message_ids.is_empty() {
+                if !is_text_channel && !message_ids.is_empty() {
                     db.add_mention_to_unread(channel, user, &message_ids)
                         .await?;
                 }

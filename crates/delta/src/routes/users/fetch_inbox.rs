@@ -634,4 +634,50 @@ mod test {
             "inbox leaked a message without ReadMessageHistory"
         );
     }
+
+    async fn fetch_unreads(harness: &TestHarness, as_user: &Actor) -> Vec<v0::ChannelUnread> {
+        let response = harness
+            .client
+            .get("/sync/unreads")
+            .header(Header::new("x-session-token", as_user.token.clone()))
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Ok);
+        response.into_json().await.expect("`ChannelUnread`")
+    }
+
+    #[rocket::async_test]
+    async fn unread_badge_is_derived_from_inbox() {
+        let harness = TestHarness::new().await;
+        let (owner, member, group) = group_setup(&harness).await;
+
+        let message = send(&harness, &owner, &group, format!("hey <@{}>", member.user.id)).await;
+
+        let unreads = fetch_unreads(&harness, &member).await;
+        let unread = unreads
+            .iter()
+            .find(|unread| unread.id.channel == group.id())
+            .expect("channel unread");
+
+        assert_eq!(unread.mentions, vec![message.id.clone()]);
+    }
+
+    #[rocket::async_test]
+    async fn unread_badge_drops_when_mention_is_edited_out() {
+        let harness = TestHarness::new().await;
+        let (owner, member, group) = group_setup(&harness).await;
+
+        let message = send(&harness, &owner, &group, format!("hey <@{}>", member.user.id)).await;
+        edit(&harness, &owner, &group, &message, "nothing here".to_string()).await;
+
+        let unreads = fetch_unreads(&harness, &member).await;
+        assert!(
+            unreads
+                .iter()
+                .find(|unread| unread.id.channel == group.id())
+                .is_none_or(|unread| unread.mentions.is_empty()),
+            "mention badge survived removing the mention"
+        );
+    }
 }

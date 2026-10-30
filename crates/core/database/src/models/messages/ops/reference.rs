@@ -1,6 +1,6 @@
 use crate::{
-    AbstractInbox, AppendMessage, FieldsMessage, Message, MessageQuery, PartialMessage,
-    ReferenceDb,
+    AbstractInbox, AppendMessage, FieldsMessage, InboxFilter, Message, MessageQuery,
+    PartialMessage, ReferenceDb,
 };
 use futures::future::try_join_all;
 use indexmap::IndexSet;
@@ -368,7 +368,8 @@ impl AbstractMessages for ReferenceDb {
         };
 
         if !ids.is_empty() {
-            self.delete_inbox_for_messages(&ids).await?;
+            self.delete_inbox_where(InboxFilter::new().messages(&ids))
+                .await?;
         }
 
         // TODO: remove attachments as well
