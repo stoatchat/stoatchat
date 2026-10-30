@@ -357,10 +357,18 @@ impl InboxEntry {
                         .and_then(|m| m.mentions.as_ref())
                         .is_some_and(|mentions| mentions.contains(&user.id));
                 }
+                if i.entry_kind == InboxKind::Role {
+                    return true;
+                }
+                let anchor = i
+                    .message
+                    .as_ref()
+                    .and_then(|m| m.everyone_mention_id.as_deref())
+                    .unwrap_or(i.message_id.as_str());
                 i.server_id
                     .as_ref()
                     .and_then(|s| joined.get(s))
-                    .is_some_and(|j| i.message_id >= *j)
+                    .is_some_and(|j| anchor >= j.as_str())
             });
 
             // Load servers and memberships only for servers on this page

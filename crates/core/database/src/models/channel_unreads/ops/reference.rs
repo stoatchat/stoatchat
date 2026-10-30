@@ -110,6 +110,56 @@ impl AbstractChannelUnreads for ReferenceDb {
         Ok(())
     }
 
+    /// Reconcile unread mentions after an edit: add `added_users` and remove
+    /// `removed_users` for the given message.
+    async fn reconcile_mention_unreads(
+        &self,
+        channel_id: &str,
+        added_users: &[String],
+        removed_users: &[String],
+        message_id: &str,
+    ) -> Result<()> {
+        let mut unreads = self.channel_unreads.lock().await;
+
+        for user_id in removed_users {
+            let key = ChannelCompositeKey {
+                channel: channel_id.to_string(),
+                user: user_id.to_string(),
+            };
+
+            if let Some(unread) = unreads.get_mut(&key) {
+                if let Some(mentions) = unread.mentions.as_mut() {
+                    mentions.retain(|id| id != message_id);
+                }
+            }
+        }
+
+        for user_id in added_users {
+            let key = ChannelCompositeKey {
+                channel: channel_id.to_string(),
+                user: user_id.to_string(),
+            };
+
+            if let Some(unread) = unreads.get_mut(&key) {
+                let mentions = unread.mentions.get_or_insert_with(Vec::new);
+                if !mentions.iter().any(|id| id == message_id) {
+                    mentions.push(message_id.to_string());
+                }
+            } else {
+                unreads.insert(
+                    key.clone(),
+                    ChannelUnread {
+                        id: key,
+                        last_id: None,
+                        mentions: Some(vec![message_id.to_string()]),
+                    },
+                );
+            }
+        }
+
+        Ok(())
+    }
+
     async fn fetch_unread_mentions(&self, user_id: &str) -> Result<Vec<ChannelUnread>> {
         let unreads = self.channel_unreads.lock().await;
         Ok(unreads

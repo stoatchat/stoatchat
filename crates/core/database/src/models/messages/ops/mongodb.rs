@@ -439,7 +439,9 @@ impl AbstractMessages for MongoDb {
         self.delete_bulk_messages(filter).await?;
 
         if !ids.is_empty() {
-            self.delete_inbox_for_messages(&ids).await?;
+            if let Err(err) = self.delete_inbox_for_messages(&ids).await {
+                revolt_config::capture_error(&err);
+            }
         }
 
         Ok(())
@@ -452,16 +454,27 @@ impl AbstractMessages for MongoDb {
             return Ok(vec![]);
         }
 
-        // One clause per role so each is bounded by its own assignment time
         let clauses: Vec<Document> = roles
             .iter()
             .map(|(role_id, since)| {
-                let lower = if since.as_str() > after { since.as_str() } else { after };
-                let mut id_range = doc! { "$gt": lower };
+                let mut id_range = doc! { "$gt": after };
                 if let Some(before) = before {
                     id_range.insert("$lt", before);
                 }
-                doc! { "role_mentions": role_id, "_id": id_range }
+
+                let anchor_path = format!("role_mention_ids.{role_id}");
+                let mut anchored = Document::new();
+                anchored.insert(anchor_path.clone(), doc! { "$gt": since });
+
+                let mut legacy = Document::new();
+                legacy.insert("_id".to_string(), doc! { "$gt": since });
+                legacy.insert(anchor_path, doc! { "$exists": false });
+
+                doc! {
+                    "role_mentions": role_id,
+                    "_id": id_range,
+                    "$or": [anchored, legacy],
+                }
             })
             .collect();
 

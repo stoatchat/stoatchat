@@ -399,7 +399,16 @@ impl AbstractMessages for ReferenceDb {
             |m| {
                 m.role_mentions.as_ref().is_some_and(|mentioned| {
                     roles.iter().any(|(role_id, since)| {
-                        mentioned.contains(role_id) && m.id.as_str() > since.as_str()
+                        if !mentioned.contains(role_id) {
+                            return false;
+                        }
+                        let anchor = m
+                            .role_mention_ids
+                            .as_ref()
+                            .and_then(|ids| ids.get(role_id))
+                            .map(String::as_str)
+                            .unwrap_or(m.id.as_str());
+                        anchor > since.as_str()
                     })
                 })
             },

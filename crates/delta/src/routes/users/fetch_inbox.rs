@@ -173,6 +173,34 @@ mod test {
         response.into_json().await.expect("`Message`")
     }
 
+    async fn send_reply(
+        harness: &TestHarness,
+        from: &Actor,
+        channel: &Channel,
+        content: String,
+        reply_to: &str,
+        mention: bool,
+    ) -> v0::Message {
+        let response = harness
+            .client
+            .post(format!("/channels/{}/messages", channel.id()))
+            .header(Header::new("x-session-token", from.token.clone()))
+            .header(Header::new("Idempotency-Key", Ulid::new().to_string()))
+            .header(ContentType::JSON)
+            .body(
+                json!({
+                    "content": content,
+                    "replies": [{ "id": reply_to, "mention": mention }]
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(response.status(), Status::Ok);
+        response.into_json().await.expect("`Message`")
+    }
+
     async fn edit(
         harness: &TestHarness,
         from: &Actor,
@@ -470,6 +498,63 @@ mod test {
         let (_, items) = fetch(&harness, &member, "?mentions=false&roles=false&everyone=true").await;
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].entry_kind, v0::InboxKind::Everyone);
+    }
+
+    #[rocket::async_test]
+    async fn non_pinging_reply_does_not_keep_edited_out_mention() {
+        let harness = TestHarness::new().await;
+        let (owner, member, group) = group_setup(&harness).await;
+
+        let target = send(&harness, &member, &group, "original".to_string()).await;
+
+        // Reply without pinging, but also explicitly mention the member
+        let message = send_reply(
+            &harness,
+            &owner,
+            &group,
+            format!("<@{}>", member.user.id),
+            &target.id,
+            false,
+        )
+        .await;
+
+        let (_, items) = fetch(&harness, &member, "").await;
+        assert_eq!(items.len(), 1);
+
+        // Editing the explicit mention out must drop the notification: the
+        // non-pinging reply cannot keep it alive.
+        edit(&harness, &owner, &group, &message, "just replying".to_string()).await;
+
+        let (_, items) = fetch(&harness, &member, "").await;
+        assert!(
+            items.is_empty(),
+            "non-pinging reply kept an edited-out mention in the inbox"
+        );
+    }
+
+    #[rocket::async_test]
+    async fn pinging_reply_keeps_mention_through_edit() {
+        let harness = TestHarness::new().await;
+        let (owner, member, group) = group_setup(&harness).await;
+
+        let target = send(&harness, &member, &group, "original".to_string()).await;
+
+        // Reply with a ping and no explicit mention in the content
+        let message =
+            send_reply(&harness, &owner, &group, "hello".to_string(), &target.id, true).await;
+
+        let (_, items) = fetch(&harness, &member, "").await;
+        assert_eq!(items.len(), 1);
+
+        // The reply still mentions the member, so editing the body keeps it
+        edit(&harness, &owner, &group, &message, "hello there".to_string()).await;
+
+        let (_, items) = fetch(&harness, &member, "").await;
+        assert_eq!(
+            items.len(),
+            1,
+            "pinging reply lost its mention after an unrelated edit"
+        );
     }
 
     #[rocket::async_test]

@@ -9,7 +9,10 @@ use revolt_permissions::{calculate_channel_permissions, ChannelPermission, Permi
 use revolt_result::{ErrorType, Result};
 use std::str::FromStr;
 use std::time::SystemTime;
-use std::{collections::HashSet, hash::RandomState};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::RandomState,
+};
 use ulid::Ulid;
 use validator::Validate;
 
@@ -64,6 +67,14 @@ auto_derived_partial!(
         /// User ids added to `mentions` solely because a reply requested a mention
         #[serde(skip_serializing_if = "Option::is_none")]
         pub reply_mentions: Option<Vec<String>>,
+        /// ULID marking when `@everyone` was introduced on this message.
+        /// Used instead of the message id to evaluate eligibility after edits.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub everyone_mention_id: Option<String>,
+        /// Per-role ULIDs marking when each role mention was introduced.
+        /// Used instead of the message id to evaluate eligibility after edits.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub role_mention_ids: Option<HashMap<String, String>>,
         /// Hashmap of emoji IDs to array of user IDs
         #[serde(skip_serializing_if = "IndexMap::is_empty", default)]
         pub reactions: IndexMap<String, IndexSet<String>>,
@@ -254,6 +265,8 @@ impl Default for Message {
             role_mentions: None,
             replies: None,
             reply_mentions: None,
+            everyone_mention_id: None,
+            role_mention_ids: None,
             reactions: Default::default(),
             interactions: Default::default(),
             masquerade: None,
@@ -535,9 +548,7 @@ impl Message {
 
         if !replies.is_empty() {
             message.replies.replace(replies);
-        }
-
-        if !reply_mentions.is_empty() {
+            
             message
                 .reply_mentions
                 .replace(reply_mentions.into_iter().collect());
@@ -551,6 +562,21 @@ impl Message {
             .set(MessageFlags::MentionsOnline, mentions_online);
 
         message.flags = Some(flag_value.0);
+
+        // Anchor each mass mention to the moment it was introduced so later
+        // edits can add new mentions without refreshing existing ones.
+        let message_id = message.id.clone();
+        if mentions_everyone {
+            message.everyone_mention_id = Some(message_id.clone());
+        }
+        if let Some(roles) = &message.role_mentions {
+            message.role_mention_ids = Some(
+                roles
+                    .iter()
+                    .map(|role| (role.clone(), message_id.clone()))
+                    .collect(),
+            );
+        }
 
         // Add attachments to message.
         let mut attachments = vec![];
@@ -869,6 +895,33 @@ impl Message {
             {
                 revolt_config::capture_error(&err);
             }
+
+            // Keep channel unread mention IDs in step with the inbox so removed
+            // mentions stop showing a badge and added ones gain one.
+            let removed_users: Vec<String> = old_mentions
+                .iter()
+                .filter(|id| !new_mentions.contains(*id) && *id != &self.author)
+                .cloned()
+                .collect();
+            let added_users: Vec<String> = new_mentions
+                .iter()
+                .filter(|id| !old_mentions.contains(*id) && *id != &self.author)
+                .cloned()
+                .collect();
+
+            if !removed_users.is_empty() || !added_users.is_empty() {
+                if let Err(err) = db
+                    .reconcile_mention_unreads(
+                        &self.channel,
+                        &added_users,
+                        &removed_users,
+                        &self.id,
+                    )
+                    .await
+                {
+                    revolt_config::capture_error(&err);
+                }
+            }
         }
 
         EventV1::MessageUpdate {
@@ -964,15 +1017,18 @@ impl Message {
         let new_parsed = revolt_parser::parse_message(new_content).user_mentions;
         let current: HashSet<String> = self.mentions.clone().unwrap_or_default().into_iter().collect();
 
-        // Only replies that actually requested a mention protect their author
-        // from being dropped; a non-pinging reply must not keep an explicit
-        // mention alive after it is edited out.
-        let reply_recipients: HashSet<String> = self
-            .reply_mentions
-            .clone()
-            .unwrap_or_default()
-            .into_iter()
-            .collect();
+        let reply_recipients: HashSet<String> = match &self.reply_mentions {
+            Some(recipients) => recipients.iter().cloned().collect(),
+            None => {
+                let mut recipients = HashSet::new();
+                for id in self.replies.clone().unwrap_or_default() {
+                    if let Ok(message) = db.fetch_message(&id).await {
+                        recipients.insert(message.author);
+                    }
+                }
+                recipients
+            }
+        };
 
         // Newly @mentioned users, validated like a fresh message
         let mut added: HashSet<String> = new_parsed
@@ -1095,6 +1151,28 @@ impl Message {
 
         partial.role_mentions = Some(role_mentions.into_iter().collect());
         partial.flags = Some(new_flags.0);
+
+        let now = Ulid::new().to_string();
+        let old_roles: HashSet<String> = self
+            .role_mentions
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
+        let old_role_ids = self.role_mention_ids.clone().unwrap_or_default();
+        let mut new_role_ids: HashMap<String, String> = HashMap::new();
+        for role in partial.role_mentions.clone().unwrap_or_default() {
+            if let Some(anchor) = old_role_ids.get(&role) {
+                new_role_ids.insert(role, anchor.clone());
+            } else if !old_roles.contains(&role) {
+                new_role_ids.insert(role, now.clone());
+            }
+        }
+        partial.role_mention_ids = Some(new_role_ids);
+
+        if mentions_everyone && !had_everyone {
+            partial.everyone_mention_id = Some(now);
+        }
 
         Ok(())
     }

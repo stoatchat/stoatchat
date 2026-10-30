@@ -119,6 +119,38 @@ pub async fn handle_ack_event(
             }
         }
         AckEvent::ProcessMessage { messages } => {
+            let is_text_channel = matches!(
+                db.fetch_channel(channel).await,
+                Ok(TextChannel { .. })
+            );
+
+            let current_mentions: HashMap<String, HashSet<String>> = if is_text_channel {
+                let mut map = HashMap::new();
+                for (_, message, _, _) in messages {
+                    if map.contains_key(&message.id) {
+                        continue;
+                    }
+                    if let Ok(fresh) = db.fetch_message(&message.id).await {
+                        map.insert(
+                            message.id.clone(),
+                            fresh.mentions.unwrap_or_default().into_iter().collect(),
+                        );
+                    }
+                }
+                map
+            } else {
+                HashMap::new()
+            };
+
+            let is_recipient = |message_id: &str, user: &str| -> bool {
+                if !is_text_channel {
+                    return true;
+                }
+                current_mentions
+                    .get(message_id)
+                    .is_some_and(|mentions| mentions.contains(user))
+            };
+
             let mut users: HashSet<&String> = HashSet::new();
             info!(
                 "Processing {} messages from channel {}",
@@ -127,8 +159,12 @@ pub async fn handle_ack_event(
             );
 
             // find all the users we'll be notifying
-            messages.iter().for_each(|(_, _, recipents, _)| {
-                users.extend(recipents.iter());
+            messages.iter().for_each(|(_, message, recipients, _)| {
+                users.extend(
+                    recipients
+                        .iter()
+                        .filter(|user| is_recipient(&message.id, user.as_str())),
+                );
             });
 
             info!("Found {} users to notify.", users.len());
@@ -137,7 +173,7 @@ pub async fn handle_ack_event(
                 let message_ids: Vec<String> = messages
                     .iter()
                     .filter_map(|(_, message, recipients, _)| {
-                        if recipients.contains(user) {
+                        if recipients.contains(user) && is_recipient(&message.id, user.as_str()) {
                             Some(message.id.clone())
                         } else {
                             None

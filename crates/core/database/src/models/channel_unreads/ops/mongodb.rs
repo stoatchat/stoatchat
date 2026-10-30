@@ -138,6 +138,56 @@ impl AbstractChannelUnreads for MongoDb {
             .map_err(|_| create_database_error!("update_many", COL))
     }
 
+    /// Reconcile unread mentions after an edit: add `added_users` and remove
+    /// `removed_users` for the given message.
+    async fn reconcile_mention_unreads(
+        &self,
+        channel_id: &str,
+        added_users: &[String],
+        removed_users: &[String],
+        message_id: &str,
+    ) -> Result<()> {
+        if !removed_users.is_empty() {
+            self.col::<Document>(COL)
+                .update_many(
+                    doc! {
+                        "_id.channel": channel_id,
+                        "_id.user": {
+                            "$in": removed_users
+                        },
+                    },
+                    doc! {
+                        "$pull": {
+                            "mentions": message_id
+                        }
+                    },
+                )
+                .await
+                .map_err(|_| create_database_error!("update_many", COL))?;
+        }
+
+        // Per-user upsert: cannot upsert against an `$in` filter.
+        for user_id in added_users {
+            self.col::<Document>(COL)
+                .update_one(
+                    doc! {
+                        "_id.channel": channel_id,
+                        "_id.user": user_id,
+                    },
+                    doc! {
+                        "$addToSet": {
+                            "mentions": message_id
+                        }
+                    },
+                )
+                .with_options(UpdateOptions::builder().upsert(true).build())
+                .await
+                .map_err(|_| create_database_error!("update_one", COL))?;
+        }
+
+        Ok(())
+    }
+
     /// Fetch all channel unreads for a user.
     async fn fetch_unreads(&self, user_id: &str) -> Result<Vec<ChannelUnread>> {
         query!(
