@@ -182,6 +182,7 @@ pub enum ErrorType {
     CannotGiveMissingPermissions,
     NotOwner,
     IsElevated,
+    CannotRemoveOwnChannelView,
 
     // ? General errors
     DatabaseError {
