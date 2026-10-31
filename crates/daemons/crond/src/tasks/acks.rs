@@ -138,7 +138,7 @@ async fn process_channel_ack(
     let message_id: Option<String> = redis.get_del(&key).await.to_internal_error()?;
 
     if let Some(message_id) = &message_id {
-        let resp = {
+        let resp: Result<()> = async {
             let unread = db.fetch_unread(&user, &channel).await?;
             let updated = db.acknowledge_message(&channel, &user, message_id).await?;
 
@@ -164,7 +164,9 @@ async fn process_channel_ack(
             }
 
             Ok(())
-        };
+        }
+        .await;
+
         if retryable && let Err(e) = resp {
             let _ = redis.set_ex::<_, _, ()>(&key, &message_id, 15 * 60).await;
             Err(e)
