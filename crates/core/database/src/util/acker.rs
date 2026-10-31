@@ -7,7 +7,7 @@ use revolt_result::{Result, ToRevoltError};
 
 use crate::{AMQP, Channel, Database, Server, User, events::client::EventV1};
 
-const ACK_PENDING_TTL: usize = 15;
+const ACK_PENDING_TTL: usize = 30;
 
 pub async fn ack_channel(user: &str, channel: &str, message: &str, amqp: &AMQP) -> Result<()> {
     let mut redis = get_connection()
