@@ -1,14 +1,14 @@
 use futures_lite::stream::StreamExt;
 use lapin::{
+    ConnectionBuilder, ConnectionProperties, ExchangeKind,
     options::*,
     types::FieldTable,
     uri::{AMQPAuthority, AMQPQueryString, AMQPUri, AMQPUserInfo},
-    ConnectionBuilder, ConnectionProperties, ExchangeKind,
 };
-use log::{debug, info};
-use redis_kiss::{get_connection, AsyncCommands, Conn as RedisConnection};
+use log::{debug, info, warn};
+use redis_kiss::{AsyncCommands, Conn as RedisConnection, get_connection};
 use revolt_config::config;
-use revolt_database::{events::rabbit::AckEventPayload, Database, AMQP};
+use revolt_database::{AMQP, Database, events::rabbit::AckEventPayload};
 use revolt_result::{Result, ToRevoltError};
 use serde_json;
 
@@ -104,12 +104,13 @@ pub async fn task(db: Database, amqp: AMQP) -> Result<()> {
                     &amqp,
                     payload.user_id,
                     payload.channel_id.unwrap(),
+                    !delivery.redelivered,
                     &mut redis,
                 )
                 .await
                 {
                     revolt_config::capture_error(&e);
-                    _ = delivery.reject(BasicRejectOptions { requeue: false }).await;
+                    _ = delivery.reject(BasicRejectOptions { requeue: true }).await;
                 } else {
                     _ = delivery.ack(BasicAckOptions { multiple: false }).await;
                 }
@@ -130,35 +131,48 @@ async fn process_channel_ack(
     amqp: &AMQP,
     user: String,
     channel: String,
+    retryable: bool,
     redis: &mut RedisConnection,
 ) -> Result<()> {
-    let message_id: Option<String> = redis
-        .get_del(format!("acker:{user}+{channel}"))
-        .await
-        .to_internal_error()?;
+    let key = format!("acker:{user}+{channel}");
+    let message_id: Option<String> = redis.get_del(&key).await.to_internal_error()?;
 
-    if let Some(message_id) = message_id {
-        let unread = db.fetch_unread(&user, &channel).await?;
-        let updated = db.acknowledge_message(&channel, &user, &message_id).await?;
+    if let Some(message_id) = &message_id {
+        let resp = {
+            let unread = db.fetch_unread(&user, &channel).await?;
+            let updated = db.acknowledge_message(&channel, &user, message_id).await?;
 
-        info!("Set new state for ack: {}:{}:{}", channel, user, message_id);
+            info!("Set new state for ack: {}:{}:{}", channel, user, message_id);
 
-        if let (Some(before), Some(after)) = (unread, updated) {
-            let before_mentions = before.mentions.unwrap_or_default().len();
-            let after_mentions = after.mentions.unwrap_or_default().len();
+            if let (Some(before), Some(after)) = (unread, updated) {
+                let before_mentions = before.mentions.unwrap_or_default().len();
+                let after_mentions = after.mentions.unwrap_or_default().len();
 
-            if after_mentions < before_mentions {
-                if let Err(err) = amqp
-                    .ack_notification_message(user.to_string(), channel.to_string(), message_id)
-                    .await
-                {
-                    revolt_config::capture_error(&err);
-                }
-            };
+                #[allow(clippy::collapsible_if)]
+                if after_mentions < before_mentions {
+                    if let Err(err) = amqp
+                        .ack_notification_message(
+                            user.to_string(),
+                            channel.to_string(),
+                            message_id.clone(),
+                        )
+                        .await
+                    {
+                        revolt_config::capture_error(&err);
+                    }
+                };
+            }
+
+            Ok(())
+        };
+        if retryable && let Err(e) = resp {
+            let _ = redis.set_ex::<_, _, ()>(&key, &message_id, 15 * 60).await;
+            Err(e)
+        } else {
+            resp
         }
-
-        Ok(())
     } else {
-        Err(message_id.to_internal_error().expect_err("no err"))
+        warn!("No pending ack found for {}:{}", channel, user);
+        Ok(())
     }
 }
