@@ -48,7 +48,7 @@ pub async fn throw_if_would_lose_server_channel_view(
     db: &Database,
     user: &User,
     server: &Server,
-    role_id: &str,
+    role_id: Option<&str>,
     permissions: &Override,
 ) -> Result<()> {
     if server.owner == user.id {
@@ -56,9 +56,12 @@ pub async fn throw_if_would_lose_server_channel_view(
     }
 
     let mut modified = server.clone();
-    match modified.roles.get_mut(role_id) {
-        Some(role) => role.permissions = permissions.clone().into(),
-        None => return Ok(()),
+    match role_id {
+        Some(id) => match modified.roles.get_mut(id) {
+            Some(role) => role.permissions = permissions.clone().into(),
+            None => return Ok(()),
+        },
+        None => modified.default_permissions = permissions.allow as i64,
     }
 
     let channels = db.fetch_channels(&server.channels).await?;

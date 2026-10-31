@@ -51,6 +51,25 @@ pub async fn edit(
         return Ok(Json(channel.into()));
     }
 
+    let remove: Vec<FieldsChannel> = data
+        .remove
+        .iter()
+        .cloned()
+        .map(Into::into)
+        .collect();
+
+    if remove.contains(&FieldsChannel::DefaultPermissions) {
+        let mut proposed = channel.clone();
+        proposed.remove_fields(remove.clone());
+        let mut query = DatabasePermissionQuery::new(db, &user).channel(&proposed);
+        if !calculate_channel_permissions(&mut query)
+            .await
+            .has_channel_permission(ChannelPermission::ViewChannel)
+        {
+            return Err(create_error!(CannotRemoveOwnChannelView));
+        }
+    }
+
     let mut partial: PartialChannel = Default::default();
 
     // Transfer group ownership
@@ -272,12 +291,6 @@ pub async fn edit(
         }
         _ => return Err(create_error!(InvalidOperation)),
     };
-
-    let remove = data
-        .remove
-        .into_iter()
-        .map(|f| f.into())
-        .collect::<Vec<FieldsChannel>>();
 
     let before = if before_channel.server().is_some() {
         Some(before_channel.generate_diff(&partial, &remove))

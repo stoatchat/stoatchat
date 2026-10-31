@@ -56,7 +56,7 @@ pub async fn set_role_permission(
         db,
         &user,
         &server,
-        &role_id,
+        Some(&role_id),
         &data.permissions,
     )
     .await?;
