@@ -225,7 +225,7 @@ pub struct GithubDiscussionComment {
     #[serde(flatten)]
     comment: GithubComment,
     child_comment_count: u32,
-    parent_id: Option<u32>,
+    parent_id: Option<u64>,
     repository_url: String,
 }
 
@@ -485,7 +485,7 @@ pub struct GithubTeam {
 pub struct GithubHead {
     label: String,
     r#ref: String,
-    repo: GithubRepository,
+    repo: Option<GithubRepository>,
     sha: String,
     user: Option<GithubUser>,
 }
