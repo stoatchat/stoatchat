@@ -168,7 +168,7 @@ async fn process_channel_ack(
         .await;
 
         if retryable && let Err(e) = resp {
-            let _ = redis.set_ex::<_, _, ()>(&key, &message_id, 15 * 60).await;
+            let _ = redis.set_ex::<_, _, ()>(&key, &message_id, 30).await;
             Err(e)
         } else {
             resp
