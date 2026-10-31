@@ -18,7 +18,7 @@ pub struct GithubUser {
     name: Option<String>,
     email: Option<String>,
     login: String,
-    id: u32,
+    id: u64,
     node_id: String,
     avatar_url: String,
     gravatar_id: String,
@@ -76,7 +76,7 @@ pub struct GithubRepositoryPermissions {
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema)]
 pub struct GithubRepository {
-    id: u32,
+    id: u64,
     node_id: String,
     name: String,
     full_name: String,
@@ -210,7 +210,7 @@ pub struct GithubComment {
     commit_id: Option<String>,
     created_at: Value,
     html_url: String,
-    id: u32,
+    id: u64,
     line: Option<u32>,
     node_id: String,
     path: Option<String>,
@@ -225,15 +225,15 @@ pub struct GithubDiscussionComment {
     #[serde(flatten)]
     comment: GithubComment,
     child_comment_count: u32,
-    parent_id: Option<u32>,
+    parent_id: Option<u64>,
     repository_url: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema)]
 pub struct GithubDiscussionCategory {
-    id: u32,
+    id: u64,
     node_id: String,
-    repository_id: u32,
+    repository_id: u64,
     emoji: String,
     name: String,
     description: String,
@@ -251,7 +251,7 @@ pub struct GithubDiscussion {
     answer_chosen_at: Value, // ??
     answer_chosen_by: Value, // ??
     html_url: String,
-    id: u32,
+    id: u64,
     node_id: String,
     number: u32,
     title: String,
@@ -298,12 +298,12 @@ pub struct GithubMilestone {
     url: String,
     html_url: String,
     labels_url: String,
-    id: u32,
+    id: u64,
     node_id: String,
     number: u32,
     state: String,
     title: String,
-    description: String,
+    description: Option<String>,
     creator: Option<GithubUser>,
     open_issues: u32,
     closed_issues: u32,
@@ -332,9 +332,9 @@ pub struct GithubAppPermissions {
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema)]
 pub struct GithubApp {
-    id: u32,
+    id: u64,
     slug: String,
-    node_is: String,
+    node_id: String,
     owner: Option<GithubUser>,
     name: String,
     description: Option<String>,
@@ -353,7 +353,7 @@ pub struct GithubApp {
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema)]
 pub struct GithubIssue {
-    id: u32,
+    id: u64,
     node_id: String,
     url: String,
     repository_url: String,
@@ -365,7 +365,6 @@ pub struct GithubIssue {
     state: String,
     state_reason: Option<String>,
     user: Option<GithubUser>,
-    labels: Vec<String>,
     assignee: Option<GithubUser>,
     assignees: Vec<GithubUser>,
     milestone: Option<GithubMilestone>,
@@ -468,7 +467,7 @@ pub struct ForkEvent {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GithubTeam {
-    id: u32,
+    id: u64,
     node_id: String,
     url: String,
     html_url: String,
@@ -486,7 +485,7 @@ pub struct GithubTeam {
 pub struct GithubHead {
     label: String,
     r#ref: String,
-    repo: GithubRepository,
+    repo: Option<GithubRepository>,
     sha: String,
     user: Option<GithubUser>,
 }
@@ -520,7 +519,7 @@ pub struct GithubAutoMerge {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GithubPullRequest {
     url: String,
-    id: u32,
+    id: u64,
     node_id: String,
     html_url: String,
     diff_url: String,
