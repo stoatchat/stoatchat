@@ -2,10 +2,9 @@ use crate::{
     AppendMessage, FieldsMessage, Message, MessageQuery,
     PartialMessage, ReferenceDb,
 };
-use futures::future::try_join_all;
 use indexmap::IndexSet;
 use revolt_result::Result;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 use ulid::Ulid;
 
@@ -190,7 +189,11 @@ impl AbstractMessages for ReferenceDb {
 
     /// Fetch multiple messages by given IDs
     async fn fetch_messages_by_id(&self, ids: &[String]) -> Result<Vec<Message>> {
-        try_join_all(ids.iter().map(|id| self.fetch_message(id))).await
+        let messages = self.messages.lock().await;
+        Ok(ids
+            .iter()
+            .filter_map(|id| messages.get(id).cloned())
+            .collect())
     }
 
     /// Update a given message with new information
@@ -362,4 +365,109 @@ impl AbstractMessages for ReferenceDb {
 
         Ok(())
     }
+
+    async fn fetch_direct_mention_messages(
+        &self,
+        user_id: &str,
+        exclude_author: &str,
+        after: &str,
+        before: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Message>> {
+        let messages = self.messages.lock().await;
+        Ok(collect_mentions(
+            messages.values(),
+            None,
+            exclude_author,
+            before,
+            limit,
+            |m| {
+                m.mentions.as_ref().is_some_and(|mentions| {
+                    mentions.iter().any(|id| id.as_str() == user_id)
+                }) && m.id.as_str() > after
+            },
+        ))
+    }
+
+    async fn fetch_role_mention_messages(
+        &self,
+        roles: &[(String, String, Vec<String>)],
+        exclude_author: &str,
+        after: &str,
+        before: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Message>> {
+        if roles.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let messages = self.messages.lock().await;
+        Ok(collect_mentions(
+            messages.values(),
+            None,
+            exclude_author,
+            before,
+            limit,
+            |m| {
+                m.role_mentions.as_ref().is_some_and(|mentioned| {
+                    roles.iter().any(|(role_id, since, channels)| {
+                        mentioned.contains(role_id)
+                            && channels.contains(&m.channel)
+                            && m.id.as_str() > since.as_str().max(after)
+                    })
+                })
+            },
+        ))
+    }
+
+    async fn fetch_everyone_mention_messages(
+        &self,
+        channel_ids: &[String],
+        exclude_author: &str,
+        after: &str,
+        before: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Message>> {
+        if channel_ids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let messages = self.messages.lock().await;
+        Ok(collect_mentions(
+            messages.values(),
+            Some(channel_ids),
+            exclude_author,
+            before,
+            limit,
+            |m| m.flags.unwrap_or(0) & 4 != 0 && m.id.as_str() > after,
+        ))
+    }
+}
+
+/// Shared filter for the inbox queries: channel, author, pagination, newest first, limited
+fn collect_mentions<'a>(
+    messages: impl Iterator<Item = &'a Message>,
+    channel_ids: Option<&[String]>,
+    exclude_author: &str,
+    before: Option<&str>,
+    limit: i64,
+    matches: impl Fn(&Message) -> bool,
+) -> Vec<Message> {
+    let channel_ids: Option<HashSet<&String>> = channel_ids.map(|ids| ids.iter().collect());
+
+    let mut found: Vec<Message> = messages
+        .filter(|m| {
+            channel_ids
+                .as_ref()
+                .is_none_or(|ids| ids.contains(&m.channel))
+        })
+        .filter(|m| m.author != exclude_author)
+        .filter(|m| before.is_none_or(|b| m.id.as_str() < b))
+        .filter(|m| matches(m))
+        .cloned()
+        .collect();
+
+    found.sort_by(|a, b| b.id.cmp(&a.id));
+    found.truncate(limit.max(0) as usize);
+    found
 }

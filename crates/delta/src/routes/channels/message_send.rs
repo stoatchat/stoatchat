@@ -363,6 +363,7 @@ mod test {
             avatar: None,
             timeout: None,
             roles: Some(second_member_roles),
+            role_since: None,
             can_publish: None,
             can_receive: None,
         };
@@ -691,6 +692,7 @@ mod test {
                     nickname: None,
                     pronouns: None,
                     roles: Some(vec![role.id.clone()]),
+                    role_since: None,
                     timeout: None,
                     can_publish: None,
                     can_receive: None,

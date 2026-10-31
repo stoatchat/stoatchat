@@ -1,12 +1,11 @@
 use std::{collections::HashMap, sync::Arc};
 
 use futures::lock::Mutex;
-
 use crate::{
     Account, AccountInvite, AuditLogEntry, Bot, Channel, ChannelCompositeKey, ChannelUnread,
     DiscoverBan, DiscoverRequest, DiscoverRequestType, Emoji, File, FileHash, Invite, MFATicket,
     Member, MemberCompositeKey, Message, PolicyChange, RatelimitEvent, Report, Server, ServerBan,
-    Session, Snapshot, User, UserSettings, Webhook,
+    Session, Snapshot, User, UserSettings, Webhook, InboxEntry, InboxJob
 };
 
 database_derived!(
@@ -38,5 +37,7 @@ database_derived!(
         pub account_invites: Arc<Mutex<HashMap<String, AccountInvite>>>,
         pub sessions: Arc<Mutex<HashMap<String, Session>>>,
         pub tickets: Arc<Mutex<HashMap<String, MFATicket>>>,
+        pub inbox: Arc<Mutex<HashMap<String, InboxEntry>>>,
+        pub inbox_jobs: Arc<Mutex<HashMap<String, InboxJob>>>,
     }
 );

@@ -433,5 +433,30 @@ pub async fn create_database(db: &MongoDb) {
     .await
     .expect("Failed to create discover_requests index");
 
+    db.run_command(doc! {
+        "createIndexes": "inbox",
+        "indexes": [
+            {
+                "key": { "user_id": 1_i32, "message_id": -1_i32 },
+                "name": "user_message"
+            },
+            {
+                "key": { "message_id": 1_i32 },
+                "name": "message"
+            },
+            {
+                "key": { "channel_id": 1_i32 },
+                "name": "channel"
+            },
+            {
+                "key": { "server_id": 1_i32 },
+                "name": "server",
+                "sparse": true
+            }
+        ]
+    })
+        .await
+        .expect("Failed to create inbox indexes.");
+
     info!("Created database.");
 }

@@ -1,6 +1,6 @@
 use bson::{to_bson, Document};
 use futures::try_join;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use mongodb::options::FindOptions;
 use revolt_models::v0::MessageSort;
 use revolt_result::Result;
@@ -421,6 +421,132 @@ impl AbstractMessages for MongoDb {
         self.delete_bulk_messages(doc! {
             "author": user_id,
         }).await
+    }
+
+    async fn fetch_direct_mention_messages(
+        &self,
+        user_id: &str,
+        exclude_author: &str,
+        after: &str,
+        before: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Message>> {
+        let mut range = doc! { "$gt": after };
+        if let Some(before) = before {
+            range.insert("$lt", before);
+        }
+
+        let cursor = self
+            .col::<Message>(COL)
+            .find(doc! {
+                "mentions": user_id,
+                "author": { "$ne": exclude_author },
+                "_id": range,
+            })
+            .sort(doc! { "_id": -1 })
+            .limit(limit)
+            .await
+            .map_err(|_| create_database_error!("find", COL))?;
+
+        cursor
+            .try_collect::<Vec<Message>>()
+            .await
+            .map_err(|_| create_database_error!("find", COL))
+    }
+
+    async fn fetch_role_mention_messages(
+        &self,
+        roles: &[(String, String, Vec<String>)],
+        exclude_author: &str,
+        after: &str,
+        before: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Message>> {
+        if roles.is_empty() {
+            return Ok(vec![]);
+        }
+
+        const ROLE_QUERY_CHUNK: usize = 32;
+
+        let mut found: Vec<Message> = vec![];
+        for role_chunk in roles.chunks(ROLE_QUERY_CHUNK) {
+            let clauses: Vec<Document> = role_chunk
+                .iter()
+                .map(|(role_id, since, channels)| {
+                    let lower = since.as_str().max(after);
+                    let mut range = doc! { "$gt": lower };
+                    if let Some(before) = before {
+                        range.insert("$lt", before);
+                    }
+
+                    doc! {
+                        "role_mentions": role_id,
+                        "channel": { "$in": channels },
+                        "_id": range,
+                    }
+                })
+                .collect();
+
+            let cursor = self
+                .col::<Message>(COL)
+                .find(doc! {
+                    "$or": clauses,
+                    "author": { "$ne": exclude_author },
+                })
+                .sort(doc! { "_id": -1 })
+                .limit(limit)
+                .await
+                .map_err(|_| create_database_error!("find", COL))?;
+
+            found.extend(
+                cursor
+                    .try_collect::<Vec<Message>>()
+                    .await
+                    .map_err(|_| create_database_error!("find", COL))?,
+            );
+        }
+
+        found.sort_by(|a, b| b.id.cmp(&a.id));
+        found.dedup_by(|a, b| a.id == b.id);
+        found.truncate(limit.max(0) as usize);
+
+        Ok(found)
+    }
+
+    async fn fetch_everyone_mention_messages(
+        &self,
+        channel_ids: &[String],
+        exclude_author: &str,
+        after: &str,
+        before: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Message>> {
+        if channel_ids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut range = doc! { "$gt": after };
+        if let Some(before) = before {
+            range.insert("$lt", before);
+        }
+
+        let cursor = self
+            .col::<Message>(COL)
+            .find(doc! {
+                "channel": { "$in": channel_ids },
+                "flags": { "$gte": 4, "$bitsAllSet": 4 },
+                "author": { "$ne": exclude_author },
+                "_id": range,
+            })
+            .sort(doc! { "_id": -1 })
+            .limit(limit)
+            .await
+            .map_err(|_| create_database_error!("find", COL))?;
+
+        cursor
+            .try_collect::<Vec<Message>>()
+            .await
+            .map_err(|_| create_database_error!("find", COL))
     }
 }
 

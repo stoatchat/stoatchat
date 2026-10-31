@@ -4,6 +4,7 @@ use revolt_permissions::{
     ChannelPermission, ChannelType, Override, OverrideField, PermissionValue, ALLOW_IN_TIMEOUT,
     DEFAULT_PERMISSION_DIRECT_MESSAGE,
 };
+use revolt_result::Result;
 
 use crate::{Channel, Database, Member, Server, User};
 
@@ -25,7 +26,7 @@ pub struct BulkDatabasePermissionQuery<'a> {
 }
 
 impl<'z, 'x> BulkDatabasePermissionQuery<'x> {
-    pub async fn members_can_see_channel(&'z mut self) -> HashMap<String, bool>
+    pub async fn members_can_see_channel(&'z mut self) -> Result<HashMap<String, bool>>
     where
         'z: 'x,
     {
@@ -43,7 +44,7 @@ impl<'z, 'x> BulkDatabasePermissionQuery<'x> {
                 .collect()
         } else {
             calculate_members_permissions(self)
-                .await
+                .await?
                 .iter()
                 .map(|(m, p)| {
                     (
@@ -53,7 +54,7 @@ impl<'z, 'x> BulkDatabasePermissionQuery<'x> {
                 })
                 .collect()
         };
-        member_perms
+        Ok(member_perms)
     }
 }
 
@@ -74,17 +75,17 @@ impl<'z> BulkDatabasePermissionQuery<'z> {
     pub async fn from_server_id<'a>(
         db: &'a Database,
         server: &str,
-    ) -> BulkDatabasePermissionQuery<'a> {
-        BulkDatabasePermissionQuery {
+    ) -> Result<BulkDatabasePermissionQuery<'a>> {
+        Ok(BulkDatabasePermissionQuery {
             database: db,
-            server: db.fetch_server(server).await.unwrap(),
+            server: db.fetch_server(server).await?,
             channel: None,
             users: None,
             members: None,
             cached_members: None,
             cached_users: None,
             cached_member_perms: None,
-        }
+        })
     }
 
     pub fn channel(self, channel: &'z Channel) -> BulkDatabasePermissionQuery<'z> {
@@ -185,7 +186,7 @@ impl<'z> BulkDatabasePermissionQuery<'z> {
 /// Calculate members permissions in a server channel.
 async fn calculate_members_permissions<'a>(
     query: &'a mut BulkDatabasePermissionQuery<'a>,
-) -> HashMap<String, PermissionValue> {
+) -> Result<HashMap<String, PermissionValue>> {
     let mut resp = HashMap::new();
 
     let (_, channel_role_permissions, channel_default_permissions) = match query
@@ -212,13 +213,7 @@ async fn calculate_members_permissions<'a>(
             .map(|m| m.id.user.clone())
             .collect();
 
-        query.cached_users = Some(
-            query
-                .database
-                .fetch_users(&ids[..])
-                .await
-                .expect("Failed to get data from the db"),
-        );
+        query.cached_users = Some(query.database.fetch_users(&ids[..]).await?);
 
         query.users = Some(query.cached_users.as_ref().unwrap().to_vec())
     }
@@ -238,8 +233,7 @@ async fn calculate_members_permissions<'a>(
             query
                 .database
                 .fetch_members(&query.server.id, &ids[..])
-                .await
-                .expect("Failed to get data from the db"),
+                .await?,
         );
         query.members = Some(query.cached_members.as_ref().unwrap().to_vec())
     }
@@ -329,7 +323,7 @@ async fn calculate_members_permissions<'a>(
         resp.insert(user.id.clone(), permission);
     }
 
-    resp
+    Ok(resp)
 }
 
 /// Calculates a member's server permissions

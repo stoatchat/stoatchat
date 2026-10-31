@@ -113,7 +113,7 @@ impl Consumer for MassMessageConsumer {
             if query.is_none() {
                 query = Some(
                     BulkDatabasePermissionQuery::from_server_id(&query_db, &payload.server_id)
-                        .await
+                        .await?
                         .from_channel_id(push.channel.id().to_string()) // wrong channel model, so fetch the right one
                         .await,
                 );
@@ -140,7 +140,7 @@ impl Consumer for MassMessageConsumer {
                     loop {
                         let mut chunk: Vec<Member> = vec![];
                         for _ in 0..config.pushd.mass_mention_chunk_size {
-                            if let Some(member) = db_query.next().await {
+                            if let Some(member) = db_query.next().await? {
                                 chunk.push(member);
                             } else {
                                 exhausted = true;
@@ -197,7 +197,7 @@ impl Consumer for MassMessageConsumer {
                         chunk.clear();
 
                         for _ in 0..config.pushd.mass_mention_chunk_size {
-                            if let Some(member) = role_members.next().await {
+                            if let Some(member) = role_members.next().await? {
                                 chunk.push(member);
                             } else {
                                 exhausted = true;
@@ -208,7 +208,7 @@ impl Consumer for MassMessageConsumer {
                         let mut q = query.clone().members(&chunk);
                         let viewing_members: Vec<String> = q
                             .members_can_see_channel()
-                            .await
+                            .await?
                             .iter()
                             .filter_map(|(uid, viewable)| {
                                 if *viewable && !existing_mentions.contains(uid) {

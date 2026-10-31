@@ -16,7 +16,7 @@ use validator::Validate;
 use crate::{events::client::EventV1, util::{
     bulk_permissions::BulkDatabasePermissionQuery, idempotency::IdempotencyKey,
     permissions::DatabasePermissionQuery,
-}, Channel, Database, Emoji, EmojiParent, File, User, AMQP};
+}, Channel, Database, Emoji, EmojiParent, File, User, AMQP, InboxJob};
 
 #[cfg(feature = "tasks")]
 use crate::tasks::{self, ack::AckEvent};
@@ -49,6 +49,9 @@ auto_derived_partial!(
         /// Time at which this message was last edited
         #[serde(skip_serializing_if = "Option::is_none")]
         pub edited: Option<Timestamp>,
+        /// Creation time in nanoseconds since the Unix epoch
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub created_at_ns: Option<i64>,
         /// Attached embeds to this message
         #[serde(skip_serializing_if = "Option::is_none")]
         pub embeds: Option<Vec<Embed>>,
@@ -246,6 +249,7 @@ impl Default for Message {
             system: None,
             attachments: None,
             edited: None,
+            created_at_ns: None,
             embeds: None,
             mentions: None,
             role_mentions: None,
@@ -261,6 +265,15 @@ impl Default for Message {
 
 #[allow(clippy::disallowed_methods)]
 impl Message {
+    /// Nanosecond creation timestamp, falling back to the ULID timestamp.
+    pub fn created_at_ns(&self) -> i64 {
+        self.created_at_ns.unwrap_or_else(|| {
+            Ulid::from_string(&self.id)
+                .map(|ulid| ulid.timestamp_ms() as i64 * 1_000_000)
+                .unwrap_or(0)
+        })
+    }
+
     /// Create message from API data
     #[allow(clippy::too_many_arguments)]
     pub async fn create_from_api(
@@ -357,6 +370,11 @@ impl Message {
         let message_id = Ulid::new().to_string();
         let mut message = Message {
             id: message_id.clone(),
+            created_at_ns: Some(
+                Timestamp::now_utc()
+                    .duration_since(Timestamp::UNIX_EPOCH)
+                    .whole_nanoseconds() as i64,
+            ),
             channel: channel.id().to_string(),
             masquerade: data.masquerade.map(|masquerade| masquerade.into()),
             interactions: data
@@ -388,6 +406,13 @@ impl Message {
             emojis,
             ..
         } = message_mentions;
+
+        // Role and mass mentions only apply to text channels.
+        if !matches!(channel, Channel::TextChannel { .. }) {
+            role_mentions.clear();
+            mentions_everyone = false;
+            mentions_online = false;
+        }
 
         if allow_mass_mentions && server_id.is_some() && !role_mentions.is_empty() {
             let server_data = db
@@ -511,11 +536,11 @@ impl Message {
                             // if there are still mentions, drill down to a channel-level
                             let member_channel_view_perms =
                                 BulkDatabasePermissionQuery::from_server_id(db, server)
-                                    .await
+                                    .await?
                                     .channel(&channel)
                                     .members(&valid_members)
                                     .members_can_see_channel()
-                                    .await;
+                                    .await?;
 
                             user_mentions
                                 .retain(|m| *member_channel_view_perms.get(m).unwrap_or(&false));
@@ -695,15 +720,30 @@ impl Message {
         channel: &Channel,
         generate_embeds: bool,
     ) -> Result<()> {
-        self.send_without_notifications(
-            db,
-            user.clone(),
-            member.clone(),
-            matches!(channel, Channel::DirectMessage { .. }),
-            generate_embeds,
-            true,
-        )
-        .await?;
+        let inbox_job = (!self.has_suppressed_notifications()
+            && (self.mentions.is_some() || self.contains_mass_push_mention()))
+        .then(|| InboxJob {
+            message_id: self.id.clone(),
+            channel_id: self.channel.clone(),
+        });
+
+        if let Some(job) = &inbox_job {
+            db.insert_inbox_job(job).await?;
+        }
+
+        if let Err(e) = self
+            .send_without_notifications(
+                db,
+                user.clone(),
+                member.clone(),
+                matches!(channel, Channel::DirectMessage { .. }),
+                generate_embeds,
+                true,
+            )
+            .await
+        {
+            return Err(e);
+        }
 
         let is_dm_or_group = matches!(
             channel,
@@ -745,6 +785,16 @@ impl Message {
                 },
             )
             .await;
+        }
+
+        if let Some(job) = inbox_job {
+            let db = db.clone();
+
+            tokio::spawn(async move {
+                if let Err(e) = job.process(&db).await {
+                    revolt_config::capture_error(&e);
+                }
+            });
         }
 
         Ok(())
@@ -1101,6 +1151,10 @@ impl Message {
             }
         }
 
+        if let Err(e) = db.delete_inbox_entries_for_messages(&[self.id.clone()]).await {
+            revolt_config::capture_error(&e);
+        }
+
         EventV1::MessageDelete {
             id: self.id.clone(),
             channel: self.channel.clone(),
@@ -1121,6 +1175,11 @@ impl Message {
             .collect::<Vec<String>>();
 
         db.delete_messages(channel, &valid_ids).await?;
+
+        if let Err(e) = db.delete_inbox_entries_for_messages(&valid_ids).await {
+            revolt_config::capture_error(&e);
+        }
+
         EventV1::BulkMessageDelete {
             channel: channel.to_string(),
             ids: valid_ids,
@@ -1143,6 +1202,9 @@ impl Message {
 
         for (channel_id, message_ids) in deleted_groups {
             if !message_ids.is_empty() {
+                if let Err(e) = db.delete_inbox_entries_for_messages(&message_ids).await {
+                    revolt_config::capture_error(&e);
+                }
                 EventV1::BulkMessageDelete {
                     channel: channel_id.clone(),
                     ids: message_ids,
@@ -1213,6 +1275,11 @@ impl SystemMessage {
     pub fn into_message(self, channel: String) -> Message {
         Message {
             id: Ulid::new().to_string(),
+            created_at_ns: Some(
+                Timestamp::now_utc()
+                    .duration_since(Timestamp::UNIX_EPOCH)
+                    .whole_nanoseconds() as i64,
+            ),
             channel,
             author: "00000000000000000000000000".to_string(),
             system: Some(self),

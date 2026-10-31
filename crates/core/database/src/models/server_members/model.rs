@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use iso8601_timestamp::Timestamp;
 use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
@@ -38,6 +40,9 @@ auto_derived_partial!(
         /// Member's roles
         #[serde(skip_serializing_if = "Vec::is_empty", default)]
         pub roles: Vec<String>,
+        /// Timestamp each role was granted
+        #[serde(skip_serializing_if = "HashMap::is_empty", default)]
+        pub role_since: HashMap<String, Timestamp>,
         /// Timestamp this member is timed out until
         #[serde(skip_serializing_if = "Option::is_none")]
         pub timeout: Option<Timestamp>,
@@ -95,6 +100,7 @@ impl Default for Member {
             pronouns: None,
             avatar: None,
             roles: vec![],
+            role_since: HashMap::new(),
             timeout: None,
             can_publish: true,
             can_receive: true,
@@ -209,9 +215,17 @@ impl Member {
     pub async fn update(
         &mut self,
         db: &Database,
-        partial: PartialMember,
+        mut partial: PartialMember,
         remove: Vec<FieldsMember>,
     ) -> Result<()> {
+        if remove.contains(&FieldsMember::Roles) {
+            self.set_roles(Vec::new());
+            partial.role_since = Some(HashMap::new());
+        } else if let Some(roles) = &partial.roles {
+            self.set_roles(roles.clone());
+            partial.role_since = Some(self.role_since.clone());
+        }
+
         for field in &remove {
             self.remove_field(field);
         }
@@ -231,13 +245,52 @@ impl Member {
         Ok(())
     }
 
+    /// Set roles, preserving grant times for retained roles and stamping new ones.
+    pub fn set_roles(&mut self, roles: Vec<String>) {
+        let now = Timestamp::now_utc();
+        let joined_at = self.joined_at;
+        let previous = self.roles.clone();
+
+        self.role_since
+            .retain(|role, _| roles.contains(role) && previous.contains(role));
+
+        for role in &roles {
+            self.role_since.entry(role.clone()).or_insert_with(|| {
+                if previous.contains(role) {
+                    joined_at
+                } else {
+                    now
+                }
+            });
+        }
+
+        self.roles = roles;
+    }
+
+    /// Grant time for a role the member currently holds.
+    pub fn role_since(&self, role: &str) -> Option<Timestamp> {
+        if self.roles.iter().any(|held| held.as_str() == role) {
+            Some(
+                self.role_since
+                    .get(role)
+                    .copied()
+                    .unwrap_or(self.joined_at),
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn remove_field(&mut self, field: &FieldsMember) {
         match field {
             FieldsMember::JoinedAt => {}
             FieldsMember::Avatar => self.avatar = None,
             FieldsMember::Nickname => self.nickname = None,
             FieldsMember::Pronouns => self.pronouns = None,
-            FieldsMember::Roles => self.roles.clear(),
+            FieldsMember::Roles => {
+                self.roles.clear();
+                self.role_since.clear();
+            }
             FieldsMember::Timeout => self.timeout = None,
             FieldsMember::CanReceive => self.can_receive = true,
             FieldsMember::CanPublish => self.can_publish = true,
@@ -334,6 +387,9 @@ impl Member {
                 .ok();
             }
         }
+        if let Err(e) = db.delete_inbox_entries_for_user(&self.id.user, Some(&self.id.server)).await {
+            revolt_config::capture_error(&e);
+        }
 
         Ok(())
     }
@@ -344,7 +400,52 @@ mod tests {
     use iso8601_timestamp::{Duration, Timestamp};
     use revolt_models::v0::DataCreateServer;
     use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
-    use crate::{Member, PartialMember, RemovalIntention, Server, User};
+    use crate::{Member, PartialMember, RemovalIntention, Role, Server, User};
+
+    #[tokio::test]
+    async fn set_roles_preserves_legacy_fallback() {
+        let joined_at = Timestamp::now_utc() - Duration::days(10);
+        let mut member = Member {
+            joined_at,
+            roles: vec!["A".to_string()],
+            role_since: Default::default(),
+            ..Default::default()
+        };
+
+        let before = Timestamp::now_utc();
+        member.set_roles(vec!["A".to_string(), "B".to_string()]);
+
+        // The retained role keeps its joined_at fallback.
+        assert_eq!(member.role_since("A"), Some(joined_at));
+
+        // The newly granted role is stamped with the current time.
+        assert!(member
+            .role_since("B")
+            .is_some_and(|granted| granted >= before && granted > joined_at));
+    }
+
+    #[tokio::test]
+    async fn set_roles_restamps_orphaned_role_metadata() {
+        use std::collections::HashMap;
+
+        let joined_at = Timestamp::now_utc() - Duration::days(10);
+        let stale = Timestamp::now_utc() - Duration::days(5);
+        let mut member = Member {
+            joined_at,
+            roles: vec![],
+            role_since: HashMap::from([("R".to_string(), stale)]),
+            ..Default::default()
+        };
+
+        let before = Timestamp::now_utc();
+        member.set_roles(vec!["R".to_string()]);
+
+        // A stale entry for a role that was not previously held must not be
+        // reused when the role is granted again.
+        assert!(member
+            .role_since("R")
+            .is_some_and(|granted| granted >= before));
+    }
 
     #[tokio::test]
     async fn muted_member_rejoin() {
@@ -381,6 +482,22 @@ mod tests {
                 .unwrap()
                 .0;
 
+            let role = Role::create(&db, &server, "Test Role".to_string())
+                .await
+                .unwrap();
+            kickable_member
+                .update(
+                    &db,
+                    PartialMember {
+                        roles: Some(vec![role.id.clone()]),
+                        ..Default::default()
+                    },
+                    vec![],
+                )
+                .await
+                .unwrap();
+            assert!(!kickable_member.role_since.is_empty());
+
             kickable_member
                 .update(
                     &db,
@@ -405,7 +522,9 @@ mod tests {
                 .unwrap()
                 .0;
 
-            assert!(kickable_member.in_timeout())
+            assert!(kickable_member.in_timeout());
+            assert!(kickable_member.roles.is_empty());
+            assert!(kickable_member.role_since.is_empty())
         });
     }
 }

@@ -345,6 +345,9 @@ pub struct GlobalLimits {
     pub restrict_server_creation: Vec<String>,
 
     pub max_invite_duration_days: usize,
+
+    /// Number of days an inbox entry is kept before pruning.
+    pub inbox_retention_days: usize,
 }
 
 #[derive(Deserialize, Debug, Clone)]

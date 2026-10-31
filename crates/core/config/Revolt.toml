@@ -258,6 +258,9 @@ restrict_server_creation = []
 # Number of days after creation before an invite expires
 max_invite_duration_days = 30
 
+# Number of days an inbox entry is kept before pruning
+inbox_retention_days = 30
+
 [features.limits.new_user]
 # Limits imposed on new users
 

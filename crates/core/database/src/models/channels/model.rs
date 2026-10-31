@@ -883,6 +883,9 @@ impl Channel {
         // TODO: missing functionality:
         // - group invites
         // - channels list / categories list on server
+        if let Err(e) = db.delete_inbox_entries_for_channel(self.id()).await {
+            revolt_config::capture_error(&e);
+        }
         db.delete_channel(self).await
     }
 }

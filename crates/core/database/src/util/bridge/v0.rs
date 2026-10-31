@@ -710,6 +710,7 @@ impl From<Member> for crate::Member {
             pronouns: value.pronouns,
             avatar: value.avatar.map(|f| f.into()),
             roles: value.roles,
+            role_since: Default::default(),
             timeout: value.timeout,
             can_publish: value.can_publish,
             can_receive: value.can_receive,
@@ -742,6 +743,7 @@ impl From<PartialMember> for crate::PartialMember {
             pronouns: value.pronouns,
             avatar: value.avatar.map(|f| f.into()),
             roles: value.roles,
+            role_since: None,
             timeout: value.timeout,
             can_publish: value.can_publish,
             can_receive: value.can_receive,
@@ -1738,5 +1740,15 @@ impl From<WebPushSubscription> for crate::WebPushSubscription {
 impl From<crate::PartialEmoji> for PartialEmoji {
     fn from(value: crate::PartialEmoji) -> Self {
         PartialEmoji { name: value.name }
+    }
+}
+
+impl From<crate::InboxKind> for InboxKind {
+    fn from(kind: crate::InboxKind) -> Self {
+        match kind {
+            crate::InboxKind::Mention => InboxKind::Mention,
+            crate::InboxKind::Role => InboxKind::Role,
+            crate::InboxKind::Everyone => InboxKind::Everyone,
+        }
     }
 }

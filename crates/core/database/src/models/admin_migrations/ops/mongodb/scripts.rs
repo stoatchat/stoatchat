@@ -26,7 +26,7 @@ struct MigrationInfo {
     revision: i32,
 }
 
-pub const LATEST_REVISION: i32 = 55; // MUST BE +1 to last migration
+pub const LATEST_REVISION: i32 = 56; // MUST BE +1 to last migration
 
 pub async fn migrate_database(db: &MongoDb) {
     let migrations = db.col::<Document>("migrations");
@@ -56,6 +56,7 @@ pub async fn migrate_database(db: &MongoDb) {
             .expect("Failed to commit migration information.");
 
         info!("Migration complete. Currently at revision {}.", revision);
+
     } else {
         panic!("Database was configured incorrectly, possibly because initalization failed.")
     }
@@ -1600,6 +1601,34 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             .await
             .expect("Failed to update default_permissions");
     };
+
+    if revision <= 55 {
+        info!("Running migration [revision 55 / 31/10/2026]: create inbox indexes.");
+        db.db().run_command(doc! {
+        "createIndexes": "inbox",
+        "indexes": [
+            {
+                "key": { "user_id": 1_i32, "message_id": -1_i32 },
+                "name": "user_message"
+            },
+            {
+                "key": { "message_id": 1_i32 },
+                "name": "message"
+            },
+            {
+                "key": { "channel_id": 1_i32 },
+                "name": "channel"
+            },
+            {
+                "key": { "server_id": 1_i32 },
+                "name": "server",
+                "sparse": true
+            }
+        ]
+    })
+            .await
+            .expect("Failed to create inbox indexes.");
+    }
 
     // Reminder to update LATEST_REVISION when adding new migrations.
     LATEST_REVISION.max(revision)

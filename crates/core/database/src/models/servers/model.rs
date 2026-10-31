@@ -232,7 +232,9 @@ impl Server {
         }
         .p(self.id.clone())
         .await;
-
+        if let Err(e) = db.delete_inbox_entries_for_server(&self.id).await {
+            revolt_config::capture_error(&e);
+        }
         db.delete_server(&self.id).await
     }
 

@@ -23,6 +23,7 @@ mod servers;
 mod sessions;
 mod user_settings;
 mod users;
+mod inbox;
 
 pub use account_invites::*;
 pub use accounts::*;
@@ -49,6 +50,7 @@ pub use servers::*;
 pub use sessions::*;
 pub use user_settings::*;
 pub use users::*;
+pub use inbox::*;
 
 use crate::{Database, ReferenceDb};
 
@@ -83,6 +85,7 @@ pub trait AbstractDatabase:
     + sessions::AbstractSessions
     + mfa_tickets::AbstractMFATickets
     + discover_requests::AbstractDiscoverRequest
+    + inbox::AbstractInbox
 {
 }
 

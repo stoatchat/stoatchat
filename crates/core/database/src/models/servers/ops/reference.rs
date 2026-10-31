@@ -30,14 +30,10 @@ impl AbstractServers for ReferenceDb {
     /// Fetch a servers by their ids
     async fn fetch_servers<'a>(&self, ids: &'a [String]) -> Result<Vec<Server>> {
         let servers = self.servers.lock().await;
-        ids.iter()
-            .map(|id| {
-                servers
-                    .get(id)
-                    .cloned()
-                    .ok_or_else(|| create_error!(NotFound))
-            })
-            .collect()
+        Ok(ids
+            .iter()
+            .filter_map(|id| servers.get(id).cloned())
+            .collect())
     }
 
     async fn fetch_owned_servers(&self, user_id: &str) -> Result<Vec<Server>> {
