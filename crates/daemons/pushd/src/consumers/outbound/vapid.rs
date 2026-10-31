@@ -11,9 +11,26 @@ use base64::{
 use lapin::{message::Delivery, Channel as AMQPChannel, Connection};
 use revolt_database::{events::rabbit::*, util::format_display_name, Database};
 use web_push::{
-    ContentEncoding, IsahcWebPushClient, SubscriptionInfo, SubscriptionKeys, VapidSignatureBuilder,
-    WebPushClient, WebPushError, WebPushMessageBuilder,
+    ContentEncoding, IsahcWebPushClient, SubscriptionInfo, SubscriptionKeys, Urgency,
+    VapidSignatureBuilder, WebPushClient, WebPushError, WebPushMessageBuilder,
 };
+
+/// Web Push caps out around 3KB, so leave some room for everything else
+const MAX_BODY_BYTES: usize = 1000;
+
+/// Cut a string down to `max` bytes without splitting a character
+fn truncate_utf8(text: &str, max: usize) -> String {
+    if text.len() <= max {
+        return text.to_string();
+    }
+
+    let mut end = max;
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+
+    format!("{}…", &text[..end])
+}
 
 #[derive(Clone)]
 #[allow(unused)]
@@ -110,7 +127,29 @@ impl Consumer for VapidOutboundConsumer {
                 serde_json::to_string(&body)?
             }
             PayloadKind::Generic(alert) => serde_json::to_string(&alert)?,
-            PayloadKind::MessageNotification(alert) => serde_json::to_string(&alert)?,
+            PayloadKind::MessageNotification(alert) => {
+                // just what the web push worker uses, the full objects are often too big to send
+                let channel_type = match &alert.channel {
+                    revolt_models::v0::Channel::SavedMessages { .. } => "SavedMessages",
+                    revolt_models::v0::Channel::DirectMessage { .. } => "DirectMessage",
+                    revolt_models::v0::Channel::Group { .. } => "Group",
+                    revolt_models::v0::Channel::TextChannel { .. } => "TextChannel",
+                };
+
+                serde_json::to_string(&serde_json::json!({
+                    "author": alert.author,
+                    "icon": alert.icon,
+                    "image": alert.image,
+                    "body": truncate_utf8(&alert.body, MAX_BODY_BYTES),
+                    "tag": alert.tag,
+                    "timestamp": alert.timestamp,
+                    "url": alert.url,
+                    "channel": {
+                        "channel_type": channel_type,
+                        "name": alert.channel.name(),
+                    },
+                }))?
+            }
             PayloadKind::DmCallStartEnd(alert) => {
                 let initiator_name = if let Some(server_id) =
                     self.db.fetch_channel(&alert.channel_id).await?.server()
@@ -152,12 +191,18 @@ impl Consumer for VapidOutboundConsumer {
         let mut builder = WebPushMessageBuilder::new(&subscription);
         builder.set_vapid_signature(signature);
 
-        builder.set_payload(ContentEncoding::AesGcm, payload_body.as_bytes());
+        builder.set_payload(ContentEncoding::Aes128Gcm, payload_body.as_bytes());
+        builder.set_urgency(Urgency::High);
 
         let msg = builder.build()?;
 
         match self.client.send(msg).await {
-            Err(WebPushError::Unauthorized) => {
+            // 401 = wrong key, 404/410 = subscription's gone
+            Err(
+                WebPushError::Unauthorized
+                | WebPushError::EndpointNotFound
+                | WebPushError::EndpointNotValid,
+            ) => {
                 if let Err(err) = self
                     .db
                     .remove_push_subscription_by_session_id(&payload.session_id)

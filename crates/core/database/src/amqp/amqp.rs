@@ -1,6 +1,7 @@
 use std::{
     collections::HashSet,
     sync::{Arc, OnceLock},
+    time::Duration,
 };
 
 use crate::User;
@@ -22,6 +23,20 @@ static AMQP_INSTANCE: OnceLock<AMQP> = OnceLock::new();
 
 pub fn get_amqp() -> &'static AMQP {
     AMQP_INSTANCE.get().expect("No AMQP instance set.")
+}
+
+/// How long to wait for the first connection before giving up, retries would otherwise hang startup forever
+pub const AMQP_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Reconnect automatically, otherwise a RabbitMQ restart leaves us dead until we restart too
+pub fn amqp_connection_properties() -> ConnectionProperties {
+    ConnectionProperties::default()
+        .configure_backoff(|backoff| {
+            backoff
+                .with_max_delay(Duration::from_secs(30))
+                .without_max_times()
+        })
+        .enable_auto_recover()
 }
 
 #[derive(Clone)]
@@ -63,17 +78,21 @@ impl AMQP {
         let config = revolt_config::config().await;
 
         let connection = Arc::new(
-            Connection::connect(
-                &format!(
-                    "amqp://{}:{}@{}:{}",
-                    &config.rabbit.username,
-                    &config.rabbit.password,
-                    &config.rabbit.host,
-                    &config.rabbit.port,
+            tokio::time::timeout(
+                AMQP_CONNECT_TIMEOUT,
+                Connection::connect(
+                    &format!(
+                        "amqp://{}:{}@{}:{}",
+                        &config.rabbit.username,
+                        &config.rabbit.password,
+                        &config.rabbit.host,
+                        &config.rabbit.port,
+                    ),
+                    amqp_connection_properties(),
                 ),
-                ConnectionProperties::default(),
             )
             .await
+            .expect("Timed out connecting to RabbitMQ")
             .expect("Failed to connect to RabbitMQ"),
         );
 

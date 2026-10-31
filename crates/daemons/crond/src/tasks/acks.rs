@@ -3,12 +3,15 @@ use lapin::{
     options::*,
     types::FieldTable,
     uri::{AMQPAuthority, AMQPQueryString, AMQPUri, AMQPUserInfo},
-    ConnectionBuilder, ConnectionProperties, ExchangeKind,
+    ConnectionBuilder, ExchangeKind,
 };
 use log::{debug, info};
 use redis_kiss::{get_connection, AsyncCommands, Conn as RedisConnection};
 use revolt_config::config;
-use revolt_database::{events::rabbit::AckEventPayload, Database, AMQP};
+use revolt_database::{
+    amqp_connection_properties, events::rabbit::AckEventPayload, Database, AMQP,
+    AMQP_CONNECT_TIMEOUT,
+};
 use revolt_result::{Result, ToRevoltError};
 use serde_json;
 
@@ -33,13 +36,17 @@ pub async fn task(db: Database, amqp: AMQP) -> Result<()> {
         query: AMQPQueryString::default(),
     };
 
-    let connection = ConnectionBuilder::new()
-        .expect("Builder")
-        .with_uri(uri)
-        .with_properties(ConnectionProperties::default())
-        .connect()
-        .await
-        .expect("Failed to connect to rabbitmq");
+    let connection = tokio::time::timeout(
+        AMQP_CONNECT_TIMEOUT,
+        ConnectionBuilder::new()
+            .expect("Builder")
+            .with_uri(uri)
+            .with_properties(amqp_connection_properties())
+            .connect(),
+    )
+    .await
+    .expect("Timed out connecting to rabbitmq")
+    .expect("Failed to connect to rabbitmq");
 
     let reader_channel = connection
         .create_channel()

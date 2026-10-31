@@ -29,14 +29,28 @@ struct MessagePayload<'a> {
     #[serde(skip_serializing)]
     device_token: &'a str,
 
-    message: &'a Message,
+    message: MessageData<'a>,
     url: &'a str,
-    #[serde(rename = "camelCase")]
+    #[serde(rename = "authorAvatar")]
     author_avatar: &'a str,
-    #[serde(rename = "camelCase")]
+    #[serde(rename = "authorDisplayName")]
     author_display_name: &'a str,
-    #[serde(rename = "camelCase")]
+    #[serde(rename = "channelName")]
     channel_name: &'a str,
+}
+
+/// The message sent alongside a notification
+#[derive(Serialize, Debug)]
+#[serde(untagged)]
+enum MessageData<'a> {
+    Full(&'a Message),
+    /// Just enough for the client to fetch the message itself
+    Ids {
+        #[serde(rename = "_id")]
+        id: &'a str,
+        channel: &'a str,
+        author: &'a str,
+    },
 }
 
 impl<'a> PayloadLike for MessagePayload<'a> {
@@ -57,11 +71,10 @@ struct CallStartStopPayload<'a> {
     device_token: &'a str,
 
     initiator_id: &'a str,
-    #[serde(rename = "camelCase")]
+    #[serde(rename = "channelId")]
     channel_id: &'a str,
-    #[serde(rename = "camelCase")]
+    #[serde(rename = "startedAt")]
     started_at: &'a str,
-    #[serde(rename = "camelCase")]
     ended: bool,
 }
 
@@ -72,6 +85,45 @@ impl<'a> PayloadLike for CallStartStopPayload<'a> {
     fn get_options(&self) -> &NotificationOptions<'a> {
         &self.options
     }
+}
+
+// region: helpers
+
+/// APNs payload limit
+const MAX_APNS_PAYLOAD_BYTES: usize = 4096;
+
+/// Max size of the body we show in the notification
+const MAX_BODY_BYTES: usize = 1024;
+
+/// Cut a string down to `max` bytes without splitting a character
+fn truncate_utf8(text: &str, max: usize) -> String {
+    if text.len() <= max {
+        return text.to_string();
+    }
+
+    let mut end = max;
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+
+    format!("{}…", &text[..end])
+}
+
+/// APNs rejects payloads over 4kb, so if the full message doesn't fit only send its ids
+/// and let the client fetch the rest. Serializes the payload once.
+fn fit_payload<'a>(
+    payload: &mut MessagePayload<'a>,
+    message: &'a Message,
+) -> serde_json::Result<()> {
+    if serde_json::to_vec(payload)?.len() > MAX_APNS_PAYLOAD_BYTES {
+        payload.message = MessageData::Ids {
+            id: &message.id,
+            channel: &message.channel,
+            author: &message.author,
+        };
+    }
+
+    Ok(())
 }
 
 // region: consumer
@@ -305,12 +357,13 @@ impl Consumer for ApnsOutboundConsumer {
 
             PayloadKind::MessageNotification(alert) => {
                 let title = self.format_title(&alert);
-                let apn_payload = MessagePayload {
+                let body = truncate_utf8(&alert.body, MAX_BODY_BYTES);
+                let mut apn_payload = MessagePayload {
                     aps: APS {
                         alert: Some(APSAlert::Default(DefaultAlert {
                             title: Some(&title),
                             subtitle: None,
-                            body: Some(&alert.body),
+                            body: Some(&body),
                             title_loc_key: None,
                             title_loc_args: None,
                             action_loc_key: None,
@@ -328,12 +381,14 @@ impl Consumer for ApnsOutboundConsumer {
                     },
                     device_token: &payload.token,
                     options: payload_options.clone(),
-                    message: &alert.message,
+                    message: MessageData::Full(&alert.message),
                     url: &alert.url,
                     author_avatar: &alert.icon,
                     author_display_name: &alert.author,
                     channel_name: alert.channel.name().unwrap_or(&title),
                 };
+
+                fit_payload(&mut apn_payload, &alert.message)?;
 
                 debug!(
                     "Sending message notification for user: {:}",
@@ -415,5 +470,76 @@ impl Consumer for ApnsOutboundConsumer {
         };
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn message(content_len: usize) -> Message {
+        serde_json::from_value(json!({
+            "_id": "01HZ0000000000000000000000",
+            "channel": "01HZ0000000000000000000001",
+            "author": "01HZ0000000000000000000002",
+            "content": "a".repeat(content_len),
+        }))
+        .unwrap()
+    }
+
+    fn payload(message: &Message) -> MessagePayload<'_> {
+        MessagePayload {
+            aps: APS::default(),
+            options: NotificationOptions::default(),
+            device_token: "token",
+            message: MessageData::Full(message),
+            url: "https://example.com",
+            author_avatar: "https://example.com/avatar.png",
+            author_display_name: "someone",
+            channel_name: "general",
+        }
+    }
+
+    #[test]
+    fn small_messages_are_sent_in_full() {
+        let message = message(100);
+        let mut payload = payload(&message);
+
+        fit_payload(&mut payload, &message).unwrap();
+
+        assert_eq!(
+            serde_json::to_value(&payload).unwrap()["message"],
+            serde_json::to_value(&message).unwrap()
+        );
+    }
+
+    #[test]
+    fn oversized_messages_fall_back_to_ids() {
+        let message = message(5000);
+        let mut payload = payload(&message);
+        assert!(serde_json::to_vec(&payload).unwrap().len() > MAX_APNS_PAYLOAD_BYTES);
+
+        fit_payload(&mut payload, &message).unwrap();
+
+        assert_eq!(
+            serde_json::to_value(&payload).unwrap()["message"],
+            json!({
+                "_id": "01HZ0000000000000000000000",
+                "channel": "01HZ0000000000000000000001",
+                "author": "01HZ0000000000000000000002",
+            })
+        );
+        assert!(serde_json::to_vec(&payload).unwrap().len() <= MAX_APNS_PAYLOAD_BYTES);
+    }
+
+    #[test]
+    fn truncating_never_splits_a_character() {
+        // each é is two bytes, so cutting at an odd length lands mid character
+        let text = "é".repeat(10);
+        let cut = truncate_utf8(&text, 5);
+
+        assert_eq!(cut, "éé…");
+        assert_eq!(truncate_utf8("short", 100), "short");
     }
 }
