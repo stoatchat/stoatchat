@@ -1,0 +1,1341 @@
+asyncapi: 3.0.0
+info:
+  title: Events
+  version: 1.0.0
+  description: This page documents various incoming and outgoing events.
+channels:
+  Authenticate:
+    address: Authenticate
+    messages:
+      Authenticate:
+        $ref: '#/components/messages/Authenticate'
+  BeginTyping:
+    address: BeginTyping
+    messages:
+      BeginTyping:
+        $ref: '#/components/messages/BeginTyping'
+  EndTyping:
+    address: EndTyping
+    messages:
+      EndTyping:
+        $ref: '#/components/messages/EndTyping'
+  Ping:
+    address: Ping
+    messages:
+      Ping:
+        $ref: '#/components/messages/Ping'
+  Subscribe:
+    address: Subscribe
+    messages:
+      Subscribe:
+        $ref: '#/components/messages/Subscribe'
+  Error:
+    address: Error
+    messages:
+      ErrorEvent:
+        $ref: '#/components/messages/ErrorEvent'
+  Authenticated:
+    address: Authenticated
+    messages:
+      Authenticated:
+        $ref: '#/components/messages/Authenticated'
+  Logout:
+    address: Logout
+    messages:
+      Logout:
+        $ref: '#/components/messages/Logout'
+  Bulk:
+    address: Bulk
+    messages:
+      Bulk:
+        $ref: '#/components/messages/Bulk'
+  Pong:
+    address: Pong
+    messages:
+      Pong:
+        $ref: '#/components/messages/Pong'
+  Ready:
+    address: Ready
+    messages:
+      Ready:
+        $ref: '#/components/messages/Ready'
+  Message:
+    address: Message
+    messages:
+      Message:
+        $ref: '#/components/messages/Message'
+  MessageUpdate:
+    address: MessageUpdate
+    messages:
+      MessageUpdate:
+        $ref: '#/components/messages/MessageUpdate'
+  MessageAppend:
+    address: MessageAppend
+    messages:
+      MessageAppend:
+        $ref: '#/components/messages/MessageAppend'
+  MessageDelete:
+    address: MessageDelete
+    messages:
+      MessageDelete:
+        $ref: '#/components/messages/MessageDelete'
+  MessageReact:
+    address: MessageReact
+    messages:
+      MessageReact:
+        $ref: '#/components/messages/MessageReact'
+  MessageUnreact:
+    address: MessageUnreact
+    messages:
+      MessageUnreact:
+        $ref: '#/components/messages/MessageUnreact'
+  MessageRemoveReaction:
+    address: MessageRemoveReaction
+    messages:
+      MessageRemoveReaction:
+        $ref: '#/components/messages/MessageRemoveReaction'
+  ChannelCreate:
+    address: ChannelCreate
+    messages:
+      ChannelCreate:
+        $ref: '#/components/messages/ChannelCreate'
+  ChannelUpdate:
+    address: ChannelUpdate
+    messages:
+      ChannelUpdate:
+        $ref: '#/components/messages/ChannelUpdate'
+  ChannelDelete:
+    address: ChannelDelete
+    messages:
+      ChannelDelete:
+        $ref: '#/components/messages/ChannelDelete'
+  ChannelGroupJoin:
+    address: ChannelGroupJoin
+    messages:
+      ChannelGroupJoin:
+        $ref: '#/components/messages/ChannelGroupJoin'
+  ChannelGroupLeave:
+    address: ChannelGroupLeave
+    messages:
+      ChannelGroupLeave:
+        $ref: '#/components/messages/ChannelGroupLeave'
+  ChannelStartTyping:
+    address: ChannelStartTyping
+    messages:
+      ChannelStartTyping:
+        $ref: '#/components/messages/ChannelStartTyping'
+  ChannelStopTyping:
+    address: ChannelStopTyping
+    messages:
+      ChannelStopTyping:
+        $ref: '#/components/messages/ChannelStopTyping'
+  ChannelAck:
+    address: ChannelAck
+    messages:
+      ChannelAck:
+        $ref: '#/components/messages/ChannelAck'
+  ServerCreate:
+    address: ServerCreate
+    messages:
+      ServerCreate:
+        $ref: '#/components/messages/ServerCreate'
+  ServerUpdate:
+    address: ServerUpdate
+    messages:
+      ServerUpdate:
+        $ref: '#/components/messages/ServerUpdate'
+  ServerDelete:
+    address: ServerDelete
+    messages:
+      ServerDelete:
+        $ref: '#/components/messages/ServerDelete'
+  ServerMemberUpdate:
+    address: ServerMemberUpdate
+    messages:
+      ServerMemberUpdate:
+        $ref: '#/components/messages/ServerMemberUpdate'
+  ServerMemberJoin:
+    address: ServerMemberJoin
+    messages:
+      ServerMemberJoin:
+        $ref: '#/components/messages/ServerMemberJoin'
+  ServerMemberLeave:
+    address: ServerMemberLeave
+    messages:
+      ServerMemberLeave:
+        $ref: '#/components/messages/ServerMemberLeave'
+  ServerRoleUpdate:
+    address: ServerRoleUpdate
+    messages:
+      ServerRoleUpdate:
+        $ref: '#/components/messages/ServerRoleUpdate'
+  ServerRoleDelete:
+    address: ServerRoleDelete
+    messages:
+      ServerRoleDelete:
+        $ref: '#/components/messages/ServerRoleDelete'
+  UserUpdate:
+    address: UserUpdate
+    messages:
+      UserUpdate:
+        $ref: '#/components/messages/UserUpdate'
+  UserRelationship:
+    address: UserRelationship
+    messages:
+      UserRelationship:
+        $ref: '#/components/messages/UserRelationship'
+  UserPlatformWipe:
+    address: UserPlatformWipe
+    messages:
+      UserPlatformWipe:
+        $ref: '#/components/messages/UserPlatformWipe'
+  EmojiCreate:
+    address: EmojiCreate
+    messages:
+      EmojiCreate:
+        $ref: '#/components/messages/EmojiCreate'
+  EmojiUpdate:
+    address: EmojiUpdate
+    messages:
+      EmojiUpdate:
+        $ref: '#/components/messages/EmojiUpdate'
+  EmojiDelete:
+    address: EmojiDelete
+    messages:
+      EmojiDelete:
+        $ref: '#/components/messages/EmojiDelete'
+  Auth:
+    address: Auth
+    messages:
+      Auth:
+        $ref: '#/components/messages/Auth'
+operations:
+  Authenticate.publish:
+    action: receive
+    channel:
+      $ref: '#/channels/Authenticate'
+    messages:
+      - $ref: '#/channels/Authenticate/messages/Authenticate'
+  BeginTyping.publish:
+    action: receive
+    channel:
+      $ref: '#/channels/BeginTyping'
+    messages:
+      - $ref: '#/channels/BeginTyping/messages/BeginTyping'
+  EndTyping.publish:
+    action: receive
+    channel:
+      $ref: '#/channels/EndTyping'
+    messages:
+      - $ref: '#/channels/EndTyping/messages/EndTyping'
+  Ping.publish:
+    action: receive
+    channel:
+      $ref: '#/channels/Ping'
+    messages:
+      - $ref: '#/channels/Ping/messages/Ping'
+  Subscribe.publish:
+    action: receive
+    channel:
+      $ref: '#/channels/Subscribe'
+    messages:
+      - $ref: '#/channels/Subscribe/messages/Subscribe'
+  Error.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/Error'
+    messages:
+      - $ref: '#/channels/Error/messages/ErrorEvent'
+  Authenticated.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/Authenticated'
+    messages:
+      - $ref: '#/channels/Authenticated/messages/Authenticated'
+  Logout.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/Logout'
+    messages:
+      - $ref: '#/channels/Logout/messages/Logout'
+  Bulk.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/Bulk'
+    messages:
+      - $ref: '#/channels/Bulk/messages/Bulk'
+  Pong.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/Pong'
+    messages:
+      - $ref: '#/channels/Pong/messages/Pong'
+  Ready.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/Ready'
+    messages:
+      - $ref: '#/channels/Ready/messages/Ready'
+  Message.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/Message'
+    messages:
+      - $ref: '#/channels/Message/messages/Message'
+  MessageUpdate.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/MessageUpdate'
+    messages:
+      - $ref: '#/channels/MessageUpdate/messages/MessageUpdate'
+  MessageAppend.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/MessageAppend'
+    messages:
+      - $ref: '#/channels/MessageAppend/messages/MessageAppend'
+  MessageDelete.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/MessageDelete'
+    messages:
+      - $ref: '#/channels/MessageDelete/messages/MessageDelete'
+  MessageReact.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/MessageReact'
+    messages:
+      - $ref: '#/channels/MessageReact/messages/MessageReact'
+  MessageUnreact.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/MessageUnreact'
+    messages:
+      - $ref: '#/channels/MessageUnreact/messages/MessageUnreact'
+  MessageRemoveReaction.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/MessageRemoveReaction'
+    messages:
+      - $ref: '#/channels/MessageRemoveReaction/messages/MessageRemoveReaction'
+  ChannelCreate.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/ChannelCreate'
+    messages:
+      - $ref: '#/channels/ChannelCreate/messages/ChannelCreate'
+  ChannelUpdate.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/ChannelUpdate'
+    messages:
+      - $ref: '#/channels/ChannelUpdate/messages/ChannelUpdate'
+  ChannelDelete.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/ChannelDelete'
+    messages:
+      - $ref: '#/channels/ChannelDelete/messages/ChannelDelete'
+  ChannelGroupJoin.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/ChannelGroupJoin'
+    messages:
+      - $ref: '#/channels/ChannelGroupJoin/messages/ChannelGroupJoin'
+  ChannelGroupLeave.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/ChannelGroupLeave'
+    messages:
+      - $ref: '#/channels/ChannelGroupLeave/messages/ChannelGroupLeave'
+  ChannelStartTyping.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/ChannelStartTyping'
+    messages:
+      - $ref: '#/channels/ChannelStartTyping/messages/ChannelStartTyping'
+  ChannelStopTyping.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/ChannelStopTyping'
+    messages:
+      - $ref: '#/channels/ChannelStopTyping/messages/ChannelStopTyping'
+  ChannelAck.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/ChannelAck'
+    messages:
+      - $ref: '#/channels/ChannelAck/messages/ChannelAck'
+  ServerCreate.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/ServerCreate'
+    messages:
+      - $ref: '#/channels/ServerCreate/messages/ServerCreate'
+  ServerUpdate.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/ServerUpdate'
+    messages:
+      - $ref: '#/channels/ServerUpdate/messages/ServerUpdate'
+  ServerDelete.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/ServerDelete'
+    messages:
+      - $ref: '#/channels/ServerDelete/messages/ServerDelete'
+  ServerMemberUpdate.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/ServerMemberUpdate'
+    messages:
+      - $ref: '#/channels/ServerMemberUpdate/messages/ServerMemberUpdate'
+  ServerMemberJoin.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/ServerMemberJoin'
+    messages:
+      - $ref: '#/channels/ServerMemberJoin/messages/ServerMemberJoin'
+  ServerMemberLeave.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/ServerMemberLeave'
+    messages:
+      - $ref: '#/channels/ServerMemberLeave/messages/ServerMemberLeave'
+  ServerRoleUpdate.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/ServerRoleUpdate'
+    messages:
+      - $ref: '#/channels/ServerRoleUpdate/messages/ServerRoleUpdate'
+  ServerRoleDelete.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/ServerRoleDelete'
+    messages:
+      - $ref: '#/channels/ServerRoleDelete/messages/ServerRoleDelete'
+  UserUpdate.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/UserUpdate'
+    messages:
+      - $ref: '#/channels/UserUpdate/messages/UserUpdate'
+  UserRelationship.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/UserRelationship'
+    messages:
+      - $ref: '#/channels/UserRelationship/messages/UserRelationship'
+  UserPlatformWipe.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/UserPlatformWipe'
+    messages:
+      - $ref: '#/channels/UserPlatformWipe/messages/UserPlatformWipe'
+  EmojiCreate.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/EmojiCreate'
+    messages:
+      - $ref: '#/channels/EmojiCreate/messages/EmojiCreate'
+  EmojiUpdate.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/EmojiUpdate'
+    messages:
+      - $ref: '#/channels/EmojiUpdate/messages/EmojiUpdate'
+  EmojiDelete.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/EmojiDelete'
+    messages:
+      - $ref: '#/channels/EmojiDelete/messages/EmojiDelete'
+  Auth.subscribe:
+    action: send
+    channel:
+      $ref: '#/channels/Auth'
+    messages:
+      - $ref: '#/channels/Auth/messages/Auth'
+components:
+  messages:
+    Authenticate:
+      name: Authenticate
+      title: Authenticate
+      summary: Authenticate with the server.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: Authenticate
+          token:
+            type: string
+        required:
+          - type
+          - token
+    BeginTyping:
+      name: BeginTyping
+      title: BeginTyping
+      summary: Tell other users that you have begun typing in a channel.
+      description: Must be in the specified channel or nothing will happen.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: BeginTyping
+          channel:
+            type: string
+            description: channel_id
+        required:
+          - type
+          - channel
+    EndTyping:
+      name: EndTyping
+      title: EndTyping
+      summary: Tell other users that you have stopped typing in a channel.
+      description: Must be in the specified channel or nothing will happen.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: EndTyping
+          channel:
+            type: string
+            description: channel_id
+        required:
+          - type
+          - channel
+    Ping:
+      name: Ping
+      title: Ping
+      summary: Ping the server, you can specify a timestamp that you'll receive back.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: Ping
+          data:
+            type: number
+        required:
+          - type
+          - data
+    Subscribe:
+      name: Subscribe
+      title: Subscribe
+      summary: Subscribe to a server's UserUpdate events.
+      description: |
+        Implementation notes:
+        - Subscriptions automatically expire within 15 minutes.
+        - A client may have up to 5 active subscriptions.
+        - This has no effect on bot sessions.
+        - This event should only be sent **iff** app/client is in focus.
+        - You should aim to send this event at most every 10 minutes per server.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: Subscribe
+          server_id:
+            type: string
+        required:
+          - type
+          - server_id
+    ErrorEvent:
+      name: Error
+      title: Error
+      summary: An error occurred which meant you couldn't authenticate.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: Error
+          error:
+            type: string
+            description: |
+              One of:
+              - `LabelMe`: uncategorised error
+              - `InternalError`: the server ran into an issue
+              - `InvalidSession`: authentication details are incorrect
+              - `OnboardingNotFinished`: user has not chosen a username
+              - `AlreadyAuthenticated`: this connection is already authenticated
+            enum:
+              - LabelMe
+              - InternalError
+              - InvalidSession
+              - OnboardingNotFinished
+              - AlreadyAuthenticated
+        required:
+          - type
+          - error
+    Authenticated:
+      name: Authenticated
+      title: Authenticated
+      summary: The server has authenticated your connection and you will shortly start receiving data.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: Authenticated
+        required:
+          - type
+    Logout:
+      name: Logout
+      title: Logged Out
+      summary: The current user session has been invalidated or the bot token has been reset.
+      description: Your connection will be closed shortly after.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: Logout
+        required:
+          - type
+    Bulk:
+      name: Bulk
+      title: Bulk
+      summary: Several events have been sent, process each item of `v` as its own event.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: Bulk
+          v:
+            type: array
+            items: {}
+        required:
+          - type
+          - v
+    Pong:
+      name: Pong
+      title: Pong
+      summary: Ping response from the server.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: Pong
+          data:
+            type: number
+        required:
+          - type
+          - data
+    Ready:
+      name: Ready
+      title: Ready
+      summary: Data for use by client, data structures match the API specification.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: Ready
+          users:
+            type: array
+            items: {}
+          servers:
+            type: array
+            items: {}
+          channels:
+            type: array
+            items: {}
+          members:
+            type: array
+            items: {}
+          emojis:
+            type: array
+            items: {}
+          user_settings:
+            type: array
+            items: {}
+          channel_unreads:
+            type: array
+            items: {}
+          policy_changes:
+            type: array
+            items: {}
+        required:
+          - type
+    Message:
+      name: Message
+      title: Message
+      summary: Message received, the event object has the same schema as the Message object in the API with the addition of an event type.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: Message
+        required:
+          - type
+    MessageUpdate:
+      name: MessageUpdate
+      title: MessageUpdate
+      summary: Message edited or otherwise updated.
+      description: '`data` field contains a partial Message object.'
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: MessageUpdate
+          id:
+            type: string
+            description: message_id
+          channel:
+            type: string
+            description: channel_id
+          data:
+            type: object
+        required:
+          - type
+          - id
+          - channel
+          - data
+    MessageAppend:
+      name: MessageAppend
+      title: MessageAppend
+      summary: Message has data being appended to it.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: MessageAppend
+          id:
+            type: string
+            description: message_id
+          channel:
+            type: string
+            description: channel_id
+          append:
+            type: object
+            properties:
+              embeds:
+                type: array
+                items: {}
+        required:
+          - type
+          - id
+          - channel
+          - append
+    MessageDelete:
+      name: MessageDelete
+      title: MessageDelete
+      summary: Message has been deleted.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: MessageDelete
+          id:
+            type: string
+            description: message_id
+          channel:
+            type: string
+            description: channel_id
+        required:
+          - type
+          - id
+          - channel
+    MessageReact:
+      name: MessageReact
+      title: MessageReact
+      summary: A reaction has been added to a message.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: MessageReact
+          id:
+            type: string
+            description: message_id
+          channel_id:
+            type: string
+          user_id:
+            type: string
+          emoji_id:
+            type: string
+        required:
+          - type
+          - id
+          - channel_id
+          - user_id
+          - emoji_id
+    MessageUnreact:
+      name: MessageUnreact
+      title: MessageUnreact
+      summary: A reaction has been removed from a message.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: MessageUnreact
+          id:
+            type: string
+            description: message_id
+          channel_id:
+            type: string
+          user_id:
+            type: string
+          emoji_id:
+            type: string
+        required:
+          - type
+          - id
+          - channel_id
+          - user_id
+          - emoji_id
+    MessageRemoveReaction:
+      name: MessageRemoveReaction
+      title: MessageRemoveReaction
+      summary: A certain reaction has been removed from the message.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: MessageRemoveReaction
+          id:
+            type: string
+            description: message_id
+          channel_id:
+            type: string
+          emoji_id:
+            type: string
+        required:
+          - type
+          - id
+          - channel_id
+          - emoji_id
+    ChannelCreate:
+      name: ChannelCreate
+      title: ChannelCreate
+      summary: Channel created, the event object has the same schema as the Channel object in the API with the addition of an event type.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: ChannelCreate
+        required:
+          - type
+    ChannelUpdate:
+      name: ChannelUpdate
+      title: ChannelUpdate
+      summary: Channel details updated.
+      description: |
+        - `data` field contains a partial Channel object.
+        - `clear` field lists fields to remove: `Icon`, `Description`
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: ChannelUpdate
+          id:
+            type: string
+            description: channel_id
+          data:
+            type: object
+          clear:
+            type: array
+            items:
+              type: string
+              enum:
+                - Icon
+                - Description
+        required:
+          - type
+          - id
+          - data
+    ChannelDelete:
+      name: ChannelDelete
+      title: ChannelDelete
+      summary: Channel has been deleted.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: ChannelDelete
+          id:
+            type: string
+            description: channel_id
+        required:
+          - type
+          - id
+    ChannelGroupJoin:
+      name: ChannelGroupJoin
+      title: ChannelGroupJoin
+      summary: A user has joined the group.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: ChannelGroupJoin
+          id:
+            type: string
+            description: channel_id
+          user:
+            type: string
+            description: user_id
+        required:
+          - type
+          - id
+          - user
+    ChannelGroupLeave:
+      name: ChannelGroupLeave
+      title: ChannelGroupLeave
+      summary: A user has left the group.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: ChannelGroupLeave
+          id:
+            type: string
+            description: channel_id
+          user:
+            type: string
+            description: user_id
+        required:
+          - type
+          - id
+          - user
+    ChannelStartTyping:
+      name: ChannelStartTyping
+      title: ChannelStartTyping
+      summary: A user has started typing in this channel.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: ChannelStartTyping
+          id:
+            type: string
+            description: channel_id
+          user:
+            type: string
+            description: user_id
+        required:
+          - type
+          - id
+          - user
+    ChannelStopTyping:
+      name: ChannelStopTyping
+      title: ChannelStopTyping
+      summary: A user has stopped typing in this channel.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: ChannelStopTyping
+          id:
+            type: string
+            description: channel_id
+          user:
+            type: string
+            description: user_id
+        required:
+          - type
+          - id
+          - user
+    ChannelAck:
+      name: ChannelAck
+      title: ChannelAck
+      summary: You have acknowledged new messages in this channel up to this message ID.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: ChannelAck
+          id:
+            type: string
+            description: channel_id
+          user:
+            type: string
+            description: user_id
+          message_id:
+            type: string
+        required:
+          - type
+          - id
+          - user
+          - message_id
+    ServerCreate:
+      name: ServerCreate
+      title: ServerCreate
+      summary: Server created, the event object has the same schema as the SERVER object in the API with the addition of an event type.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: ServerCreate
+        required:
+          - type
+    ServerUpdate:
+      name: ServerUpdate
+      title: ServerUpdate
+      summary: Server details updated.
+      description: |
+        - `data` field contains a partial Server object.
+        - `clear` field lists fields to remove: `Icon`, `Banner`, `Description`
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: ServerUpdate
+          id:
+            type: string
+            description: server_id
+          data:
+            type: object
+          clear:
+            type: array
+            items:
+              type: string
+              enum:
+                - Icon
+                - Banner
+                - Description
+        required:
+          - type
+          - id
+          - data
+    ServerDelete:
+      name: ServerDelete
+      title: ServerDelete
+      summary: Server has been deleted.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: ServerDelete
+          id:
+            type: string
+            description: server_id
+        required:
+          - type
+          - id
+    ServerMemberUpdate:
+      name: ServerMemberUpdate
+      title: ServerMemberUpdate
+      summary: Server member details updated.
+      description: |
+        - `data` field contains a partial Server Member object.
+        - `clear` field lists fields to remove: `Nickname`, `Avatar`
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: ServerMemberUpdate
+          id:
+            type: object
+            properties:
+              server:
+                type: string
+                description: server_id
+              user:
+                type: string
+                description: user_id
+          data:
+            type: object
+          clear:
+            type: array
+            items:
+              type: string
+              enum:
+                - Nickname
+                - Avatar
+        required:
+          - type
+          - id
+          - data
+    ServerMemberJoin:
+      name: ServerMemberJoin
+      title: ServerMemberJoin
+      summary: A user has joined the server.
+      description: '`member` field contains a Member object.'
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: ServerMemberJoin
+          id:
+            type: string
+            description: server_id
+          user:
+            type: string
+            description: user_id
+          member:
+            type: object
+        required:
+          - type
+          - id
+          - user
+          - member
+    ServerMemberLeave:
+      name: ServerMemberLeave
+      title: ServerMemberLeave
+      summary: A user has left the server.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: ServerMemberLeave
+          id:
+            type: string
+            description: server_id
+          user:
+            type: string
+            description: user_id
+        required:
+          - type
+          - id
+          - user
+    ServerRoleUpdate:
+      name: ServerRoleUpdate
+      title: ServerRoleUpdate
+      summary: Server role has been updated or created.
+      description: |
+        - `data` field contains a partial Server Role object.
+        - `clear` field lists fields to remove: `Colour`
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: ServerRoleUpdate
+          id:
+            type: string
+            description: server_id
+          role_id:
+            type: string
+          data:
+            type: object
+          clear:
+            type: array
+            items:
+              type: string
+              enum:
+                - Colour
+        required:
+          - type
+          - id
+          - role_id
+          - data
+    ServerRoleDelete:
+      name: ServerRoleDelete
+      title: ServerRoleDelete
+      summary: Server role has been deleted.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: ServerRoleDelete
+          id:
+            type: string
+            description: server_id
+          role_id:
+            type: string
+        required:
+          - type
+          - id
+          - role_id
+    UserUpdate:
+      name: UserUpdate
+      title: UserUpdate
+      summary: User has been updated.
+      description: |
+        - `data` field contains a partial User object.
+        - `clear` field lists fields to remove: `ProfileContent`, `ProfileBackground`, `StatusText`, `Avatar`, `DisplayName`
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: UserUpdate
+          id:
+            type: string
+            description: user_id
+          data:
+            type: object
+          clear:
+            type: array
+            items:
+              type: string
+              enum:
+                - ProfileContent
+                - ProfileBackground
+                - StatusText
+                - Avatar
+                - DisplayName
+        required:
+          - type
+          - id
+          - data
+    UserRelationship:
+      name: UserRelationship
+      title: UserRelationship
+      summary: Your relationship with another user has changed.
+      description: |
+        - `user` field contains a User object.
+        - `status` field matches Relationship Status in API.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: UserRelationship
+          id:
+            type: string
+            description: your_user_id
+          user:
+            type: object
+          status:
+            type: string
+        required:
+          - type
+          - id
+          - user
+          - status
+    UserPlatformWipe:
+      name: UserPlatformWipe
+      title: UserPlatformWipe
+      summary: User has been platform banned or deleted their account.
+      description: |
+        Clients should remove the following associated data:
+        - Messages
+        - DM Channels
+        - Relationships
+        - Server Memberships
+
+        User flags are specified to explain why a wipe is occurring though not all reasons will necessarily ever appear.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: UserPlatformWipe
+          user_id:
+            type: string
+          flags:
+            type: string
+            description: user_flags
+        required:
+          - type
+          - user_id
+          - flags
+    EmojiCreate:
+      name: EmojiCreate
+      title: EmojiCreate
+      summary: Emoji created, the event object has the same schema as the Emoji object in the API with the addition of an event type.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: EmojiCreate
+        required:
+          - type
+    EmojiUpdate:
+      name: EmojiUpdate
+      title: EmojiUpdate
+      summary: Emoji has been updated.
+      description: '`data` field contains a partial Emoji object.'
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: EmojiUpdate
+          id:
+            type: string
+            description: emoji_id
+          data:
+            type: object
+            properties:
+              name:
+                type: string
+                description: emoji_name
+        required:
+          - type
+          - id
+          - data
+    EmojiDelete:
+      name: EmojiDelete
+      title: EmojiDelete
+      summary: Emoji has been deleted.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: EmojiDelete
+          id:
+            type: string
+            description: emoji_id
+        required:
+          - type
+          - id
+    Auth:
+      name: Auth
+      title: Auth
+      summary: Forwarded events from Authifier, currently only session deletion events are forwarded.
+      description: |
+        `event_type` may be one of:
+
+        **DeleteSession** - A session has been deleted.
+        ```json
+        { "event_type": "DeleteSession", "user_id": "{user_id}", "session_id": "{session_id}" }
+        ```
+
+        **DeleteAllSessions** - All sessions for this account have been deleted, optionally excluding a given ID.
+        ```json
+        { "event_type": "DeleteAllSessions", "user_id": "{user_id}", "exclude_session_id": "{session_id}" }
+        ```
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: Auth
+          event_type:
+            type: string
+            enum:
+              - DeleteSession
+              - DeleteAllSessions
+          user_id:
+            type: string
+          session_id:
+            type: string
+          exclude_session_id:
+            type: string
+        required:
+          - type
+          - event_type
+          - user_id
