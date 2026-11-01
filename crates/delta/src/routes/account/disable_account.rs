@@ -1,6 +1,6 @@
 //! Disable an account.
 //! POST /account/disable
-use revolt_result::Result;
+use revolt_result::{create_error, Result};
 use revolt_database::{Database, Account, ValidatedTicket};
 use rocket::State;
 use rocket_empty::EmptyResponse;
@@ -13,15 +13,20 @@ use rocket_empty::EmptyResponse;
 pub async fn disable_account(
     db: &State<Database>,
     mut account: Account,
-    _ticket: ValidatedTicket,
-) -> Result<EmptyResponse> {
+    validated_ticket: Option<ValidatedTicket>,
+) -> Result<EmptyResponse>
+{
+    if account.mfa.is_active() && validated_ticket.is_none() {
+        return Err(create_error!(InvalidCredentials));
+    }
+
     account.disable(db).await.map(|_| EmptyResponse)
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{rocket, util::test::TestHarness};
-    use revolt_database::{MFATicket, events::client::EventV1};
+    use revolt_database::{events::client::EventV1, MFATicket, Totp};
     use revolt_result::ErrorType;
     use rocket::http::{Header, Status};
     use crate::util::test::PubSubTestHelper;
@@ -29,8 +34,16 @@ mod tests {
     #[rocket::async_test]
     async fn success() {
         let harness = TestHarness::new().await;
-        let (account, session, _) = harness.new_user().await;
+        let (mut account, session, _) = harness.new_user().await;
         let mut pubsub = PubSubTestHelper::new(&format!("{}!", &account.id)).await;
+
+        let totp = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+
+        account.mfa.totp_token = totp.clone();
+        account.email = "disable_account@smtp.test".to_string();
+        account.save(&harness.db).await.unwrap();
 
         let ticket = MFATicket::new(account.id.to_string(), true);
         ticket.save(&harness.db).await.unwrap();
@@ -65,5 +78,27 @@ mod tests {
         } else {
             false
         }).await;
+    }
+
+    #[rocket::async_test]
+    async fn fail_mfa() {
+        let harness = TestHarness::new().await;
+        let (mut account, session, _) = harness.new_user().await;
+
+        let totp = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+
+        account.mfa.totp_token = totp.clone();
+        account.email = "disable_account@smtp.test".to_string();
+        account.save(&harness.db).await.unwrap();
+
+        let res = harness.client
+            .post("/auth/account/disable")
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Unauthorized);
     }
 }

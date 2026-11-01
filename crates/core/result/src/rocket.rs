@@ -100,6 +100,7 @@ impl<'r> Responder<'r, 'static> for Error {
             ErrorType::FileTooLarge { .. } => Status::UnprocessableEntity,
             ErrorType::FileTypeNotAllowed => Status::BadRequest,
             ErrorType::ImageProcessingFailed => Status::InternalServerError,
+            ErrorType::ImageResolutionNotAllowed => Status::UnprocessableEntity,
             ErrorType::NoEmbedData => Status::BadRequest,
             ErrorType::VosoUnavailable => Status::BadRequest,
 

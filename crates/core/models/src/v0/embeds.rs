@@ -116,6 +116,10 @@ auto_derived!(
         },
         /// Streamable Video
         Streamable { id: String },
+        /// Gifbox
+        Gifbox {
+            poster_url: Option<String>,
+        }
     }
 
     /// Website metadata

@@ -1,6 +1,7 @@
 use revolt_result::Result;
 
 use crate::File;
+use crate::FileHash;
 
 use super::FileUsedFor;
 
@@ -22,8 +23,8 @@ pub trait AbstractAttachments: Sync + Send {
     /// Fetch all dangling attachments.
     async fn fetch_dangling_files(&self) -> Result<Vec<File>>;
 
-    /// Count references to a given hash.
-    async fn count_file_hash_references(&self, hash: &str) -> Result<usize>;
+    /// Count references to a given hash, by either its original or processed hash.
+    async fn count_file_hash_references(&self, hash: &FileHash) -> Result<usize>;
 
     /// Find an attachment by its details and mark it as used by a given parent.
     async fn find_and_use_attachment(

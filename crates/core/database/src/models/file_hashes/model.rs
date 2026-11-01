@@ -91,3 +91,49 @@ impl FileHash {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use iso8601_timestamp::Timestamp;
+    use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
+
+    use crate::{FileHash, Metadata};
+
+    #[tokio::test]
+    #[allow(clippy::disallowed_methods)]
+    async fn count_references_by_original_and_processed_hash() {
+        database_test!(|db| async move {
+            let hash = FileHash {
+                id: "original".to_string(),
+                processed_hash: "processed".to_string(),
+                created_at: Timestamp::now_utc(),
+                bucket_id: "bucket".to_string(),
+                path: "path".to_string(),
+                iv: String::new(),
+                metadata: Metadata::File,
+                content_type: "application/octet-stream".to_string(),
+                size: 0,
+            };
+
+            let current = hash.into_file(
+                "current".to_string(),
+                "attachments".to_string(),
+                "current.bin".to_string(),
+                "user".to_string(),
+            );
+
+            let mut legacy = hash.into_file(
+                "legacy".to_string(),
+                "attachments".to_string(),
+                "legacy.bin".to_string(),
+                "user".to_string(),
+            );
+            legacy.hash = Some(hash.processed_hash.clone());
+
+            db.insert_attachment(&current).await.unwrap();
+            db.insert_attachment(&legacy).await.unwrap();
+
+            assert_eq!(db.count_file_hash_references(&hash).await.unwrap(), 2);
+        });
+    }
+}

@@ -4,6 +4,7 @@ use revolt_config::report_internal_error;
 use revolt_result::Result;
 
 use crate::File;
+use crate::FileHash;
 use crate::FileUsedFor;
 use crate::MongoDb;
 
@@ -64,14 +65,16 @@ impl AbstractAttachments for MongoDb {
         )
     }
 
-    /// Count references to a given hash.
-    async fn count_file_hash_references(&self, hash: &str) -> Result<usize> {
+    /// Count references to a given hash, by either its original or processed hash.
+    async fn count_file_hash_references(&self, hash: &FileHash) -> Result<usize> {
         query!(
             self,
             count_documents,
             COL,
             doc! {
-                "hash": hash
+                "hash": {
+                    "$in": [&hash.id, &hash.processed_hash]
+                }
             }
         )
         .map(|count| count as usize)

@@ -70,6 +70,7 @@ pub async fn invite_bot(
                     &server.id,
                     PartialRole {
                         permissions: Some(requested.into()),
+                        owner: Some(bot.id),
                         ..Default::default()
                     },
                     vec![],

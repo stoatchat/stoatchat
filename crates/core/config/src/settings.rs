@@ -162,6 +162,7 @@ pub struct PushApn {
     pub pkcs8: String,
     pub key_id: String,
     pub team_id: String,
+    pub topic: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
