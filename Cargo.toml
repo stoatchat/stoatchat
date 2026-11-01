@@ -128,7 +128,7 @@ rocket_prometheus = "0.10.0-rc.3"
 utoipa = "4.2.3"
 revolt_okapi = "0.9.1"
 schemars = "0.8.8"
-utoipa-scalar = "0.1.0"
+utoipa-scalar = "0.4.0"
 
 # Image Processing
 jxl-oxide = "0.12.5"
