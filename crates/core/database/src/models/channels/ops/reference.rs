@@ -116,14 +116,10 @@ impl AbstractChannels for ReferenceDb {
                 Channel::TextChannel {
                     role_permissions, ..
                 } => {
-                    if role_permissions.get(role_id).is_some() {
-                        role_permissions.remove(role_id);
-                        role_permissions.insert(String::from(role_id), permissions);
+                    role_permissions.remove(role_id);
+                    role_permissions.insert(String::from(role_id), permissions);
 
-                        Ok(())
-                    } else {
-                        Err(create_error!(NotFound))
-                    }
+                    Ok(())
                 }
                 _ => Err(create_error!(NotFound)),
             }
