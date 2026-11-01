@@ -2,7 +2,7 @@
 //! POST /account/delete
 use rocket::State;
 use rocket_empty::EmptyResponse;
-use revolt_result::Result;
+use revolt_result::{create_error, Result};
 use revolt_database::{Database, Account, ValidatedTicket};
 /// # Delete Account
 ///
@@ -12,8 +12,12 @@ use revolt_database::{Database, Account, ValidatedTicket};
 pub async fn delete_account(
     db: &State<Database>,
     mut account: Account,
-    _ticket: ValidatedTicket,
+    validated_ticket: Option<ValidatedTicket>,
 ) -> Result<EmptyResponse> {
+    if account.mfa.is_active() && validated_ticket.is_none() {
+        return Err(create_error!(InvalidCredentials));
+    }
+
     account
         .start_account_deletion(db)
         .await
@@ -23,14 +27,20 @@ pub async fn delete_account(
 #[cfg(test)]
 mod tests {
     use crate::{rocket, util::test::TestHarness};
-    use revolt_database::MFATicket;
+    use revolt_database::{MFATicket, Totp};
     use rocket::http::{ContentType, Header, Status};
+    use revolt_config::overwrite_config;
 
     #[rocket::async_test]
     async fn success() {
         let harness = TestHarness::new().await;
         let (mut account, session, _) = harness.new_user().await;
 
+        let totp = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+
+        account.mfa.totp_token = totp.clone();
         account.email = "delete_account@smtp.test".to_string();
         account.save(&harness.db).await.unwrap();
 
@@ -60,5 +70,27 @@ mod tests {
             .await;
 
         assert_eq!(res.status(), Status::NoContent);
+    }
+
+    #[rocket::async_test]
+    async fn fail_mfa() {
+        let harness = TestHarness::new().await;
+        let (mut account, session, _) = harness.new_user().await;
+
+        let totp = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+
+        account.mfa.totp_token = totp.clone();
+        account.email = "delete_account@smtp.test".to_string();
+        account.save(&harness.db).await.unwrap();
+
+        let res = harness.client
+            .post("/auth/account/delete")
+            .header(Header::new("X-Session-Token", session.token))
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Unauthorized);
     }
 }
