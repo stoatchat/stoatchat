@@ -1,10 +1,9 @@
 use futures_lite::stream::StreamExt;
 use lapin::{
-    ConnectionBuilder, ConnectionProperties, ExchangeKind,
+    ConnectionBuilder, ExchangeKind,
     options::*,
     types::FieldTable,
     uri::{AMQPAuthority, AMQPQueryString, AMQPUri, AMQPUserInfo},
-    ConnectionBuilder, ExchangeKind,
 };
 use log::{debug, info, warn};
 use redis_kiss::{AsyncCommands, Conn as RedisConnection, get_connection};
