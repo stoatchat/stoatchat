@@ -178,9 +178,18 @@ pub struct ApiSecurityShield {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct ApiSecurityWebauthn {
+    pub rp_id: String,
+    pub rp_name: String,
+    pub extra_origins: Vec<String>,
+    pub max_passkeys: usize,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct ApiSecurity {
     pub shield: ApiSecurityShield,
     pub captcha: ApiSecurityCaptcha,
+    pub webauthn: ApiSecurityWebauthn,
     pub trust_cloudflare: bool,
     pub easypwned: String,
     pub tenor_key: String,
