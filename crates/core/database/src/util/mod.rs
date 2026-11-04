@@ -12,6 +12,7 @@ pub mod permissions;
 pub mod reference;
 pub mod shield;
 pub mod test_fixtures;
+pub mod webauthn;
 
 pub use funcs::*;
 pub use chunked::ChunkedDatabaseGenerator;

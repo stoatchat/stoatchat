@@ -82,6 +82,16 @@ hcaptcha_sitekey = ""
 host = ""
 key = ""
 
+[api.security.webauthn]
+# Relying party ID for passkeys, defaults to the host of `hosts.app` if empty
+rp_id = ""
+# Relying party name shown by authenticators
+rp_name = "Stoat"
+# Additional origins allowed to use passkeys, `hosts.app` is always allowed
+# e.g. "android:apk-key-hash:..." for the Android app
+extra_origins = []
+max_passkeys = 10
+
 [api.workers]
 # Maximum concurrent connections (to proxy server)
 max_concurrent_connections = 50
