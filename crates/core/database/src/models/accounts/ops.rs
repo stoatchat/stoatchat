@@ -1,6 +1,6 @@
 use revolt_result::Result;
 
-use crate::Account;
+use crate::{Account, PasskeyCredential};
 
 #[cfg(feature = "mongodb")]
 mod mongodb;
@@ -34,6 +34,12 @@ pub trait AbstractAccounts: Sync + Send {
 
     // Save account
     async fn save_account(&self, account: &Account) -> Result<()>;
+
+    /// Add a newly registered passkey
+    async fn add_passkey(&self, account_id: &str, passkey: &PasskeyCredential) -> Result<()>;
+
+    /// Save a passkey's credential and last use after it has been used to authenticate
+    async fn save_passkey(&self, account_id: &str, passkey: &PasskeyCredential) -> Result<()>;
 
     async fn bump_lockout_count(&self, id: &str) -> Result<Account>;
 }
