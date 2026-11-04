@@ -132,7 +132,12 @@ impl AbstractAccounts for MongoDb {
                 },
             )
             .await
-            .map_err(|_| create_error!(PasskeyAlreadyRegistered))?;
+            .map_err(|err| match *err.kind {
+                mongodb::error::ErrorKind::Write(mongodb::error::WriteFailure::WriteError(
+                    mongodb::error::WriteError { code: 11000, .. },
+                )) => create_error!(PasskeyAlreadyRegistered),
+                _ => create_database_error!("update_one", COL),
+            })?;
 
         if result.matched_count == 0 {
             return Err(create_error!(UnknownUser));

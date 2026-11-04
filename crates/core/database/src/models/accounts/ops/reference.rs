@@ -1,6 +1,6 @@
 use crate::{
-    util::webauthn::encode_credential_id, AbstractAccounts, Account, DeletionInfo,
-    EmailVerification, Lockout, PasskeyCredential, ReferenceDb,
+    AbstractAccounts, Account, DeletionInfo, EmailVerification, Lockout, PasskeyCredential,
+    ReferenceDb, util::webauthn::encode_credential_id,
 };
 use iso8601_timestamp::{Duration, Timestamp};
 use revolt_result::Result;
@@ -124,7 +124,7 @@ impl AbstractAccounts for ReferenceDb {
                         .any(|ours| ours.credential_id == passkey.credential_id)
                 })
         }) {
-            return Err(create_database_error!("insert_one", "accounts"));
+            return Err(create_database_error!("update_one", "accounts"));
         }
 
         accounts.insert(account.id.to_string(), account.clone());
