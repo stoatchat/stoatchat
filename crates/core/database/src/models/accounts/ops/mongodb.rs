@@ -1,4 +1,4 @@
-use crate::{AbstractAccounts, Account, MongoDb};
+use crate::{util::webauthn::encode_credential_id, AbstractAccounts, Account, MongoDb};
 use bson::{to_bson, to_document};
 use iso8601_timestamp::{Duration, Timestamp};
 use mongodb::options::{
@@ -85,6 +85,18 @@ impl AbstractAccounts for MongoDb {
             }
         )?
         .ok_or_else(|| create_error!(InvalidToken))
+    }
+
+    /// Find account owning a passkey by its WebAuthn credential id
+    async fn fetch_account_by_passkey(&self, credential_id: &[u8]) -> Result<Option<Account>> {
+        query!(
+            self,
+            find_one,
+            COL,
+            doc! {
+                "mfa.passkeys.credential_id": encode_credential_id(credential_id)
+            }
+        )
     }
 
     /// Find accounts which are due to be deleted

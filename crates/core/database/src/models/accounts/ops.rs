@@ -26,6 +26,9 @@ pub trait AbstractAccounts: Sync + Send {
     /// Find account with active deletion token
     async fn fetch_account_with_deletion_token(&self, token: &str) -> Result<Account>;
 
+    /// Find account owning a passkey by its WebAuthn credential id
+    async fn fetch_account_by_passkey(&self, credential_id: &[u8]) -> Result<Option<Account>>;
+
     /// Find accounts which are due to be deleted
     async fn fetch_accounts_due_for_deletion(&self) -> Result<Vec<Account>>;
 

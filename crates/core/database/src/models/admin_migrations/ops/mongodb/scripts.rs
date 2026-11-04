@@ -26,7 +26,7 @@ struct MigrationInfo {
     revision: i32,
 }
 
-pub const LATEST_REVISION: i32 = 55; // MUST BE +1 to last migration
+pub const LATEST_REVISION: i32 = 56; // MUST BE +1 to last migration
 
 pub async fn migrate_database(db: &MongoDb) {
     let migrations = db.col::<Document>("migrations");
@@ -1600,6 +1600,27 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             .await
             .expect("Failed to update default_permissions");
     };
+
+    if revision <= 55 {
+        info!("Running migration [revision 55 / 02-11-2026]: Add passkey credential index to accounts");
+
+        db.db()
+            .run_command(doc! {
+                "createIndexes": "accounts",
+                "indexes": [
+                    {
+                        "key": {
+                            "mfa.passkeys.credential_id": 1
+                        },
+                        "name": "passkey_credential_id",
+                        "unique": true,
+                        "sparse": true
+                    }
+                ]
+            })
+            .await
+            .expect("Failed to create passkey_credential_id index");
+    }
 
     // Reminder to update LATEST_REVISION when adding new migrations.
     LATEST_REVISION.max(revision)
