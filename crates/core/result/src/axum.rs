@@ -123,6 +123,8 @@ impl IntoResponse for Error {
             ErrorType::LockedOut => StatusCode::FORBIDDEN,
             ErrorType::TotpAlreadyEnabled => StatusCode::BAD_REQUEST,
             ErrorType::DisallowedMFAMethod => StatusCode::BAD_REQUEST,
+            ErrorType::TooManyPasskeys { .. } => StatusCode::BAD_REQUEST,
+            ErrorType::PasskeyAlreadyRegistered => StatusCode::CONFLICT,
             ErrorType::OperationFailed => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorType::IncorrectData { .. } => StatusCode::BAD_REQUEST,
         };
