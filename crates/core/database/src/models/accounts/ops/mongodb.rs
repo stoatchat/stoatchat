@@ -1,4 +1,6 @@
-use crate::{util::webauthn::encode_credential_id, AbstractAccounts, Account, MongoDb};
+use crate::{
+    AbstractAccounts, Account, MongoDb, PasskeyCredential, util::webauthn::encode_credential_id,
+};
 use bson::{to_bson, to_document};
 use iso8601_timestamp::{Duration, Timestamp};
 use mongodb::options::{
@@ -112,6 +114,63 @@ impl AbstractAccounts for MongoDb {
                 }
             }
         )
+    }
+
+    /// Add a newly registered passkey
+    async fn add_passkey(&self, account_id: &str, passkey: &PasskeyCredential) -> Result<()> {
+        let result = self
+            .col::<Account>(COL)
+            .update_one(
+                doc! {
+                    "_id": account_id
+                },
+                doc! {
+                    "$push": {
+                        "mfa.passkeys": to_bson(passkey)
+                            .map_err(|_| create_database_error!("to_bson", COL))?
+                    }
+                },
+            )
+            .await
+            .map_err(|_| create_error!(PasskeyAlreadyRegistered))?;
+
+        if result.matched_count == 0 {
+            return Err(create_error!(UnknownUser));
+        }
+
+        Ok(())
+    }
+
+    /// Save a passkey's credential and last use after it has been used to authenticate
+    async fn save_passkey(&self, account_id: &str, passkey: &PasskeyCredential) -> Result<()> {
+        let credential = serde_json::to_value(&passkey.credential)
+            .ok()
+            .and_then(|credential| to_bson(&credential).ok())
+            .ok_or_else(|| create_database_error!("to_bson", COL))?;
+
+        let result = self
+            .col::<Account>(COL)
+            .update_one(
+                doc! {
+                    "_id": account_id,
+                    "mfa.passkeys.id": &passkey.id
+                },
+                doc! {
+                    "$set": {
+                        "mfa.passkeys.$.credential": credential,
+                        "mfa.passkeys.$.last_used": to_bson(&passkey.last_used)
+                            .map_err(|_| create_database_error!("to_bson", COL))?
+                    }
+                },
+            )
+            .await
+            .map_err(|_| create_database_error!("update_one", COL))?;
+
+        if result.matched_count == 0 {
+            return Err(create_error!(InvalidCredentials));
+        }
+
+        Ok(())
     }
 
     // Save account

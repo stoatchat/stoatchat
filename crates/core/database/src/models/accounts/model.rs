@@ -654,7 +654,7 @@ impl Account {
         }
         passkey.last_used = Some(Timestamp::now_utc());
 
-        self.save(db).await.to_internal_error()
+        db.save_passkey(&self.id, passkey).await
     }
 
     /// Begin registering a new passkey
@@ -728,10 +728,9 @@ impl Account {
         }
 
         let config = config().await;
-        if self.mfa.passkeys.len() >= config.api.security.webauthn.max_passkeys {
-            return Err(create_error!(TooManyPasskeys {
-                max: config.api.security.webauthn.max_passkeys
-            }));
+        let max = config.api.security.webauthn.max_passkeys;
+        if self.mfa.passkeys.len() >= max {
+            return Err(create_error!(TooManyPasskeys { max }));
         }
 
         let credential: RegisterPublicKeyCredential =
@@ -741,14 +740,6 @@ impl Account {
             .await?
             .finish_passkey_registration(&credential, &state)
             .map_err(|_| create_error!(InvalidToken))?;
-
-        if db
-            .fetch_account_by_passkey(passkey.cred_id())
-            .await?
-            .is_some()
-        {
-            return Err(create_error!(PasskeyAlreadyRegistered));
-        }
 
         let passkey = PasskeyCredential {
             id: ulid::Ulid::new().to_string(),
@@ -768,7 +759,7 @@ impl Account {
         };
 
         self.mfa.passkeys.push(passkey.clone());
-        self.save(db).await?;
+        db.add_passkey(&self.id, &passkey).await?;
 
         Ok(passkey)
     }
