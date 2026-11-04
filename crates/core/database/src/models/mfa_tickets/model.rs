@@ -90,6 +90,16 @@ impl MFATicket {
 
         db.delete_ticket(&self.id).await
     }
+
+    pub async fn fail_attempt(&mut self, db: &Database) -> Result<()> {
+        self.attempts += 1;
+
+        if self.attempts >= 3 {
+            db.delete_ticket(&self.id).await
+        } else {
+            db.save_ticket(self).await
+        }
+    }
 }
 
 impl Deref for ValidatedTicket {
