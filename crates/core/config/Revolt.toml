@@ -125,6 +125,7 @@ bots = [10, 10]
 "servers/<id>/mod" = [30, 10]
 auth = [15, 10]
 "auth/delete" = [10, 5]
+"auth/passkey_login" = [5, 10]
 swagger = [30, 30]
 "safety/report" = [3, 15]
 

@@ -61,6 +61,12 @@ impl<'a> RatelimitResolver<Request<'a>> for DeltaRatelimits {
                 | ("servers", Some(id), Some("members"), Method::Patch)
                 | ("servers", Some(id), Some("bans"), _) => ("servers/<id>/mod", Some(id)),
                 ("servers", Some(id), _, _) => ("servers/<id>", Some(id)),
+                ("auth", Some("session"), Some("login"), Method::Post)
+                    if request.routed_segment(3) == Some("passkey") =>
+                {
+                    // Unauthenticated and creates a challenge in redis on every request
+                    ("auth/passkey_login", None)
+                }
                 ("auth", _, _, _) => {
                     if method == Method::Delete {
                         ("auth/delete", None)
