@@ -36,6 +36,12 @@ impl<'a> RatelimitResolver<Request<'a>> for DeltaRatelimits {
                     ("channels", Some(id))
                 }
                 ("servers", Some(id), _) => ("servers", Some(id)),
+                ("auth", Some("session"), Method::Post)
+                    if extra == Some("login") && request.routed_segment(3) == Some("passkey") =>
+                {
+                    // Unauthenticated and creates a challenge in redis on every request
+                    ("auth_passkey_login", None)
+                }
                 ("auth", _, _) => {
                     if request.method() == Method::Delete {
                         ("auth_delete", None)
@@ -63,6 +69,7 @@ impl<'a> RatelimitResolver<Request<'a>> for DeltaRatelimits {
             "servers" => 5,
             "auth" => 15,
             "auth_delete" => 255,
+            "auth_passkey_login" => 5,
             "default_avatar" => 255,
             "swagger" => 100,
             "safety" => 15,
