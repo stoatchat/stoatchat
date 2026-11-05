@@ -44,7 +44,7 @@ async fn build_webauthn() -> Result<Webauthn> {
 }
 
 /// helper to make sure everything is encoded the same.
-pub(crate) fn encode_credential_id(credential_id: &[u8]) -> String {
+pub fn encode_credential_id(credential_id: &[u8]) -> String {
     URL_SAFE_NO_PAD.encode(credential_id)
 }
 
