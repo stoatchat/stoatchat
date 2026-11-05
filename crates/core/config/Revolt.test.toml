@@ -4,6 +4,10 @@ environment = "test"
 mongodb = "mongodb://localhost"
 redis = "redis://localhost/"
 
+[hosts]
+# Passkey tests need localhost for secure context
+app = "http://localhost"
+
 [rabbit]
 host = "127.0.0.1"
 port = 5672

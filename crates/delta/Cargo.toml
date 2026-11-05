@@ -86,6 +86,7 @@ livekit-protocol = { workspace = true }
 
 [dev-dependencies]
 revolt-config = { workspace = true, features = ["test"] }
+webauthn-authenticator-rs = { workspace = true }
 
 [build-dependencies]
 vergen = { workspace = true }
