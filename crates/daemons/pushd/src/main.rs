@@ -6,10 +6,10 @@ use std::sync::Arc;
 use lapin::{
     options::{BasicConsumeOptions, ExchangeDeclareOptions, QueueBindOptions, QueueDeclareOptions},
     types::{AMQPValue, FieldTable},
-    Channel, Connection, ConnectionProperties,
+    Channel, Connection,
 };
 use revolt_config::{config, Settings};
-use revolt_database::Database;
+use revolt_database::{amqp_connection_properties, Database, AMQP_CONNECT_TIMEOUT};
 use tokio::signal::ctrl_c;
 
 mod consumers;
@@ -36,17 +36,21 @@ async fn main() {
     let config = config().await;
 
     let connection = Arc::new(
-        Connection::connect(
-            &format!(
-                "amqp://{}:{}@{}:{}",
-                &config.rabbit.username,
-                &config.rabbit.password,
-                &config.rabbit.host,
-                &config.rabbit.port,
+        tokio::time::timeout(
+            AMQP_CONNECT_TIMEOUT,
+            Connection::connect(
+                &format!(
+                    "amqp://{}:{}@{}:{}",
+                    &config.rabbit.username,
+                    &config.rabbit.password,
+                    &config.rabbit.host,
+                    &config.rabbit.port,
+                ),
+                amqp_connection_properties(),
             ),
-            ConnectionProperties::default(),
         )
         .await
+        .expect("Timed out connecting to RabbitMQ")
         .expect("Failed to connect to RabbitMQ"),
     );
 

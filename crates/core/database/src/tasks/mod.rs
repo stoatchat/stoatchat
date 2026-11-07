@@ -3,7 +3,7 @@
 use crate::{Database, AMQP};
 
 use tokio::task;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 const WORKER_COUNT: usize = 5;
 
@@ -26,22 +26,31 @@ pub struct DelayedTask<T> {
     run_now: bool,
     last_updated: Instant,
     first_seen: Instant,
+    save_after: Duration,
+    expire_after: Duration,
 }
 
 /// Commit to database every 30 seconds if the task is particularly active.
-static EXPIRE_CONSTANT: u64 = 30;
+static EXPIRE_CONSTANT: Duration = Duration::from_secs(30);
 
 /// Otherwise, commit to database after 5 seconds.
-static SAVE_CONSTANT: u64 = 5;
+static SAVE_CONSTANT: Duration = Duration::from_secs(5);
 
 impl<T> DelayedTask<T> {
     /// Create a new delayed task
     pub fn new(data: T) -> Self {
+        Self::with_timings(data, SAVE_CONSTANT, EXPIRE_CONSTANT)
+    }
+
+    /// Create a new delayed task with custom timings
+    pub fn with_timings(data: T, save_after: Duration, expire_after: Duration) -> Self {
         DelayedTask {
             data,
             run_now: false,
             last_updated: Instant::now(),
             first_seen: Instant::now(),
+            save_after,
+            expire_after,
         }
     }
 
@@ -58,7 +67,7 @@ impl<T> DelayedTask<T> {
     /// Check if a task should run yet
     pub fn should_run(&self) -> bool {
         self.run_now
-            || self.first_seen.elapsed().as_secs() > EXPIRE_CONSTANT
-            || self.last_updated.elapsed().as_secs() > SAVE_CONSTANT
+            || self.first_seen.elapsed() >= self.expire_after
+            || self.last_updated.elapsed() >= self.save_after
     }
 }

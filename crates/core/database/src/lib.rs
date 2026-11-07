@@ -220,7 +220,7 @@ pub mod events;
 pub mod tasks;
 
 mod amqp;
-pub use amqp::amqp::AMQP;
+pub use amqp::amqp::{AMQP, AMQP_CONNECT_TIMEOUT, amqp_connection_properties};
 
 #[cfg(feature = "voice")]
 pub mod voice;
