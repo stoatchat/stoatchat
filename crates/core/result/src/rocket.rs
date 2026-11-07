@@ -127,6 +127,8 @@ impl<'r> Responder<'r, 'static> for Error {
             ErrorType::LockedOut => Status::Forbidden,
             ErrorType::TotpAlreadyEnabled => Status::BadRequest,
             ErrorType::DisallowedMFAMethod => Status::BadRequest,
+            ErrorType::TooManyPasskeys { .. } => Status::BadRequest,
+            ErrorType::PasskeyAlreadyRegistered => Status::Conflict,
             ErrorType::OperationFailed => Status::InternalServerError,
             ErrorType::IncorrectData { .. } => Status::BadRequest,
         };

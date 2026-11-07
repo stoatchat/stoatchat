@@ -1,4 +1,6 @@
-use crate::{AbstractAccounts, Account, MongoDb};
+use crate::{
+    AbstractAccounts, Account, MongoDb, PasskeyCredential, util::webauthn::encode_credential_id,
+};
 use bson::{to_bson, to_document};
 use iso8601_timestamp::{Duration, Timestamp};
 use mongodb::options::{
@@ -87,6 +89,18 @@ impl AbstractAccounts for MongoDb {
         .ok_or_else(|| create_error!(InvalidToken))
     }
 
+    /// Find account owning a passkey by its WebAuthn credential id
+    async fn fetch_account_by_passkey(&self, credential_id: &[u8]) -> Result<Option<Account>> {
+        query!(
+            self,
+            find_one,
+            COL,
+            doc! {
+                "mfa.passkeys.credential_id": encode_credential_id(credential_id)
+            }
+        )
+    }
+
     /// Find accounts which are due to be deleted
     async fn fetch_accounts_due_for_deletion(&self) -> Result<Vec<Account>> {
         query!(
@@ -100,6 +114,68 @@ impl AbstractAccounts for MongoDb {
                 }
             }
         )
+    }
+
+    /// Add a newly registered passkey
+    async fn add_passkey(&self, account_id: &str, passkey: &PasskeyCredential) -> Result<()> {
+        let result = self
+            .col::<Account>(COL)
+            .update_one(
+                doc! {
+                    "_id": account_id
+                },
+                doc! {
+                    "$push": {
+                        "mfa.passkeys": to_bson(passkey)
+                            .map_err(|_| create_database_error!("to_bson", COL))?
+                    }
+                },
+            )
+            .await
+            .map_err(|err| match *err.kind {
+                mongodb::error::ErrorKind::Write(mongodb::error::WriteFailure::WriteError(
+                    mongodb::error::WriteError { code: 11000, .. },
+                )) => create_error!(PasskeyAlreadyRegistered),
+                _ => create_database_error!("update_one", COL),
+            })?;
+
+        if result.matched_count == 0 {
+            return Err(create_error!(UnknownUser));
+        }
+
+        Ok(())
+    }
+
+    /// Save a passkey's credential and last use after it has been used to authenticate
+    async fn save_passkey(&self, account_id: &str, passkey: &PasskeyCredential) -> Result<()> {
+        let credential = serde_json::to_value(&passkey.credential)
+            .ok()
+            .and_then(|credential| to_bson(&credential).ok())
+            .ok_or_else(|| create_database_error!("to_bson", COL))?;
+
+        let result = self
+            .col::<Account>(COL)
+            .update_one(
+                doc! {
+                    "_id": account_id,
+                    "mfa.passkeys.id": &passkey.id
+                },
+                doc! {
+                    "$set": {
+                        "mfa.passkeys.$.credential": credential,
+                        "mfa.passkeys.$.last_used": to_bson(&passkey.last_used)
+                            .map_err(|_| create_database_error!("to_bson", COL))?
+                    }
+                },
+            )
+            .await
+            .map_err(|_| create_database_error!("update_one", COL))?;
+
+        if result.matched_count == 0 {
+            return Err(create_error!(InvalidCredentials));
+        }
+
+        Ok(())
     }
 
     // Save account
