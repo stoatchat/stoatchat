@@ -33,11 +33,10 @@ impl<'r> FromRequest<'r> for Ratelimiter {
             .local_cache_async(async {
                 let storage = request.guard::<&State<RatelimitStorage>>().await.unwrap();
 
-                let session = request.guard::<Session>().await.succeeded();
                 let user = request.guard::<User>().await.succeeded();
 
-                let identifier = if let Some(session) = session {
-                    session.user_id
+                let identifier = if let Some(ref user) = user {
+                    user.id.clone()
                 } else {
                     to_real_ip(request).await
                 };
