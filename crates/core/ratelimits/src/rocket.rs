@@ -8,7 +8,7 @@ use rocket::request::{FromRequest, Outcome};
 use rocket::serde::json::Json;
 use rocket::{Data, Request, Response, State};
 
-use revolt_database::{Database, Session, util::ip::rocket::to_real_ip};
+use revolt_database::util::ip::rocket::to_real_ip;
 use revolt_rocket_okapi::r#gen::OpenApiGenerator;
 use revolt_rocket_okapi::request::{OpenApiFromRequest, RequestHeaderInput};
 
