@@ -100,6 +100,29 @@ expires_after = 2592000  # 30d
 # Minimum allowed length of usernames
 min_username_length = 2
 
+# Buckets are configurable as (rate, window).
+[api.ratelimits]
+fallback = [10, 10]
+
+[api.ratelimits.defaults]
+users = [10, 10]
+"users/<id>/default_avatar" = [1, 5]
+"users/patch" = [2, 15]
+bots = [10, 10]
+"channels/<id>/post" = [7, 7]
+"channels/<id>" = [15, 10]
+"servers/<id>" = [5, 10]
+"servers/<id>/mod" = [30, 10]
+auth = [15, 10]
+"auth/delete" = [10, 5]
+swagger = [30, 30]
+"safety/report" = [3, 15]
+
+# Example config for a ratelimit override. Any user with the ratelimit key corresponding to this will have its ratelimits elevated to this.
+# [[api.ratelimits.override]]
+# key = "MOD_BOT"
+# overrides = { "servers/<id>/mod" = [60, 10] }
+
 [pushd]
 # this changes the names of the queues to not overlap 
 # prod/beta if they happen to be on the same exchange/instance.

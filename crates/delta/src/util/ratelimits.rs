@@ -1,10 +1,32 @@
-use revolt_ratelimits::ratelimiter::RatelimitResolver;
-use rocket::{http::Method, Request};
+use revolt_config::{ApiRatelimitOverride, Ratelimit, config};
+use revolt_database::User;
+use revolt_ratelimits::ratelimiter::{RatelimitResolver, async_trait};
+use rocket::{Request, http::Method};
 
 pub struct DeltaRatelimits;
 
+fn get_bucket_overrides(
+    bucket: &str,
+    default: Ratelimit,
+    overrides: Vec<&ApiRatelimitOverride>,
+) -> Ratelimit {
+    // When several overrides match, use the most permissive one
+    overrides
+        .into_iter()
+        .filter_map(|o| o.overrides.get(bucket).copied())
+        .max_by(|(a_limit, a_window), (b_limit, b_window)| {
+            (*a_limit as u64 * *b_window as u64).cmp(&(*b_limit as u64 * *a_window as u64))
+        })
+        .unwrap_or(default)
+}
+
+#[async_trait]
 impl<'a> RatelimitResolver<Request<'a>> for DeltaRatelimits {
-    fn resolve_bucket<'r>(&self, request: &'r Request<'_>) -> (&'r str, Option<&'r str>) {
+    async fn resolve_bucket<'r>(
+        &self,
+        request: &'r Request<'a>,
+        _user: Option<&User>,
+    ) -> (&'r str, Option<&'r str>) {
         let (segment, resource, extra) = (
             request.routed_segment(0),
             request.routed_segment(1),
@@ -16,58 +38,76 @@ impl<'a> RatelimitResolver<Request<'a>> for DeltaRatelimits {
             let resource = resource;
 
             let method = request.method();
-            match (segment, resource, method) {
-                ("users", target, Method::Patch) => ("user_edit", target),
-                ("users", _, _) => {
+            match (segment, resource, extra, method) {
+                ("users", target, _, Method::Patch) => ("users/patch", target),
+                ("users", target, _, _) => {
                     if let Some("default_avatar") = extra {
-                        return ("default_avatar", None);
+                        return ("users/<id>/default_avatar", target);
                     }
 
                     ("users", None)
                 }
-                ("bots", _, _) => ("bots", None),
-                ("channels", Some(id), _) => {
-                    if request.method() == Method::Post {
-                        if let Some("messages") = extra {
-                            return ("messaging", Some(id));
-                        }
+                ("bots", _, _, _) => ("bots", None),
+                ("channels", Some(id), extra, _) => {
+                    if method == Method::Post
+                        && let Some("messages") = extra
+                    {
+                        return ("channels/<id>/post", Some(id));
                     }
 
-                    ("channels", Some(id))
+                    ("channels/<id>", Some(id))
                 }
-                ("servers", Some(id), _) => ("servers", Some(id)),
-                ("auth", _, _) => {
-                    if request.method() == Method::Delete {
-                        ("auth_delete", None)
+                ("servers", Some(id), Some("members"), Method::Delete)
+                | ("servers", Some(id), Some("members"), Method::Patch)
+                | ("servers", Some(id), Some("bans"), _) => ("servers/<id>/mod", Some(id)),
+                ("servers", Some(id), _, _) => ("servers/<id>", Some(id)),
+                ("auth", _, _, _) => {
+                    if method == Method::Delete {
+                        ("auth/delete", None)
                     } else {
                         ("auth", None)
                     }
                 }
-                ("swagger", _, _) => ("swagger", None),
-                ("safety", Some("report"), _) => ("safety_report", Some("report")),
-                ("safety", _, _) => ("safety", None),
-                _ => ("any_dlta", None),
+                ("swagger", _, _, _) => ("swagger", None),
+                ("safety", Some("report"), _, _) => ("safety/report", None),
+                _ => ("fallback", None),
             }
         } else {
-            ("any_dlta", None)
+            ("fallback", None)
         }
     }
 
-    fn resolve_bucket_limit(&self, bucket: &str) -> u32 {
-        match bucket {
-            "user_edit" => 2,
-            "users" => 20,
-            "bots" => 10,
-            "messaging" => 10,
-            "channels" => 15,
-            "servers" => 5,
-            "auth" => 15,
-            "auth_delete" => 255,
-            "default_avatar" => 255,
-            "swagger" => 100,
-            "safety" => 15,
-            "safety_report" => 3,
-            _ => 20,
+    async fn resolve_bucket_limit(&self, bucket: &str, user: Option<&User>) -> (u32, u32) {
+        let config = config().await;
+        let default: &Ratelimit = config
+            .api
+            .ratelimits
+            .defaults
+            .get(bucket)
+            .unwrap_or(&config.api.ratelimits.fallback);
+
+        if let Some(user) = user
+            && let Some(overrides) = &user.ratelimit_overrides
+        {
+            let applicable_overrides: Vec<&ApiRatelimitOverride> = config
+                .api
+                .ratelimits
+                .overrides
+                .iter()
+                .filter(|o| overrides.contains(&o.key))
+                .collect();
+
+            get_bucket_overrides(bucket, *default, applicable_overrides)
+        } else {
+            *default
+        }
+    }
+
+    fn apply_bucket(&self, bucket: &str, resource: Option<&str>) -> String {
+        if let Some(rss) = resource {
+            bucket.replace("<id>", rss)
+        } else {
+            bucket.to_string()
         }
     }
 }

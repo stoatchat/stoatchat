@@ -37,17 +37,21 @@ where
         {
             let storage = RatelimitStorage::from_ref(state);
 
-            let identifier = if let Ok(user) = parts.extract_with_state::<User, _>(state).await {
-                user.id
-            } else {
-                to_real_ip(parts).await
-            };
+            let (identifier, user) =
+                if let Ok(user) = parts.extract_with_state::<User, _>(state).await {
+                    (user.id.clone(), Some(user))
+                } else {
+                    (to_real_ip(parts).await, None)
+                };
 
-            let (bucket, resource) = storage.resolver.resolve_bucket(parts);
-            let limit = storage.resolver.resolve_bucket_limit(bucket);
+            let (bucket, resource) = storage.resolver.resolve_bucket(parts, user.as_ref()).await;
+            let (limit, window) = storage
+                .resolver
+                .resolve_bucket_limit(bucket, user.as_ref())
+                .await;
 
             let ratelimiter =
-                Ratelimiter::from(&identifier, limit, (bucket, resource)).await;
+                Ratelimiter::from(&identifier, limit, window, (bucket, resource)).await;
 
             parts.extensions.insert(ratelimiter.map_err(Json));
         };
@@ -130,6 +134,7 @@ pub async fn ratelimit_middleware(
         limit,
         remaining,
         reset,
+        window: _,
     } = ratelimiter;
 
     let headers = response.headers_mut();

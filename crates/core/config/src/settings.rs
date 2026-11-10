@@ -223,6 +223,23 @@ pub struct ApiAuditLogs {
     pub expires_after: u64,
 }
 
+pub type Ratelimit = (u32, u32);
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ApiRatelimitOverride {
+    pub key: String,
+    pub overrides: HashMap<String, Ratelimit>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ApiRatelimits {
+    /// Ratelimit used for buckets with no entry in `defaults`
+    pub fallback: Ratelimit,
+    pub defaults: HashMap<String, Ratelimit>,
+    #[serde(default, rename = "override")]
+    pub overrides: Vec<ApiRatelimitOverride>,
+}
+
 #[derive(Deserialize, Debug, Clone)]
 pub struct Api {
     pub registration: ApiRegistration,
@@ -232,6 +249,7 @@ pub struct Api {
     pub livekit: ApiLiveKit,
     pub users: ApiUsers,
     pub audit_logs: ApiAuditLogs,
+    pub ratelimits: ApiRatelimits,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -520,5 +538,49 @@ mod tests {
     #[tokio::test]
     async fn it_works() {
         init().await;
+    }
+
+    #[tokio::test]
+    async fn parses_ratelimits() {
+        let config = super::config().await;
+        let ratelimits = config.api.ratelimits;
+
+        assert_eq!(ratelimits.defaults.get("users/patch"), Some(&(2, 15)));
+        assert_eq!(ratelimits.defaults.get("channels/<id>/post"), Some(&(7, 7)));
+        assert_eq!(ratelimits.fallback, (10, 10));
+        assert!(ratelimits.overrides.is_empty());
+    }
+
+    #[test]
+    fn parses_ratelimit_overrides() {
+        use config::{Config, File, FileFormat};
+
+        let ratelimits: super::ApiRatelimits = Config::builder()
+            .add_source(File::from_str(
+                r#"
+                fallback = [10, 10]
+
+                [defaults]
+                "servers/<server>/mod" = [30, 10]
+
+                [[override]]
+                key = "MOD_BOT"
+                overrides = { "servers/<server>/mod" = [60, 10] }
+                "#,
+                FileFormat::Toml,
+            ))
+            .build()
+            .unwrap()
+            .try_deserialize()
+            .unwrap();
+
+        assert_eq!(ratelimits.overrides.len(), 1);
+        assert_eq!(ratelimits.overrides[0].key, "MOD_BOT");
+        assert_eq!(
+            ratelimits.overrides[0]
+                .overrides
+                .get("servers/<server>/mod"),
+            Some(&(60, 10))
+        );
     }
 }

@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use log::info;
+use revolt_database::User;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::uri::Origin;
 use rocket::http::{Method, Status};
@@ -7,9 +8,9 @@ use rocket::request::{FromRequest, Outcome};
 use rocket::serde::json::Json;
 use rocket::{Data, Request, Response, State};
 
+use revolt_database::{Database, Session, util::ip::rocket::to_real_ip};
 use revolt_rocket_okapi::r#gen::OpenApiGenerator;
 use revolt_rocket_okapi::request::{OpenApiFromRequest, RequestHeaderInput};
-use revolt_database::{Session, util::ip::rocket::to_real_ip};
 
 use crate::ratelimiter::RequestKind;
 use crate::ratelimiter::{RatelimitInformation, Ratelimiter};
@@ -30,21 +31,33 @@ impl<'r> FromRequest<'r> for Ratelimiter {
     async fn from_request<'a>(request: &'r rocket::Request<'a>) -> Outcome<Self, Self::Error> {
         let ratelimiter = request
             .local_cache_async(async {
-                use rocket::outcome::Outcome;
-
                 let storage = request.guard::<&State<RatelimitStorage>>().await.unwrap();
 
-                let identifier = if let Outcome::Success(session) = request.guard::<Session>().await
-                {
-                    session.id
+                let session = request.guard::<Session>().await.succeeded();
+                let user = request.guard::<User>().await.succeeded();
+
+                let identifier = if let Some(session) = session {
+                    session.user_id
                 } else {
                     to_real_ip(request).await
                 };
 
-                let (bucket, resource) = storage.resolver.resolve_bucket(request);
-                let limit = storage.resolver.resolve_bucket_limit(bucket);
+                let (bucket, resource) = storage
+                    .resolver
+                    .resolve_bucket(request, user.as_ref())
+                    .await;
+                let (limit, window) = storage
+                    .resolver
+                    .resolve_bucket_limit(bucket, user.as_ref())
+                    .await;
 
-                Ratelimiter::from(&identifier, limit, (bucket, resource)).await
+                Ratelimiter::from(
+                    &identifier,
+                    limit,
+                    window,
+                    (&storage.resolver.apply_bucket(bucket, resource), resource),
+                )
+                .await
             })
             .await;
 
@@ -101,6 +114,7 @@ impl Fairing for RatelimitFairing {
             limit,
             remaining,
             reset,
+            window: _,
         } = ratelimiter;
 
         response.set_raw_header("X-RateLimit-Limit", limit.to_string());
