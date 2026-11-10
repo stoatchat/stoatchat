@@ -158,6 +158,10 @@ impl Ratelimiter {
             });
         }
 
+        if window == 0 {
+            panic!("Window must be greater than 0 seconds")
+        }
+
         let mut conn = get_connection()
             .await
             .expect("Failed to get redis connection")
