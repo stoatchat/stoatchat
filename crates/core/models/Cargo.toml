@@ -1,6 +1,6 @@
 [package]
 name = "revolt-models"
-version = "0.16.3"
+version = "0.16.4"
 edition = "2024"
 license = "MIT"
 authors = ["izzy <me@insrt.uk>"]
