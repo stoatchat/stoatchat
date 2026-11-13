@@ -4,11 +4,13 @@ use std::ops::Add;
 use std::sync::{Arc, LazyLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+pub use async_trait::async_trait;
 use redis_kiss::redis::ExistenceCheck;
 use redis_kiss::{
     get_connection,
     redis::{Pipeline, SetExpiry, SetOptions, aio::Connection},
 };
+use revolt_database::User;
 use revolt_result::ToRevoltError;
 use serde::Serialize;
 
@@ -18,9 +20,17 @@ pub trait RequestKind {
     type R<'a>;
 }
 
+#[async_trait]
 pub trait RatelimitResolver<R>: Send + Sync {
-    fn resolve_bucket<'a>(&self, request: &'a R) -> (&'a str, Option<&'a str>);
-    fn resolve_bucket_limit(&self, bucket: &str) -> u32;
+    async fn resolve_bucket<'a>(
+        &self,
+        request: &'a R,
+        user: Option<&User>,
+    ) -> (&'a str, Option<&'a str>);
+
+    async fn resolve_bucket_limit(&self, bucket: &str, user: Option<&User>) -> (u32, u32);
+
+    fn apply_bucket(&self, bucket: &str, resource: Option<&str>) -> String;
 }
 
 #[derive(Clone)]
@@ -52,8 +62,8 @@ fn now() -> Duration {
 
 impl Entry {
     /// Find bucket by its key, and incremement its usage count
-    pub async fn from(conn: &mut Connection, now: Duration, key: u64) -> Entry {
-        let expire = now.add(Duration::from_secs(10)).as_millis();
+    pub async fn from(conn: &mut Connection, now: Duration, key: u64, window: u32) -> Entry {
+        let expire = now.add(Duration::from_secs(window as u64)).as_millis();
 
         let (used, _, reset) = Pipeline::new()
             .incr(format!("rl:{key}:used"), 1)
@@ -62,7 +72,7 @@ impl Entry {
                 expire as usize,
                 SetOptions::default()
                     .conditional_set(ExistenceCheck::NX)
-                    .with_expiration(SetExpiry::EX(10)),
+                    .with_expiration(SetExpiry::EX(window as usize)),
             )
             .get(format!("rl:{key}:reset"))
             .query_async::<_, (u32, (), u128)>(conn)
@@ -74,12 +84,12 @@ impl Entry {
     }
 
     /// Check if the entry is expired, and reset it if so
-    pub fn is_expired(&mut self, now: Duration) {
+    pub fn is_expired(&mut self, now: Duration, window: u32) {
         let current_time = now.as_millis();
 
         if current_time > self.reset {
             self.used = 1;
-            self.reset = now.add(Duration::from_secs(10)).as_millis();
+            self.reset = now.add(Duration::from_secs(window as u64)).as_millis();
         };
     }
 
@@ -115,6 +125,7 @@ impl Entry {
 pub struct Ratelimiter {
     pub key: u64,
     pub limit: u32,
+    pub window: u32,
     pub remaining: u32,
     pub reset: u128,
 }
@@ -124,6 +135,7 @@ impl Ratelimiter {
     pub async fn from(
         identifier: &str,
         limit: u32,
+        window: u32,
         (bucket, resource): (&str, Option<&str>),
     ) -> Result<Ratelimiter, Ratelimiter> {
         let mut key = DefaultHasher::new();
@@ -141,8 +153,13 @@ impl Ratelimiter {
                 key,
                 limit,
                 remaining: limit,
+                window,
                 reset: 10000,
             });
+        }
+
+        if window == 0 {
+            panic!("Window must be greater than 0 seconds")
         }
 
         let mut conn = get_connection()
@@ -151,7 +168,7 @@ impl Ratelimiter {
             .into_inner();
 
         let now = now();
-        let mut entry = Entry::from(&mut conn, now, key).await;
+        let mut entry = Entry::from(&mut conn, now, key, window).await;
 
         let remaining = entry.get_remaining(now, limit);
         let reset = entry.left_until_reset(now);
@@ -159,13 +176,14 @@ impl Ratelimiter {
             key,
             limit,
             remaining,
+            window,
             reset,
         };
         if remaining == 0 {
             return Err(ratelimiter);
         }
 
-        entry.is_expired(now);
+        entry.is_expired(now, window);
         entry.save(&mut conn, key).await;
         ratelimiter.remaining = ratelimiter.remaining.saturating_sub(1);
 

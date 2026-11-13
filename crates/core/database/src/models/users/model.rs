@@ -1,9 +1,9 @@
 use std::{collections::HashSet, str::FromStr, time::Duration};
 
 use crate::{
+    AMQP, Database, File, RatelimitEvent,
     events::client::EventV1,
     util::email::{email_templates, send_email},
-    Database, File, RatelimitEvent, AMQP,
 };
 
 use futures::future::join_all;
@@ -11,10 +11,10 @@ use iso8601_timestamp::Timestamp;
 use once_cell::sync::Lazy;
 use rand::seq::SliceRandom;
 use regex::{Regex, RegexBuilder};
-use revolt_config::{config, FeaturesLimits};
+use revolt_config::{FeaturesLimits, config};
 use revolt_models::v0::{self, UserBadges, UserFlags};
 use revolt_presence::filter_online;
-use revolt_result::{create_error, Result};
+use revolt_result::{Result, create_error};
 use serde_json::json;
 use ulid::Ulid;
 
@@ -60,6 +60,8 @@ auto_derived_partial!(
         /// Bot information
         #[serde(skip_serializing_if = "Option::is_none")]
         pub bot: Option<BotInformation>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub ratelimit_overrides: Option<Vec<String>>,
 
         /// Time until user is unsuspended
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -203,6 +205,7 @@ impl Default for User {
             privileged: Default::default(),
             bot: Default::default(),
             suspended_until: Default::default(),
+            ratelimit_overrides: Default::default(),
             last_acknowledged_policy_change: Timestamp::UNIX_EPOCH,
         }
     }
@@ -971,8 +974,8 @@ mod tests {
 
     #[tokio::test]
     async fn create_user() {
-        use revolt_result::Result;
         use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
+        use revolt_result::Result;
 
         database_test!(|db| async move {
             let mut created_clean = User::create(&db, "Test".to_string(), None, None)
@@ -1057,9 +1060,13 @@ mod tests {
 
             // Removing the banner without any other field changes used to
             // send MongoDB an empty $set, which it rejects outright.
-            user.update(&db, PartialUser::default(), vec![FieldsUser::ProfileBackground])
-                .await
-                .unwrap();
+            user.update(
+                &db,
+                PartialUser::default(),
+                vec![FieldsUser::ProfileBackground],
+            )
+            .await
+            .unwrap();
 
             assert!(user.profile.as_ref().unwrap().background.is_none());
         });
