@@ -10,7 +10,7 @@ use revolt_permissions::{
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 
-use crate::util::{audit_log_reason::AuditLogReason, permissions};
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Set Role Permission
 ///
@@ -52,14 +52,9 @@ pub async fn set_role_permission(
         .throw_permission_override(current_override, &data.permissions)
         .await?;
 
-    permissions::throw_if_would_lose_server_channel_view(
-        db,
-        &user,
-        &server,
-        Some(&role_id),
-        &data.permissions,
-    )
-    .await?;
+    query
+        .throw_if_would_lose_server_channel_view(Some(&role_id), &data.permissions)
+        .await?;
 
     let override_field: OverrideField = data.permissions.into();
 

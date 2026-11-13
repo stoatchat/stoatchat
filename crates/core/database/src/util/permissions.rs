@@ -2,9 +2,9 @@ use std::borrow::Cow;
 
 use revolt_permissions::{
     calculate_user_permissions, ChannelType, Override, PermissionQuery, PermissionValue,
-    RelationshipStatus, DEFAULT_PERMISSION_DIRECT_MESSAGE,
+    RelationshipStatus, DEFAULT_PERMISSION_DIRECT_MESSAGE, calculate_channel_permissions, ChannelPermission
 };
-
+use revolt_result::{create_error, Result};
 use crate::{Channel, Database, Member, Server, User};
 
 /// Permissions calculator
@@ -474,6 +474,103 @@ impl<'a> DatabasePermissionQuery<'a> {
         self.member
             .as_ref()
             .map(|member| member.get_ranking(self.server.as_ref().unwrap()))
+    }
+
+    /// Prevent a non-owner from locking themselves out of this channel
+    /// by applying the given override (to a role, or to the default if `role_id` is None).
+    pub async fn throw_if_would_lose_channel_view(
+        &self,
+        role_id: Option<&str>,
+        permissions: &Override,
+    ) -> Result<()> {
+        let Some(channel) = self.channel.as_deref() else {
+            return Ok(());
+        };
+
+        let mut channel = channel.clone();
+        match &mut channel {
+            Channel::TextChannel {
+                role_permissions,
+                default_permissions,
+                ..
+            } => {
+                if let Some(role_id) = role_id {
+                    role_permissions.insert(role_id.to_string(), permissions.clone().into());
+                } else {
+                    *default_permissions = Some(permissions.clone().into());
+                }
+            }
+            _ => return Ok(()),
+        }
+
+        let mut query = self.clone();
+        query.channel = Some(Cow::Owned(channel));
+
+        if !calculate_channel_permissions(&mut query)
+            .await
+            .has_channel_permission(ChannelPermission::ViewChannel)
+        {
+            return Err(create_error!(CannotRemoveOwnChannelView));
+        }
+
+        Ok(())
+    }
+
+    /// Prevent a non-owner from locking themselves out of the server's channels
+    /// by applying the given override (to a role, or to the server default if `role_id` is None).
+    pub async fn throw_if_would_lose_server_channel_view(
+        &self,
+        role_id: Option<&str>,
+        permissions: &Override,
+    ) -> Result<()> {
+        let Some(server) = self.server.as_deref() else {
+            return Ok(());
+        };
+
+        if server.owner == self.perspective.id {
+            return Ok(());
+        }
+
+        let mut modified = server.clone();
+        match role_id {
+            Some(id) => match modified.roles.get_mut(id) {
+                Some(role) => role.permissions = permissions.clone().into(),
+                None => return Ok(()),
+            },
+            None => modified.default_permissions = permissions.allow as i64,
+        }
+
+        let channels = self.database.fetch_channels(&server.channels).await?;
+
+        for channel in channels {
+            if !matches!(channel, Channel::TextChannel { .. }) {
+                continue;
+            }
+
+            let mut old_query = self.clone();
+            old_query.channel = Some(Cow::Owned(channel.clone()));
+
+            if !calculate_channel_permissions(&mut old_query)
+                .await
+                .has_channel_permission(ChannelPermission::ViewChannel)
+            {
+                // Already couldn't see it, so nothing to lose.
+                continue;
+            }
+
+            let mut new_query = self.clone();
+            new_query.channel = Some(Cow::Owned(channel));
+            new_query.server = Some(Cow::Owned(modified.clone()));
+
+            if !calculate_channel_permissions(&mut new_query)
+                .await
+                .has_channel_permission(ChannelPermission::ViewChannel)
+            {
+                return Err(create_error!(CannotRemoveOwnChannelView));
+            }
+        }
+
+        Ok(())
     }
 }
 

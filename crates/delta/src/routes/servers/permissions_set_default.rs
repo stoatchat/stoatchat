@@ -10,7 +10,7 @@ use revolt_permissions::{
 use revolt_result::Result;
 use rocket::{serde::json::Json, State};
 
-use crate::util::{audit_log_reason::AuditLogReason, permissions};
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Set Default Permission
 ///
@@ -44,16 +44,8 @@ pub async fn set_default_server_permissions(
         )
         .await?;
 
-    permissions::throw_if_would_lose_server_channel_view(
-        db,
-        &user,
-        &server,
-        None,
-        &Override {
-            allow: data.permissions,
-            deny: 0,
-        },
-    )
+    query
+        .throw_if_would_lose_server_channel_view(None, &Override {allow: data.permissions, deny: 0})
         .await?;
 
     let partial = PartialServer {

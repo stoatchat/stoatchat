@@ -8,7 +8,7 @@ use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 
-use crate::util::{audit_log_reason::AuditLogReason, permissions};
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Set Default Permission
 ///
@@ -61,10 +61,9 @@ pub async fn set_default_channel_permissions(
                     .throw_permission_override(default_permissions.map(|x| x.into()), &field)
                     .await?;
 
-                permissions::throw_if_would_lose_channel_view(
-                    db, &user, &channel, None, &field,
-                )
-                .await?;
+                query
+                    .throw_if_would_lose_channel_view(None, &field)
+                    .await?;
 
                 let partial = PartialChannel {
                     default_permissions: Some(field.into()),

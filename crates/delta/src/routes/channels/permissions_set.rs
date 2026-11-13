@@ -8,7 +8,7 @@ use revolt_permissions::{ChannelPermission, Override, OverrideField, PermissionQ
 use revolt_result::{create_error, Result};
 use rocket::{serde::json::Json, State};
 
-use crate::util::{audit_log_reason::AuditLogReason, permissions};
+use crate::util::audit_log_reason::AuditLogReason;
 
 /// # Set Role Permission
 ///
@@ -48,14 +48,9 @@ pub async fn set_role_permissions(
                 .throw_permission_override(current_value, &data.permissions)
                 .await?;
 
-            permissions::throw_if_would_lose_channel_view(
-                db,
-                &user,
-                &channel,
-                Some(&role_id),
-                &data.permissions,
-            )
-            .await?;
+            query
+                .throw_if_would_lose_channel_view(Some(&role.id), &data.permissions)
+                .await?;
 
             let mut new_channel = channel.clone();
             let override_field: OverrideField = data.permissions.clone().into();
