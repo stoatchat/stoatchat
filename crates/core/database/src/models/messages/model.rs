@@ -976,8 +976,9 @@ impl Message {
         db: &Database,
         user: &User,
         query: &mut DatabasePermissionQuery<'_>,
-        emoji: &str,
+        mut emoji: &str,
     ) -> Result<()> {
+        emoji = emoji.strip_prefix('\u{200C}').unwrap_or(emoji);
         // Check how many reactions are already on the message
         let config = config().await;
         if self.reactions.len() >= config.features.limits.global.message_reactions
@@ -1156,7 +1157,8 @@ impl Message {
     }
 
     /// Remove a reaction from a message
-    pub async fn remove_reaction(&self, db: &Database, user: &str, emoji: &str) -> Result<()> {
+    pub async fn remove_reaction(&self, db: &Database, user: &str,  mut emoji: &str) -> Result<()> {
+        emoji = emoji.strip_prefix('\u{200C}').unwrap_or(emoji);
         // Check if it actually exists
         let empty = if let Some(users) = self.reactions.get(emoji) {
             if !users.contains(user) {
@@ -1188,7 +1190,8 @@ impl Message {
     }
 
     /// Remove a reaction from a message
-    pub async fn clear_reaction(&self, db: &Database, emoji: &str) -> Result<()> {
+    pub async fn clear_reaction(&self, db: &Database, mut emoji: &str) -> Result<()> {
+        emoji = emoji.strip_prefix('\u{200C}').unwrap_or(emoji);
         // Send reaction event
         EventV1::MessageRemoveReaction {
             id: self.id.to_string(),
