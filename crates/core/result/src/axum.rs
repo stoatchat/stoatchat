@@ -72,6 +72,7 @@ impl IntoResponse for Error {
             ErrorType::CannotGiveMissingPermissions => StatusCode::FORBIDDEN,
             ErrorType::NotOwner => StatusCode::FORBIDDEN,
             ErrorType::IsElevated => StatusCode::FORBIDDEN,
+            ErrorType::CannotRemoveOwnChannelView => StatusCode::FORBIDDEN,
 
             ErrorType::DatabaseError { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorType::InternalError => StatusCode::INTERNAL_SERVER_ERROR,

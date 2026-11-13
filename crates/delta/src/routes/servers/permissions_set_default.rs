@@ -44,6 +44,10 @@ pub async fn set_default_server_permissions(
         )
         .await?;
 
+    query
+        .throw_if_would_lose_server_channel_view(None, &Override {allow: data.permissions, deny: 0})
+        .await?;
+
     let partial = PartialServer {
         default_permissions: Some(data.permissions as i64),
         ..Default::default()
