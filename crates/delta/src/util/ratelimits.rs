@@ -15,7 +15,7 @@ fn get_bucket_overrides(
         .into_iter()
         .filter_map(|o| o.overrides.get(bucket).copied())
         .max_by(|(a_limit, a_window), (b_limit, b_window)| {
-            (*a_limit * *b_window).cmp(&(*b_limit * *a_window))
+            (a_limit * b_window).cmp(&(b_limit * a_window))
         })
         .unwrap_or(default)
 }
