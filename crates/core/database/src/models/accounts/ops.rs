@@ -1,6 +1,6 @@
 use revolt_result::Result;
 
-use crate::Account;
+use crate::{Account, PasskeyCredential};
 
 #[cfg(feature = "mongodb")]
 mod mongodb;
@@ -26,11 +26,20 @@ pub trait AbstractAccounts: Sync + Send {
     /// Find account with active deletion token
     async fn fetch_account_with_deletion_token(&self, token: &str) -> Result<Account>;
 
+    /// Find account owning a passkey by its WebAuthn credential id
+    async fn fetch_account_by_passkey(&self, credential_id: &[u8]) -> Result<Option<Account>>;
+
     /// Find accounts which are due to be deleted
     async fn fetch_accounts_due_for_deletion(&self) -> Result<Vec<Account>>;
 
     // Save account
     async fn save_account(&self, account: &Account) -> Result<()>;
+
+    /// Add a newly registered passkey
+    async fn add_passkey(&self, account_id: &str, passkey: &PasskeyCredential) -> Result<()>;
+
+    /// Save a passkey's credential and last use after it has been used to authenticate
+    async fn save_passkey(&self, account_id: &str, passkey: &PasskeyCredential) -> Result<()>;
 
     async fn bump_lockout_count(&self, id: &str) -> Result<Account>;
 }
