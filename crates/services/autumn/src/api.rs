@@ -420,14 +420,16 @@ fn parse_byte_range(header: Option<&str>, total: usize) -> ByteRange {
 /// Build a file response, honouring `Range` requests
 fn serve_bytes(
     data: Vec<u8>,
+    method: &Method,
     request_headers: &HeaderMap,
     content_type: String,
     cache_control: &str,
 ) -> Response {
     let total = data.len();
 
-    // Without an ETag/Last-Modified we can't validate If-Range, so fall back to the full file
-    let range = if request_headers.contains_key(header::IF_RANGE) {
+    // Range is only defined for GET (RFC 9110 §14.2). Without an ETag/Last-Modified
+    // we can't validate If-Range, so fall back to the full file.
+    let range = if method != Method::GET || request_headers.contains_key(header::IF_RANGE) {
         ByteRange::Full
     } else {
         parse_byte_range(
@@ -596,6 +598,7 @@ async fn fetch_preview(
 )]
 async fn fetch_file(
     State(db): State<Database>,
+    method: Method,
     headers: HeaderMap,
     Path((tag, file_id, file_name)): Path<(Tag, String, String)>,
 ) -> Result<Response> {
@@ -628,7 +631,7 @@ async fn fetch_file(
     let hash = file.as_hash(&db).await?;
     let data = retrieve_file_by_hash(&hash).await?;
 
-    Ok(serve_bytes(data, &headers, hash.content_type, CACHE_CONTROL))
+    Ok(serve_bytes(data, &method, &headers, hash.content_type, CACHE_CONTROL))
 }
 
 /// Fetch original file (Moderation)
@@ -637,6 +640,7 @@ async fn fetch_file(
 /// It uses the config key api.security.admin_keys to determine access. This is intended for server to server communication.
 async fn fetch_file_mod(
     State(db): State<Database>,
+    method: Method,
     headers: HeaderMap,
     Path((tag, file_id, file_name)): Path<(Tag, String, String)>,
 ) -> Result<Response> {
@@ -683,6 +687,7 @@ async fn fetch_file_mod(
 
     Ok(serve_bytes(
         data,
+        &method,
         &headers,
         hash.content_type,
         "private, max-age=300, must-revalidate",
@@ -691,7 +696,8 @@ async fn fetch_file_mod(
 
 #[cfg(test)]
 mod tests {
-    use super::{image_within_limits, parse_byte_range, ByteRange};
+    use super::{image_within_limits, parse_byte_range, ByteRange, serve_bytes, CACHE_CONTROL};
+    use axum::http::{header, HeaderMap, Method, StatusCode};
     use revolt_config::FilesLimit;
 
     fn limits() -> FilesLimit {
@@ -758,5 +764,17 @@ mod tests {
         assert_eq!(parse_byte_range(Some("bytes=0-1,4-5"), 100), ByteRange::Full);
         assert_eq!(parse_byte_range(Some("items=0-1"), 100), ByteRange::Full);
         assert_eq!(parse_byte_range(Some("bytes=a-b"), 100), ByteRange::Full);
+    }
+
+    #[test]
+    fn head_ignores_range() {
+        let mut h = HeaderMap::new();
+        h.insert(header::RANGE, "bytes=0-1".parse().unwrap());
+
+        let res = serve_bytes(vec![0u8; 100], &Method::HEAD, &h, "video/mp4".into(), CACHE_CONTROL);
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let res = serve_bytes(vec![0u8; 100], &Method::GET, &h, "video/mp4".into(), CACHE_CONTROL);
+        assert_eq!(res.status(), StatusCode::PARTIAL_CONTENT);
     }
 }
