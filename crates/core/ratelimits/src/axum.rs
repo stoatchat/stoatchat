@@ -50,8 +50,13 @@ where
                 .resolve_bucket_limit(bucket, user.as_ref())
                 .await;
 
-            let ratelimiter =
-                Ratelimiter::from(&identifier, limit, window, (bucket, resource)).await;
+            let ratelimiter = Ratelimiter::from(
+                &identifier,
+                limit,
+                window,
+                (&storage.resolver.apply_bucket(bucket, resource), resource),
+            )
+            .await;
 
             parts.extensions.insert(ratelimiter.map_err(Json));
         };
