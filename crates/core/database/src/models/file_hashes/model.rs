@@ -63,6 +63,7 @@ impl FileHash {
         tag: String,
         filename: String,
         uploader_id: String,
+        e2e_id: Option<String>,
     ) -> File {
         File {
             id,
@@ -88,6 +89,7 @@ impl FileHash {
             object_id: None,
             server_id: None,
             user_id: None,
+            e2e_id,
         }
     }
 }
