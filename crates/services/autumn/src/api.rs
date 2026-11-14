@@ -5,7 +5,7 @@ use std::{
 
 use axum::{
     extract::{DefaultBodyLimit, Path, State},
-    http::{header, HeaderMap, Method},
+    http::{header, HeaderMap, Method, StatusCode},
     response::{IntoResponse, Redirect, Response},
     routing::{get, post},
     Json, Router,
@@ -44,6 +44,8 @@ pub async fn router() -> Router<AppState> {
             "X-RateLimit-Bucket".try_into().unwrap(),
             "X-RateLimit-Remaining".try_into().unwrap(),
             "X-RateLimit-Reset-After".try_into().unwrap(),
+            "Accept-Ranges".try_into().unwrap(),
+            "Content-Range".try_into().unwrap(),
         ])
         .allow_origin(Any);
 
@@ -357,6 +359,116 @@ fn image_within_limits(width: usize, height: usize, limits: &FilesLimit) -> bool
 /// Header value used for cache control
 pub static CACHE_CONTROL: &str = "public, max-age=604800, must-revalidate";
 
+/// Outcome of parsing a `Range` request header
+#[derive(Debug, PartialEq, Eq)]
+enum ByteRange {
+    /// No usable range (absent, malformed, or multi-range): serve the whole file with 200
+    Full,
+    /// Inclusive byte range to serve with 206
+    Partial(usize, usize),
+    /// Well-formed but outside the file: respond 416
+    Unsatisfiable,
+}
+
+/// Parse a single `bytes=` range per RFC 9110 §14
+fn parse_byte_range(header: Option<&str>, total: usize) -> ByteRange {
+    let Some(spec) = header.and_then(|h| h.trim().strip_prefix("bytes=")) else {
+        return ByteRange::Full;
+    };
+
+    // Multi-range requests are optional to support; ignore them
+    if spec.contains(',') {
+        return ByteRange::Full;
+    }
+
+    let Some((start, end)) = spec.split_once('-') else {
+        return ByteRange::Full;
+    };
+    let (start, end) = (start.trim(), end.trim());
+
+    // Suffix range: last N bytes
+    if start.is_empty() {
+        let Ok(n) = end.parse::<usize>() else {
+            return ByteRange::Full;
+        };
+        if n == 0 || total == 0 {
+            return ByteRange::Unsatisfiable;
+        }
+        return ByteRange::Partial(total.saturating_sub(n), total - 1);
+    }
+
+    let Ok(start) = start.parse::<usize>() else {
+        return ByteRange::Full;
+    };
+    let end = if end.is_empty() {
+        usize::MAX
+    } else {
+        match end.parse::<usize>() {
+            Ok(v) => v,
+            Err(_) => return ByteRange::Full,
+        }
+    };
+
+    if end < start {
+        return ByteRange::Full; // invalid, ignore
+    }
+    if start >= total {
+        return ByteRange::Unsatisfiable;
+    }
+
+    ByteRange::Partial(start, end.min(total - 1))
+}
+
+/// Build a file response, honouring `Range` requests
+fn serve_bytes(
+    data: Vec<u8>,
+    method: &Method,
+    request_headers: &HeaderMap,
+    content_type: String,
+    cache_control: &str,
+) -> Response {
+    let total = data.len();
+
+    // Range is only defined for GET (RFC 9110 §14.2). Without an ETag/Last-Modified
+    // we can't validate If-Range, so fall back to the full file.
+    let range = if method != Method::GET || request_headers.contains_key(header::IF_RANGE) {
+        ByteRange::Full
+    } else {
+        parse_byte_range(
+            request_headers
+                .get(header::RANGE)
+                .and_then(|v| v.to_str().ok()),
+            total,
+        )
+    };
+
+    let base = [
+        (header::CONTENT_TYPE, content_type),
+        (header::CONTENT_DISPOSITION, "attachment".to_owned()),
+        (header::CACHE_CONTROL, cache_control.to_owned()),
+        (header::ACCEPT_RANGES, "bytes".to_owned()),
+    ];
+
+    match range {
+        ByteRange::Full => (base, data).into_response(),
+        ByteRange::Partial(start, end) => (
+            StatusCode::PARTIAL_CONTENT,
+            base,
+            [(header::CONTENT_RANGE, format!("bytes {start}-{end}/{total}"))],
+            data[start..=end].to_vec(),
+        )
+            .into_response(),
+        ByteRange::Unsatisfiable => (
+            StatusCode::RANGE_NOT_SATISFIABLE,
+            [
+                (header::ACCEPT_RANGES, "bytes".to_owned()),
+                (header::CONTENT_RANGE, format!("bytes */{total}")),
+            ],
+        )
+            .into_response(),
+    }
+}
+
 /// Fetch preview of file
 ///
 /// This route will only return image content. <br>
@@ -476,7 +588,9 @@ async fn fetch_preview(
     path = "/{tag}/{file_id}/{file_name}",
     tag = "Files",
     responses(
-        (status = 200, description = "Original file", body = Vec<u8>)
+        (status = 200, description = "Original file", body = Vec<u8>),
+        (status = 206, description = "Partial content (Range request)", body = Vec<u8>),
+        (status = 416, description = "Range not satisfiable")
     ),
     params(
         ("tag" = Tag, Path, description = "Tag to fetch from (e.g. attachments, icons, ...)"),
@@ -486,6 +600,8 @@ async fn fetch_preview(
 )]
 async fn fetch_file(
     State(db): State<Database>,
+    method: Method,
+    headers: HeaderMap,
     Path((tag, file_id, file_name)): Path<(Tag, String, String)>,
 ) -> Result<Response> {
     let tag: &'static str = tag.clone().into();
@@ -515,17 +631,9 @@ async fn fetch_file(
     }
 
     let hash = file.as_hash(&db).await?;
-    retrieve_file_by_hash(&hash).await.map(|data| {
-        (
-            [
-                (header::CONTENT_TYPE, hash.content_type),
-                (header::CONTENT_DISPOSITION, "attachment".to_owned()),
-                (header::CACHE_CONTROL, CACHE_CONTROL.to_owned()),
-            ],
-            data,
-        )
-            .into_response()
-    })
+    let data = retrieve_file_by_hash(&hash).await?;
+
+    Ok(serve_bytes(data, &method, &headers, hash.content_type, CACHE_CONTROL))
 }
 
 /// Fetch original file (Moderation)
@@ -534,6 +642,7 @@ async fn fetch_file(
 /// It uses the config key api.security.admin_keys to determine access. This is intended for server to server communication.
 async fn fetch_file_mod(
     State(db): State<Database>,
+    method: Method,
     headers: HeaderMap,
     Path((tag, file_id, file_name)): Path<(Tag, String, String)>,
 ) -> Result<Response> {
@@ -576,25 +685,21 @@ async fn fetch_file_mod(
     }
 
     let hash = file.as_hash(&db).await?;
-    retrieve_file_by_hash(&hash).await.map(|data| {
-        (
-            [
-                (header::CONTENT_TYPE, hash.content_type),
-                (header::CONTENT_DISPOSITION, "attachment".to_owned()),
-                (
-                    header::CACHE_CONTROL,
-                    "private, max-age=300, must-revalidate".to_owned(),
-                ),
-            ],
-            data,
-        )
-            .into_response()
-    })
+    let data = retrieve_file_by_hash(&hash).await?;
+
+    Ok(serve_bytes(
+        data,
+        &method,
+        &headers,
+        hash.content_type,
+        "private, max-age=300, must-revalidate",
+    ))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::image_within_limits;
+    use super::{image_within_limits, parse_byte_range, ByteRange, serve_bytes, CACHE_CONTROL};
+    use axum::http::{header, HeaderMap, Method, StatusCode};
     use revolt_config::FilesLimit;
 
     fn limits() -> FilesLimit {
@@ -632,5 +737,46 @@ mod tests {
     fn rejects_images_below_min_resolution() {
         assert!(!image_within_limits(0, 100, &limits()));
         assert!(!image_within_limits(100, 0, &limits()));
+    }
+
+    #[test]
+    fn range_basic() {
+        assert_eq!(parse_byte_range(Some("bytes=0-1"), 100), ByteRange::Partial(0, 1));
+        assert_eq!(parse_byte_range(Some("bytes=0-"), 100), ByteRange::Partial(0, 99));
+        assert_eq!(parse_byte_range(Some("bytes=50-999"), 100), ByteRange::Partial(50, 99));
+    }
+
+    #[test]
+    fn range_suffix() {
+        assert_eq!(parse_byte_range(Some("bytes=-10"), 100), ByteRange::Partial(90, 99));
+        assert_eq!(parse_byte_range(Some("bytes=-500"), 100), ByteRange::Partial(0, 99));
+        assert_eq!(parse_byte_range(Some("bytes=-0"), 100), ByteRange::Unsatisfiable);
+    }
+
+    #[test]
+    fn range_unsatisfiable() {
+        assert_eq!(parse_byte_range(Some("bytes=100-"), 100), ByteRange::Unsatisfiable);
+        assert_eq!(parse_byte_range(Some("bytes=0-1"), 0), ByteRange::Unsatisfiable);
+    }
+
+    #[test]
+    fn range_ignored() {
+        assert_eq!(parse_byte_range(None, 100), ByteRange::Full);
+        assert_eq!(parse_byte_range(Some("bytes=5-2"), 100), ByteRange::Full);
+        assert_eq!(parse_byte_range(Some("bytes=0-1,4-5"), 100), ByteRange::Full);
+        assert_eq!(parse_byte_range(Some("items=0-1"), 100), ByteRange::Full);
+        assert_eq!(parse_byte_range(Some("bytes=a-b"), 100), ByteRange::Full);
+    }
+
+    #[test]
+    fn head_ignores_range() {
+        let mut h = HeaderMap::new();
+        h.insert(header::RANGE, "bytes=0-1".parse().unwrap());
+
+        let res = serve_bytes(vec![0u8; 100], &Method::HEAD, &h, "video/mp4".into(), CACHE_CONTROL);
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let res = serve_bytes(vec![0u8; 100], &Method::GET, &h, "video/mp4".into(), CACHE_CONTROL);
+        assert_eq!(res.status(), StatusCode::PARTIAL_CONTENT);
     }
 }
