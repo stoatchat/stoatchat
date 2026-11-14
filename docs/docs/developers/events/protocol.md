@@ -2,7 +2,9 @@
 
 This page documents various incoming and outgoing events.
 
-**Help Wanted:** we should adopt [AsyncAPI](https://www.asyncapi.com) to properly document the protocol!
+:::warning
+Legacy documentation, superseeded by new [Protocols](/developers/events/protocols) documentation.
+:::
 
 ## Client to Server
 
