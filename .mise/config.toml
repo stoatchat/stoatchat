@@ -2,7 +2,7 @@
 node = "25.4.0"
 pnpm = "10.34.9"
 
-gh = "2.25.0"
+gh = "2.104.0"
 
 rust = "1.92.0"
 "github:nextest-rs/nextest" = { version = "0.9.122", version_prefix = "cargo-nextest-" }
