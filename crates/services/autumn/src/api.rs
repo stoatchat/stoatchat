@@ -44,6 +44,8 @@ pub async fn router() -> Router<AppState> {
             "X-RateLimit-Bucket".try_into().unwrap(),
             "X-RateLimit-Remaining".try_into().unwrap(),
             "X-RateLimit-Reset-After".try_into().unwrap(),
+            "Accept-Ranges".try_into().unwrap(),
+            "Content-Range".try_into().unwrap(),
         ])
         .allow_origin(Any);
 
