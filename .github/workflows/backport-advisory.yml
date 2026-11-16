@@ -1,0 +1,130 @@
+name: Backport security advisory
+
+# Security advisory fixes are merged straight into main as "Merge commit from fork"
+# without a pull request, so the label-driven backport workflow never sees them.
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  backport:
+    name: Backport advisory fixes
+    if: >-
+      ${{ contains(join(github.event.commits.*.message, ' '), 'Merge commit from fork') }}
+    runs-on: ubuntu-latest
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        with:
+          app-id: ${{ secrets.GH_STOAT_RELEASE_APP_ID }}
+          private-key: ${{ secrets.GH_STOAT_RELEASE_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true
+
+      - name: Cherry-pick onto release branches
+        id: cherry-pick
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+        run: |
+          git config user.name 'stoat-release[bot]'
+          git config user.email '245062572+stoat-release[bot]@users.noreply.github.com'
+
+          commits=$(git rev-list --reverse --no-merges "$BEFORE..$AFTER" \
+            --grep='^Merge commit from fork' --regexp-ignore-case)
+          if [ -z "$commits" ]; then
+            echo "No advisory commits in this push"
+            exit 0
+          fi
+
+          # The two newest release lines, e.g. release/v0.16 and release/v0.15
+          targets=$(git for-each-ref --format='%(refname:lstrip=3)' 'refs/remotes/origin/release/v*' \
+            | sort -V | tail -n 2)
+
+          failed=0
+          picked=''
+          for sha in $commits; do
+            short=${sha:0:7}
+            for target in $targets; do
+              branch="backport/advisory-$short-to-$target"
+              if [ -n "$(gh pr list --head "$branch" --state all --json number --jq '.[].number')" ]; then
+                echo "A pull request for $branch already exists, skipping"
+                continue
+              fi
+
+              git checkout -B "$branch" "origin/$target"
+              if ! git cherry-pick -x "$sha"; then
+                git cherry-pick --abort
+                echo "::error::$short does not cherry-pick cleanly onto $target, backport it by hand"
+                failed=1
+                continue
+              fi
+
+              picked+="$sha $target"$'\n'
+            done
+          done
+
+          {
+            echo 'picked<<EOF'
+            printf '%s' "$picked"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+          exit $failed
+
+      - name: Push backport branches
+        id: push
+        if: ${{ !cancelled() && steps.cherry-pick.outputs.picked != '' }}
+        env:
+          PICKED: ${{ steps.cherry-pick.outputs.picked }}
+        run: |
+          failed=0
+          pushed=''
+          while read -r sha target; do
+            branch="backport/advisory-${sha:0:7}-to-$target"
+            if ! git push --force origin "$branch"; then
+              echo "::error::Failed to push $branch"
+              failed=1
+              continue
+            fi
+
+            pushed+="$sha $target"$'\n'
+          done <<< "$PICKED"
+
+          {
+            echo 'pushed<<EOF'
+            printf '%s' "$pushed"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+          exit $failed
+
+      - name: Open backport pull requests
+        if: ${{ !cancelled() && steps.push.outputs.pushed != '' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PUSHED: ${{ steps.push.outputs.pushed }}
+        run: |
+          failed=0
+          while read -r sha target; do
+            short=${sha:0:7}
+            branch="backport/advisory-$short-to-$target"
+            if ! gh pr create \
+              --base "$target" \
+              --head "$branch" \
+              --label backport \
+              --title "fix: backport security advisory $short to $target" \
+              --body "Backport of security advisory fix $sha to \`$target\`."; then
+              echo "::error::Failed to open a pull request for $branch"
+              failed=1
+            fi
+          done <<< "$PUSHED"
+
+          exit $failed
