@@ -1,5 +1,5 @@
 use anyhow::Result;
-use image::{AnimationDecoder, DynamicImage, ImageBuffer, ImageReader};
+use image::{AnimationDecoder, DynamicImage, ImageBuffer, ImageDecoder, ImageReader, Limits};
 use jxl_oxide::integration::JxlDecoder;
 use revolt_config::report_internal_error;
 use std::io::{BufRead, Read, Seek};
@@ -8,6 +8,45 @@ use tiny_skia::Pixmap;
 use usvg::Transform;
 
 use crate::{MediaError, MediaRepository};
+
+/// Maximum width or height of an image we are willing to decode
+const MAX_DECODE_PIXEL_SIDE: u32 = 10_000;
+/// Maximum total pixel count of an image we are willing to decode
+const MAX_DECODE_PIXELS: u64 = 40_000_000;
+/// Maximum memory a decoder may allocate (matches image-rs default)
+const MAX_DECODE_ALLOC: u64 = 512 * 1024 * 1024;
+
+fn decode_limits() -> Limits {
+    let mut limits = Limits::default();
+    limits.max_image_width = Some(MAX_DECODE_PIXEL_SIDE);
+    limits.max_image_height = Some(MAX_DECODE_PIXEL_SIDE);
+    // Technically this only leaves space for 2 images to be processed at a time on the default 1gb limit but its probably fine
+    limits.max_alloc = Some(MAX_DECODE_ALLOC);
+    limits
+}
+
+fn decode_with_limits(mut decoder: impl ImageDecoder) -> Result<DynamicImage, MediaError> {
+    let (width, height) = decoder.dimensions();
+    if width > MAX_DECODE_PIXEL_SIDE
+        || height > MAX_DECODE_PIXEL_SIDE
+        || (width as u64) * (height as u64) > MAX_DECODE_PIXELS
+    {
+        return Err(MediaError::ImageProcessingFailed {
+            cause: format!("image dimensions {width}x{height} exceed decode limits"),
+        });
+    }
+
+    // Reserve the output buffer so the decoder only gets whats left
+    let mut limits = decode_limits();
+    limits
+        .reserve(decoder.total_bytes())
+        .map_err(|e| MediaError::from(anyhow::anyhow!(e)))?;
+    decoder
+        .set_limits(limits)
+        .map_err(|e| MediaError::from(anyhow::anyhow!(e)))?;
+
+    DynamicImage::from_decoder(decoder).map_err(|e| MediaError::from(anyhow::anyhow!(e)))
+}
 
 pub struct MediaImpl {
     config: revolt_config::Files,
@@ -93,8 +132,7 @@ impl MediaRepository for MediaImpl {
                 let decoder =
                     JxlDecoder::new(reader).map_err(|e| MediaError::from(anyhow::anyhow!(e)))?;
 
-                DynamicImage::from_decoder(decoder)
-                    .map_err(|e| MediaError::from(anyhow::anyhow!(e)))
+                decode_with_limits(decoder)
             }
             "image/svg+xml" => {
                 let mut buf = Vec::new();
@@ -137,11 +175,11 @@ impl MediaRepository for MediaImpl {
                     .with_guessed_format()
                     .map_err(|e| MediaError::from(anyhow::anyhow!(e)))?;
 
-                let image: Result<DynamicImage, MediaError> = image
-                    .decode()
-                    .map_err(|e| MediaError::from(anyhow::anyhow!(e)));
+                let decoder = image
+                    .into_decoder()
+                    .map_err(|e| MediaError::from(anyhow::anyhow!(e)))?;
 
-                image
+                decode_with_limits(decoder)
             }
         }
     }
@@ -329,6 +367,34 @@ mod tests {
         let mut reader = Cursor::new(buf);
         let image = media.decode_image(&mut reader, "image/jxl").unwrap();
         media.create_thumbnail(image, "attachments");
+    }
+
+    #[tokio::test]
+    async fn asset_test_oversized_jxl_rejected() {
+        let media = MediaImpl::from_config().await;
+        // dice.jxl truncated to 4 KiB with its size header patched to declare 10922x8192
+        let buf = include_bytes!("../../tests/assets/oversized.jxl");
+
+        let mut reader = Cursor::new(buf);
+        let err = media.decode_image(&mut reader, "image/jxl").unwrap_err();
+        assert!(
+            err.to_string().contains("exceed decode limits"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn asset_test_oversized_png_rejected() {
+        let media = MediaImpl::from_config().await;
+        // 7000x7000 is within the per-side limit but exceeds the megapixel limit
+        let buf = include_bytes!("../../tests/assets/oversized.png");
+
+        let mut reader = Cursor::new(buf);
+        let err = media.decode_image(&mut reader, "image/png").unwrap_err();
+        assert!(
+            err.to_string().contains("exceed decode limits"),
+            "unexpected error: {err}"
+        );
     }
 
     #[tokio::test]
