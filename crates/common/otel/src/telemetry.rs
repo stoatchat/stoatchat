@@ -1,17 +1,18 @@
 use opentelemetry::KeyValue;
-#[cfg(feature = "axum")]
+#[cfg(any(feature = "axum", feature = "amqp"))]
 use opentelemetry::logs::LoggerProvider;
 use opentelemetry::trace::TracerProvider;
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use opentelemetry_otlp::{LogExporter, Protocol, SpanExporter, WithExportConfig};
 use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::logs::SdkLoggerProvider;
+use opentelemetry_sdk::propagation::TraceContextPropagator;
 use opentelemetry_sdk::trace::SdkTracerProvider;
 use tracing::debug;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::prelude::*;
 
-#[cfg(feature = "axum")]
+#[cfg(any(feature = "axum", feature = "amqp"))]
 use crate::implementation::WIDE_LOGGER;
 
 pub struct Telemetry {
@@ -48,7 +49,7 @@ impl Telemetry {
             .with_batch_exporter(span_exporter)
             .build();
 
-        #[cfg(feature = "axum")]
+        #[cfg(any(feature = "axum", feature = "amqp"))]
         let _ = WIDE_LOGGER.set(logger_provider.logger("stoat_otel::wide"));
 
         let otel_layer =
@@ -61,6 +62,9 @@ impl Telemetry {
         let fmt_layer = tracing_subscriber::fmt::layer()
             .with_thread_names(true)
             .with_filter(env_filter());
+
+        // W3C traceparent, so traces can be continued across services
+        opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
 
         tracing_subscriber::registry()
             .with(otel_layer)
@@ -107,6 +111,7 @@ fn export_filter() -> EnvFilter {
         .add_directive("aws_sdk_s3=off".parse().unwrap())
         .add_directive("tower_http::catch_panic=off".parse().unwrap())
         .add_directive("http_request=off".parse().unwrap())
+        .add_directive("amqp_message=off".parse().unwrap())
 }
 
 impl Drop for Telemetry {
