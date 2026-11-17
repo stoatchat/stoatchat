@@ -1677,6 +1677,7 @@ impl From<crate::MultiFactorAuthentication> for MultiFactorStatus {
             totp_mfa: !item.totp_token.is_disabled(),
             // security_key_mfa: item.security_key_token.is_some(),
             recovery_active: !item.recovery_codes.is_empty(),
+            passkey_mfa: !item.passkeys.is_empty(),
             ..Default::default()
         }
     }
@@ -1688,6 +1689,19 @@ impl From<crate::MFAMethod> for MFAMethod {
             crate::MFAMethod::Password => MFAMethod::Password,
             crate::MFAMethod::Recovery => MFAMethod::Recovery,
             crate::MFAMethod::Totp => MFAMethod::Totp,
+            crate::MFAMethod::Passkey => MFAMethod::Passkey,
+        }
+    }
+}
+
+impl From<crate::PasskeyCredential> for PasskeyInfo {
+    fn from(value: crate::PasskeyCredential) -> Self {
+        PasskeyInfo {
+            id: value.id,
+            name: value.name,
+            discoverable: value.discoverable,
+            created_at: value.created_at,
+            last_used: value.last_used,
         }
     }
 }

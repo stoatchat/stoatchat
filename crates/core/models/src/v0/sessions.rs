@@ -71,6 +71,14 @@ auto_derived!(
             /// Friendly name used for the session
             friendly_name: Option<String>,
         },
+        Passkey {
+            /// Challenge token from `POST /auth/session/login/passkey`
+            passkey_challenge: String,
+            /// `PublicKeyCredential` returned by `navigator.credentials.get`
+            passkey_response: serde_json::Value,
+            /// Friendly name used for the session
+            friendly_name: Option<String>,
+        },
     }
 
     #[serde(tag = "result")]

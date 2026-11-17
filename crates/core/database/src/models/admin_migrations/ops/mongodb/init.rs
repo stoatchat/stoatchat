@@ -376,6 +376,14 @@ pub async fn create_database(db: &MongoDb) {
                     "deletion.token": 1
                 },
                 "name": "account_deletion"
+            },
+            {
+                "key": {
+                    "mfa.passkeys.credential_id": 1
+                },
+                "name": "passkey_credential_id",
+                "unique": true,
+                "sparse": true
             }
         ]
     })
