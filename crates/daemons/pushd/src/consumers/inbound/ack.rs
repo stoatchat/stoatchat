@@ -43,21 +43,41 @@ impl Consumer for AckConsumer {
 
         debug!(user_id = %payload.user_id, "Processing unreads");
 
-        let unreads = if let Ok(u) = self.db.fetch_unread_mentions(&payload.user_id).await {
-            if u.is_empty() {
+        let unreads = match self.db.fetch_unread_mentions(&payload.user_id).await {
+            Ok(u) if u.is_empty() => {
                 debug!(
                     user_id = %payload.user_id,
                     "Discarding unread task (no mentions found)"
                 );
                 return Ok(());
-            };
-
-            u
-        } else {
-            return Ok(());
+            }
+            Ok(u) => u,
+            Err(error) => {
+                context.add("push.dropped", "fetch_unreads_failed");
+                warn!(
+                    reason = "fetch_unreads_failed",
+                    error = ?error,
+                    user_id = %payload.user_id,
+                    "push notification dropped"
+                );
+                return Ok(());
+            }
         };
 
-        if let Ok(sessions) = self.db.fetch_sessions(&payload.user_id).await {
+        if let Ok(sessions) = self
+            .db
+            .fetch_sessions(&payload.user_id)
+            .await
+            .inspect_err(|error| {
+                context.add("push.dropped", "fetch_sessions_failed");
+                warn!(
+                    reason = "fetch_sessions_failed",
+                    error = ?error,
+                    user_id = %payload.user_id,
+                    "push notification dropped"
+                )
+            })
+        {
             let config = revolt_config::config().await;
             // Step 2: find any apple sessions, since we don't need to calculate this for anything else.
             // If there's no apple sessions, we can return early

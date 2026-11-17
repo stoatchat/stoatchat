@@ -50,17 +50,29 @@ impl Consumer for MessageConsumer {
 
         debug!("Received message event on origin");
 
-        let mut queued = 0;
-        if let Ok(sessions) = self
+        let sessions = match self
             .db
             .fetch_sessions_with_subscription(&payload.users)
             .await
         {
-            for session in sessions {
-                let notification = PayloadKind::MessageNotification(payload.notification.clone());
-                if self.publish_push(notification, session).await? {
-                    queued += 1;
-                }
+            Ok(sessions) => sessions,
+            Err(error) => {
+                context.add("push.dropped", "fetch_sessions_failed");
+                warn!(
+                    reason = "fetch_sessions_failed",
+                    error = ?error,
+                    users = ?payload.users,
+                    "push notification dropped"
+                );
+                return Ok(());
+            }
+        };
+
+        let mut queued = 0;
+        for session in sessions {
+            let notification = PayloadKind::MessageNotification(payload.notification.clone());
+            if self.publish_push(notification, session).await? {
+                queued += 1;
             }
         }
 

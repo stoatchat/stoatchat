@@ -40,15 +40,27 @@ impl Consumer for FRAcceptedConsumer {
 
         debug!("Received FR accept event");
 
+        let sessions = match self.db.fetch_sessions(&payload.user).await {
+            Ok(sessions) => sessions,
+            Err(error) => {
+                context.add("push.dropped", "fetch_sessions_failed");
+                warn!(
+                    reason = "fetch_sessions_failed",
+                    error = ?error,
+                    user_id = %payload.user,
+                    "push notification dropped"
+                );
+                return Ok(());
+            }
+        };
+
         let mut queued = 0;
-        if let Ok(sessions) = self.db.fetch_sessions(&payload.user).await {
-            for session in sessions {
-                if self
-                    .publish_push(PayloadKind::FRAccepted(payload.clone()), session)
-                    .await?
-                {
-                    queued += 1;
-                }
+        for session in sessions {
+            if self
+                .publish_push(PayloadKind::FRAccepted(payload.clone()), session)
+                .await?
+            {
+                queued += 1;
             }
         }
 

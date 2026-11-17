@@ -46,9 +46,11 @@ impl Consumer for DmCallConsumer {
         | revolt_database::Channel::Group { recipients, .. }) =
             self.db.fetch_channel(&payload.channel_id).await?
         else {
+            context.add("push.dropped", "not_dm_or_group");
             warn!(
+                reason = "not_dm_or_group",
                 channel_id = %payload.channel_id,
-                "Discarding dm call start/stop event for non-dm/group channel"
+                "push notification dropped"
             );
 
             return Ok(());
@@ -70,14 +72,25 @@ impl Consumer for DmCallConsumer {
 
         let mut queued = 0;
         for user_id in call_recipients {
-            if let Ok(sessions) = self.db.fetch_sessions(&user_id).await {
-                for session in sessions {
-                    if self
-                        .publish_push(PayloadKind::DmCallStartEnd(payload.clone()), session)
-                        .await?
-                    {
-                        queued += 1;
-                    }
+            let sessions = match self.db.fetch_sessions(&user_id).await {
+                Ok(sessions) => sessions,
+                Err(error) => {
+                    warn!(
+                        reason = "fetch_sessions_failed",
+                        error = ?error,
+                        %user_id,
+                        "push notification dropped"
+                    );
+                    continue;
+                }
+            };
+
+            for session in sessions {
+                if self
+                    .publish_push(PayloadKind::DmCallStartEnd(payload.clone()), session)
+                    .await?
+                {
+                    queued += 1;
                 }
             }
         }

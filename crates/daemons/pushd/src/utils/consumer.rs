@@ -181,14 +181,34 @@ impl<C: Consumer> ConsumerDelegate for Delegate<C> {
                     let _ = stoat_otel::middleware::amqp::wide_events(
                         consumer_name,
                         delivery,
-                        |delivery, context| async move { consumer.consume(delivery, &context).await },
+                        |delivery, context| async move {
+                            let result = consumer.consume(delivery, &context).await;
+
+                            // deliveries are consumed with no_ack, so a failure here means the message is gone for good
+                            if let Err(error) = &result {
+                                context.add("push.dropped", "consume_failed");
+                                error!(
+                                    consumer = consumer_name,
+                                    reason = "consume_failed",
+                                    error = ?error,
+                                    "push notification dropped"
+                                );
+                            }
+
+                            result
+                        },
                     )
                     .await;
                 })
             }
             Ok(None) => Box::pin(ready(())),
             Err(error) => Box::pin(async move {
-                error!(consumer = consumer_name, error = ?error, "Received bad delivery")
+                error!(
+                    consumer = consumer_name,
+                    reason = "bad_delivery",
+                    error = ?error,
+                    "push notification dropped"
+                )
             }),
         }
     }

@@ -32,17 +32,24 @@ impl MassMessageConsumer {
         push: &PushNotification,
         users: &[String],
     ) -> Result<i64> {
+        let sessions = match self.db.fetch_sessions_with_subscription(users).await {
+            Ok(sessions) => sessions,
+            Err(error) => {
+                warn!(
+                    reason = "fetch_sessions_failed",
+                    error = ?error,
+                    users = ?users,
+                    "push notification dropped"
+                );
+                return Ok(0);
+            }
+        };
+
         let mut queued = 0;
-        if let Ok(sessions) = self
-            .db
-            .fetch_sessions_with_subscription(users)
-            .await
-        {
-            for session in sessions {
-                let notification = PayloadKind::MessageNotification(push.clone());
-                if self.publish_push(notification, session).await? {
-                    queued += 1;
-                }
+        for session in sessions {
+            let notification = PayloadKind::MessageNotification(push.clone());
+            if self.publish_push(notification, session).await? {
+                queued += 1;
             }
         }
 

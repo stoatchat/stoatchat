@@ -285,6 +285,15 @@ impl Consumer for FcmOutboundConsumer {
 
         match resp {
             Err(FcmError::Auth) => {
+                context.add("push.dropped", "invalid_token");
+                info!(
+                    reason = "invalid_token",
+                    provider = "fcm",
+                    user_id = %payload.user_id,
+                    session_id = %payload.session_id,
+                    "push notification dropped, removing subscription"
+                );
+
                 if let Err(err) = self
                     .db
                     .remove_push_subscription_by_session_id(&payload.session_id)

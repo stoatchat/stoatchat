@@ -465,10 +465,13 @@ impl Consumer for ApnsOutboundConsumer {
                     }),
                 ..
             })) => {
+                context.add("push.dropped", "invalid_token");
                 info!(
-                    session_id = %payload.session_id,
+                    reason = "invalid_token",
+                    provider = "apn",
                     user_id = %payload.user_id,
-                    "Removing APNS subscription due to invalid token"
+                    session_id = %payload.session_id,
+                    "push notification dropped, removing subscription"
                 );
 
                 if let Err(err) = self
