@@ -54,6 +54,13 @@ pub async fn edit(
     let mut query = DatabasePermissionQuery::new(db, &user).server(&server);
     let permissions = calculate_server_permissions(&mut query).await;
 
+    if server.owner != user.id
+        && !user.privileged
+        && db.fetch_member(&server.id, &user.id).await.is_err()
+    {
+        return Err(create_error!(NotElevated));
+    }
+
     // Fetch target permissions
     let mut target_query = DatabasePermissionQuery::new(db, &target_user)
         .server(&server)
@@ -61,6 +68,10 @@ pub async fn edit(
     let target_permissions = calculate_server_permissions(&mut target_query).await;
 
     // Check permissions in server
+    if data.remove.contains(&v0::FieldsMember::JoinedAt) {
+        return Err(create_error!(InvalidOperation));
+    }
+
     if data.nickname.is_some() || data.remove.contains(&v0::FieldsMember::Nickname) {
         if user.id == member.id.user {
             permissions.throw_if_lacking_channel_permission(ChannelPermission::ChangeNickname)?;
@@ -103,11 +114,11 @@ pub async fn edit(
         permissions.throw_if_lacking_channel_permission(ChannelPermission::TimeoutMembers)?;
     }
 
-    if data.can_publish.is_some() {
+    if data.can_publish.is_some() || data.remove.contains(&v0::FieldsMember::CanPublish) {
         permissions.throw_if_lacking_channel_permission(ChannelPermission::MuteMembers)?;
     }
 
-    if data.can_receive.is_some() {
+    if data.can_receive.is_some() || data.remove.contains(&v0::FieldsMember::CanReceive) {
         permissions.throw_if_lacking_channel_permission(ChannelPermission::DeafenMembers)?;
     }
 
