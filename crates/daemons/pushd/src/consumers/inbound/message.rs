@@ -1,11 +1,14 @@
 use std::sync::Arc;
 
-use crate::utils::{render_notification_content, Consumer};
+use crate::utils::{
+    record_skips, record_users_without_sessions, render_notification_content, Consumer,
+};
 use anyhow::Result;
 use async_trait::async_trait;
 use lapin::{message::Delivery, Channel, Connection};
 use stoat_otel::WideContextRepository;
 use revolt_database::{events::rabbit::*, Database};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[derive(Clone)]
 #[allow(unused)]
@@ -40,6 +43,11 @@ impl Consumer for MessageConsumer {
         context.add("message_id", payload.notification.message.id.clone());
         context.add("channel_id", payload.notification.message.channel.clone());
 
+        // on the span too, so push.skipped events can be tied back to the message
+        let span = tracing::Span::current();
+        span.set_attribute("message_id", payload.notification.message.id.clone());
+        span.set_attribute("channel_id", payload.notification.message.channel.clone());
+
         match render_notification_content(&payload.notification, &self.db).await {
             Ok(body) => {
                 payload.notification.raw_body = Some(payload.notification.body);
@@ -64,9 +72,12 @@ impl Consumer for MessageConsumer {
                     users = ?payload.users,
                     "push notification dropped"
                 );
+                record_skips(&payload.users, "fetch_sessions_failed");
                 return Ok(());
             }
         };
+
+        record_users_without_sessions(&payload.users, &sessions);
 
         let mut queued = 0;
         for session in sessions {

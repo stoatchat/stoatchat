@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     future::{ready, Future},
     pin::Pin,
     sync::Arc,
@@ -16,6 +16,7 @@ use revolt_database::{
     events::rabbit::{PayloadKind, PayloadToService},
     Database, Session,
 };
+use opentelemetry::KeyValue;
 use stoat_otel::WideContextRepository;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -93,6 +94,7 @@ pub trait Consumer: Clone + Send + Sync + 'static {
     /// Returns whether anything was queued, sessions without a subscription are skipped.
     async fn publish_push(&self, notification: PayloadKind, session: Session) -> Result<bool> {
         let Some(sub) = session.subscription else {
+            record_skip(&session.user_id, Some(&session.id), "no_subscription");
             return Ok(false);
         };
 
@@ -157,6 +159,62 @@ pub fn record_push_target(
     span.set_attribute("push.kind", kind);
     span.set_attribute("user_id", payload.user_id.clone());
     span.set_attribute("session_id", payload.session_id.clone());
+
+    if let PayloadKind::MessageNotification(push) = &payload.notification {
+        context.add("message_id", push.message.id.clone());
+        context.add("channel_id", push.message.channel.clone());
+        span.set_attribute("message_id", push.message.id.clone());
+        span.set_attribute("channel_id", push.message.channel.clone());
+    }
+}
+
+/// Record why a user wasn't sent a push as an event on the current span, only when `EXTRA_TRACING=1`.
+/// Goes straight to the trace rather than through tracing, so it doesn't flood the logs
+pub fn record_skip(user_id: &str, session_id: Option<&str>, reason: &'static str) {
+    if !stoat_otel::extra_tracing() {
+        return;
+    }
+
+    let mut attributes = vec![
+        KeyValue::new("user_id", user_id.to_string()),
+        KeyValue::new("reason", reason),
+    ];
+
+    if let Some(session_id) = session_id {
+        attributes.push(KeyValue::new("session_id", session_id.to_string()));
+    }
+
+    tracing::Span::current().add_event("push.skipped", attributes);
+}
+
+/// Record every user that was skipped for the same reason, only when `EXTRA_TRACING=1`
+pub fn record_skips<'a>(user_ids: impl IntoIterator<Item = &'a String>, reason: &'static str) {
+    if !stoat_otel::extra_tracing() {
+        return;
+    }
+
+    for user_id in user_ids {
+        record_skip(user_id, None, reason);
+    }
+}
+
+/// Record users that had no push-capable sessions, only when `EXTRA_TRACING=1`
+pub fn record_users_without_sessions(users: &[String], sessions: &[Session]) {
+    if !stoat_otel::extra_tracing() {
+        return;
+    }
+
+    let with_sessions: HashSet<&str> = sessions
+        .iter()
+        .map(|session| session.user_id.as_str())
+        .collect();
+
+    record_skips(
+        users
+            .iter()
+            .filter(|user_id| !with_sessions.contains(user_id.as_str())),
+        "no_sessions",
+    );
 }
 
 pub struct Delegate<C: Consumer>(pub C);

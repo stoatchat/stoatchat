@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::utils::Consumer;
+use crate::utils::{record_skip, Consumer};
 use anyhow::Result;
 use async_trait::async_trait;
 use lapin::{message::Delivery, Channel, Connection};
@@ -50,9 +50,14 @@ impl Consumer for FRReceivedConsumer {
                     user_id = %payload.user,
                     "push notification dropped"
                 );
+                record_skip(&payload.user, None, "fetch_sessions_failed");
                 return Ok(());
             }
         };
+
+        if sessions.is_empty() {
+            record_skip(&payload.user, None, "no_sessions");
+        }
 
         let mut queued = 0;
         for session in sessions {

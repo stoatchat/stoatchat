@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::utils::Consumer;
+use crate::utils::{record_skip, Consumer};
 use anyhow::Result;
 use async_trait::async_trait;
 use lapin::{message::Delivery, Channel, Connection};
@@ -59,12 +59,29 @@ impl Consumer for DmCallConsumer {
         let call_recipients = if let Some(user_recipients) = _p.recipients {
             user_recipients
                 .into_iter()
-                .filter(|user_id| recipients.contains(user_id) && user_id != &payload.initiator_id)
+                .filter(|user_id| {
+                    if user_id == &payload.initiator_id {
+                        record_skip(user_id, None, "call_initiator");
+                        false
+                    } else if !recipients.contains(user_id) {
+                        record_skip(user_id, None, "not_in_channel");
+                        false
+                    } else {
+                        true
+                    }
+                })
                 .collect()
         } else {
             recipients
                 .into_iter()
-                .filter(|user_id| user_id != &payload.initiator_id)
+                .filter(|user_id| {
+                    if user_id == &payload.initiator_id {
+                        record_skip(user_id, None, "call_initiator");
+                        false
+                    } else {
+                        true
+                    }
+                })
                 .collect::<Vec<_>>()
         };
 
@@ -81,9 +98,14 @@ impl Consumer for DmCallConsumer {
                         %user_id,
                         "push notification dropped"
                     );
+                    record_skip(&user_id, None, "fetch_sessions_failed");
                     continue;
                 }
             };
+
+            if sessions.is_empty() {
+                record_skip(&user_id, None, "no_sessions");
+            }
 
             for session in sessions {
                 if self

@@ -30,6 +30,7 @@ ulid = { workspace = true }
 # Logging
 tracing = { workspace = true }
 tracing-opentelemetry = { workspace = true }
+opentelemetry = { workspace = true }
 
 # Common
 stoat-otel = { workspace = true, features = ["amqp"] }

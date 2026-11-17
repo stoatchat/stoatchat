@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::utils::Consumer;
+use crate::utils::{record_skip, Consumer};
 use anyhow::Result;
 use async_trait::async_trait;
 use lapin::{message::Delivery, Channel, Connection};
@@ -49,6 +49,7 @@ impl Consumer for AckConsumer {
                     user_id = %payload.user_id,
                     "Discarding unread task (no mentions found)"
                 );
+                record_skip(&payload.user_id, None, "no_unread_mentions");
                 return Ok(());
             }
             Ok(u) => u,
@@ -60,6 +61,7 @@ impl Consumer for AckConsumer {
                     user_id = %payload.user_id,
                     "push notification dropped"
                 );
+                record_skip(&payload.user_id, None, "fetch_unreads_failed");
                 return Ok(());
             }
         };
@@ -75,7 +77,8 @@ impl Consumer for AckConsumer {
                     error = ?error,
                     user_id = %payload.user_id,
                     "push notification dropped"
-                )
+                );
+                record_skip(&payload.user_id, None, "fetch_sessions_failed");
             })
         {
             let config = revolt_config::config().await;
@@ -97,6 +100,7 @@ impl Consumer for AckConsumer {
                     user_id = %payload.user_id,
                     "Discarding unread task (no apn sessions found)"
                 );
+                record_skip(&payload.user_id, None, "no_apn_sessions");
                 return Ok(());
             }
 

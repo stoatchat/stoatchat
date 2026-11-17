@@ -4,7 +4,10 @@ use std::{
     sync::Arc,
 };
 
-use crate::utils::{render_notification_content, Consumer};
+use crate::utils::{
+    record_skip, record_skips, record_users_without_sessions, render_notification_content,
+    Consumer,
+};
 use anyhow::Result;
 use async_trait::async_trait;
 use lapin::{message::Delivery, Channel, Connection};
@@ -41,9 +44,12 @@ impl MassMessageConsumer {
                     users = ?users,
                     "push notification dropped"
                 );
+                record_skips(users, "fetch_sessions_failed");
                 return Ok(0);
             }
         };
+
+        record_users_without_sessions(users, &sessions);
 
         let mut queued = 0;
         for session in sessions {
@@ -164,15 +170,31 @@ impl Consumer for MassMessageConsumer {
 
                         debug!(?target_users, ?online_users, "Userids after filter");
 
+                        let chunk_span = info_span!(
+                            "mass_mention.chunk",
+                            mention = "everyone",
+                            message_id = %push.message.id,
+                            channel_id = %push.message.channel,
+                            members = userids.len(),
+                            targets = target_users.len()
+                        );
+
+                        if stoat_otel::extra_tracing() {
+                            let _guard = chunk_span.enter();
+                            for user_id in &userids {
+                                // directly mentioned users are notified by the regular message push
+                                if existing_mentions.contains(user_id) {
+                                    record_skip(user_id, None, "already_mentioned");
+                                } else if online_users.contains(user_id) {
+                                    record_skip(user_id, None, "online");
+                                }
+                            }
+                        }
+
                         chunks += 1;
                         queued += self
                             .fire_notification_for_users(&push, &target_users)
-                            .instrument(info_span!(
-                                "mass_mention.chunk",
-                                mention = "everyone",
-                                members = userids.len(),
-                                targets = target_users.len()
-                            ))
+                            .instrument(chunk_span)
                             .await?;
 
                         if exhausted {
@@ -202,9 +224,8 @@ impl Consumer for MassMessageConsumer {
                         }
 
                         let mut q = query.clone().members(&chunk);
-                        let viewing_members: Vec<String> = q
-                            .members_can_see_channel()
-                            .await
+                        let visibility = q.members_can_see_channel().await;
+                        let viewing_members: Vec<String> = visibility
                             .iter()
                             .filter_map(|(uid, viewable)| {
                                 if *viewable && !existing_mentions.contains(uid) {
@@ -228,15 +249,32 @@ impl Consumer for MassMessageConsumer {
 
                         debug!(?targets, "Targets");
 
+                        let chunk_span = info_span!(
+                            "mass_mention.chunk",
+                            mention = "roles",
+                            message_id = %push.message.id,
+                            channel_id = %push.message.channel,
+                            members = chunk.len(),
+                            targets = targets.len()
+                        );
+
+                        if stoat_otel::extra_tracing() {
+                            let _guard = chunk_span.enter();
+                            for (user_id, viewable) in &visibility {
+                                if !viewable {
+                                    record_skip(user_id, None, "cannot_view_channel");
+                                } else if existing_mentions.contains(user_id) {
+                                    record_skip(user_id, None, "already_mentioned");
+                                } else if online.contains(user_id) {
+                                    record_skip(user_id, None, "online");
+                                }
+                            }
+                        }
+
                         chunks += 1;
                         queued += self
                             .fire_notification_for_users(&push, &targets)
-                            .instrument(info_span!(
-                                "mass_mention.chunk",
-                                mention = "roles",
-                                members = chunk.len(),
-                                targets = targets.len()
-                            ))
+                            .instrument(chunk_span)
                             .await?;
                     }
                 }

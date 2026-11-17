@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use crate::utils::{record_push_target, Consumer};
+use crate::utils::{record_push_target, record_skip, Consumer};
 use stoat_otel::WideContextRepository;
 use anyhow::{bail, Result};
 use async_trait::async_trait;
@@ -293,6 +293,7 @@ impl Consumer for FcmOutboundConsumer {
                     session_id = %payload.session_id,
                     "push notification dropped, removing subscription"
                 );
+                record_skip(&payload.user_id, Some(&payload.session_id), "invalid_token");
 
                 if let Err(err) = self
                     .db

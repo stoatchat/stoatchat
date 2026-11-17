@@ -7784,6 +7784,7 @@ dependencies = [
  "isahc",
  "iso8601-timestamp",
  "lapin",
+ "opentelemetry",
  "redis-kiss",
  "regex",
  "revolt-config",
