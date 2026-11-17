@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use crate::utils::Consumer;
+use crate::utils::{record_push_target, Consumer};
+use stoat_otel::WideContextRepository;
 use anyhow::{bail, Result};
 use async_trait::async_trait;
 use fcm_v1::{
@@ -12,6 +13,7 @@ use lapin::{message::Delivery, Channel as AMQPChannel, Connection};
 use revolt_config::config;
 use revolt_database::{events::rabbit::*, Database};
 use serde_json::Value;
+use tracing::Instrument;
 
 /// Custom notification data
 #[derive(Debug, Clone, PartialEq)]
@@ -124,6 +126,15 @@ pub struct FcmOutboundConsumer {
     client: Client,
 }
 
+impl FcmOutboundConsumer {
+    async fn send(&self, message: &Message) -> Result<Message, FcmError> {
+        self.client
+            .send(message)
+            .instrument(info_span!("fcm.send", otel.kind = "client"))
+            .await
+    }
+}
+
 #[async_trait]
 impl Consumer for FcmOutboundConsumer {
     async fn create(
@@ -163,8 +174,9 @@ impl Consumer for FcmOutboundConsumer {
         &self.channel
     }
 
-    async fn consume(&self, delivery: Delivery) -> Result<()> {
+    async fn consume(&self, delivery: Delivery, context: &WideContextRepository) -> Result<()> {
         let payload: PayloadToService = serde_json::from_slice(&delivery.data)?;
+        record_push_target(context, "fcm", &payload);
 
         #[allow(clippy::needless_late_init)]
         let resp: Result<Message, FcmError>;
@@ -189,7 +201,7 @@ impl Consumer for FcmOutboundConsumer {
                     ..Default::default()
                 };
 
-                resp = self.client.send(&msg).await;
+                resp = self.send(&msg).await;
             }
 
             PayloadKind::FRAccepted(alert) => {
@@ -211,7 +223,7 @@ impl Consumer for FcmOutboundConsumer {
                     ..Default::default()
                 };
 
-                resp = self.client.send(&msg).await;
+                resp = self.send(&msg).await;
             }
             PayloadKind::Generic(alert) => {
                 let data = NotificationData::Generic {
@@ -226,7 +238,7 @@ impl Consumer for FcmOutboundConsumer {
                     ..Default::default()
                 };
 
-                resp = self.client.send(&msg).await;
+                resp = self.send(&msg).await;
             }
 
             PayloadKind::MessageNotification(alert) => {
@@ -245,7 +257,7 @@ impl Consumer for FcmOutboundConsumer {
                     ..Default::default()
                 };
 
-                resp = self.client.send(&msg).await;
+                resp = self.send(&msg).await;
             }
 
             PayloadKind::DmCallStartEnd(alert) => {
@@ -263,7 +275,7 @@ impl Consumer for FcmOutboundConsumer {
                     ..Default::default()
                 };
 
-                resp = self.client.send(&msg).await;
+                resp = self.send(&msg).await;
             }
 
             PayloadKind::BadgeUpdate(_) => {

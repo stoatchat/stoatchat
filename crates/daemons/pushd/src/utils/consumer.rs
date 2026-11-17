@@ -16,6 +16,9 @@ use revolt_database::{
     events::rabbit::{PayloadKind, PayloadToService},
     Database, Session,
 };
+use stoat_otel::WideContextRepository;
+use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[async_trait]
 pub trait Consumer: Clone + Send + Sync + 'static {
@@ -25,7 +28,7 @@ pub trait Consumer: Clone + Send + Sync + 'static {
         channel: Arc<Channel>,
     ) -> Self;
     fn channel(&self) -> &Arc<Channel>;
-    async fn consume(&self, delivery: Delivery) -> Result<()>;
+    async fn consume(&self, delivery: Delivery, context: &WideContextRepository) -> Result<()>;
 
     async fn publish_message_with_options(
         &self,
@@ -35,20 +38,39 @@ pub trait Consumer: Clone + Send + Sync + 'static {
         options: BasicPublishOptions,
         properties: BasicProperties,
     ) -> Result<(), AMQPError> {
-        let channel = self.channel();
+        let span = info_span!(
+            "amqp.publish",
+            otel.name = format!("publish {routing_key}"),
+            otel.kind = "producer",
+            messaging.system = "rabbitmq",
+            messaging.operation.type = "send",
+            messaging.destination.name = exchange,
+            messaging.rabbitmq.destination.routing_key = routing_key,
+        );
 
-        channel
-            .basic_publish(
-                exchange.into(),
-                routing_key.into(),
-                options,
-                payload,
-                properties,
-            )
-            .await?;
-        debug!(routing_key, "Sent message to queue");
+        async move {
+            let channel = self.channel();
 
-        Ok(())
+            // injected inside the producer span so the consumer's span hangs off it
+            let mut headers = properties.headers().clone().unwrap_or_default();
+            stoat_otel::amqp::inject_headers(&mut headers);
+            let properties = properties.with_headers(headers);
+
+            channel
+                .basic_publish(
+                    exchange.into(),
+                    routing_key.into(),
+                    options,
+                    payload,
+                    properties,
+                )
+                .await?;
+            debug!(routing_key, "Sent message to queue");
+
+            Ok(())
+        }
+        .instrument(span)
+        .await
     }
 
     async fn publish_message(
@@ -67,11 +89,11 @@ pub trait Consumer: Clone + Send + Sync + 'static {
         .await
     }
 
-    /// Queue a push for the session on its provider's outbound queue,
-    /// sessions without a subscription are skipped
-    async fn publish_push(&self, notification: PayloadKind, session: Session) -> Result<()> {
+    /// Queue a push for the session on its provider's outbound queue.
+    /// Returns whether anything was queued, sessions without a subscription are skipped.
+    async fn publish_push(&self, notification: PayloadKind, session: Session) -> Result<bool> {
         let Some(sub) = session.subscription else {
-            return Ok(());
+            return Ok(false);
         };
 
         let config = revolt_config::config().await;
@@ -101,31 +123,73 @@ pub trait Consumer: Clone + Send + Sync + 'static {
         self.publish_message(payload.as_bytes(), &config.pushd.exchange, routing_key)
             .await?;
 
-        Ok(())
+        Ok(true)
     }
 }
 
+/// Short name for the kind of notification, used in spans and wide events
+pub fn notification_kind(notification: &PayloadKind) -> &'static str {
+    match notification {
+        PayloadKind::MessageNotification(_) => "message",
+        PayloadKind::FRAccepted(_) => "fr_accepted",
+        PayloadKind::FRReceived(_) => "fr_received",
+        PayloadKind::BadgeUpdate(_) => "badge_update",
+        PayloadKind::Generic(_) => "generic",
+        PayloadKind::DmCallStartEnd(_) => "dm_call",
+    }
+}
+
+/// Attach the target of an outbound push to the wide event and the current span
+pub fn record_push_target(
+    context: &WideContextRepository,
+    provider: &'static str,
+    payload: &PayloadToService,
+) {
+    let kind = notification_kind(&payload.notification);
+
+    context.add("push.provider", provider);
+    context.add("push.kind", kind);
+    context.add("user_id", payload.user_id.clone());
+    context.add("session_id", payload.session_id.clone());
+
+    let span = tracing::Span::current();
+    span.set_attribute("push.provider", provider);
+    span.set_attribute("push.kind", kind);
+    span.set_attribute("user_id", payload.user_id.clone());
+    span.set_attribute("session_id", payload.session_id.clone());
+}
+
 pub struct Delegate<C: Consumer>(pub C);
+
+fn consumer_name<C>() -> &'static str {
+    let name = std::any::type_name::<C>();
+    name.rsplit("::").next().unwrap_or(name)
+}
 
 impl<C: Consumer> ConsumerDelegate for Delegate<C> {
     fn on_new_delivery(
         &self,
         delivery: DeliveryResult,
     ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
+        let consumer_name = consumer_name::<C>();
+
         match delivery {
             Ok(Some(delivery)) => {
                 let consumer = self.0.clone();
 
                 Box::pin(async move {
-                    if let Err(error) = consumer.consume(delivery).await {
-                        error!(error = ?error, "Failed to process delivery");
-                    };
+                    let _ = stoat_otel::middleware::amqp::wide_events(
+                        consumer_name,
+                        delivery,
+                        |delivery, context| async move { consumer.consume(delivery, &context).await },
+                    )
+                    .await;
                 })
             }
             Ok(None) => Box::pin(ready(())),
-            Err(error) => {
-                Box::pin(async move { error!(error = ?error, "Received bad delivery") })
-            }
+            Err(error) => Box::pin(async move {
+                error!(consumer = consumer_name, error = ?error, "Received bad delivery")
+            }),
         }
     }
 }

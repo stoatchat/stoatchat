@@ -7799,6 +7799,7 @@ dependencies = [
  "stoat-otel",
  "tokio",
  "tracing",
+ "tracing-opentelemetry",
  "ulid",
  "web-push",
 ]

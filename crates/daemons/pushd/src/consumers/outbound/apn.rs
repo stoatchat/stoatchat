@@ -1,6 +1,7 @@
 use std::{borrow::Cow, collections::BTreeMap, io::Cursor, sync::Arc};
 
-use crate::utils::Consumer;
+use crate::utils::{record_push_target, Consumer};
+use stoat_otel::WideContextRepository;
 use anyhow::Result;
 use async_trait::async_trait;
 use base64::{
@@ -18,6 +19,7 @@ use revolt_a2::{
 use revolt_database::{events::rabbit::*, Database};
 use revolt_models::v0::{Channel, Message, PushNotification};
 use serde::Serialize;
+use tracing::Instrument;
 
 // region: payload
 
@@ -157,6 +159,32 @@ impl ApnsOutboundConsumer {
         }
     }
 
+    async fn send<T: PayloadLike>(&self, payload: T) -> Result<Response, Error> {
+        let span = info_span!(
+            "apn.send",
+            otel.kind = "client",
+            apns.status = tracing::field::Empty
+        );
+
+        async move {
+            let resp = self.client.send(payload).await;
+
+            let status = match &resp {
+                Ok(response) => Some(response.code),
+                Err(Error::ResponseError(response)) => Some(response.code),
+                Err(_) => None,
+            };
+
+            if let Some(status) = status {
+                tracing::Span::current().record("apns.status", status);
+            }
+
+            resp
+        }
+        .instrument(span)
+        .await
+    }
+
     async fn get_badge_count(&self, user: &str) -> Option<u32> {
         if let Ok(unreads) = self.db.fetch_unread_mentions(user).await {
             let mut mention_count = 0;
@@ -223,8 +251,9 @@ impl Consumer for ApnsOutboundConsumer {
         &self.channel
     }
 
-    async fn consume(&self, delivery: Delivery) -> Result<()> {
+    async fn consume(&self, delivery: Delivery, context: &WideContextRepository) -> Result<()> {
         let payload: PayloadToService = serde_json::from_slice(&delivery.data)?;
+        record_push_target(context, "apn", &payload);
 
         let payload_options = NotificationOptions {
             apns_id: None,
@@ -272,8 +301,8 @@ impl Consumer for ApnsOutboundConsumer {
                     data: BTreeMap::new(),
                 };
 
-                debug!(user_id = %payload.user_id, "Sending friend request received");
-                self.client.send(apn_payload).await
+                debug!("Sending friend request received");
+                self.send(apn_payload).await
             }
 
             PayloadKind::FRAccepted(alert) => {
@@ -312,8 +341,8 @@ impl Consumer for ApnsOutboundConsumer {
                     data: BTreeMap::new(),
                 };
 
-                debug!(user_id = %payload.user_id, "Sending friend request accept");
-                self.client.send(apn_payload).await
+                debug!("Sending friend request accept");
+                self.send(apn_payload).await
             }
             PayloadKind::Generic(alert) => {
                 let apn_payload = Payload {
@@ -342,8 +371,8 @@ impl Consumer for ApnsOutboundConsumer {
                     data: BTreeMap::new(),
                 };
 
-                debug!(user_id = %payload.user_id, "Sending generic notification");
-                self.client.send(apn_payload).await
+                debug!("Sending generic notification");
+                self.send(apn_payload).await
             }
 
             PayloadKind::MessageNotification(alert) => {
@@ -381,8 +410,8 @@ impl Consumer for ApnsOutboundConsumer {
 
                 fit_payload(&mut apn_payload, &alert.message)?;
 
-                debug!(user_id = %payload.user_id, "Sending message notification");
-                self.client.send(apn_payload).await
+                debug!("Sending message notification");
+                self.send(apn_payload).await
             }
 
             PayloadKind::BadgeUpdate(badge) => {
@@ -396,8 +425,8 @@ impl Consumer for ApnsOutboundConsumer {
                     data: BTreeMap::new(),
                 };
 
-                debug!(user_id = %payload.user_id, "Sending badge update");
-                self.client.send(apn_payload).await
+                debug!("Sending badge update");
+                self.send(apn_payload).await
             }
 
             PayloadKind::DmCallStartEnd(alert) => {
@@ -422,8 +451,8 @@ impl Consumer for ApnsOutboundConsumer {
                     ended: alert.ended,
                 };
 
-                debug!(user_id = %payload.user_id, "Sending call start/stop notification");
-                self.client.send(apn_payload).await
+                debug!("Sending call start/stop notification");
+                self.send(apn_payload).await
             }
         };
 

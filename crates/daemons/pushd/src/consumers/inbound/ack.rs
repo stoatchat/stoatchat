@@ -4,6 +4,7 @@ use crate::utils::Consumer;
 use anyhow::Result;
 use async_trait::async_trait;
 use lapin::{message::Delivery, Channel, Connection};
+use stoat_otel::WideContextRepository;
 use revolt_database::{events::rabbit::*, Database};
 
 #[derive(Clone)]
@@ -33,8 +34,9 @@ impl Consumer for AckConsumer {
     }
 
     /// This consumer processes all acks the platform receives, and sends relevant badge updates to apple platforms.
-    async fn consume(&self, delivery: Delivery) -> Result<()> {
+    async fn consume(&self, delivery: Delivery, context: &WideContextRepository) -> Result<()> {
         let payload: AckPayload = serde_json::from_slice(&delivery.data)?;
+        context.add("user_id", payload.user_id.clone());
 
         // Step 1: fetch unreads and don't continue if there's no unreads
         // #[allow(clippy::disallowed_methods)]
@@ -83,6 +85,8 @@ impl Consumer for AckConsumer {
             for u in &unreads {
                 mention_count += u.mentions.as_ref().unwrap().len()
             }
+            context.add("mention_count", mention_count as i64);
+            let mut queued = 0;
 
             // Step 4: loop through each apple session and send the badge update
             for session in apple_sessions {
@@ -103,7 +107,10 @@ impl Consumer for AckConsumer {
                     &config.pushd.apn.queue,
                 )
                 .await?;
+                queued += 1;
             }
+
+            context.add("pushes.queued", queued);
         }
 
         Ok(())

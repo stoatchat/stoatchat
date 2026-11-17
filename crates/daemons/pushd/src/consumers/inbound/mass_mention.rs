@@ -8,6 +8,8 @@ use crate::utils::{render_notification_content, Consumer};
 use anyhow::Result;
 use async_trait::async_trait;
 use lapin::{message::Delivery, Channel, Connection};
+use stoat_otel::WideContextRepository;
+use tracing::Instrument;
 use revolt_database::{
     events::rabbit::*, util::bulk_permissions::BulkDatabasePermissionQuery, Database, Member,
     MessageFlagsValue,
@@ -24,23 +26,27 @@ pub struct MassMessageConsumer {
 }
 
 impl MassMessageConsumer {
+    /// Returns how many pushes were queued
     async fn fire_notification_for_users(
         &self,
         push: &PushNotification,
         users: &[String],
-    ) -> Result<()> {
+    ) -> Result<i64> {
+        let mut queued = 0;
         if let Ok(sessions) = self
             .db
             .fetch_sessions_with_subscription(users)
             .await
         {
             for session in sessions {
-                self.publish_push(PayloadKind::MessageNotification(push.clone()), session)
-                    .await?;
+                let notification = PayloadKind::MessageNotification(push.clone());
+                if self.publish_push(notification, session).await? {
+                    queued += 1;
+                }
             }
         }
 
-        Ok(())
+        Ok(queued)
     }
 }
 
@@ -63,8 +69,10 @@ impl Consumer for MassMessageConsumer {
     }
 
     /// This consumer handles adding mentions for all the users affected by a mass mention ping, and then sends out push notifications.
-    async fn consume(&self, delivery: Delivery) -> Result<()> {
+    async fn consume(&self, delivery: Delivery, context: &WideContextRepository) -> Result<()> {
         let mut payload: MassMessageSentPayload = serde_json::from_slice(&delivery.data)?;
+        context.add("server_id", payload.server_id.clone());
+        context.add("notifications.count", payload.notifications.len() as i64);
         let config = revolt_config::config().await;
 
         for push in payload.notifications.iter_mut() {
@@ -81,6 +89,8 @@ impl Consumer for MassMessageConsumer {
 
         // We should only ever receive clumped messages from a single channel, so it's safe to reuse this many times.
         let mut query: Option<BulkDatabasePermissionQuery<'_>> = None;
+        let mut queued = 0;
+        let mut chunks = 0;
         let query_db = self.db.clone();
 
         for push in payload.notifications {
@@ -147,7 +157,15 @@ impl Consumer for MassMessageConsumer {
 
                         debug!(?target_users, ?online_users, "Userids after filter");
 
-                        self.fire_notification_for_users(&push, &target_users)
+                        chunks += 1;
+                        queued += self
+                            .fire_notification_for_users(&push, &target_users)
+                            .instrument(info_span!(
+                                "mass_mention.chunk",
+                                mention = "everyone",
+                                members = userids.len(),
+                                targets = target_users.len()
+                            ))
                             .await?;
 
                         if exhausted {
@@ -203,12 +221,23 @@ impl Consumer for MassMessageConsumer {
 
                         debug!(?targets, "Targets");
 
-                        self.fire_notification_for_users(&push, &targets).await?;
+                        chunks += 1;
+                        queued += self
+                            .fire_notification_for_users(&push, &targets)
+                            .instrument(info_span!(
+                                "mass_mention.chunk",
+                                mention = "roles",
+                                members = chunk.len(),
+                                targets = targets.len()
+                            ))
+                            .await?;
                     }
                 }
             }
         }
 
+        context.add("chunks.count", chunks);
+        context.add("pushes.queued", queued);
         Ok(())
     }
 }
