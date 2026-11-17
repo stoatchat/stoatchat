@@ -4,7 +4,6 @@ use crate::utils::Consumer;
 use anyhow::Result;
 use async_trait::async_trait;
 use lapin::{message::Delivery, Channel, Connection};
-use log::debug;
 use revolt_database::{events::rabbit::*, Database};
 
 #[derive(Clone)]

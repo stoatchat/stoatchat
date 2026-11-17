@@ -125,14 +125,14 @@ impl Consumer for MassMessageConsumer {
                         let userids: Vec<String> =
                             chunk.iter().map(|member| member.id.user.clone()).collect();
 
-                        debug!("Userids in chunk: {:?}", userids);
+                        debug!(?userids, "Userids in chunk");
 
                         if let Err(err) = self
                             .db
                             .add_mention_to_many_unreads(push.channel.id(), &userids, &ack_chnl)
                             .await
                         {
-                            revolt_config::capture_error(&err);
+                            error!(error = ?err, "Failed to add mass mention to unreads");
                         }
 
                         // ignore anyone in this list
@@ -145,10 +145,7 @@ impl Consumer for MassMessageConsumer {
                             .cloned()
                             .collect();
 
-                        debug!(
-                            "Userids after filter: {:?} (online: {:?}",
-                            target_users, online_users
-                        );
+                        debug!(?target_users, ?online_users, "Userids after filter");
 
                         self.fire_notification_for_users(&push, &target_users)
                             .await?;
@@ -193,10 +190,10 @@ impl Consumer for MassMessageConsumer {
                             })
                             .collect();
 
-                        debug!("viewing members: {:?}", viewing_members);
+                        debug!(?viewing_members, "Viewing members");
 
                         let online = revolt_presence::filter_online(&viewing_members).await;
-                        debug!("online: {:?}", online);
+                        debug!(?online, "Online members");
 
                         let targets: Vec<String> = viewing_members
                             .iter()
@@ -204,7 +201,7 @@ impl Consumer for MassMessageConsumer {
                             .cloned()
                             .collect();
 
-                        debug!("targets: {:?}", targets);
+                        debug!(?targets, "Targets");
 
                         self.fire_notification_for_users(&push, &targets).await?;
                     }

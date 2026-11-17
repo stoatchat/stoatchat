@@ -278,7 +278,11 @@ impl Consumer for FcmOutboundConsumer {
                     .remove_push_subscription_by_session_id(&payload.session_id)
                     .await
                 {
-                    revolt_config::capture_error(&err);
+                    error!(
+                        error = ?err,
+                        session_id = %payload.session_id,
+                        "Failed to remove push subscription"
+                    );
                 }
             }
             res => {

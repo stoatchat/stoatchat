@@ -4,7 +4,6 @@ use crate::utils::Consumer;
 use anyhow::Result;
 use async_trait::async_trait;
 use lapin::{message::Delivery, Channel, Connection};
-use log::debug;
 use revolt_database::{events::rabbit::*, Database};
 
 #[derive(Clone)]
@@ -45,8 +44,8 @@ impl Consumer for DmCallConsumer {
             self.db.fetch_channel(&payload.channel_id).await?
         else {
             warn!(
-                "Discarding dm call start/stop event for non-dm/group channel {}",
-                payload.channel_id
+                channel_id = %payload.channel_id,
+                "Discarding dm call start/stop event for non-dm/group channel"
             );
 
             return Ok(());

@@ -12,7 +12,6 @@ use lapin::{
     options::BasicPublishOptions,
     BasicProperties, Channel, Connection, ConsumerDelegate, Error as AMQPError,
 };
-use log::debug;
 use revolt_database::{
     events::rabbit::{PayloadKind, PayloadToService},
     Database, Session,
@@ -47,7 +46,7 @@ pub trait Consumer: Clone + Send + Sync + 'static {
                 properties,
             )
             .await?;
-        debug!("Sent message to queue for target {}", routing_key);
+        debug!(routing_key, "Sent message to queue");
 
         Ok(())
     }
@@ -118,14 +117,15 @@ impl<C: Consumer> ConsumerDelegate for Delegate<C> {
                 let consumer = self.0.clone();
 
                 Box::pin(async move {
-                    if let Err(e) = consumer.consume(delivery).await {
-                        revolt_config::capture_anyhow(&e);
-                        log::error!("{e:?}");
+                    if let Err(error) = consumer.consume(delivery).await {
+                        error!(error = ?error, "Failed to process delivery");
                     };
                 })
             }
             Ok(None) => Box::pin(ready(())),
-            Err(e) => Box::pin(async move { log::error!("Received bad delivery: {e:?}") }),
+            Err(error) => {
+                Box::pin(async move { error!(error = ?error, "Received bad delivery") })
+            }
         }
     }
 }

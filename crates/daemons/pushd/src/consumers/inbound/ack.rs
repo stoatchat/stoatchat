@@ -39,13 +39,13 @@ impl Consumer for AckConsumer {
         // Step 1: fetch unreads and don't continue if there's no unreads
         // #[allow(clippy::disallowed_methods)]
 
-        debug!("Processing unreads for {:}", &payload.user_id);
+        debug!(user_id = %payload.user_id, "Processing unreads");
 
         let unreads = if let Ok(u) = self.db.fetch_unread_mentions(&payload.user_id).await {
             if u.is_empty() {
                 debug!(
-                    "Discarding unread task (no mentions found) for {:}",
-                    &payload.user_id
+                    user_id = %payload.user_id,
+                    "Discarding unread task (no mentions found)"
                 );
                 return Ok(());
             };
@@ -72,8 +72,8 @@ impl Consumer for AckConsumer {
 
             if apple_sessions.peek().is_none() {
                 debug!(
-                    "Discarding unread task (no apn sessions found) for {:}",
-                    &payload.user_id
+                    user_id = %payload.user_id,
+                    "Discarding unread task (no apn sessions found)"
                 );
                 return Ok(());
             }
@@ -95,10 +95,7 @@ impl Consumer for AckConsumer {
                 };
                 let payload = serde_json::to_string(&service_payload)?;
 
-                log::debug!(
-                    "Publishing ack to apn session {}",
-                    session.subscription.as_ref().unwrap().auth
-                );
+                debug!(session_id = %session.id, "Publishing ack to apn session");
 
                 self.publish_message(
                     payload.as_bytes(),

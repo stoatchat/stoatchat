@@ -166,7 +166,7 @@ impl ApnsOutboundConsumer {
                 }
             }
 
-            debug!("Got badge count for APN: {}", mention_count);
+            debug!(mention_count, "Got badge count for APN");
 
             return Some(mention_count);
         }
@@ -272,10 +272,7 @@ impl Consumer for ApnsOutboundConsumer {
                     data: BTreeMap::new(),
                 };
 
-                debug!(
-                    "Sending friend request received for user: {:}",
-                    &payload.user_id
-                );
+                debug!(user_id = %payload.user_id, "Sending friend request received");
                 self.client.send(apn_payload).await
             }
 
@@ -315,10 +312,7 @@ impl Consumer for ApnsOutboundConsumer {
                     data: BTreeMap::new(),
                 };
 
-                debug!(
-                    "Sending friend request accept for user: {:}",
-                    &payload.user_id
-                );
+                debug!(user_id = %payload.user_id, "Sending friend request accept");
                 self.client.send(apn_payload).await
             }
             PayloadKind::Generic(alert) => {
@@ -348,10 +342,7 @@ impl Consumer for ApnsOutboundConsumer {
                     data: BTreeMap::new(),
                 };
 
-                debug!(
-                    "Sending generic notification for user: {:}",
-                    &payload.user_id
-                );
+                debug!(user_id = %payload.user_id, "Sending generic notification");
                 self.client.send(apn_payload).await
             }
 
@@ -390,10 +381,7 @@ impl Consumer for ApnsOutboundConsumer {
 
                 fit_payload(&mut apn_payload, &alert.message)?;
 
-                debug!(
-                    "Sending message notification for user: {:}",
-                    &payload.user_id
-                );
+                debug!(user_id = %payload.user_id, "Sending message notification");
                 self.client.send(apn_payload).await
             }
 
@@ -408,7 +396,7 @@ impl Consumer for ApnsOutboundConsumer {
                     data: BTreeMap::new(),
                 };
 
-                debug!("Sending badge update for user: {:}", &payload.user_id);
+                debug!(user_id = %payload.user_id, "Sending badge update");
                 self.client.send(apn_payload).await
             }
 
@@ -434,10 +422,7 @@ impl Consumer for ApnsOutboundConsumer {
                     ended: alert.ended,
                 };
 
-                debug!(
-                    "Sending call start/stop notification for user: {:}",
-                    &payload.user_id
-                );
+                debug!(user_id = %payload.user_id, "Sending call start/stop notification");
                 self.client.send(apn_payload).await
             }
         };
@@ -452,8 +437,9 @@ impl Consumer for ApnsOutboundConsumer {
                 ..
             })) => {
                 info!(
-                    "Removing APNS subscription id {:} (user: {:}) due to invalid token",
-                    &payload.session_id, &payload.user_id
+                    session_id = %payload.session_id,
+                    user_id = %payload.user_id,
+                    "Removing APNS subscription due to invalid token"
                 );
 
                 if let Err(err) = self
@@ -461,7 +447,11 @@ impl Consumer for ApnsOutboundConsumer {
                     .remove_push_subscription_by_session_id(&payload.session_id)
                     .await
                 {
-                    revolt_config::capture_error(&err);
+                    error!(
+                        error = ?err,
+                        session_id = %payload.session_id,
+                        "Failed to remove push subscription"
+                    );
                 }
             }
             resp => {

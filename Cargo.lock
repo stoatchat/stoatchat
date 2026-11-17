@@ -7784,8 +7784,6 @@ dependencies = [
  "isahc",
  "iso8601-timestamp",
  "lapin",
- "log",
- "pretty_env_logger",
  "redis-kiss",
  "regex",
  "revolt-config",
@@ -7798,7 +7796,9 @@ dependencies = [
  "revolt_optional_struct",
  "serde",
  "serde_json",
+ "stoat-otel",
  "tokio",
+ "tracing",
  "ulid",
  "web-push",
 ]
