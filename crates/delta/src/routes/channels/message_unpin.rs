@@ -1,11 +1,11 @@
 use revolt_database::{
+    AMQP, AuditLogEntryAction, Channel, Database, FieldsMessage, PartialMessage, SystemMessage,
+    User,
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    AuditLogEntryAction, Channel, Database, FieldsMessage, PartialMessage, SystemMessage, User,
-    AMQP,
 };
 use revolt_models::v0::MessageAuthor;
-use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
-use revolt_result::{create_error, Result};
+use revolt_permissions::{ChannelPermission, calculate_channel_permissions};
+use revolt_result::{Result, create_error};
 use rocket::State;
 use rocket_empty::EmptyResponse;
 
@@ -26,11 +26,27 @@ pub async fn message_unpin(
 ) -> Result<EmptyResponse> {
     let channel = target.as_channel(db).await?;
 
-    if !matches!(channel, Channel::DirectMessage { .. }) {
-        let mut query = DatabasePermissionQuery::new(db, &user).channel(&channel);
-        calculate_channel_permissions(&mut query)
-            .await
-            .throw_if_lacking_channel_permission(ChannelPermission::ManageMessages)?;
+    match &channel {
+        Channel::TextChannel { .. } | Channel::Group { .. } => {
+            let mut query = DatabasePermissionQuery::new(db, &user).channel(&channel);
+            calculate_channel_permissions(&mut query)
+                .await
+                .throw_if_lacking_channel_permission(ChannelPermission::ManageMessages)?;
+        }
+        Channel::DirectMessage { recipients, .. } => {
+            if !recipients.contains(&user.id) {
+                return Err(create_error!(MissingPermission {
+                    permission: ChannelPermission::ManageMessages.to_string()
+                }));
+            }
+        }
+        Channel::SavedMessages { user: user_, .. } => {
+            if &user.id != user_ {
+                return Err(create_error!(MissingPermission {
+                    permission: ChannelPermission::ManageMessages.to_string()
+                }));
+            }
+        }
     }
 
     let mut message = msg.as_message_in_channel(db, channel.id()).await?;
@@ -83,11 +99,12 @@ pub async fn message_unpin(
 
 #[cfg(test)]
 mod test {
+    use crate::util::test::PubSubTestHelper;
     use crate::{rocket, util::test::TestHarness};
     use revolt_database::{
+        Member, Message, PartialMessage, Server,
         events::client::EventV1,
         util::{idempotency::IdempotencyKey, reference::Reference},
-        Member, Message, PartialMessage, Server,
     };
     use revolt_models::v0::{self, FieldsMessage, SystemMessage};
     use rocket::http::{Header, Status};
