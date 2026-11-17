@@ -105,8 +105,9 @@ impl Emoji {
             db.fetch_emoji(emoji).await?;
             Ok(true)
         } else {
-            let sanitized_emoji = emoji.replace('\u{FE0F}', "");
-            Ok(PERMISSIBLE_EMOJIS.contains(&sanitized_emoji))
+            let no_vs = emoji.replace('\u{FE0F}', "");
+            let sanitized_emoji = no_vs.strip_prefix('\u{200C}').unwrap_or(&no_vs);
+            Ok(PERMISSIBLE_EMOJIS.contains(sanitized_emoji))
         }
     }
 
