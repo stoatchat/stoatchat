@@ -10,9 +10,10 @@ pub async fn task(db: Database, _: revolt_database::AMQP) -> Result<()> {
         let count = accounts.len();
 
         for mut account in accounts {
-            let mut user = db.fetch_user(&account.id).await?;
-
-            user.delete(&db).await?;
+            // Accounts that request deletion between account creation and user creation don't have an attached user.
+            if let Ok(mut user) = db.fetch_user(&account.id).await {
+                user.delete(&db).await?;
+            }
             account.mark_deleted(&db).await?;
         }
 
