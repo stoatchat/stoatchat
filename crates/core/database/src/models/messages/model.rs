@@ -1,11 +1,11 @@
 use indexmap::{IndexMap, IndexSet};
 use iso8601_timestamp::Timestamp;
-use revolt_config::{config, FeaturesLimits};
+use revolt_config::{FeaturesLimits, config};
 use revolt_models::v0::{
     self, BulkMessageResponse, DataMessageSend, Embed, MessageAuthor, MessageFlags, MessageSort,
     MessageWebhook, PushNotification, ReplyIntent, SendableEmbed, Text,
 };
-use revolt_permissions::{calculate_channel_permissions, ChannelPermission, PermissionValue};
+use revolt_permissions::{ChannelPermission, PermissionValue, calculate_channel_permissions};
 use revolt_result::{ErrorType, Result};
 use std::str::FromStr;
 use std::time::SystemTime;
@@ -13,10 +13,14 @@ use std::{collections::HashSet, hash::RandomState};
 use ulid::Ulid;
 use validator::Validate;
 
-use crate::{events::client::EventV1, util::{
-    bulk_permissions::BulkDatabasePermissionQuery, idempotency::IdempotencyKey,
-    permissions::DatabasePermissionQuery,
-}, Channel, Database, Emoji, EmojiParent, File, User, AMQP};
+use crate::{
+    AMQP, Channel, Database, Emoji, EmojiParent, File, User,
+    events::client::EventV1,
+    util::{
+        bulk_permissions::BulkDatabasePermissionQuery, idempotency::IdempotencyKey,
+        permissions::DatabasePermissionQuery,
+    },
+};
 
 #[cfg(feature = "tasks")]
 use crate::tasks::{self, ack::AckEvent};
@@ -364,7 +368,7 @@ impl Message {
                 .map(|interactions| interactions.into())
                 .unwrap_or_default(),
             author: author_id,
-            webhook: webhook.map(|w| w.into()),
+            webhook: webhook.clone().map(|w| w.into()),
             flags: data.flags,
             ..Default::default()
         };
@@ -410,10 +414,12 @@ impl Message {
                 "Mentioned everyone: {}, mentioned online: {}, mentioned roles: {:?}",
                 mentions_everyone, mentions_online, &role_mentions
             );
+            let mut perms: Option<PermissionValue> = None;
+
             if let Some(user) = match author {
                 MessageAuthor::User(user) => Some(Ok(user)),
                 MessageAuthor::System { .. } => Some(Err(())), // DISALLOWED
-                MessageAuthor::Webhook(..) => None,            // Bypass check
+                MessageAuthor::Webhook(..) => None,
             } {
                 if user.is_err() {
                     return Err(create_error!(InvalidProperty));
@@ -421,8 +427,12 @@ impl Message {
                 let owned_user: User = user.unwrap().to_owned().into();
 
                 let mut query = DatabasePermissionQuery::new(db, &owned_user).channel(&channel);
-                let perms = calculate_channel_permissions(&mut query).await;
+                perms = Some(calculate_channel_permissions(&mut query).await);
+            } else if let Some(ref webhook) = webhook {
+                perms = Some(PermissionValue::from_raw(webhook.permissions));
+            }
 
+            if let Some(perms) = perms {
                 if (mentions_everyone || mentions_online)
                     && !perms.has_channel_permission(ChannelPermission::MentionEveryone)
                 {
@@ -438,6 +448,8 @@ impl Message {
                         permission: ChannelPermission::MentionRoles.to_string()
                     }));
                 }
+            } else {
+                unreachable!("Author is webhook but no webhook present?")
             }
         }
 
@@ -1007,7 +1019,9 @@ impl Message {
                 if Message::any_foreign_emoji(db, &server_id, &[emoji.to_string()]).await? {
                     calculate_channel_permissions(query)
                         .await
-                        .throw_if_lacking_channel_permission(ChannelPermission::UseExternalEmojis)?;
+                        .throw_if_lacking_channel_permission(
+                            ChannelPermission::UseExternalEmojis,
+                        )?;
                 }
             }
         }
