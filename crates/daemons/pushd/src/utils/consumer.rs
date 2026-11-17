@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     future::{ready, Future},
     pin::Pin,
     sync::Arc,
@@ -12,7 +13,10 @@ use lapin::{
     BasicProperties, Channel, Connection, ConsumerDelegate, Error as AMQPError,
 };
 use log::debug;
-use revolt_database::Database;
+use revolt_database::{
+    events::rabbit::{PayloadKind, PayloadToService},
+    Database, Session,
+};
 
 #[async_trait]
 pub trait Consumer: Clone + Send + Sync + 'static {
@@ -62,6 +66,43 @@ pub trait Consumer: Clone + Send + Sync + 'static {
             BasicProperties::default(),
         )
         .await
+    }
+
+    /// Queue a push for the session on its provider's outbound queue,
+    /// sessions without a subscription are skipped
+    async fn publish_push(&self, notification: PayloadKind, session: Session) -> Result<()> {
+        let Some(sub) = session.subscription else {
+            return Ok(());
+        };
+
+        let config = revolt_config::config().await;
+
+        let mut sendable = PayloadToService {
+            notification,
+            token: sub.auth,
+            user_id: session.user_id,
+            session_id: session.id,
+            extras: HashMap::new(),
+        };
+
+        let routing_key = match sub.endpoint.as_str() {
+            "apn" => &config.pushd.apn.queue,
+            "fcm" => &config.pushd.fcm.queue,
+            endpoint => {
+                sendable.extras.insert("p256dh".to_string(), sub.p256dh);
+                sendable
+                    .extras
+                    .insert("endpoint".to_string(), endpoint.to_string());
+
+                &config.pushd.vapid.queue
+            }
+        };
+
+        let payload = serde_json::to_string(&sendable)?;
+        self.publish_message(payload.as_bytes(), &config.pushd.exchange, routing_key)
+            .await?;
+
+        Ok(())
     }
 }
 

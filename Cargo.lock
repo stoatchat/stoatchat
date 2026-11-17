@@ -9240,6 +9240,7 @@ name = "stoat-otel"
 version = "0.16.0"
 dependencies = [
  "axum",
+ "lapin",
  "opentelemetry",
  "opentelemetry-appender-tracing",
  "opentelemetry-otlp",

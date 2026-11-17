@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use crate::utils::{render_notification_content, Consumer};
 use anyhow::Result;
@@ -49,36 +49,12 @@ impl Consumer for MessageConsumer {
             .fetch_sessions_with_subscription(&payload.users)
             .await
         {
-            let config = revolt_config::config().await;
             for session in sessions {
-                if let Some(sub) = session.subscription {
-                    let mut sendable = PayloadToService {
-                        notification: PayloadKind::MessageNotification(
-                            payload.notification.clone(),
-                        ),
-                        token: sub.auth,
-                        user_id: session.user_id,
-                        session_id: session.id,
-                        extras: HashMap::new(),
-                    };
-
-                    let routing_key = match sub.endpoint.as_str() {
-                        "apn" => &config.pushd.apn.queue,
-                        "fcm" => &config.pushd.fcm.queue,
-                        endpoint => {
-                            sendable.extras.insert("p256dh".to_string(), sub.p256dh);
-                            sendable
-                                .extras
-                                .insert("endpoint".to_string(), endpoint.to_string());
-
-                            &config.pushd.vapid.queue
-                        }
-                    };
-
-                    let payload = serde_json::to_string(&sendable)?;
-                    self.publish_message(payload.as_bytes(), &config.pushd.exchange, routing_key)
-                        .await?;
-                }
+                self.publish_push(
+                    PayloadKind::MessageNotification(payload.notification.clone()),
+                    session,
+                )
+                .await?;
             }
         }
 

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use crate::utils::Consumer;
 use anyhow::Result;
@@ -40,35 +40,9 @@ impl Consumer for FRAcceptedConsumer {
         debug!("Received FR accept event");
 
         if let Ok(sessions) = self.db.fetch_sessions(&payload.user).await {
-            let config = revolt_config::config().await;
             for session in sessions {
-                if let Some(sub) = session.subscription {
-                    let mut sendable = PayloadToService {
-                        notification: PayloadKind::FRAccepted(payload.clone()),
-                        token: sub.auth,
-                        user_id: session.user_id,
-                        session_id: session.id,
-                        extras: HashMap::new(),
-                    };
-
-                    let routing_key = match sub.endpoint.as_str() {
-                        "apn" => &config.pushd.apn.queue,
-                        "fcm" => &config.pushd.fcm.queue,
-                        endpoint => {
-                            sendable.extras.insert("p256dh".to_string(), sub.p256dh);
-                            sendable
-                                .extras
-                                .insert("endpoint".to_string(), endpoint.to_string());
-
-                            &config.pushd.vapid.queue
-                        }
-                    };
-
-                    let payload = serde_json::to_string(&sendable)?;
-
-                    self.publish_message(payload.as_bytes(), &config.pushd.exchange, routing_key)
-                        .await?;
-                }
+                self.publish_push(PayloadKind::FRAccepted(payload.clone()), session)
+                    .await?;
             }
         }
 
