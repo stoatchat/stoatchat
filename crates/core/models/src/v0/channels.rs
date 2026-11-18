@@ -67,6 +67,13 @@ auto_derived!(
                 serde(skip_serializing_if = "crate::if_false", default)
             )]
             nsfw: bool,
+
+            /// Whether this group is end-to-end encrypted
+            #[cfg_attr(
+                feature = "serde",
+                serde(skip_serializing_if = "crate::if_false", default)
+            )]
+            e2e: bool,
         },
         /// Text channel belonging to a server
         TextChannel {
@@ -116,6 +123,13 @@ auto_derived!(
             /// The channel's slowmode delay in seconds
             #[serde(skip_serializing_if = "Option::is_none")]
             slowmode: Option<u64>,
+
+            /// Whether this channel is end-to-end encrypted
+            #[cfg_attr(
+                feature = "serde",
+                serde(skip_serializing_if = "crate::if_false", default)
+            )]
+            e2e: bool,
         },
     }
 
@@ -156,6 +170,8 @@ auto_derived!(
         pub voice: Option<VoiceInformation>,
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
         pub slowmode: Option<u64>,
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+        pub e2e: Option<bool>,
     }
 
     /// Optional fields on channel object
@@ -203,6 +219,10 @@ auto_derived!(
         /// Fields to remove from channel
         #[cfg_attr(feature = "serde", serde(default))]
         pub remove: Vec<FieldsChannel>,
+
+        /// Whether this channel is end-to-end encrypted
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub e2e: Option<bool>,
     }
 
     /// Create new group
@@ -227,6 +247,9 @@ auto_derived!(
         /// Whether this group is age-restricted
         #[serde(skip_serializing_if = "Option::is_none")]
         pub nsfw: Option<bool>,
+        /// Whether this group is end-to-end encrypted
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub e2e: Option<bool>,
     }
 
     /// Server Channel Type
@@ -255,10 +278,12 @@ auto_derived!(
         /// Whether this channel is age restricted
         #[serde(skip_serializing_if = "Option::is_none")]
         pub nsfw: Option<bool>,
-
         /// Voice Information for when this channel is also a voice channel
         #[serde(skip_serializing_if = "Option::is_none")]
         pub voice: Option<VoiceInformation>,
+        /// Whether this channel is end-to-end encrypted
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub e2e: Option<bool>,
     }
 
     /// New default permissions

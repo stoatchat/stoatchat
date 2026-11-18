@@ -233,6 +233,7 @@ mod test {
                 description: None,
                 nsfw: Some(false),
                 voice: None,
+                e2e: Some(false),
             },
             true,
         )
@@ -268,6 +269,7 @@ mod test {
             last_message_id: None,
             voice: None,
             slowmode: None,
+            e2e: None,
         };
         locked_channel
             .update(&harness.db, partial, vec![])
