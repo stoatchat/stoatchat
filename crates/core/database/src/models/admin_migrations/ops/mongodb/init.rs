@@ -117,6 +117,10 @@ pub async fn create_database(db: &MongoDb) {
         .await
         .expect("Failed to create discover_requests collection");
 
+    db.create_collection("notification_settings")
+        .await
+        .expect("Failed to create notification_settings collection");
+
     db.run_command(doc! {
         "createIndexes": "users",
         "indexes": [
@@ -432,6 +436,23 @@ pub async fn create_database(db: &MongoDb) {
     })
     .await
     .expect("Failed to create discover_requests index");
+
+    db.run_command(doc! {
+        "createIndexes": "notification_settings",
+        "indexes": [
+            {
+                "key": {
+                    "user": 1_i32,
+                    "server": 1_i32,
+                    "channel": 1_i32,
+                },
+                "name": "user_server_channel",
+                "unique": true
+            }
+        ]
+    })
+    .await
+    .expect("Failed to create notification_settings index");
 
     info!("Created database.");
 }

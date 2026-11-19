@@ -5,13 +5,13 @@ use serde::{Deserialize, Serialize};
 use revolt_models::v0::{
     AppendMessage, Channel, ChannelSlowmode, ChannelUnread, ChannelVoiceState, Emoji,
     FieldsChannel, FieldsMember, FieldsMessage, FieldsRole, FieldsServer, FieldsUser,
-    FieldsWebhook, Member, MemberCompositeKey, Message, PartialChannel, PartialEmoji,
-    PartialMember, PartialMessage, PartialRole, PartialServer, PartialUser, PartialUserVoiceState,
-    PartialWebhook, PolicyChange, RemovalIntention, Report, Server, User, UserSettings,
-    UserVoiceState, Webhook,
+    FieldsWebhook, Member, MemberCompositeKey, Message, NotificationSetting, PartialChannel,
+    PartialEmoji, PartialMember, PartialMessage, PartialRole, PartialServer, PartialUser,
+    PartialUserVoiceState, PartialWebhook, PolicyChange, RemovalIntention, Report, Server, User,
+    UserSettings, UserVoiceState, Webhook,
 };
 
-use crate::{Account, Database, Session, amqp::get_amqp};
+use crate::{Account, Session, amqp::get_amqp};
 
 /// Ping Packet
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -33,6 +33,7 @@ pub struct ReadyPayloadFields {
     pub user_settings: Vec<String>,
     pub channel_unreads: bool,
     pub policy_changes: bool,
+    pub notification_settings: bool,
 }
 
 impl Default for ReadyPayloadFields {
@@ -47,6 +48,7 @@ impl Default for ReadyPayloadFields {
             user_settings: Vec::new(),
             channel_unreads: false,
             policy_changes: true,
+            notification_settings: false,
         }
     }
 }
@@ -90,6 +92,9 @@ pub enum EventV1 {
 
         #[serde(skip_serializing_if = "Option::is_none")]
         policy_changes: Option<Vec<PolicyChange>>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
+        notification_settings: Option<Vec<NotificationSetting>>,
     },
 
     /// Ping response

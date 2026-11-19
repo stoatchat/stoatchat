@@ -281,6 +281,9 @@ restrict_server_creation = []
 # Number of days after creation before an invite expires
 max_invite_duration_days = 30
 
+# Servers with more members than this won't get all message push notifications
+all_messages_notifications_max_server_size = 1_000
+
 [features.limits.new_user]
 # Limits imposed on new users
 

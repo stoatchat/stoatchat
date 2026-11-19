@@ -1,9 +1,9 @@
-use async_tungstenite::tungstenite::{handshake, Message};
+use async_tungstenite::tungstenite::{Message, handshake};
 use futures::channel::oneshot::Sender;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use revolt_database::events::client::ReadyPayloadFields;
-use revolt_result::{create_error, Result};
+use revolt_result::{Result, create_error};
 use serde::{Deserialize, Serialize};
 
 /// matches either a single word ie "users" or a key and value ie "settings[notifications]"
@@ -140,6 +140,7 @@ impl handshake::server::Callback for WebsocketHandshakeCallback {
                 user_settings: Vec::new(),
                 channel_unreads: false,
                 policy_changes: false,
+                notification_settings: false,
             }
         } else {
             ReadyPayloadFields::default()
@@ -179,6 +180,9 @@ impl handshake::server::Callback for WebsocketHandshakeCallback {
                                     }
                                 }
                                 "policy_changes" => ready_payload_fields.policy_changes = true,
+                                "notification_settings" => {
+                                    ready_payload_fields.notification_settings = true
+                                }
                                 _ => {}
                             }
                         }

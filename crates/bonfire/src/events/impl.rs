@@ -3,13 +3,13 @@ use std::collections::{HashMap, HashSet};
 use futures::future::join_all;
 use redis_kiss::AsyncCommands;
 use revolt_database::{
+    Channel, Database, Member, MemberCompositeKey, Presence, RelationshipStatus,
     events::client::{EventV1, ReadyPayloadFields},
     util::permissions::DatabasePermissionQuery,
-    voice::{get_channel_voice_state, UserVoiceChannel},
-    Channel, Database, Member, MemberCompositeKey, Presence, RelationshipStatus,
+    voice::{UserVoiceChannel, get_channel_voice_state},
 };
 use revolt_models::v0;
-use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
+use revolt_permissions::{ChannelPermission, calculate_channel_permissions};
 use revolt_presence::filter_online;
 use revolt_result::Result;
 
@@ -263,6 +263,20 @@ impl State {
             None
         };
 
+        let notification_settings = if fields.notification_settings {
+            let server_ids: Vec<&str> = server_ids.iter().map(String::as_str).collect();
+
+            Some(
+                db.get_notification_settings_for_ready(&user.id, &server_ids)
+                    .await?
+                    .into_iter()
+                    .map(Into::into)
+                    .collect(),
+            )
+        } else {
+            None
+        };
+
         // Copy data into local state cache.
         self.cache.users = users.iter().cloned().map(|x| (x.id.clone(), x)).collect();
         self.cache
@@ -328,6 +342,7 @@ impl State {
             channel_unreads,
 
             policy_changes,
+            notification_settings,
         })
     }
 
