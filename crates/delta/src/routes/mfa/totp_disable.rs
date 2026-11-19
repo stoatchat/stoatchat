@@ -1,6 +1,6 @@
 //! Disable TOTP 2FA.
 //! DELETE /mfa/totp
-use revolt_database::{Database, Account, ValidatedTicket, Totp};
+use revolt_database::{AMQP, Account, Database, MFAMethod, Totp, User, ValidatedTicket};
 use revolt_result::Result;
 use rocket::State;
 use rocket_empty::EmptyResponse;
@@ -12,14 +12,29 @@ use rocket_empty::EmptyResponse;
 #[delete("/totp")]
 pub async fn totp_disable(
     db: &State<Database>,
+    amqp: &State<AMQP>,
     mut account: Account,
+    user: User,
     _ticket: ValidatedTicket,
 ) -> Result<EmptyResponse> {
     // Disable TOTP
     account.mfa.totp_token = Totp::Disabled;
 
     // Save model to database
-    account.save(db).await.map(|_| EmptyResponse)
+    account.save(db).await?;
+
+    _ = user
+        .send_system_notice(
+            db,
+            amqp,
+            revolt_database::SystemNotice::MfaUpdated {
+                add: None,
+                remove: Some(vec![MFAMethod::Totp]),
+            },
+        )
+        .await;
+
+    Ok(EmptyResponse)
 }
 
 #[cfg(test)]
@@ -36,8 +51,8 @@ mod tests {
         let ticket = MFATicket::new(account.id, true);
         ticket.save(&harness.db).await.unwrap();
 
-
-        let res = harness.client
+        let res = harness
+            .client
             .delete("/auth/mfa/totp")
             .header(Header::new("X-Session-Token", session.token.clone()))
             .header(Header::new("X-MFA-Ticket", ticket.token))

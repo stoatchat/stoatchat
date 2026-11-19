@@ -5,7 +5,6 @@ use lapin::{
     types::FieldTable,
     uri::{AMQPAuthority, AMQPQueryString, AMQPUri, AMQPUserInfo},
 };
-use log::{debug, info, warn};
 use redis_kiss::{AsyncCommands, Conn as RedisConnection, get_connection};
 use revolt_config::config;
 use revolt_database::{
@@ -14,6 +13,7 @@ use revolt_database::{
 };
 use revolt_result::{Result, ToRevoltError};
 use serde_json;
+use tracing::{debug, error, field::Empty, info, info_span, warn, Instrument, Span};
 
 pub async fn task(db: Database, amqp: AMQP) -> Result<()> {
     let config = config().await;
@@ -101,32 +101,61 @@ pub async fn task(db: Database, amqp: AMQP) -> Result<()> {
 
     while let Some(delivery) = consumer.next().await {
         if let Ok(delivery) = delivery {
-            let payload = serde_json::from_slice::<AckEventPayload>(&delivery.data);
+            let span = info_span!(
+                parent: None,
+                "crond.ack",
+                otel.name = format!("process {}", delivery.routing_key),
+                otel.kind = "consumer",
+                messaging.system = "rabbitmq",
+                messaging.operation.type = "process",
+                messaging.destination.name = %delivery.exchange,
+                messaging.rabbitmq.destination.routing_key = %delivery.routing_key,
+                redelivered = delivery.redelivered,
+                user_id = Empty,
+                channel_id = Empty,
+                otel.status_code = Empty,
+            );
+            stoat_otel::amqp::set_parent_from_headers(
+                &span,
+                delivery.properties.headers().as_ref(),
+            );
 
-            if let Ok(payload) = payload {
-                debug!("Received ack event: {payload:?}");
+            async {
+                let payload = serde_json::from_slice::<AckEventPayload>(&delivery.data);
 
-                if let Err(e) = process_channel_ack(
-                    &db,
-                    &amqp,
-                    payload.user_id,
-                    payload.channel_id.unwrap(),
-                    !delivery.redelivered,
-                    &mut redis,
-                )
-                .await
-                {
-                    revolt_config::capture_error(&e);
-                    _ = delivery.reject(BasicRejectOptions { requeue: true }).await;
+                if let Ok(payload) = payload {
+                    debug!(?payload, "Received ack event");
+
+                    let span = Span::current();
+                    span.record("user_id", &payload.user_id);
+                    span.record("channel_id", payload.channel_id.as_deref());
+
+                    if let Err(e) = process_channel_ack(
+                        &db,
+                        &amqp,
+                        payload.user_id,
+                        payload.channel_id.unwrap(),
+                        !delivery.redelivered,
+                        &mut redis,
+                    )
+                    .await
+                    {
+                        Span::current().record("otel.status_code", "error");
+                        error!(error = ?e, "Failed to process ack, requeueing");
+                        _ = delivery.reject(BasicRejectOptions { requeue: true }).await;
+                    } else {
+                        _ = delivery.ack(BasicAckOptions { multiple: false }).await;
+                    }
                 } else {
-                    _ = delivery.ack(BasicAckOptions { multiple: false }).await;
+                    Span::current().record("otel.status_code", "error");
+                    error!(
+                        data = %String::from_utf8_lossy(&delivery.data),
+                        "Failed to decode ack data"
+                    );
                 }
-            } else {
-                revolt_config::capture_message(
-                    format!("Failed to decode ack data: {:?}", delivery.data).as_str(),
-                    revolt_config::Level::Error,
-                );
             }
+            .instrument(span)
+            .await;
         }
     }
     Ok(())
@@ -149,7 +178,7 @@ async fn process_channel_ack(
             let unread = db.fetch_unread(&user, &channel).await?;
             let updated = db.acknowledge_message(&channel, &user, message_id).await?;
 
-            info!("Set new state for ack: {}:{}:{}", channel, user, message_id);
+            info!(%channel, %user, %message_id, "Set new state for ack");
 
             if let (Some(before), Some(after)) = (unread, updated) {
                 let before_mentions = before.mentions.unwrap_or_default().len();
@@ -165,7 +194,14 @@ async fn process_channel_ack(
                         )
                         .await
                     {
-                        revolt_config::capture_error(&err);
+                        error!(
+                            reason = "ack_publish_failed",
+                            user_id = %user,
+                            channel_id = %channel,
+                            %message_id,
+                            error = ?err,
+                            "push notification dropped"
+                        );
                     }
                 };
             }
@@ -181,7 +217,7 @@ async fn process_channel_ack(
             resp
         }
     } else {
-        warn!("No pending ack found for {}:{}", channel, user);
+        warn!(%channel, %user, "No pending ack found");
         Ok(())
     }
 }

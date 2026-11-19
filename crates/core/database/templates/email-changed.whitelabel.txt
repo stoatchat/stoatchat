@@ -1,0 +1,11 @@
+The email address for your account was changed to {{to}}.
+
+If you made this change, you can safely ignore this email.
+
+If this wasn't you, contact your instance administrator immediately.
+
+This email is intended for {{email}}
+
+This email has no association with Stoat or Revolt Platforms Ltd.
+Learn more about third party instances here:
+https://developers.stoat.chat/faq/

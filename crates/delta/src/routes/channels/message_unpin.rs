@@ -3,7 +3,7 @@ use revolt_database::{
     User,
     util::{permissions::DatabasePermissionQuery, reference::Reference},
 };
-use revolt_models::v0::MessageAuthor;
+use revolt_models::v0::{MessageAuthor, SYSTEM_USER_ID};
 use revolt_permissions::{ChannelPermission, calculate_channel_permissions};
 use revolt_result::{Result, create_error};
 use rocket::State;
@@ -34,7 +34,7 @@ pub async fn message_unpin(
                 .throw_if_lacking_channel_permission(ChannelPermission::ManageMessages)?;
         }
         Channel::DirectMessage { recipients, .. } => {
-            if !recipients.contains(&user.id) {
+            if !recipients.contains(&user.id) || recipients.iter().any(|id| id == SYSTEM_USER_ID) {
                 return Err(create_error!(MissingPermission {
                     permission: ChannelPermission::ManageMessages.to_string()
                 }));

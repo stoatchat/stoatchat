@@ -2,7 +2,7 @@ use revolt_database::{
     AMQP, AuditLogEntryAction, Channel, Database, PartialMessage, SystemMessage, User,
     util::{permissions::DatabasePermissionQuery, reference::Reference},
 };
-use revolt_models::v0::MessageAuthor;
+use revolt_models::v0::{MessageAuthor, SYSTEM_USER_ID};
 use revolt_permissions::{ChannelPermission, calculate_channel_permissions};
 use revolt_result::{Result, create_error};
 use rocket::State;
@@ -33,7 +33,7 @@ pub async fn message_pin(
                 .throw_if_lacking_channel_permission(ChannelPermission::ManageMessages)?;
         }
         Channel::DirectMessage { recipients, .. } => {
-            if !recipients.contains(&user.id) {
+            if !recipients.contains(&user.id) || recipients.iter().any(|id| id == SYSTEM_USER_ID) {
                 return Err(create_error!(MissingPermission {
                     permission: "ManageMessages".to_string()
                 }));

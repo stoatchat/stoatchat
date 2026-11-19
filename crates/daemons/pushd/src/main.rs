@@ -1,5 +1,5 @@
 #[macro_use]
-extern crate log;
+extern crate tracing;
 
 use std::sync::Arc;
 
@@ -19,6 +19,7 @@ use consumers::{
         ack::AckConsumer, dm_call::DmCallConsumer, fr_accepted::FRAcceptedConsumer,
         fr_received::FRReceivedConsumer, generic::GenericConsumer,
         mass_mention::MassMessageConsumer, message::MessageConsumer,
+        system_notice::SystemNoticeConsumer,
     },
     outbound::{apn::ApnsOutboundConsumer, fcm::FcmOutboundConsumer, vapid::VapidOutboundConsumer},
 };
@@ -27,8 +28,10 @@ use crate::utils::{Consumer, Delegate};
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() {
-    // Configure logging and environment
-    revolt_config::configure!(pushd);
+    let _telemetry = stoat_otel::init(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+    info!(version = env!("CARGO_PKG_VERSION"), "Starting pushd");
+
+    revolt_config::config().await;
 
     // Setup database
     let db = revolt_database::DatabaseInfo::Auto.connect().await.unwrap();
@@ -132,6 +135,18 @@ async fn main() {
             &config,
             &config.pushd.dm_call_queue,
             &config.pushd.get_dm_call_routing_key(),
+            None,
+        )
+        .await,
+    );
+
+    channels.push(
+        make_queue_and_consume::<SystemNoticeConsumer>(
+            &db,
+            &connection,
+            &config,
+            &config.pushd.system_notice_queue,
+            &config.pushd.get_system_notice_routing_key(),
             None,
         )
         .await,
@@ -273,10 +288,10 @@ where
         .await
         .unwrap();
     info!(
-        "Consuming routing key {} as queue {}, tag {}",
         routing_key,
-        queue_name,
-        consumer.tag()
+        queue = queue_name,
+        tag = %consumer.tag(),
+        "Consuming queue"
     );
 
     let delegate = Delegate(
