@@ -63,6 +63,15 @@ impl DatabaseInfo {
                     #[cfg(not(feature = "mongodb"))]
                     return Err("MongoDB not enabled.".to_string());
                 } else {
+                    // Don't silently fall back to the in-memory reference database
+                    // when MongoDB support is available but no URL was configured
+                    #[cfg(feature = "mongodb")]
+                    return Err("No MongoDB connection URL configured! \
+                        Set `database.mongodb` in Revolt.toml \
+                        or the REVOLT__DATABASE__MONGODB environment variable."
+                        .to_string());
+
+                    #[cfg(not(feature = "mongodb"))]
                     DatabaseInfo::Reference.connect().await
                 }
             }

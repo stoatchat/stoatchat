@@ -20,7 +20,10 @@ impl AbstractMigrations for MongoDb {
         let list = self
             .list_database_names()
             .await
-            .expect("Failed to fetch database names.");
+            .expect(
+                "Failed to connect to MongoDB. Check that it is running and that \
+                `database.mongodb` in Revolt.toml points to it",
+            );
 
         if list.iter().any(|x| x == &self.1) {
             scripts::migrate_database(self).await;
