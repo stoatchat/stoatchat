@@ -3,21 +3,35 @@ use std::time::Duration;
 use revolt_database::Database;
 use revolt_result::Result;
 use tokio::time::sleep;
+use tracing::{info, info_span, Instrument};
+
+use crate::traced_run;
 
 pub async fn task(db: Database, _: revolt_database::AMQP) -> Result<()> {
     loop {
-        let accounts = db.fetch_accounts_due_for_deletion().await?;
-        let count = accounts.len();
+        traced_run("delete_accounts", async {
+            let accounts = db.fetch_accounts_due_for_deletion().await?;
+            let count = accounts.len();
 
-        for mut account in accounts {
-            // Accounts that request deletion between account creation and user creation don't have an attached user.
-            if let Ok(mut user) = db.fetch_user(&account.id).await {
-                user.delete(&db).await?;
+            for mut account in accounts {
+                let span = info_span!("account.delete", account_id = %account.id);
+
+                async {
+                    // Accounts that request deletion between account creation and user creation don't have an attached user.
+                    if let Ok(mut user) = db.fetch_user(&account.id).await {
+                        user.delete(&db).await?;
+                    }
+                    account.mark_deleted(&db).await
+                }
+                .instrument(span)
+                .await?;
             }
-            account.mark_deleted(&db).await?;
-        }
 
-        log::info!("Deleted {count} accounts.");
+            info!(count, "Deleted accounts");
+
+            Ok(())
+        })
+        .await?;
 
         sleep(Duration::from_hours(1)).await
     }

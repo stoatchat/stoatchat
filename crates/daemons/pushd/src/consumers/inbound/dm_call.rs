@@ -1,10 +1,10 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
-use crate::utils::Consumer;
+use crate::utils::{record_skip, Consumer};
 use anyhow::Result;
 use async_trait::async_trait;
 use lapin::{message::Delivery, Channel, Connection};
-use log::debug;
+use stoat_otel::WideContextRepository;
 use revolt_database::{events::rabbit::*, Database};
 
 #[derive(Clone)]
@@ -34,9 +34,11 @@ impl Consumer for DmCallConsumer {
     }
 
     /// This consumer handles delegating messages into their respective platform queues.
-    async fn consume(&self, delivery: Delivery) -> Result<()> {
+    async fn consume(&self, delivery: Delivery, context: &WideContextRepository) -> Result<()> {
         let _p: InternalDmCallPayload = serde_json::from_slice(&delivery.data)?;
         let payload = _p.payload;
+        context.add("channel_id", payload.channel_id.clone());
+        context.add("call.ended", payload.ended);
 
         debug!("Received dm call start/stop event");
 
@@ -44,9 +46,11 @@ impl Consumer for DmCallConsumer {
         | revolt_database::Channel::Group { recipients, .. }) =
             self.db.fetch_channel(&payload.channel_id).await?
         else {
+            context.add("push.dropped", "not_dm_or_group");
             warn!(
-                "Discarding dm call start/stop event for non-dm/group channel {}",
-                payload.channel_id
+                reason = "not_dm_or_group",
+                channel_id = %payload.channel_id,
+                "push notification dropped"
             );
 
             return Ok(());
@@ -55,55 +59,65 @@ impl Consumer for DmCallConsumer {
         let call_recipients = if let Some(user_recipients) = _p.recipients {
             user_recipients
                 .into_iter()
-                .filter(|user_id| recipients.contains(user_id) && user_id != &payload.initiator_id)
+                .filter(|user_id| {
+                    if user_id == &payload.initiator_id {
+                        record_skip(user_id, None, "call_initiator");
+                        false
+                    } else if !recipients.contains(user_id) {
+                        record_skip(user_id, None, "not_in_channel");
+                        false
+                    } else {
+                        true
+                    }
+                })
                 .collect()
         } else {
             recipients
                 .into_iter()
-                .filter(|user_id| user_id != &payload.initiator_id)
+                .filter(|user_id| {
+                    if user_id == &payload.initiator_id {
+                        record_skip(user_id, None, "call_initiator");
+                        false
+                    } else {
+                        true
+                    }
+                })
                 .collect::<Vec<_>>()
         };
 
-        let config = revolt_config::config().await;
+        context.add("users.count", call_recipients.len() as i64);
 
+        let mut queued = 0;
         for user_id in call_recipients {
-            if let Ok(sessions) = self.db.fetch_sessions(&user_id).await {
-                for session in sessions {
-                    if let Some(sub) = session.subscription {
-                        let mut sendable = PayloadToService {
-                            notification: PayloadKind::DmCallStartEnd(payload.clone()),
-                            token: sub.auth,
-                            user_id: session.user_id,
-                            session_id: session.id,
-                            extras: HashMap::new(),
-                        };
+            let sessions = match self.db.fetch_sessions(&user_id).await {
+                Ok(sessions) => sessions,
+                Err(error) => {
+                    warn!(
+                        reason = "fetch_sessions_failed",
+                        error = ?error,
+                        %user_id,
+                        "push notification dropped"
+                    );
+                    record_skip(&user_id, None, "fetch_sessions_failed");
+                    continue;
+                }
+            };
 
-                        let routing_key = match sub.endpoint.as_str() {
-                            "apn" => &config.pushd.apn.queue,
-                            "fcm" => &config.pushd.fcm.queue,
-                            endpoint => {
-                                sendable.extras.insert("p256dh".to_string(), sub.p256dh);
-                                sendable
-                                    .extras
-                                    .insert("endpoint".to_string(), endpoint.to_string());
+            if sessions.is_empty() {
+                record_skip(&user_id, None, "no_sessions");
+            }
 
-                                &config.pushd.vapid.queue
-                            }
-                        };
-
-                        let payload = serde_json::to_string(&sendable)?;
-
-                        self.publish_message(
-                            payload.as_bytes(),
-                            &config.pushd.exchange,
-                            routing_key,
-                        )
-                        .await?;
-                    }
+            for session in sessions {
+                if self
+                    .publish_push(PayloadKind::DmCallStartEnd(payload.clone()), session)
+                    .await?
+                {
+                    queued += 1;
                 }
             }
         }
 
+        context.add("pushes.queued", queued);
         Ok(())
     }
 }
