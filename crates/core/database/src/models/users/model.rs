@@ -3,7 +3,7 @@ use std::{collections::HashSet, str::FromStr, time::Duration};
 use crate::{
     AMQP, Channel, Database, File, MFAMethod, Message, RatelimitEvent,
     events::client::EventV1,
-    util::email::{email_templates, send_email},
+    util::email::{Template, Templates, email_templates, send_email},
 };
 
 use futures::future::join_all;
@@ -216,37 +216,72 @@ impl SystemNotice {
             SystemNotice::EmailChanged { from, to } => format!(
                 "Your account email was changed from `{from}` to `{to}`. If this wasn't you, contact support immediately."
             ),
-            SystemNotice::MfaUpdated { add, remove } => {
-                let describe = |factors: &Option<Vec<MFAMethod>>| {
-                    factors
-                        .iter()
-                        .flatten()
-                        .map(|factor| match factor {
-                            MFAMethod::Password => "password",
-                            MFAMethod::Recovery => "recovery codes",
-                            MFAMethod::Totp => "authenticator app",
-                        })
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                };
-
-                let added = describe(add);
-                let removed = describe(remove);
-
-                let changes = match (added.is_empty(), removed.is_empty()) {
-                    (false, false) => format!("added: {added}; removed: {removed}"),
-                    (false, true) => format!("added: {added}"),
-                    (true, false) => format!("removed: {removed}"),
-                    (true, true) => unreachable!("At least one change must be provided"),
-                };
-
-                format!(
-                    "Your two-factor authentication settings were updated ({changes}). If this wasn't you, contact support immediately."
-                )
-            }
+            SystemNotice::MfaUpdated { add, remove } => format!(
+                "Your two-factor authentication settings were updated ({}). If this wasn't you, contact support immediately.",
+                Self::describe_mfa_changes(add, remove)
+            ),
             SystemNotice::ModerationNotice { content } | SystemNotice::BotNotice { content } => {
                 content.clone()
             }
+        }
+    }
+
+    /// Describe added and removed MFA methods, e.g. `added: authenticator app; removed: recovery codes`
+    fn describe_mfa_changes(
+        add: &Option<Vec<MFAMethod>>,
+        remove: &Option<Vec<MFAMethod>>,
+    ) -> String {
+        let describe = |factors: &Option<Vec<MFAMethod>>| {
+            factors
+                .iter()
+                .flatten()
+                .map(|factor| match factor {
+                    MFAMethod::Password => "password",
+                    MFAMethod::Recovery => "recovery codes",
+                    MFAMethod::Totp => "authenticator app",
+                })
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+
+        let added = describe(add);
+        let removed = describe(remove);
+
+        match (added.is_empty(), removed.is_empty()) {
+            (false, false) => format!("added: {added}; removed: {removed}"),
+            (false, true) => format!("added: {added}"),
+            (true, false) => format!("removed: {removed}"),
+            (true, true) => unreachable!("At least one change must be provided"),
+        }
+    }
+
+    /// Pick the email template and template variables for this notice
+    fn email<'a>(
+        &self,
+        templates: &'a Templates,
+        email: &str,
+    ) -> (&'a Template, serde_json::Value) {
+        match self {
+            SystemNotice::PasswordChanged => (
+                &templates.password_changed,
+                json!({ "email": email, "url": templates.password_changed.url }),
+            ),
+            SystemNotice::EmailChanged { from, to } => (
+                &templates.email_changed,
+                json!({ "email": email, "from": from, "to": to }),
+            ),
+            SystemNotice::MfaUpdated { add, remove } => (
+                &templates.mfa_updated,
+                json!({ "email": email, "changes": Self::describe_mfa_changes(add, remove) }),
+            ),
+            SystemNotice::ModerationNotice { content } => (
+                &templates.moderation_notice,
+                json!({ "email": email, "content": content }),
+            ),
+            SystemNotice::BotNotice { content } => (
+                &templates.bot_notice,
+                json!({ "email": email, "content": content }),
+            ),
         }
     }
 }
@@ -371,11 +406,34 @@ impl User {
         amqp: &AMQP,
         notice: SystemNotice,
     ) -> Result<()> {
-        self.send_system_dm(db, amqp, notice.content()).await?;
+        // Attempt every channel even if an earlier one fails
+        let dm = self
+            .send_system_dm(db, amqp, notice.content())
+            .await
+            .map(|_| ());
 
-        // TODO: send email notification & push notifications
+        let email = async {
+            let config = config().await;
+            if config.api.smtp.host.is_empty() {
+                return Ok(());
+            }
 
-        Ok(())
+            // Send email
+            let address = match &notice {
+                SystemNotice::EmailChanged { from, .. } => from.clone(),
+                _ => db.fetch_account(&self.id).await?.email,
+            };
+
+            let templates = email_templates().await;
+            let (template, variables) = notice.email(&templates, &address);
+
+            send_email(&config.api.smtp, address, template, variables)
+        }
+        .await;
+
+        // TODO: send push notifications
+
+        dm.and(email)
     }
 
     /// Get limits for this user

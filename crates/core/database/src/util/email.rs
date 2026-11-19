@@ -1,11 +1,11 @@
 use std::{collections::HashSet, sync::LazyLock};
 
 use lettre::{
-    transport::smtp::{authentication::Credentials, client::Tls},
     SmtpTransport,
+    transport::smtp::{authentication::Credentials, client::Tls},
 };
 use regex::Regex;
-use revolt_config::{config, ApiSmtp};
+use revolt_config::{ApiSmtp, config};
 use revolt_result::Result;
 
 static SPLIT: LazyLock<Regex> = LazyLock::new(|| Regex::new("([^@]+)(@.+)").unwrap());
@@ -62,6 +62,16 @@ pub struct Templates {
     pub deletion: Template,
     /// Template for suspention
     pub suspension: Template,
+    /// Template for password changed notice
+    pub password_changed: Template,
+    /// Template for email changed notice
+    pub email_changed: Template,
+    /// Template for MFA updated notice
+    pub mfa_updated: Template,
+    /// Template for platform moderation notice
+    pub moderation_notice: Template,
+    /// Template for bot notice
+    pub bot_notice: Template,
 }
 
 pub async fn email_templates() -> Templates {
@@ -99,6 +109,36 @@ pub async fn email_templates() -> Templates {
                 url: "".into(),
                 html: None,
             },
+            password_changed: Template {
+                title: "password_changed".into(),
+                text: "[[dummy]]".into(),
+                url: "".into(),
+                html: None,
+            },
+            email_changed: Template {
+                title: "email_changed".into(),
+                text: "[[dummy]]".into(),
+                url: "".into(),
+                html: None,
+            },
+            mfa_updated: Template {
+                title: "mfa_updated".into(),
+                text: "[[dummy]]".into(),
+                url: "".into(),
+                html: None,
+            },
+            moderation_notice: Template {
+                title: "moderation_notice".into(),
+                text: "[[dummy]]".into(),
+                url: "".into(),
+                html: None,
+            },
+            bot_notice: Template {
+                title: "bot_notice".into(),
+                text: "[[dummy]]".into(),
+                url: "".into(),
+                html: None,
+            },
         }
     } else if config.production {
         Templates {
@@ -132,6 +172,36 @@ pub async fn email_templates() -> Templates {
                 text: include_str!("../../templates/suspension.txt").to_owned(),
                 url: Default::default(),
             },
+            password_changed: Template {
+                title: "Your password was changed.".into(),
+                text: include_str!("../../templates/password-changed.txt").into(),
+                url: format!("{}/login/reset/", config.hosts.app),
+                html: Some(include_str!("../../templates/password-changed.html").into()),
+            },
+            email_changed: Template {
+                title: "Your email address was changed.".into(),
+                text: include_str!("../../templates/email-changed.txt").into(),
+                url: Default::default(),
+                html: Some(include_str!("../../templates/email-changed.html").into()),
+            },
+            mfa_updated: Template {
+                title: "Your two-factor authentication was updated.".into(),
+                text: include_str!("../../templates/mfa-updated.txt").into(),
+                url: Default::default(),
+                html: Some(include_str!("../../templates/mfa-updated.html").into()),
+            },
+            moderation_notice: Template {
+                title: "Notice from Stoat moderation.".into(),
+                text: include_str!("../../templates/moderation-notice.txt").into(),
+                url: Default::default(),
+                html: Some(include_str!("../../templates/moderation-notice.html").into()),
+            },
+            bot_notice: Template {
+                title: "Notice regarding your Stoat bot.".into(),
+                text: include_str!("../../templates/bot-notice.txt").into(),
+                url: Default::default(),
+                html: Some(include_str!("../../templates/bot-notice.html").into()),
+            },
         }
     } else {
         Templates {
@@ -162,6 +232,36 @@ pub async fn email_templates() -> Templates {
             suspension: Template {
                 title: "Account Suspension".to_string(),
                 text: include_str!("../../templates/suspension.whitelabel.txt").to_owned(),
+                url: Default::default(),
+                html: None,
+            },
+            password_changed: Template {
+                title: "Your password was changed.".into(),
+                text: include_str!("../../templates/password-changed.whitelabel.txt").into(),
+                url: format!("{}/login/reset/", config.hosts.app),
+                html: None,
+            },
+            email_changed: Template {
+                title: "Your email address was changed.".into(),
+                text: include_str!("../../templates/email-changed.whitelabel.txt").into(),
+                url: Default::default(),
+                html: None,
+            },
+            mfa_updated: Template {
+                title: "Your two-factor authentication was updated.".into(),
+                text: include_str!("../../templates/mfa-updated.whitelabel.txt").into(),
+                url: Default::default(),
+                html: None,
+            },
+            moderation_notice: Template {
+                title: "Notice from instance moderation.".into(),
+                text: include_str!("../../templates/moderation-notice.whitelabel.txt").into(),
+                url: Default::default(),
+                html: None,
+            },
+            bot_notice: Template {
+                title: "Notice regarding your bot.".into(),
+                text: include_str!("../../templates/bot-notice.whitelabel.txt").into(),
                 url: Default::default(),
                 html: None,
             },

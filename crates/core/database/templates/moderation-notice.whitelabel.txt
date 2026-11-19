@@ -1,0 +1,9 @@
+You have received a notice from the platform moderation team:
+
+{{{content}}}
+
+This email is intended for {{email}}
+
+This email has no association with Stoat or Revolt Platforms Ltd.
+Learn more about third party instances here:
+https://developers.stoat.chat/faq/
