@@ -19,6 +19,11 @@ auto_derived!(
         pub height: usize,
         /// Positioning and size
         pub size: ImageSize,
+        /// Whether the image is animated (GIF, APNG or animated WebP)
+        ///
+        /// `None` if this could not be determined
+        #[serde(skip_serializing_if = "Option::is_none", default)]
+        pub animated: Option<bool>,
     }
 
     /// Video

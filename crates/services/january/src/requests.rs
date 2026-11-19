@@ -10,7 +10,9 @@ use reqwest::{
     redirect,
 };
 use revolt_config::{config, report_internal_error};
-use revolt_files::{create_thumbnail, decode_image, image_size_vec, is_valid_image, video_size};
+use revolt_files::{
+    create_thumbnail, decode_image, image_size_vec, is_animated_vec, is_valid_image, video_size,
+};
 use revolt_models::v0::{Embed, Image, ImageSize, Video};
 use revolt_result::{Error, Result, ToRevoltError, create_error};
 use std::net::{IpAddr, SocketAddr};
@@ -168,7 +170,15 @@ impl Request {
                         if matches!(mime.type_(), mime::IMAGE) {
                             let reader = &mut Cursor::new(&bytes);
 
-                            if matches!(mime.subtype(), mime::GIF) {
+                            if is_animated_vec(&bytes, mime.essence_str()).unwrap_or(false) {
+                                // Animated images (GIF, APNG, animated WebP) are passed through
+                                // as-is, since thumbnailing would discard all but the first frame
+                                if is_valid_image(reader, mime.essence_str()) {
+                                    Ok((mime.essence_str().to_owned(), bytes.to_vec()))
+                                } else {
+                                    Err(create_error!(FileTypeNotAllowed))
+                                }
+                            } else if matches!(mime.subtype(), mime::GIF) {
                                 if is_valid_image(reader, "image/gif") {
                                     Ok(("image/gif".to_owned(), bytes.to_vec()))
                                 } else {
@@ -229,15 +239,16 @@ impl Request {
                 }
             };
 
-            if let Some((width, height)) = image_size_vec(
-                &report_internal_error!(request.response.bytes().await)?,
-                request.mime.as_ref(),
-            ) {
+            let bytes = report_internal_error!(request.response.bytes().await)?;
+            let mime = request.mime.essence_str();
+
+            if let Some((width, height)) = image_size_vec(&bytes, mime) {
                 Ok(Some(Image {
                     url: url.to_owned(),
                     width,
                     height,
                     size,
+                    animated: is_animated_vec(&bytes, mime),
                 }))
             } else {
                 Ok(None)

@@ -16,6 +16,26 @@ const MAX_DECODE_PIXELS: u64 = 40_000_000;
 /// Maximum memory a decoder may allocate (matches image-rs default)
 const MAX_DECODE_ALLOC: u64 = 512 * 1024 * 1024;
 
+/// Check whether the image data provided by a reader contains animation data
+fn is_animated_reader<R: BufRead + Seek>(reader: R, mime: &str) -> Option<bool> {
+    match mime {
+        // Current behaviour is to assume GIFs are animated, this checks for at least 2 frames
+        "image/gif" => {
+            let decoder = image::codecs::gif::GifDecoder::new(reader).ok()?;
+            Some(decoder.into_frames().take(2).count() > 1)
+        }
+        "image/png" | "image/apng" => {
+            let decoder = image::codecs::png::PngDecoder::new(reader).ok()?;
+            decoder.is_apng().ok()
+        }
+        "image/webp" => {
+            let decoder = image::codecs::webp::WebPDecoder::new(reader).ok()?;
+            Some(decoder.has_animation())
+        }
+        _ => Some(false),
+    }
+}
+
 fn decode_limits() -> Limits {
     let mut limits = Limits::default();
     limits.max_image_width = Some(MAX_DECODE_PIXEL_SIDE);
@@ -76,28 +96,12 @@ impl MediaRepository for MediaImpl {
     }
 
     fn is_animated(&self, f: &NamedTempFile, mime: &str) -> Option<bool> {
-        match mime {
-            // Current behaviour is to assume GIFs are animated, this checks for at least 2 frames
-            "image/gif" => {
-                let file = std::fs::File::open(f.path()).ok()?;
-                let reader = std::io::BufReader::new(file);
-                let decoder = image::codecs::gif::GifDecoder::new(reader).ok()?;
-                Some(decoder.into_frames().take(2).count() > 1)
-            }
-            "image/png" => {
-                let file = std::fs::File::open(f.path()).ok()?;
-                let reader = std::io::BufReader::new(file);
-                let decoder = image::codecs::png::PngDecoder::new(reader).ok()?;
-                decoder.is_apng().ok()
-            }
-            "image/webp" => {
-                let file = std::fs::File::open(f.path()).ok()?;
-                let reader = std::io::BufReader::new(file);
-                let decoder = image::codecs::webp::WebPDecoder::new(reader).ok()?;
-                Some(decoder.has_animation())
-            }
-            _ => Some(false),
-        }
+        let file = std::fs::File::open(f.path()).ok()?;
+        is_animated_reader(std::io::BufReader::new(file), mime)
+    }
+
+    fn is_animated_vec(&self, v: &[u8], mime: &str) -> Option<bool> {
+        is_animated_reader(std::io::Cursor::new(v), mime)
     }
 
     #[tracing::instrument(skip(self, v))]
