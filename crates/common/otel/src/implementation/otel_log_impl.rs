@@ -1,16 +1,20 @@
 use std::sync::OnceLock;
 
+#[cfg(feature = "axum")]
 use opentelemetry::{
     Key,
     logs::{AnyValue, LogRecord, Logger, Severity},
 };
 use opentelemetry_sdk::logs::SdkLogger;
+#[cfg(feature = "axum")]
 use tracing::Level;
 
+#[cfg(feature = "axum")]
 use crate::models::HttpRequestEvent;
 
 pub(crate) static WIDE_LOGGER: OnceLock<SdkLogger> = OnceLock::new();
 
+#[cfg(feature = "axum")]
 impl HttpRequestEvent {
     pub(crate) fn emit(self, attributes: Vec<(Key, AnyValue)>) {
         let level = self.level();
