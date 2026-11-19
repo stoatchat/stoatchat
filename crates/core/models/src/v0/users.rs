@@ -19,6 +19,11 @@ pub static RE_USERNAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(\p{L}|[\d_.-])
 /// Block newline and carriage return
 pub static RE_DISPLAY_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[^\u200B\n\r]+$").unwrap());
 
+/// Id of the official system account
+///
+/// Used as the author of system messages and platform DMs to users
+pub const SYSTEM_USER_ID: &str = "00000000000000000000000000";
+
 auto_derived_partial!(
     /// User
     pub struct User {
@@ -32,7 +37,7 @@ auto_derived_partial!(
         /// Display name
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
         pub display_name: Option<String>,
-         /// User's pronouns
+        /// User's pronouns
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
         pub pronouns: Option<String>,
         #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]

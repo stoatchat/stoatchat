@@ -7518,7 +7518,6 @@ dependencies = [
  "futures-lite",
  "iso8601-timestamp",
  "lapin",
- "log",
  "redis-kiss",
  "revolt-config",
  "revolt-database",
@@ -7528,7 +7527,9 @@ dependencies = [
  "revolt_optional_struct",
  "serde",
  "serde_json",
+ "stoat-otel",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -7784,8 +7785,7 @@ dependencies = [
  "isahc",
  "iso8601-timestamp",
  "lapin",
- "log",
- "pretty_env_logger",
+ "opentelemetry",
  "redis-kiss",
  "regex",
  "revolt-config",
@@ -7798,7 +7798,10 @@ dependencies = [
  "revolt_optional_struct",
  "serde",
  "serde_json",
+ "stoat-otel",
  "tokio",
+ "tracing",
+ "tracing-opentelemetry",
  "ulid",
  "web-push",
 ]
@@ -9240,6 +9243,7 @@ name = "stoat-otel"
 version = "0.16.0"
 dependencies = [
  "axum",
+ "lapin",
  "opentelemetry",
  "opentelemetry-appender-tracing",
  "opentelemetry-otlp",

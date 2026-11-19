@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::utils::Consumer;
+use crate::utils::{record_push_target, record_skip, Consumer};
+use stoat_otel::WideContextRepository;
 
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
@@ -10,6 +11,7 @@ use base64::{
 };
 use lapin::{message::Delivery, Channel as AMQPChannel, Connection};
 use revolt_database::{events::rabbit::*, util::format_display_name, Database};
+use tracing::Instrument;
 use web_push::{
     ContentEncoding, IsahcWebPushClient, SubscriptionInfo, SubscriptionKeys, Urgency,
     VapidSignatureBuilder, WebPushClient, WebPushError, WebPushMessageBuilder,
@@ -74,8 +76,9 @@ impl Consumer for VapidOutboundConsumer {
         &self.channel
     }
 
-    async fn consume(&self, delivery: Delivery) -> Result<()> {
+    async fn consume(&self, delivery: Delivery, context: &WideContextRepository) -> Result<()> {
         let payload: PayloadToService = serde_json::from_slice(&delivery.data)?;
+        record_push_target(context, "webpush", &payload);
 
         let subscription = SubscriptionInfo {
             endpoint: payload
@@ -196,19 +199,39 @@ impl Consumer for VapidOutboundConsumer {
 
         let msg = builder.build()?;
 
-        match self.client.send(msg).await {
+        let resp = self
+            .client
+            .send(msg)
+            .instrument(info_span!("webpush.send", otel.kind = "client"))
+            .await;
+
+        match resp {
             // 401 = wrong key, 404/410 = subscription's gone
             Err(
                 WebPushError::Unauthorized
                 | WebPushError::EndpointNotFound
                 | WebPushError::EndpointNotValid,
             ) => {
+                context.add("push.dropped", "invalid_token");
+                info!(
+                    reason = "invalid_token",
+                    provider = "webpush",
+                    user_id = %payload.user_id,
+                    session_id = %payload.session_id,
+                    "push notification dropped, removing subscription"
+                );
+                record_skip(&payload.user_id, Some(&payload.session_id), "invalid_token");
+
                 if let Err(err) = self
                     .db
                     .remove_push_subscription_by_session_id(&payload.session_id)
                     .await
                 {
-                    revolt_config::capture_error(&err);
+                    error!(
+                        error = ?err,
+                        session_id = %payload.session_id,
+                        "Failed to remove push subscription"
+                    );
                 }
             }
             res => {

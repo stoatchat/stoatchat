@@ -19,6 +19,9 @@ pub trait PermissionQuery {
     /// Whether the currently selected user is a bot
     async fn user_is_bot(&mut self) -> bool;
 
+    /// Whether the currently selected user is the official system account
+    async fn user_is_system(&mut self) -> bool;
+
     /// Do we have a mutual connection with the currently selected user?
     async fn have_mutual_connection(&mut self) -> bool;
 

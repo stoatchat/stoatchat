@@ -1,14 +1,14 @@
 use revolt_database::{
+    AMQP, AuditLogEntryAction, Channel, Database, PartialChannel, User,
     util::{permissions::DatabasePermissionQuery, reference::Reference},
     voice::{
-        delete_voice_channel, is_in_voice_channel, remove_user_from_voice_channel,
-        UserVoiceChannel, VoiceClient,
+        UserVoiceChannel, VoiceClient, delete_voice_channel, is_in_voice_channel,
+        remove_user_from_voice_channel,
     },
-    AuditLogEntryAction, Channel, Database, PartialChannel, User, AMQP,
 };
 use revolt_models::v0;
-use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
-use revolt_result::{create_error, Result};
+use revolt_permissions::{ChannelPermission, calculate_channel_permissions};
+use revolt_result::{Result, create_error};
 use rocket::State;
 use rocket_empty::EmptyResponse;
 
@@ -37,7 +37,11 @@ pub async fn delete(
     #[allow(deprecated)]
     match &channel {
         Channel::SavedMessages { .. } => Err(create_error!(NoEffect))?,
-        Channel::DirectMessage { .. } => {
+        Channel::DirectMessage { recipients, .. } => {
+            if recipients.iter().any(|id| id == v0::SYSTEM_USER_ID) {
+                return Err(create_error!(InvalidOperation));
+            }
+
             channel
                 .update(
                     db,
@@ -86,11 +90,12 @@ pub async fn delete(
 
 #[cfg(test)]
 mod test {
-    use crate::{rocket, util::test::TestHarness};
-    use revolt_database::{events::client::EventV1, Channel};
-    use revolt_models::v0::DataCreateGroup;
-    use rocket::http::{Header, Status};
     use crate::util::test::PubSubTestHelper;
+    use crate::{rocket, util::test::TestHarness};
+    use revolt_database::{Channel, events::client::EventV1};
+    use revolt_models::v0::{DataCreateGroup, SYSTEM_USER_ID};
+    use rocket::http::{ContentType, Header, Status};
+    use serde_json::json;
 
     #[rocket::async_test]
     async fn success_delete_group() {
@@ -120,11 +125,108 @@ mod test {
         drop(response);
 
         pubsub
-            .wait_for_event( |event| match event {
+            .wait_for_event(|event| match event {
                 EventV1::ChannelDelete { id, .. } => id == group.id(),
                 _ => false,
             })
             .await;
+    }
+
+    #[rocket::async_test]
+    async fn fail_interact_with_system_dm() {
+        let harness = TestHarness::new().await;
+        let (_, session, user) = harness.new_user().await;
+
+        let message = user
+            .send_system_dm(&harness.db, &harness.amqp, "Account notice".to_string())
+            .await
+            .expect("`Message`");
+
+        let token = || Header::new("x-session-token", session.token.to_string());
+
+        // Can read the channel
+        let response = harness
+            .client
+            .get(format!("/channels/{}/messages", message.channel))
+            .header(token())
+            .dispatch()
+            .await;
+        assert_eq!(response.status(), Status::Ok);
+        drop(response);
+
+        // Cannot send, react, pin or close
+        let response = harness
+            .client
+            .post(format!("/channels/{}/messages", message.channel))
+            .header(ContentType::JSON)
+            .header(token())
+            .body(json!({ "content": "hi" }).to_string())
+            .dispatch()
+            .await;
+        assert_eq!(response.status(), Status::Forbidden);
+        drop(response);
+
+        let response = harness
+            .client
+            .put(format!(
+                "/channels/{}/messages/{}/reactions/%F0%9F%91%8D",
+                message.channel, message.id
+            ))
+            .header(token())
+            .dispatch()
+            .await;
+        assert_eq!(response.status(), Status::Forbidden);
+        drop(response);
+
+        let response = harness
+            .client
+            .post(format!(
+                "/channels/{}/messages/{}/pin",
+                message.channel, message.id
+            ))
+            .header(token())
+            .dispatch()
+            .await;
+        assert_eq!(response.status(), Status::Forbidden);
+        drop(response);
+
+        let response = harness
+            .client
+            .delete(format!("/channels/{}", message.channel))
+            .header(token())
+            .dispatch()
+            .await;
+        assert_ne!(response.status(), Status::NoContent);
+        drop(response);
+
+        // Cannot block or friend the system user
+        let response = harness
+            .client
+            .put(format!("/users/{SYSTEM_USER_ID}/block"))
+            .header(token())
+            .dispatch()
+            .await;
+        assert_ne!(response.status(), Status::Ok);
+        drop(response);
+
+        let response = harness
+            .client
+            .put(format!("/users/{SYSTEM_USER_ID}/friend"))
+            .header(token())
+            .dispatch()
+            .await;
+        assert_ne!(response.status(), Status::Ok);
+        drop(response);
+
+        let channel = harness
+            .db
+            .fetch_channel(&message.channel)
+            .await
+            .expect("`Channel`");
+        assert!(matches!(
+            channel,
+            Channel::DirectMessage { active: true, .. }
+        ));
     }
 
     // TEST: member leaves group (no delete)

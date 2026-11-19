@@ -4,6 +4,7 @@ use revolt_permissions::{
     calculate_user_permissions, ChannelType, Override, PermissionQuery, PermissionValue,
     RelationshipStatus, DEFAULT_PERMISSION_DIRECT_MESSAGE, calculate_channel_permissions, ChannelPermission
 };
+use revolt_models::v0::SYSTEM_USER_ID;
 use revolt_result::{create_error, Result};
 use crate::{Channel, Database, Member, Server, User};
 
@@ -90,6 +91,13 @@ impl PermissionQuery for DatabasePermissionQuery<'_> {
         } else {
             false
         }
+    }
+
+    /// Whether the currently selected user is the official system account
+    async fn user_is_system(&mut self) -> bool {
+        self.user
+            .as_ref()
+            .is_some_and(|user| user.id == SYSTEM_USER_ID)
     }
 
     /// Do we have a mutual connection with the currently selected user?
