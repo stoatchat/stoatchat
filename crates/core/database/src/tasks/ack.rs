@@ -1,5 +1,5 @@
 // Queue Type: Debounced
-use crate::{Database, Message, AMQP};
+use crate::{AMQP, Database, Message};
 
 use deadqueue::limited::Queue;
 use once_cell::sync::Lazy;
@@ -165,10 +165,7 @@ pub async fn handle_ack_event(
             let mut mass_mentions = vec![];
 
             for (push, message, recipients, silenced) in messages {
-                if *silenced
-                    || push.is_none()
-                    || (recipients.is_empty() && !message.contains_mass_push_mention())
-                {
+                if *silenced || push.is_none() || (recipients.is_empty()) {
                     debug!(
                         "Rejecting push: silenced: {}, recipient count: {}, push exists: {:?}",
                         *silenced,

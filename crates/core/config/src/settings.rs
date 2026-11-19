@@ -363,6 +363,8 @@ pub struct GlobalLimits {
     pub restrict_server_creation: Vec<String>,
 
     pub max_invite_duration_days: usize,
+
+    pub all_messages_notifications_max_server_size: usize,
 }
 
 #[derive(Deserialize, Debug, Clone)]
