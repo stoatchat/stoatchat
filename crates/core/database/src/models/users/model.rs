@@ -2,7 +2,7 @@ use std::{collections::HashSet, str::FromStr, time::Duration};
 
 use crate::{
     AMQP, Channel, Database, File, MFAMethod, Message, RatelimitEvent,
-    events::client::EventV1,
+    events::{client::EventV1, rabbit::SystemNoticeMessage},
     util::email::{Template, Templates, email_templates, send_email},
 };
 
@@ -188,7 +188,10 @@ static USERNAME_CODEPOINT_REGEX: Lazy<Regex> = Lazy::new(|| {
 });
 
 /// Notices which can be sent to a user from the official system account
-#[derive(Debug, Clone)]
+///
+/// Sent as-is in push notifications so clients can localize them
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(tag = "type")]
 pub enum SystemNotice {
     /// Users password was changed
     PasswordChanged,
@@ -223,6 +226,35 @@ impl SystemNotice {
             SystemNotice::ModerationNotice { content } | SystemNotice::BotNotice { content } => {
                 content.clone()
             }
+        }
+    }
+
+    /// Shorten free-form content to its first line, as push payloads are size limited
+    pub fn for_push(&self) -> SystemNotice {
+        let shorten = |content: &str| match content.split_once('\n') {
+            Some((first, _)) => format!("{}...", first.trim_end()),
+            None => content.to_string(),
+        };
+
+        match self {
+            SystemNotice::ModerationNotice { content } => SystemNotice::ModerationNotice {
+                content: shorten(content),
+            },
+            SystemNotice::BotNotice { content } => SystemNotice::BotNotice {
+                content: shorten(content),
+            },
+            notice => notice.clone(),
+        }
+    }
+
+    /// Localization key clients use to render this notice in a push notification
+    pub fn localization_key(&self) -> &'static str {
+        match self {
+            SystemNotice::PasswordChanged => "push.system.password_changed",
+            SystemNotice::EmailChanged { .. } => "push.system.email_changed",
+            SystemNotice::MfaUpdated { .. } => "push.system.mfa_updated",
+            SystemNotice::ModerationNotice { .. } => "push.system.moderation_notice",
+            SystemNotice::BotNotice { .. } => "push.system.bot_notice",
         }
     }
 
@@ -367,14 +399,13 @@ impl User {
     pub async fn send_system_dm(
         &self,
         db: &Database,
-        amqp: &AMQP,
         content: String,
+        send_notification: bool,
     ) -> Result<Message> {
         let system = User::fetch_or_create_system(db).await?;
         let channel = Channel::create_dm(db, &system, self).await?;
 
         let author: v0::User = system.clone().into(db, Some(&system)).await;
-        let model_user = system.clone().into_known_static(false).await;
 
         let mut message = Message {
             id: Ulid::new().to_string(),
@@ -384,17 +415,25 @@ impl User {
             ..Default::default()
         };
 
-        message
-            .send(
-                db,
-                Some(amqp),
-                v0::MessageAuthor::User(&author),
-                Some(model_user),
-                None,
-                &channel,
-                false,
-            )
-            .await?;
+        if send_notification {
+            let model_user = system.clone().into_known_static(false).await;
+
+            message
+                .send(
+                    db,
+                    None,
+                    v0::MessageAuthor::User(&author),
+                    Some(model_user),
+                    None,
+                    &channel,
+                    true,
+                )
+                .await?;
+        } else {
+            message
+                .send_without_notifications(db, Some(author), None, true, true, !send_notification)
+                .await?;
+        }
 
         Ok(message)
     }
@@ -406,11 +445,22 @@ impl User {
         amqp: &AMQP,
         notice: SystemNotice,
     ) -> Result<()> {
-        // Attempt every channel even if an earlier one fails
-        let dm = self
-            .send_system_dm(db, amqp, notice.content())
-            .await
-            .map(|_| ());
+        let dm = self.send_system_dm(db, notice.content(), false).await;
+
+        // Link the push to the system DM so clients can navigate to it
+        let message = match &dm {
+            Ok(message) => Some(SystemNoticeMessage {
+                channel_id: message.channel.clone(),
+                message_id: message.id.clone(),
+                url: format!(
+                    "{}/channel/{}/{}",
+                    config().await.hosts.app,
+                    message.channel,
+                    message.id
+                ),
+            }),
+            Err(_) => None,
+        };
 
         let email = async {
             let config = config().await;
@@ -431,9 +481,12 @@ impl User {
         }
         .await;
 
-        // TODO: send push notifications
+        let push = amqp
+            .system_notice(&self.id, notice.for_push(), message)
+            .await
+            .map_err(|_| create_error!(InternalError));
 
-        dm.and(email)
+        dm.map(|_| ()).and(email).and(push)
     }
 
     /// Get limits for this user
@@ -1106,7 +1159,53 @@ impl User {
 
 #[cfg(test)]
 mod tests {
-    use crate::User;
+    use crate::{MFAMethod, SystemNotice, User};
+
+    #[test]
+    fn system_notice_for_push() {
+        let notice = SystemNotice::ModerationNotice {
+            content: "First line  \nSecond line\nThird".to_string(),
+        };
+        assert_eq!(
+            notice.for_push(),
+            SystemNotice::ModerationNotice {
+                content: "First line...".to_string()
+            }
+        );
+
+        let notice = SystemNotice::BotNotice {
+            content: "Only line".to_string(),
+        };
+        assert_eq!(notice.for_push(), notice);
+
+        assert_eq!(
+            SystemNotice::PasswordChanged.for_push(),
+            SystemNotice::PasswordChanged
+        );
+    }
+
+    #[test]
+    fn system_notice_serialization() {
+        let notice = SystemNotice::MfaUpdated {
+            add: Some(vec![MFAMethod::Totp]),
+            remove: None,
+        };
+
+        let value = serde_json::to_value(&notice).unwrap();
+        assert_eq!(
+            value,
+            serde_json::json!({ "type": "MfaUpdated", "add": ["Totp"], "remove": null })
+        );
+        assert_eq!(
+            serde_json::from_value::<SystemNotice>(value).unwrap(),
+            notice
+        );
+
+        assert_eq!(
+            serde_json::to_value(SystemNotice::PasswordChanged).unwrap(),
+            serde_json::json!({ "type": "PasswordChanged" })
+        );
+    }
 
     #[test]
     fn username_validation_blocked_names() {

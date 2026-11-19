@@ -138,6 +138,7 @@ pub fn notification_kind(notification: &PayloadKind) -> &'static str {
         PayloadKind::BadgeUpdate(_) => "badge_update",
         PayloadKind::Generic(_) => "generic",
         PayloadKind::DmCallStartEnd(_) => "dm_call",
+        PayloadKind::SystemNotice(_) => "system_notice",
     }
 }
 

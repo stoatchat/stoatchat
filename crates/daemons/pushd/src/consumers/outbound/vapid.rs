@@ -1,16 +1,16 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::utils::{record_push_target, record_skip, Consumer};
+use crate::utils::{Consumer, record_push_target, record_skip};
 use stoat_otel::WideContextRepository;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use async_trait::async_trait;
 use base64::{
-    engine::{self},
     Engine as _,
+    engine::{self},
 };
-use lapin::{message::Delivery, Channel as AMQPChannel, Connection};
-use revolt_database::{events::rabbit::*, util::format_display_name, Database};
+use lapin::{Channel as AMQPChannel, Connection, message::Delivery};
+use revolt_database::{Database, events::rabbit::*, util::format_display_name};
 use tracing::Instrument;
 use web_push::{
     ContentEncoding, IsahcWebPushClient, SubscriptionInfo, SubscriptionKeys, Urgency,
@@ -46,11 +46,7 @@ pub struct VapidOutboundConsumer {
 
 #[async_trait]
 impl Consumer for VapidOutboundConsumer {
-    async fn create(
-        db: Database,
-        connection: Arc<Connection>,
-        channel: Arc<AMQPChannel>,
-    ) -> Self {
+    async fn create(db: Database, connection: Arc<Connection>, channel: Arc<AMQPChannel>) -> Self {
         let config = revolt_config::config().await;
 
         if config.pushd.vapid.private_key.is_empty() || config.pushd.vapid.public_key.is_empty() {
@@ -180,6 +176,14 @@ impl Consumer for VapidOutboundConsumer {
 
                 serde_json::to_string(&body)?
             }
+            PayloadKind::SystemNotice(alert) => serde_json::to_string(&serde_json::json!({
+                "type": "push.system",
+                "loc_key": alert.notice.localization_key(),
+                "notice": alert.notice,
+                "body": alert.notice.content(),
+                "url": alert.message.as_ref().map(|message| &message.url),
+                "message": alert.message,
+            }))?,
             PayloadKind::BadgeUpdate(_) => {
                 bail!("Vapid cannot handle badge updates and they should not be sent here.");
             }

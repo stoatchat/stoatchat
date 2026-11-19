@@ -414,6 +414,47 @@ impl Consumer for ApnsOutboundConsumer {
                 self.send(apn_payload).await
             }
 
+            PayloadKind::SystemNotice(alert) => {
+                let notice = alert.notice;
+
+                let mut data = BTreeMap::new();
+                data.insert("notice", serde_json::to_value(&notice)?);
+
+                if let Some(message) = alert.message {
+                    data.insert("url", serde_json::Value::String(message.url.clone()));
+                    data.insert("message", serde_json::to_value(&message)?);
+                }
+
+                let apn_payload = Payload {
+                    aps: APS {
+                        alert: Some(APSAlert::Default(DefaultAlert {
+                            title: None,
+                            subtitle: None,
+                            body: None,
+                            title_loc_key: None,
+                            title_loc_args: None,
+                            action_loc_key: None,
+                            loc_key: Some(notice.localization_key()),
+                            loc_args: None,
+                            launch_image: None,
+                        })),
+                        badge: self.get_badge_count(&payload.user_id).await,
+                        sound: Some(APSSound::Sound("default")),
+                        thread_id: None,
+                        content_available: None,
+                        category: None,
+                        mutable_content: Some(1),
+                        url_args: None,
+                    },
+                    device_token: &payload.token,
+                    options: payload_options.clone(),
+                    data,
+                };
+
+                debug!("Sending system notice");
+                self.send(apn_payload).await
+            }
+
             PayloadKind::BadgeUpdate(badge) => {
                 let apn_payload = Payload {
                     aps: APS {

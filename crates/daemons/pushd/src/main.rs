@@ -19,6 +19,7 @@ use consumers::{
         ack::AckConsumer, dm_call::DmCallConsumer, fr_accepted::FRAcceptedConsumer,
         fr_received::FRReceivedConsumer, generic::GenericConsumer,
         mass_mention::MassMessageConsumer, message::MessageConsumer,
+        system_notice::SystemNoticeConsumer,
     },
     outbound::{apn::ApnsOutboundConsumer, fcm::FcmOutboundConsumer, vapid::VapidOutboundConsumer},
 };
@@ -134,6 +135,18 @@ async fn main() {
             &config,
             &config.pushd.dm_call_queue,
             &config.pushd.get_dm_call_routing_key(),
+            None,
+        )
+        .await,
+    );
+
+    channels.push(
+        make_queue_and_consume::<SystemNoticeConsumer>(
+            &db,
+            &connection,
+            &config,
+            &config.pushd.system_notice_queue,
+            &config.pushd.get_system_notice_routing_key(),
             None,
         )
         .await,

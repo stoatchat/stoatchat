@@ -5,3 +5,4 @@ pub mod fr_received;
 pub mod generic;
 pub mod mass_mention;
 pub mod message;
+pub mod system_notice;

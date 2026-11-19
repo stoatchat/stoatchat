@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use crate::User;
+use crate::{SystemNotice, User};
 use crate::events::{client::EventV1, rabbit::*};
 use lapin::{
     BasicProperties, Channel, Connection, ConnectionProperties, Error as AMQPError,
@@ -48,6 +48,7 @@ pub struct AMQP {
     mass_mention_message_sent: Arc<Channel>,
     ack_notification_message: Arc<Channel>,
     dm_call_updated: Arc<Channel>,
+    system_notice: Arc<Channel>,
     process_ack: Arc<Channel>,
     publish_event: Arc<Channel>,
     #[allow(unused)]
@@ -64,6 +65,7 @@ impl AMQP {
             mass_mention_message_sent: Self::create_channel(&connection).await,
             ack_notification_message: Self::create_channel(&connection).await,
             dm_call_updated: Self::create_channel(&connection).await,
+            system_notice: Self::create_channel(&connection).await,
             process_ack: Self::create_channel(&connection).await,
             publish_event: Self::create_channel(&connection).await,
             connection,
@@ -371,6 +373,44 @@ impl AMQP {
             .basic_publish(
                 config.pushd.exchange.clone().into(),
                 config.pushd.get_dm_call_routing_key().into(),
+                BasicPublishOptions::default(),
+                payload.as_bytes(),
+                AMQPProperties::default()
+                    .with_content_type("application/json".into())
+                    .with_delivery_mode(2),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    /// # System Notice
+    /// Used to send a push notification for a notice from the system account
+    pub async fn system_notice(
+        &self,
+        user_id: &str,
+        notice: SystemNotice,
+        message: Option<SystemNoticeMessage>,
+    ) -> Result<(), AMQPError> {
+        let config = revolt_config::config().await;
+
+        let payload = SystemNoticePayload {
+            notice,
+            message,
+            user: user_id.to_string(),
+        };
+        let payload = to_string(&payload).unwrap();
+
+        debug!(
+            "Sending system notice payload on channel {}: {}",
+            config.pushd.get_system_notice_routing_key(),
+            payload
+        );
+
+        self.system_notice
+            .basic_publish(
+                config.pushd.exchange.clone().into(),
+                config.pushd.get_system_notice_routing_key().into(),
                 BasicPublishOptions::default(),
                 payload.as_bytes(),
                 AMQPProperties::default()

@@ -138,7 +138,7 @@ mod test {
         let (_, session, user) = harness.new_user().await;
 
         let message = user
-            .send_system_dm(&harness.db, &harness.amqp, "Account notice".to_string())
+            .send_system_dm(&harness.db, "Account notice".to_string(), false)
             .await
             .expect("`Message`");
 

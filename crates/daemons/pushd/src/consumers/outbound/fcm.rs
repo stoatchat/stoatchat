@@ -11,7 +11,7 @@ use fcm_v1::{
 };
 use lapin::{message::Delivery, Channel as AMQPChannel, Connection};
 use revolt_config::config;
-use revolt_database::{events::rabbit::*, Database};
+use revolt_database::{events::rabbit::*, Database, SystemNotice};
 use serde_json::Value;
 use tracing::Instrument;
 
@@ -46,6 +46,10 @@ pub enum NotificationData {
         ended: bool,
         duration: usize,
     },
+    SystemNotice {
+        notice: SystemNotice,
+        message: Option<SystemNoticeMessage>,
+    },
 }
 
 impl NotificationData {
@@ -56,6 +60,7 @@ impl NotificationData {
             NotificationData::Generic { .. } => "push.generic",
             NotificationData::Message { .. } => "push.message",
             NotificationData::DmCallStartEnd { .. } => "push.dm.call",
+            NotificationData::SystemNotice { .. } => "push.system",
         }
     }
 
@@ -110,6 +115,25 @@ impl NotificationData {
                 data.insert("started_at".to_string(), Value::String(started_at));
                 data.insert("ended".to_string(), Value::Bool(ended));
                 data.insert("duration".to_string(), Value::Number(duration.into()));
+            }
+            NotificationData::SystemNotice { notice, message } => {
+                data.insert(
+                    "loc_key".to_string(),
+                    Value::String(notice.localization_key().to_string()),
+                );
+                // FCM data values must be strings, so objects are sent as encoded JSON
+                data.insert(
+                    "notice".to_string(),
+                    Value::String(serde_json::to_string(&notice).unwrap_or_default()),
+                );
+
+                if let Some(message) = message {
+                    data.insert("url".to_string(), Value::String(message.url.clone()));
+                    data.insert(
+                        "message".to_string(),
+                        Value::String(serde_json::to_string(&message).unwrap_or_default()),
+                    );
+                }
             }
         }
 
@@ -267,6 +291,21 @@ impl Consumer for FcmOutboundConsumer {
                     started_at: alert.started_at.unwrap_or_else(|| "".to_string()),
                     ended: alert.ended,
                     duration: config().await.api.livekit.call_ring_duration,
+                };
+
+                let msg = Message {
+                    token: Some(payload.token),
+                    data: Some(data.into_payload()),
+                    ..Default::default()
+                };
+
+                resp = self.send(&msg).await;
+            }
+
+            PayloadKind::SystemNotice(alert) => {
+                let data = NotificationData::SystemNotice {
+                    notice: alert.notice,
+                    message: alert.message,
                 };
 
                 let msg = Message {
