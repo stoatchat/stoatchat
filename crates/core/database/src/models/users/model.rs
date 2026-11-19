@@ -1,7 +1,7 @@
 use std::{collections::HashSet, str::FromStr, time::Duration};
 
 use crate::{
-    AMQP, Channel, Database, File, Message, RatelimitEvent,
+    AMQP, Channel, Database, File, MFAMethod, Message, RatelimitEvent,
     events::client::EventV1,
     util::email::{email_templates, send_email},
 };
@@ -187,6 +187,70 @@ static USERNAME_CODEPOINT_REGEX: Lazy<Regex> = Lazy::new(|| {
         .unwrap()
 });
 
+/// Notices which can be sent to a user from the official system account
+#[derive(Debug, Clone)]
+pub enum SystemNotice {
+    /// Users password was changed
+    PasswordChanged,
+    /// Users email was changed
+    EmailChanged { from: String, to: String },
+    /// MFA methods were updated
+    MfaUpdated {
+        add: Option<Vec<MFAMethod>>,
+        remove: Option<Vec<MFAMethod>>,
+    },
+    /// Notice from platform moderation
+    ModerationNotice { content: String },
+    /// Notice regarding a bot owned by the user
+    BotNotice { content: String },
+}
+
+impl SystemNotice {
+    /// Render this notice as message content
+    pub fn content(&self) -> String {
+        match self {
+            SystemNotice::PasswordChanged => {
+                "Your password was changed. If this wasn't you, reset your password immediately."
+                    .to_string()
+            }
+            SystemNotice::EmailChanged { from, to } => format!(
+                "Your account email was changed from `{from}` to `{to}`. If this wasn't you, contact support immediately."
+            ),
+            SystemNotice::MfaUpdated { add, remove } => {
+                let describe = |factors: &Option<Vec<MFAMethod>>| {
+                    factors
+                        .iter()
+                        .flatten()
+                        .map(|factor| match factor {
+                            MFAMethod::Password => "password",
+                            MFAMethod::Recovery => "recovery codes",
+                            MFAMethod::Totp => "authenticator app",
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                };
+
+                let added = describe(add);
+                let removed = describe(remove);
+
+                let changes = match (added.is_empty(), removed.is_empty()) {
+                    (false, false) => format!("added: {added}; removed: {removed}"),
+                    (false, true) => format!("added: {added}"),
+                    (true, false) => format!("removed: {removed}"),
+                    (true, true) => unreachable!("At least one change must be provided"),
+                };
+
+                format!(
+                    "Your two-factor authentication settings were updated ({changes}). If this wasn't you, contact support immediately."
+                )
+            }
+            SystemNotice::ModerationNotice { content } | SystemNotice::BotNotice { content } => {
+                content.clone()
+            }
+        }
+    }
+}
+
 #[allow(clippy::derivable_impls)]
 impl Default for User {
     fn default() -> Self {
@@ -298,6 +362,20 @@ impl User {
             .await?;
 
         Ok(message)
+    }
+
+    /// Notify this user through every available channel: push notification, system DM and email
+    pub async fn send_system_notice(
+        &self,
+        db: &Database,
+        amqp: &AMQP,
+        notice: SystemNotice,
+    ) -> Result<()> {
+        self.send_system_dm(db, amqp, notice.content()).await?;
+
+        // TODO: send email notification & push notifications
+
+        Ok(())
     }
 
     /// Get limits for this user

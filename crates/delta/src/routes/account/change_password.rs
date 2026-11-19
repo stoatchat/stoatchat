@@ -1,13 +1,13 @@
 //! Change account password.
 //! PATCH /account/change/password
 use revolt_database::{
+    AMQP, Account, Database, User, ValidatedTicket,
     util::password::{assert_safe, hash_password},
-    Account, Database, ValidatedTicket,
 };
 use revolt_models::v0;
-use revolt_result::{create_error, Result};
-use rocket::serde::json::Json;
+use revolt_result::{Result, create_error};
 use rocket::State;
+use rocket::serde::json::Json;
 use rocket_empty::EmptyResponse;
 
 /// # Change Password
@@ -17,8 +17,10 @@ use rocket_empty::EmptyResponse;
 #[patch("/change/password", data = "<data>")]
 pub async fn change_password(
     db: &State<Database>,
+    amqp: &State<AMQP>,
     validated_ticket: Option<ValidatedTicket>,
     mut account: Account,
+    user: User,
     data: Json<v0::DataChangePassword>,
 ) -> Result<EmptyResponse> {
     let data = data.into_inner();
@@ -37,7 +39,13 @@ pub async fn change_password(
     account.password = hash_password(data.password)?;
 
     // Commit to database
-    account.save(db).await.map(|_| EmptyResponse)
+    account.save(db).await?;
+
+    _ = user
+        .send_system_notice(db, amqp, revolt_database::SystemNotice::PasswordChanged)
+        .await;
+
+    Ok(EmptyResponse)
 }
 
 #[cfg(test)]

@@ -1,10 +1,10 @@
 //! Generate a new secret for TOTP.
 //! POST /mfa/totp
-use revolt_database::{Database, Account};
+use revolt_database::{AMQP, Account, Database, MFAMethod, User};
 use revolt_models::v0;
 use revolt_result::Result;
-use rocket::serde::json::Json;
 use rocket::State;
+use rocket::serde::json::Json;
 use rocket_empty::EmptyResponse;
 
 /// # Enable TOTP 2FA
@@ -14,22 +14,37 @@ use rocket_empty::EmptyResponse;
 #[put("/totp", data = "<data>")]
 pub async fn totp_enable(
     db: &State<Database>,
+    amqp: &State<AMQP>,
     mut account: Account,
+    user: User,
     data: Json<v0::MFAResponse>,
 ) -> Result<EmptyResponse> {
     // Enable TOTP 2FA
     account.mfa.enable_totp(data.into_inner())?;
 
     // Save model to database
-    account.save(db).await.map(|_| EmptyResponse)
+    account.save(db).await?;
+
+    _ = user
+        .send_system_notice(
+            db,
+            amqp,
+            revolt_database::SystemNotice::MfaUpdated {
+                add: Some(vec![MFAMethod::Totp]),
+                remove: None,
+            },
+        )
+        .await;
+
+    Ok(EmptyResponse)
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{rocket, util::test::TestHarness};
     use revolt_database::{MFATicket, Totp};
-    use rocket::http::{ContentType, Header, Status};
     use revolt_models::v0;
+    use rocket::http::{ContentType, Header, Status};
 
     #[rocket::async_test]
     async fn success() {
@@ -39,7 +54,8 @@ mod tests {
         let ticket = MFATicket::new(account.id.to_string(), true);
         ticket.save(&harness.db).await.unwrap();
 
-        let res = harness.client
+        let res = harness
+            .client
             .post("/auth/mfa/totp")
             .header(Header::new("X-Session-Token", session.token.clone()))
             .header(Header::new("X-MFA-Ticket", ticket.token))
@@ -48,11 +64,16 @@ mod tests {
 
         assert_eq!(res.status(), Status::Ok);
 
-        let secret = res.into_json::<v0::ResponseTotpSecret>().await.unwrap().secret;
+        let secret = res
+            .into_json::<v0::ResponseTotpSecret>()
+            .await
+            .unwrap()
+            .secret;
 
         let code = Totp::Enabled { secret }.generate_code().unwrap();
 
-        let res = harness.client
+        let res = harness
+            .client
             .put("/auth/mfa/totp")
             .header(Header::new("X-Session-Token", session.token))
             .header(ContentType::JSON)
@@ -62,7 +83,8 @@ mod tests {
 
         assert_eq!(res.status(), Status::NoContent);
 
-        let res = harness.client
+        let res = harness
+            .client
             .post("/auth/session/login")
             .header(ContentType::JSON)
             .body(
@@ -79,7 +101,8 @@ mod tests {
         let response = res.into_json::<v0::ResponseLogin>().await.unwrap();
 
         if let v0::ResponseLogin::MFA { ticket, .. } = response {
-            let res = harness.client
+            let res = harness
+                .client
                 .post("/auth/session/login")
                 .header(ContentType::JSON)
                 .body(
