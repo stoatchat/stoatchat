@@ -1,7 +1,7 @@
 use std::{collections::HashSet, str::FromStr, time::Duration};
 
 use crate::{
-    AMQP, Database, File, RatelimitEvent,
+    AMQP, Channel, Database, File, Message, RatelimitEvent,
     events::client::EventV1,
     util::email::{email_templates, send_email},
 };
@@ -12,7 +12,7 @@ use once_cell::sync::Lazy;
 use rand::seq::SliceRandom;
 use regex::{Regex, RegexBuilder};
 use revolt_config::{FeaturesLimits, config};
-use revolt_models::v0::{self, UserBadges, UserFlags};
+use revolt_models::v0::{self, SYSTEM_USER_ID, UserBadges, UserFlags};
 use revolt_presence::filter_online;
 use revolt_result::{Result, create_error};
 use serde_json::json;
@@ -241,6 +241,63 @@ impl User {
 
         db.insert_user(&user).await?;
         Ok(user)
+    }
+
+    /// Fetch the official system account, creating it if it doesn't exist yet
+    pub async fn fetch_or_create_system(db: &Database) -> Result<User> {
+        if let Ok(user) = db.fetch_user(SYSTEM_USER_ID).await {
+            return Ok(user);
+        }
+
+        let user = User {
+            id: SYSTEM_USER_ID.to_string(),
+            username: "Stoat".to_string(),
+            discriminator: "0000".to_string(),
+            last_acknowledged_policy_change: Timestamp::now_utc(),
+            ..Default::default()
+        };
+
+        match db.insert_user(&user).await {
+            Ok(()) => Ok(user),
+            // Another node may have created it concurrently
+            Err(_) => db.fetch_user(SYSTEM_USER_ID).await,
+        }
+    }
+
+    /// Send a direct message to this user from the official system account
+    pub async fn send_system_dm(
+        &self,
+        db: &Database,
+        amqp: &AMQP,
+        content: String,
+    ) -> Result<Message> {
+        let system = User::fetch_or_create_system(db).await?;
+        let channel = Channel::create_dm(db, &system, self).await?;
+
+        let author: v0::User = system.clone().into(db, Some(&system)).await;
+        let model_user = system.clone().into_known_static(false).await;
+
+        let mut message = Message {
+            id: Ulid::new().to_string(),
+            channel: channel.id().to_string(),
+            author: system.id.clone(),
+            content: Some(content),
+            ..Default::default()
+        };
+
+        message
+            .send(
+                db,
+                Some(amqp),
+                v0::MessageAuthor::User(&author),
+                Some(model_user),
+                None,
+                &channel,
+                false,
+            )
+            .await?;
+
+        Ok(message)
     }
 
     /// Get limits for this user
@@ -550,6 +607,10 @@ impl User {
         amqp: &AMQP,
         target: &mut User,
     ) -> Result<()> {
+        if target.id == SYSTEM_USER_ID {
+            return Err(create_error!(InvalidOperation));
+        }
+
         match self.relationship_with(&target.id) {
             RelationshipStatus::User => Err(create_error!(NoEffect)),
             RelationshipStatus::Friend => Err(create_error!(AlreadyFriends)),
@@ -622,6 +683,10 @@ impl User {
 
     /// Block another user
     pub async fn block_user(&mut self, db: &Database, target: &mut User) -> Result<()> {
+        if target.id == SYSTEM_USER_ID {
+            return Err(create_error!(InvalidOperation));
+        }
+
         match self.relationship_with(&target.id) {
             RelationshipStatus::User | RelationshipStatus::Blocked => Err(create_error!(NoEffect)),
             RelationshipStatus::BlockedOther => {
@@ -842,10 +907,11 @@ impl User {
         let config = config().await;
         let badges = self.badges.unwrap_or_default() as u32;
 
-        if let Some(cutoff) = config.api.users.early_adopter_cutoff {
-            if Ulid::from_string(&self.id).unwrap().timestamp_ms() < cutoff {
-                return badges + UserBadges::EarlyAdopter as u32;
-            };
+        if let Some(cutoff) = config.api.users.early_adopter_cutoff
+            && self.id != SYSTEM_USER_ID
+            && Ulid::from_string(&self.id).unwrap().timestamp_ms() < cutoff
+        {
+            return badges + UserBadges::EarlyAdopter as u32;
         };
 
         badges

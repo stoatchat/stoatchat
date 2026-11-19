@@ -40,6 +40,10 @@ async fn validate_user_permissions() {
             false
         }
 
+        async fn user_is_system(&mut self) -> bool {
+            false
+        }
+
         async fn have_mutual_connection(&mut self) -> bool {
             false
         }
@@ -134,6 +138,10 @@ async fn validate_group_permissions() {
         }
 
         async fn user_is_bot(&mut self) -> bool {
+            unreachable!()
+        }
+
+        async fn user_is_system(&mut self) -> bool {
             unreachable!()
         }
 
@@ -238,6 +246,10 @@ async fn validate_server_permissions() {
         }
 
         async fn user_is_bot(&mut self) -> bool {
+            unreachable!()
+        }
+
+        async fn user_is_system(&mut self) -> bool {
             unreachable!()
         }
 
@@ -346,6 +358,10 @@ async fn validate_timed_out_member() {
             unreachable!()
         }
 
+        async fn user_is_system(&mut self) -> bool {
+            unreachable!()
+        }
+
         async fn have_mutual_connection(&mut self) -> bool {
             unreachable!()
         }
@@ -447,6 +463,10 @@ async fn validate_channel_default_below_server_roles() {
         }
 
         async fn user_is_bot(&mut self) -> bool {
+            unreachable!()
+        }
+
+        async fn user_is_system(&mut self) -> bool {
             unreachable!()
         }
 
