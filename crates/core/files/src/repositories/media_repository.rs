@@ -9,6 +9,8 @@ pub trait MediaRepository: Send + Sync + 'static {
 
     fn is_animated(&self, f: &NamedTempFile, mime: &str) -> Option<bool>;
 
+    fn is_animated_vec(&self, v: &[u8], mime: &str) -> Option<bool>;
+
     fn image_size_vec(&self, v: &[u8], mime: &str) -> Option<(usize, usize)>;
 
     fn decode_image<R: Read + BufRead + Seek>(

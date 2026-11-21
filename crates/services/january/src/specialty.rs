@@ -109,6 +109,7 @@ impl SpecialtySitesGenerator {
                         width: photo_item.width,
                         height: photo_item.height,
                         size: revolt_models::v0::ImageSize::Large,
+                        animated: false,
                     })
                 }
             }
