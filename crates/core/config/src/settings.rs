@@ -29,18 +29,40 @@ static CONFIG_BUILDER: LazyLock<RwLock<Config>> = LazyLock::new(|| {
         ));
 
         let cwd = std::env::current_dir().unwrap();
-        let mut cwd: Option<&Path> = Some(&cwd);
+        let mut search_path: Option<&Path> = Some(&cwd);
+        let mut found_config_file = false;
 
-        while let Some(path) = cwd {
+        while let Some(path) = search_path {
             for config_path in CONFIG_SEARCH_PATHS {
                 let config_path = path.join(config_path);
                 if config_path.exists() {
+                    if let Err(err) = std::fs::File::open(&config_path) {
+                        panic!(
+                            "Configuration file {} exists but could not be read: {err}",
+                            config_path.display()
+                        );
+                    }
+
+                    found_config_file = true;
                     builder = builder
                         .add_source(File::new(config_path.to_str().unwrap(), FileFormat::Toml));
                 }
             }
 
-            cwd = path.parent();
+            search_path = path.parent();
+        }
+
+        // Logging is usually not set up yet at this point, so print directly to stderr
+        if !found_config_file && !std::env::vars().any(|(key, _)| key.starts_with("REVOLT__")) {
+            eprintln!(
+                "WARNING: No configuration file found!\n\
+                 Looked for Revolt.toml and Revolt.overrides.toml in {} and its parent\n\
+                 directories, and for /Revolt.toml, and no REVOLT__* environment variables are set.\n\
+                 Falling back to the built-in defaults, which expect the self-hosted Docker setup\n\
+                 (MongoDB at `mongodb://database`, Redis at `redis://redis/`).\n\
+                 Create a Revolt.toml (or Revolt.overrides.toml) to configure your environment.",
+                cwd.display()
+            );
         }
 
         if std::env::var("TEST_DB").is_ok() {
@@ -66,7 +88,9 @@ static CONFIG_BUILDER: LazyLock<RwLock<Config>> = LazyLock::new(|| {
 
         builder = builder.add_source(Environment::with_prefix("REVOLT").separator("__"));
 
-        builder.build().unwrap()
+        builder
+            .build()
+            .unwrap_or_else(|err| panic!("Failed to load configuration: {err}"))
     })
 });
 
@@ -483,7 +507,10 @@ pub async fn read() -> Config {
 }
 
 pub async fn config_no_cache() -> Settings {
-    let mut config = read().await.try_deserialize::<Settings>().unwrap();
+    let mut config = read()
+        .await
+        .try_deserialize::<Settings>()
+        .unwrap_or_else(|err| panic!("Invalid configuration: {err}"));
 
     // inject REDIS_URI for redis-kiss library
     if std::env::var("REDIS_URI").is_err() {
