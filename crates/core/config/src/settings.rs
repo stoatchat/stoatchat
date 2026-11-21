@@ -55,7 +55,7 @@ static CONFIG_BUILDER: LazyLock<RwLock<Config>> = LazyLock::new(|| {
         // Logging is usually not set up yet at this point, so print directly to stderr
         if !found_config_file && !std::env::vars().any(|(key, _)| key.starts_with("REVOLT__")) {
             eprintln!(
-                "\x1b[33mWARNING: No configuration file found!\x1b[0m\n\
+                "WARNING: No configuration file found!\n\
                  Looked for Revolt.toml and Revolt.overrides.toml in {} and its parent\n\
                  directories, and for /Revolt.toml, and no REVOLT__* environment variables are set.\n\
                  Falling back to the built-in defaults, which expect the self-hosted Docker setup\n\
