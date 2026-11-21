@@ -16,13 +16,38 @@ const MAX_DECODE_PIXELS: u64 = 40_000_000;
 /// Maximum memory a decoder may allocate (matches image-rs default)
 const MAX_DECODE_ALLOC: u64 = 512 * 1024 * 1024;
 
+/// Whether an image of the given dimensions is too large for us to decode
+pub fn exceeds_decode_limits(width: u64, height: u64) -> bool {
+    width > MAX_DECODE_PIXEL_SIDE as u64
+        || height > MAX_DECODE_PIXEL_SIDE as u64
+        || width.saturating_mul(height) > MAX_DECODE_PIXELS
+}
+
 /// Check whether the image data provided by a reader contains animation data
 fn is_animated_reader<R: BufRead + Seek>(reader: R, mime: &str) -> Option<bool> {
     match mime {
         // Current behaviour is to assume GIFs are animated, this checks for at least 2 frames
         "image/gif" => {
-            let decoder = image::codecs::gif::GifDecoder::new(reader).ok()?;
-            Some(decoder.into_frames().take(2).count() > 1)
+            let mut decoder = image::codecs::gif::GifDecoder::new(reader).ok()?;
+
+            // Frames have to be decoded to be counted, so apply the same limits as decode_image
+            let (width, height) = decoder.dimensions();
+            if exceeds_decode_limits(width.into(), height.into()) {
+                return None;
+            }
+            decoder.set_limits(decode_limits()).ok()?;
+
+            let mut frames = decoder.into_frames();
+            match frames.next() {
+                // The first frame must decode, otherwise this isn't a usable GIF
+                Some(Ok(_)) => {}
+                Some(Err(_)) => return None,
+                None => return Some(false),
+            }
+
+            // A second frame record means the GIF is animated, even if that frame fails to
+            // decode here (e.g. truncated data), as browsers will still play what they can
+            Some(frames.next().is_some())
         }
         "image/png" | "image/apng" => {
             let decoder = image::codecs::png::PngDecoder::new(reader).ok()?;
@@ -47,10 +72,7 @@ fn decode_limits() -> Limits {
 
 fn decode_with_limits(mut decoder: impl ImageDecoder) -> Result<DynamicImage, MediaError> {
     let (width, height) = decoder.dimensions();
-    if width > MAX_DECODE_PIXEL_SIDE
-        || height > MAX_DECODE_PIXEL_SIDE
-        || (width as u64) * (height as u64) > MAX_DECODE_PIXELS
-    {
+    if exceeds_decode_limits(width.into(), height.into()) {
         return Err(MediaError::ImageProcessingFailed {
             cause: format!("image dimensions {width}x{height} exceed decode limits"),
         });
@@ -197,13 +219,17 @@ impl MediaRepository for MediaImpl {
                 .read(reader)
                 .inspect_err(|err| tracing::error!("Failed to read JXL! {err:?}"))
                 .is_ok(),
-            _ => !matches!(
-                image::ImageReader::new(reader)
-                    .with_guessed_format()
-                    .inspect_err(|err| tracing::error!("Failed to read image! {err:?}"))
-                    .map(|f| f.decode()),
-                Err(_) | Ok(Err(_))
-            ),
+            _ => image::ImageReader::new(reader)
+                .with_guessed_format()
+                .map_err(|e| MediaError::from(anyhow::anyhow!(e)))
+                .and_then(|image| {
+                    image
+                        .into_decoder()
+                        .map_err(|e| MediaError::from(anyhow::anyhow!(e)))
+                })
+                .and_then(decode_with_limits)
+                .inspect_err(|err| tracing::error!("Failed to read image! {err:?}"))
+                .is_ok(),
         }
     }
 
@@ -475,5 +501,51 @@ mod tests {
         f.write_all(include_bytes!("../../tests/assets/anim-icos.gif"))
             .unwrap();
         assert_eq!(media.is_animated(&f, "image/gif"), Some(true));
+    }
+
+    #[tokio::test]
+    async fn asset_test_is_animated_vec() {
+        let media = MediaImpl::from_config().await;
+        let cases: [(&[u8], &str, bool); 7] = [
+            (include_bytes!("../../tests/assets/test.jpeg"), "image/jpeg", false),
+            (include_bytes!("../../tests/assets/test.png"), "image/png", false),
+            (include_bytes!("../../tests/assets/dice.webp"), "image/webp", false),
+            (include_bytes!("../../tests/assets/anim-icos.apng"), "image/png", true),
+            (include_bytes!("../../tests/assets/anim-icos.apng"), "image/apng", true),
+            (include_bytes!("../../tests/assets/anim-icos.webp"), "image/webp", true),
+            (include_bytes!("../../tests/assets/anim-icos.gif"), "image/gif", true),
+        ];
+
+        for (buf, mime, animated) in cases {
+            assert_eq!(media.is_animated_vec(buf, mime), Some(animated), "{mime}");
+            assert_eq!(crate::is_animated_vec(buf, mime), Some(animated), "{mime}");
+        }
+    }
+
+    #[tokio::test]
+    async fn asset_test_truncated_gif_is_animated() {
+        let media = MediaImpl::from_config().await;
+        let buf = include_bytes!("../../tests/assets/anim-icos.gif");
+
+        // The second frame's image data spans bytes 8830..16772, so cutting the file off
+        // partway through it leaves one good frame followed by one that fails to decode
+        let truncated = &buf[..12_000];
+        assert_eq!(media.is_animated_vec(truncated, "image/gif"), Some(true));
+
+        // Cutting it off during the first frame's image data (808..8822) leaves nothing usable
+        let truncated = &buf[..4_000];
+        assert_eq!(media.is_animated_vec(truncated, "image/gif"), None);
+    }
+
+    #[tokio::test]
+    async fn asset_test_oversized_gif_is_not_decoded() {
+        let media = MediaImpl::from_config().await;
+        // Header-only GIF declaring a 20000x20000 logical screen
+        let mut buf = b"GIF89a".to_vec();
+        buf.extend_from_slice(&20000u16.to_le_bytes());
+        buf.extend_from_slice(&20000u16.to_le_bytes());
+        buf.extend_from_slice(&[0, 0, 0, 0x3B]);
+
+        assert_eq!(media.is_animated_vec(&buf, "image/gif"), None);
     }
 }

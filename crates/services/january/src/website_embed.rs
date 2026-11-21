@@ -100,7 +100,7 @@ pub async fn create_website_embed(original_url: &str, document: &str) -> Option<
                         .parse()
                         .unwrap_or(0),
                     size,
-                    animated: None,
+                    animated: false,
                 }
             }),
         video: meta
