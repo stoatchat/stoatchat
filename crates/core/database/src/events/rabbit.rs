@@ -3,12 +3,11 @@ use std::collections::HashMap;
 use revolt_models::v0::PushNotification;
 use serde::{Deserialize, Serialize};
 
-use crate::User;
+use crate::{Message, User};
 
 #[derive(Serialize, Deserialize)]
 pub struct MessageSentPayload {
-    pub notification: PushNotification,
-    pub users: Vec<String>,
+    pub message: Message,
 }
 
 #[derive(Serialize, Deserialize)]

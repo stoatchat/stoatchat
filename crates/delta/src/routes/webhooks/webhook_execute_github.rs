@@ -1,5 +1,5 @@
 use revolt_database::{AMQP, Database, Message, util::reference::Reference};
-use revolt_models::v0::{MessageAuthor, SendableEmbed, Webhook};
+use revolt_models::v0::{SendableEmbed, Webhook};
 use revolt_result::{Error, Result, create_error};
 use revolt_rocket_okapi::{
     r#gen::OpenApiGenerator,
@@ -1095,8 +1095,7 @@ pub async fn webhook_execute_github(
     message
         .send(
             db,
-            Some(amqp),
-            MessageAuthor::Webhook(&webhook.into()),
+            amqp,
             None,
             None,
             &channel,

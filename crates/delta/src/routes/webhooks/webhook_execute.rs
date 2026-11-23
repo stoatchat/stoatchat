@@ -57,7 +57,7 @@ pub async fn webhook_execute(
     Ok(Json(
         Message::create_from_api(
             db,
-            Some(amqp),
+            amqp,
             channel,
             data,
             v0::MessageAuthor::Webhook(&webhook.into()),

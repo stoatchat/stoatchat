@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::utils::{record_skips, record_users_without_sessions, Consumer};
+use crate::utils::{record_skip, Consumer};
 use anyhow::Result;
 use async_trait::async_trait;
 use lapin::{message::Delivery, Channel, Connection};
@@ -35,36 +35,36 @@ impl Consumer for GenericConsumer {
 
     /// This consumer handles delegating messages into their respective platform queues.
     async fn consume(&self, delivery: Delivery, context: &WideContextRepository) -> Result<()> {
-        let payload: MessageSentPayload = serde_json::from_slice(&delivery.data)?;
-        context.add("users.count", payload.users.len() as i64);
+        let payload: GenericPayload = serde_json::from_slice(&delivery.data)?;
+        context.add("user_id", payload.user.id.clone());
 
-        debug!("Received message event on origin");
+        debug!("Received generic event");
 
-        let sessions = match self
-            .db
-            .fetch_sessions_with_subscription(&payload.users)
-            .await
-        {
+        let sessions = match self.db.fetch_sessions(&payload.user.id).await {
             Ok(sessions) => sessions,
             Err(error) => {
                 context.add("push.dropped", "fetch_sessions_failed");
                 warn!(
                     reason = "fetch_sessions_failed",
                     error = ?error,
-                    users = ?payload.users,
+                    user_id = %payload.user.id,
                     "push notification dropped"
                 );
-                record_skips(&payload.users, "fetch_sessions_failed");
+                record_skip(&payload.user.id, None, "fetch_sessions_failed");
                 return Ok(());
             }
         };
 
-        record_users_without_sessions(&payload.users, &sessions);
+        if sessions.is_empty() {
+            record_skip(&payload.user.id, None, "no_sessions");
+        }
 
         let mut queued = 0;
         for session in sessions {
-            let notification = PayloadKind::MessageNotification(payload.notification.clone());
-            if self.publish_push(notification, session).await? {
+            if self
+                .publish_push(PayloadKind::Generic(payload.clone()), session)
+                .await?
+            {
                 queued += 1;
             }
         }

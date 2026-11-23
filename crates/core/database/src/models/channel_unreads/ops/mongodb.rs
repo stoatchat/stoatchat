@@ -1,6 +1,7 @@
 use bson::Document;
 use mongodb::options::FindOneAndUpdateOptions;
 use mongodb::options::ReturnDocument;
+use mongodb::options::UpdateOneModel;
 use mongodb::options::UpdateOptions;
 use revolt_result::Result;
 use ulid::Ulid;
@@ -96,7 +97,7 @@ impl AbstractChannelUnreads for MongoDb {
                     "_id.user": user_id,
                 },
                 doc! {
-                    "$push": {
+                    "$addToSet": {
                         "mentions": {
                             "$each": message_ids
                         }
@@ -116,26 +117,34 @@ impl AbstractChannelUnreads for MongoDb {
         user_ids: &[String],
         message_ids: &[String],
     ) -> Result<()> {
-        self.col::<Document>(COL)
-            .update_many(
-                doc! {
+        if user_ids.is_empty() {
+            return Ok(());
+        }
+
+        let namespace = self.col::<Document>(COL).namespace();
+        let models = user_ids.iter().map(|user_id| {
+            UpdateOneModel::builder()
+                .namespace(namespace.clone())
+                .filter(doc! {
                     "_id.channel": channel_id,
-                    "_id.user": {
-                        "$in": user_ids
-                    },
-                },
-                doc! {
-                    "$push": {
+                    "_id.user": user_id,
+                })
+                .update(doc! {
+                    "$addToSet": {
                         "mentions": {
                             "$each": message_ids
                         }
                     }
-                },
-            )
-            .with_options(UpdateOptions::builder().upsert(true).build())
+                })
+                .upsert(true)
+                .build()
+        });
+
+        self.bulk_write(models)
+            .ordered(false)
             .await
             .map(|_| ())
-            .map_err(|_| create_database_error!("update_many", COL))
+            .map_err(|_| create_database_error!("bulk_write", COL))
     }
 
     /// Fetch all channel unreads for a user.

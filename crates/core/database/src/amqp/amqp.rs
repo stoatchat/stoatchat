@@ -1,11 +1,10 @@
 use std::{
-    collections::HashSet,
     sync::{Arc, OnceLock},
     time::Duration,
 };
 
-use crate::User;
 use crate::events::{client::EventV1, rabbit::*};
+use crate::{Message, User};
 use lapin::{
     BasicProperties, Channel, Connection, ConnectionProperties, Error as AMQPError,
     options::BasicPublishOptions,
@@ -14,7 +13,6 @@ use lapin::{
 };
 use revolt_config::config;
 use revolt_models::v0::PushNotification;
-use revolt_presence::filter_online;
 use revolt_result::Result;
 
 use serde_json::to_string;
@@ -215,26 +213,10 @@ impl AMQP {
         Ok(())
     }
 
-    pub async fn message_sent(
-        &self,
-        recipients: Vec<String>,
-        payload: PushNotification,
-    ) -> Result<(), AMQPError> {
-        if recipients.is_empty() {
-            return Ok(());
-        }
-
+    pub async fn message_sent(&self, message: Message) -> Result<(), AMQPError> {
         let config = revolt_config::config().await;
 
-        let online_ids = filter_online(&recipients).await;
-        let recipients = (&recipients.into_iter().collect::<HashSet<String>>() - &online_ids)
-            .into_iter()
-            .collect::<Vec<String>>();
-
-        let payload = MessageSentPayload {
-            notification: payload,
-            users: recipients,
-        };
+        let payload = MessageSentPayload { message };
         let payload = to_string(&payload).unwrap();
 
         debug!(

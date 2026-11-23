@@ -3,7 +3,6 @@ use revolt_database::{
     User,
     util::{permissions::DatabasePermissionQuery, reference::Reference},
 };
-use revolt_models::v0::MessageAuthor;
 use revolt_permissions::{ChannelPermission, calculate_channel_permissions};
 use revolt_result::{Result, create_error};
 use rocket::State;
@@ -66,11 +65,7 @@ pub async fn message_unpin(
     .into_message(channel.id().to_string())
     .send(
         db,
-        Some(amqp),
-        MessageAuthor::System {
-            username: &user.username,
-            avatar: user.avatar.as_ref().map(|file| file.id.as_ref()),
-        },
+        amqp,
         None,
         None,
         &channel,

@@ -109,8 +109,7 @@ pub async fn edit(
         .into_message(channel.id().to_string())
         .send(
             db,
-            Some(amqp),
-            user.as_author_for_system(),
+            amqp,
             None,
             None,
             &channel,
@@ -178,8 +177,7 @@ pub async fn edit(
                 .into_message(channel.id().to_string())
                 .send(
                     db,
-                    Some(amqp),
-                    user.as_author_for_system(),
+                    amqp,
                     None,
                     None,
                     &channel,
@@ -196,8 +194,7 @@ pub async fn edit(
                 .into_message(channel.id().to_string())
                 .send(
                     db,
-                    Some(amqp),
-                    user.as_author_for_system(),
+                    amqp,
                     None,
                     None,
                     &channel,
@@ -214,8 +211,7 @@ pub async fn edit(
                 .into_message(channel.id().to_string())
                 .send(
                     db,
-                    Some(amqp),
-                    user.as_author_for_system(),
+                    amqp,
                     None,
                     None,
                     &channel,

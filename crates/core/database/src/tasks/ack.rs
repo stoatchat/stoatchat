@@ -1,31 +1,18 @@
 // Queue Type: Debounced
-use crate::{AMQP, Database, Message};
+use crate::{AMQP, Database};
 
 use deadqueue::limited::Queue;
 use once_cell::sync::Lazy;
-use revolt_config::capture_message;
-use revolt_models::v0::PushNotification;
-use std::{
-    any::Any,
-    collections::{HashMap, HashSet},
-    time::Duration,
-};
-use validator::HasLen;
+
+use std::{collections::HashMap, time::Duration};
 
 use revolt_result::Result;
 
 use super::DelayedTask;
-use crate::Channel::TextChannel;
 
 /// Enumeration of possible events
 #[derive(Debug, Eq, PartialEq)]
 pub enum AckEvent {
-    /// Add mentions for a channel
-    ProcessMessage {
-        /// push notification, message, recipients, push silenced
-        messages: Vec<(Option<PushNotification>, Message, Vec<String>, bool)>,
-    },
-
     /// Acknowledge message in a channel for a user
     AckMessage {
         /// Message ID
@@ -72,22 +59,6 @@ pub async fn queue_ack(channel: String, user: String, event: AckEvent) {
     );
 }
 
-/// Do not add more than one message per event.
-pub async fn queue_message(channel: String, event: AckEvent) {
-    Q.try_push(Data {
-        channel,
-        user: None,
-        event,
-    })
-    .ok();
-
-    info!(
-        "Queue is using {} slots from {}. Queued type: MENTION",
-        Q.len(),
-        Q.capacity()
-    );
-}
-
 pub async fn handle_ack_event(
     event: &AckEvent,
     db: &Database,
@@ -122,95 +93,6 @@ pub async fn handle_ack_event(
                         revolt_config::capture_error(&err);
                     }
                 };
-            }
-        }
-        AckEvent::ProcessMessage { messages } => {
-            let mut users: HashSet<&String> = HashSet::new();
-            info!(
-                "Processing {} messages from channel {}",
-                messages.len(),
-                messages[0].1.channel
-            );
-
-            // find all the users we'll be notifying
-            messages.iter().for_each(|(_, _, recipents, _)| {
-                users.extend(recipents.iter());
-            });
-
-            info!("Found {} users to notify.", users.len());
-
-            for user in users {
-                let message_ids: Vec<String> = messages
-                    .iter()
-                    .filter_map(|(_, message, recipients, _)| {
-                        if recipients.contains(user) {
-                            Some(message.id.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-
-                if !message_ids.is_empty() {
-                    // one user failing shouldn't stop everyone else's notifications
-                    if let Err(err) = db.add_mention_to_unread(channel, user, &message_ids).await {
-                        revolt_config::capture_error(&err);
-                        error!("Failed to add mentions for user {user} in {channel}: {err:?}");
-                        continue;
-                    }
-                }
-                info!("Added {} mentions for user {}", message_ids.len(), &user);
-            }
-
-            let mut mass_mentions = vec![];
-
-            for (push, message, recipients, silenced) in messages {
-                if *silenced || push.is_none() || (recipients.is_empty()) {
-                    debug!(
-                        "Rejecting push: silenced: {}, recipient count: {}, push exists: {:?}",
-                        *silenced,
-                        recipients.length(),
-                        push.is_some()
-                    );
-                    continue;
-                }
-
-                debug!(
-                    "Sending push event to AMQP; message {} for {} users",
-                    push.as_ref().unwrap().message.id,
-                    recipients.len()
-                );
-                if let Err(err) = amqp
-                    .message_sent(recipients.clone(), push.clone().unwrap())
-                    .await
-                {
-                    revolt_config::capture_error(&err);
-                }
-
-                if message.contains_mass_push_mention() {
-                    mass_mentions.push(push.clone().unwrap());
-                }
-            }
-
-            if !mass_mentions.is_empty() {
-                debug!(
-                    "Sending mass mention push event to AMQP; channel {}",
-                    &mass_mentions[0].message.channel
-                );
-
-                // channel might've been deleted in the meantime
-                let channel = db.fetch_channel(&mass_mentions[0].message.channel).await?;
-
-                if let TextChannel { server, .. } = channel {
-                    if let Err(err) = amqp.mass_mention_message_sent(server, mass_mentions).await {
-                        revolt_config::capture_error(&err);
-                    }
-                } else {
-                    info!(
-                        "Unknown channel type {:?} when sending mass mention event",
-                        channel.type_id()
-                    );
-                }
             }
         }
     };
@@ -263,45 +145,10 @@ pub async fn worker(db: Database, amqp: AMQP) {
                 channel,
                 match &event {
                     AckEvent::AckMessage { .. } => 0,
-                    AckEvent::ProcessMessage { .. } => 1,
                 },
             );
             if let Some(task) = tasks.get_mut(&key) {
                 match &mut event {
-                    AckEvent::ProcessMessage { messages: new_data } => {
-                        if let AckEvent::ProcessMessage { messages: existing } =
-                            &mut task.data.event
-                        {
-                            if let Some(new_event) = new_data.pop() {
-                                // if the message contains a mass mention, do not delay it any further.
-                                if new_event.1.contains_mass_push_mention() {
-                                    // add the new message to the list of messages to be processed.
-                                    existing.push(new_event);
-                                    task.run_immediately();
-                                    continue;
-                                }
-
-                                existing.push(new_event);
-
-                                // put a cap on the amount of messages that can be queued, for particularly active channels
-                                if (existing.length() as u16)
-                                    < revolt_config::config()
-                                        .await
-                                        .features
-                                        .advanced
-                                        .process_message_delay_limit
-                                {
-                                    task.delay();
-                                }
-                            } else {
-                                let err_msg = format!("Got zero-length message event: {event:?}");
-                                capture_message(&err_msg, revolt_config::Level::Warning);
-                                info!("{err_msg}")
-                            }
-                        } else {
-                            panic!("Somehow got an ack message in the add mention arm");
-                        }
-                    }
                     AckEvent::AckMessage { .. } => {
                         // replace the last acked message with the new acked message
                         task.data.event = event;
@@ -310,11 +157,6 @@ pub async fn worker(db: Database, amqp: AMQP) {
                 }
             } else {
                 let task = match &event {
-                    AckEvent::ProcessMessage { .. } => DelayedTask::with_timings(
-                        Task { event },
-                        PROCESS_MESSAGE_SAVE_AFTER,
-                        PROCESS_MESSAGE_EXPIRE_AFTER,
-                    ),
                     AckEvent::AckMessage { .. } => DelayedTask::new(Task { event }),
                 };
 

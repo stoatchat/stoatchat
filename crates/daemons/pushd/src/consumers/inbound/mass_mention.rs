@@ -1,24 +1,19 @@
-use std::{
-    collections::HashSet,
-    hash::RandomState,
-    sync::Arc,
-};
+use std::{collections::HashSet, hash::RandomState, sync::Arc};
 
 use crate::utils::{
-    record_skip, record_skips, record_users_without_sessions, render_notification_content,
-    Consumer,
+    Consumer, record_skip, record_skips, record_users_without_sessions, render_notification_content,
 };
 use anyhow::Result;
 use async_trait::async_trait;
-use lapin::{message::Delivery, Channel, Connection};
-use stoat_otel::WideContextRepository;
-use tracing::Instrument;
+use lapin::{Channel, Connection, message::Delivery};
 use revolt_database::{
-    events::rabbit::*, util::bulk_permissions::BulkDatabasePermissionQuery, Database, Member,
-    MessageFlagsValue,
+    Database, Member, MessageFlagsValue, events::rabbit::*,
+    util::bulk_permissions::BulkDatabasePermissionQuery,
 };
 use revolt_models::v0::{MessageFlags, PushNotification};
 use revolt_result::ToRevoltError;
+use stoat_otel::WideContextRepository;
+use tracing::Instrument;
 
 #[derive(Clone)]
 #[allow(unused)]
@@ -65,11 +60,7 @@ impl MassMessageConsumer {
 
 #[async_trait]
 impl Consumer for MassMessageConsumer {
-    async fn create(
-        db: Database,
-        connection: Arc<Connection>,
-        channel: Arc<Channel>,
-    ) -> Self {
+    async fn create(db: Database, connection: Arc<Connection>, channel: Arc<Channel>) -> Self {
         Self {
             db,
             connection,
@@ -133,7 +124,7 @@ impl Consumer for MassMessageConsumer {
                         .await?;
 
                     let mut exhausted = false;
-                    let ack_chnl = vec![push.channel.id().to_string()];
+                    let ack_msgs = vec![push.message.id.clone()];
                     loop {
                         let mut chunk: Vec<Member> = vec![];
                         for _ in 0..config.pushd.mass_mention_chunk_size {
@@ -145,14 +136,18 @@ impl Consumer for MassMessageConsumer {
                             }
                         }
 
-                        let userids: Vec<String> =
-                            chunk.iter().map(|member| member.id.user.clone()).collect();
+                        // the author doesn't get mentioned by their own message
+                        let userids: Vec<String> = chunk
+                            .iter()
+                            .map(|member| member.id.user.clone())
+                            .filter(|id| *id != push.message.author)
+                            .collect();
 
                         debug!(?userids, "Userids in chunk");
 
                         if let Err(err) = self
                             .db
-                            .add_mention_to_many_unreads(push.channel.id(), &userids, &ack_chnl)
+                            .add_mention_to_many_unreads(push.channel.id(), &userids, &ack_msgs)
                             .await
                         {
                             error!(error = ?err, "Failed to add mass mention to unreads");
@@ -228,7 +223,10 @@ impl Consumer for MassMessageConsumer {
                         let viewing_members: Vec<String> = visibility
                             .iter()
                             .filter_map(|(uid, viewable)| {
-                                if *viewable && !existing_mentions.contains(uid) {
+                                if *viewable
+                                    && !existing_mentions.contains(uid)
+                                    && *uid != push.message.author
+                                {
                                     Some(uid.clone())
                                 } else {
                                     None
@@ -263,6 +261,8 @@ impl Consumer for MassMessageConsumer {
                             for (user_id, viewable) in &visibility {
                                 if !viewable {
                                     record_skip(user_id, None, "cannot_view_channel");
+                                } else if *user_id == push.message.author {
+                                    record_skip(user_id, None, "author");
                                 } else if existing_mentions.contains(user_id) {
                                     record_skip(user_id, None, "already_mentioned");
                                 } else if online.contains(user_id) {
