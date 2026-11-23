@@ -225,20 +225,16 @@ impl Consumer for MessageConsumer {
         }
 
         let online = revolt_presence::filter_online(&recipients).await;
-        let users: Vec<String> = if stoat_otel::extra_tracing() {
-            recipients
-                .into_iter()
-                .filter(|id| {
-                    let is_online = online.contains(id);
-                    if is_online {
-                        record_skip(id, None, "online");
-                    }
-                    !is_online
-                })
-                .collect()
-        } else {
-            online.into_iter().collect()
-        };
+        let users: Vec<String> = recipients
+            .into_iter()
+            .filter(|id| {
+                let is_online = online.contains(id);
+                if is_online {
+                    record_skip(id, None, "online");
+                }
+                !is_online
+            })
+            .collect();
 
         context.add("users.count", users.len() as i64);
 
