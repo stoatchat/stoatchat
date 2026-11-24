@@ -2,8 +2,8 @@ use revolt_database::util::reference::Reference;
 use revolt_database::{Database, File, PartialWebhook};
 use revolt_models::v0::{DataEditWebhook, Webhook};
 use revolt_models::validator::Validate;
-use revolt_result::{create_error, Result};
-use rocket::{serde::json::Json, State};
+use revolt_result::{Result, create_error};
+use rocket::{State, serde::json::Json};
 
 /// # Edits a webhook
 ///
@@ -37,9 +37,12 @@ pub async fn webhook_edit_token(
         remove,
     } = data;
 
+    if permissions.is_some() {
+        return Err(create_error!(InvalidOperation));
+    }
+
     let mut partial = PartialWebhook {
         name,
-        permissions,
         ..Default::default()
     };
 
