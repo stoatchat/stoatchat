@@ -36,19 +36,15 @@ mod test {
     use revolt_models::v0::NotificationSettingPreference;
     use rocket::http::{ContentType, Header, Status};
 
-    #[rocket::async_test]
-    async fn set_and_get() {
+    // Each PUT + GET pair counts twice against the servers/<id> ratelimit (5 per 10s),
+    // so keep this to at most two preferences per server.
+    async fn set_and_get_preferences(preferences: [NotificationSettingPreference; 2]) {
         let harness = TestHarness::new().await;
         let (_, session, user) = harness.new_user().await;
         let (server, _) = harness.new_server(&user).await;
         let path = format!("/servers/{}/notifications", server.id);
 
-        for preference in [
-            NotificationSettingPreference::Mentions,
-            NotificationSettingPreference::AllMessages,
-            NotificationSettingPreference::None,
-            NotificationSettingPreference::Mentions,
-        ] {
+        for preference in preferences {
             let response = harness
                 .client
                 .put(&path)
@@ -75,6 +71,24 @@ mod test {
                 preference
             );
         }
+    }
+
+    #[rocket::async_test]
+    async fn set_and_get() {
+        set_and_get_preferences([
+            NotificationSettingPreference::Mentions,
+            NotificationSettingPreference::AllMessages,
+        ])
+        .await;
+    }
+
+    #[rocket::async_test]
+    async fn set_and_get_back_to_mentions() {
+        set_and_get_preferences([
+            NotificationSettingPreference::None,
+            NotificationSettingPreference::Mentions,
+        ])
+        .await;
     }
 
     #[rocket::async_test]

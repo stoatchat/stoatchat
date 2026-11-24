@@ -1,6 +1,6 @@
 use indexmap::{IndexMap, IndexSet};
 use iso8601_timestamp::Timestamp;
-use revolt_config::{FeaturesLimits, config};
+use revolt_config::{FeaturesLimits, capture_error, config};
 use revolt_models::v0::{
     self, BulkMessageResponse, DataMessageSend, Embed, MessageAuthor, MessageFlags, MessageSort,
     MessageWebhook, ReplyIntent, SendableEmbed, Text,
@@ -672,7 +672,6 @@ impl Message {
     }
 
     /// Send a message
-    #[allow(clippy::too_many_arguments)]
     pub async fn send(
         &mut self,
         db: &Database,
@@ -691,7 +690,10 @@ impl Message {
         )
         .await?;
 
-        amqp.message_sent(self.clone()).await.to_internal_error()
+        if let Err(e) = amqp.message_sent(self, channel).await {
+            capture_error(&e);
+        }
+        Ok(())
     }
 
     /// Create text embed from sendable embed

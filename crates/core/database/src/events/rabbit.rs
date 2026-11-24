@@ -1,13 +1,15 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 use revolt_models::v0::PushNotification;
 use serde::{Deserialize, Serialize};
 
-use crate::{Message, User};
+use crate::{Channel, Message, User};
 
+/// Borrowed when publishing, owned when consuming
 #[derive(Serialize, Deserialize)]
-pub struct MessageSentPayload {
-    pub message: Message,
+pub struct MessageSentPayload<'a> {
+    pub message: Cow<'a, Message>,
+    pub channel: Cow<'a, Channel>,
 }
 
 #[derive(Serialize, Deserialize)]

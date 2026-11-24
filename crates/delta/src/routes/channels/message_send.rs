@@ -285,7 +285,7 @@ mod test {
         // Second user is not part of the server
         let message = Message::create_from_api(
             &harness.db,
-            Some(&harness.amqp),
+            &harness.amqp,
             locked_channel.clone(),
             v0::DataMessageSend {
                 content: Some(format!("<@{}>", second_user.id)),
@@ -325,7 +325,7 @@ mod test {
         // Second user cannot see the channel
         let message = Message::create_from_api(
             &harness.db,
-            Some(&harness.amqp),
+            &harness.amqp,
             locked_channel.clone(),
             v0::DataMessageSend {
                 content: Some(format!("<@{}>", second_user.id)),
@@ -374,7 +374,7 @@ mod test {
         // This time the mention SHOULD go through
         let message = Message::create_from_api(
             &harness.db,
-            Some(&harness.amqp),
+            &harness.amqp,
             locked_channel.clone(),
             v0::DataMessageSend {
                 content: Some(format!("<@{}>", second_user.id)),
@@ -416,7 +416,7 @@ mod test {
         // Should succeed
         let message_with_reply = Message::create_from_api(
             &harness.db,
-            Some(&harness.amqp),
+            &harness.amqp,
             channel.clone(),
             v0::DataMessageSend {
                 content: Some("Message with reply".to_string()),
@@ -467,7 +467,7 @@ mod test {
         // Should send the message without a reply
         let message_with_missing_reply = Message::create_from_api(
             &harness.db,
-            Some(&harness.amqp),
+            &harness.amqp,
             channel.clone(),
             v0::DataMessageSend {
                 content: Some("Message with missing reply".to_string()),
@@ -504,7 +504,7 @@ mod test {
         // Should fail to send the message
         Message::create_from_api(
             &harness.db,
-            Some(&harness.amqp),
+            &harness.amqp,
             channel.clone(),
             v0::DataMessageSend {
                 content: Some("Message with missing reply".to_string()),
@@ -535,7 +535,7 @@ mod test {
         // Should fail to send the message
         Message::create_from_api(
             &harness.db,
-            Some(&harness.amqp),
+            &harness.amqp,
             channel.clone(),
             v0::DataMessageSend {
                 content: Some("Message with missing reply".to_string()),
@@ -589,7 +589,7 @@ mod test {
         // Should fail
         let bad_message_with_mentions = Message::create_from_api(
             &harness.db,
-            Some(&harness.amqp),
+            &harness.amqp,
             channel.clone(),
             v0::DataMessageSend {
                 content: Some(format!("Mentioning @everyone and role <%{}>", &role.id)),
@@ -634,7 +634,7 @@ mod test {
         // Should be undetected and therefor pass
         let message_with_codeblock = Message::create_from_api(
             &harness.db,
-            Some(&harness.amqp),
+            &harness.amqp,
             channel.clone(),
             v0::DataMessageSend {
                 content: Some(format!("Mentioning `@everyone` and role `<%{}>`", &role.id)),
@@ -704,7 +704,7 @@ mod test {
         // Should succeed
         let message_with_mentions = Message::create_from_api(
             &harness.db,
-            Some(&harness.amqp),
+            &harness.amqp,
             channel.clone(),
             v0::DataMessageSend {
                 content: Some(format!("Mentioning @everyone and role <%{}>", &role.id)),

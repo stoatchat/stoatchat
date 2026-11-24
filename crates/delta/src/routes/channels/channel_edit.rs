@@ -1,13 +1,13 @@
 use revolt_database::{
+    AMQP, AuditLogEntryAction, Channel, Database, FieldsChannel, File, PartialChannel,
+    SystemMessage, User,
     util::{permissions::DatabasePermissionQuery, reference::Reference},
-    voice::{delete_voice_channel, UserVoiceChannel, VoiceClient},
-    AuditLogEntryAction, Channel, Database, FieldsChannel, File, PartialChannel, SystemMessage,
-    User, AMQP,
+    voice::{UserVoiceChannel, VoiceClient, delete_voice_channel},
 };
 use revolt_models::v0;
-use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
-use revolt_result::{create_error, Result};
-use rocket::{serde::json::Json, State};
+use revolt_permissions::{ChannelPermission, calculate_channel_permissions};
+use revolt_result::{Result, create_error};
+use rocket::{State, serde::json::Json};
 use validator::Validate;
 
 use crate::util::audit_log_reason::AuditLogReason;
@@ -51,12 +51,7 @@ pub async fn edit(
         return Ok(Json(channel.into()));
     }
 
-    let remove: Vec<FieldsChannel> = data
-        .remove
-        .iter()
-        .cloned()
-        .map(Into::into)
-        .collect();
+    let remove: Vec<FieldsChannel> = data.remove.iter().cloned().map(Into::into).collect();
 
     if remove.contains(&FieldsChannel::DefaultPermissions) {
         let mut proposed = channel.clone();
@@ -91,7 +86,7 @@ pub async fn edit(
             // Ensure new owner is not a bot
             let new_owner_user = db.fetch_user(&new_owner).await?;
             if new_owner_user.bot.is_some() {
-                return Err(create_error!(IsBot))
+                return Err(create_error!(IsBot));
             }
 
             // Transfer ownership
@@ -107,14 +102,7 @@ pub async fn edit(
             return Err(create_error!(InvalidOperation));
         }
         .into_message(channel.id().to_string())
-        .send(
-            db,
-            amqp,
-            None,
-            None,
-            &channel,
-            false,
-        )
+        .send(db, amqp, None, None, &channel, false)
         .await
         .ok();
     }
@@ -175,14 +163,7 @@ pub async fn edit(
                     by: user.id.clone(),
                 }
                 .into_message(channel.id().to_string())
-                .send(
-                    db,
-                    amqp,
-                    None,
-                    None,
-                    &channel,
-                    false,
-                )
+                .send(db, amqp, None, None, &channel, false)
                 .await
                 .ok();
             }
@@ -192,14 +173,7 @@ pub async fn edit(
                     by: user.id.clone(),
                 }
                 .into_message(channel.id().to_string())
-                .send(
-                    db,
-                    amqp,
-                    None,
-                    None,
-                    &channel,
-                    false,
-                )
+                .send(db, amqp, None, None, &channel, false)
                 .await
                 .ok();
             }
@@ -209,14 +183,7 @@ pub async fn edit(
                     by: user.id.clone(),
                 }
                 .into_message(channel.id().to_string())
-                .send(
-                    db,
-                    amqp,
-                    None,
-                    None,
-                    &channel,
-                    false,
-                )
+                .send(db, amqp, None, None, &channel, false)
                 .await
                 .ok();
             }
@@ -306,7 +273,13 @@ pub async fn edit(
             before,
             after: partial,
         }
-        .insert(db, channel.server().unwrap().to_string(), reason, user.id, None)
+        .insert(
+            db,
+            channel.server().unwrap().to_string(),
+            reason,
+            user.id,
+            None,
+        )
         .await;
     };
 
@@ -315,13 +288,13 @@ pub async fn edit(
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashSet;
+    use crate::util::test::PubSubTestHelper;
     use crate::{rocket, util::test::TestHarness};
-    use revolt_database::{Channel};
+    use revolt_database::Channel;
+    use revolt_database::events::client::EventV1;
     use revolt_models::v0::{DataCreateGroup, SystemMessage};
     use rocket::http::{ContentType, Header, Status};
-    use revolt_database::events::client::EventV1;
-    use crate::util::test::PubSubTestHelper;
+    use std::collections::HashSet;
 
     #[rocket::async_test]
     async fn success_transfer_group_owner() {
@@ -338,8 +311,8 @@ mod test {
             },
             user.id.clone(),
         )
-            .await
-            .expect("`Channel`");
+        .await
+        .expect("`Channel`");
 
         let mut pubsub = PubSubTestHelper::new(group.id()).await;
 
@@ -353,7 +326,7 @@ mod test {
                 json!({
                     "owner": other_user.id,
                 })
-                    .to_string(),
+                .to_string(),
             )
             .dispatch()
             .await;
@@ -392,8 +365,8 @@ mod test {
             },
             user.id.clone(),
         )
-            .await
-            .expect("`Channel`");
+        .await
+        .expect("`Channel`");
 
         // Make bot the owner
         let owner_response = harness
@@ -405,7 +378,7 @@ mod test {
                 json!({
                     "owner": bot_user.id,
                 })
-                    .to_string(),
+                .to_string(),
             )
             .dispatch()
             .await;

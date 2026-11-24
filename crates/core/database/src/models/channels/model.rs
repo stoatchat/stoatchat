@@ -784,10 +784,12 @@ impl Channel {
                 recipients,
                 ..
             } => {
+                let id = id.clone();
+
                 if &user.id == owner {
                     if let Some(new_owner) = recipients.iter().find(|x| *x != &user.id) {
                         db.update_channel(
-                            id,
+                            &id,
                             &PartialChannel {
                                 owner: Some(new_owner.into()),
                                 ..Default::default()
@@ -809,7 +811,11 @@ impl Channel {
                     }
                 }
 
-                db.remove_user_from_group(id, &user.id).await?;
+                db.remove_user_from_group(&id, &user.id).await?;
+                let mut new_chnl = self.clone();
+                if let Channel::Group { recipients, .. } = &mut new_chnl {
+                    recipients.retain(|uid| *uid != user.id)
+                }
 
                 EventV1::ChannelGroupLeave {
                     id: id.to_string(),
@@ -830,7 +836,7 @@ impl Channel {
                         }
                     }
                     .into_message(id.to_string())
-                    .send(db, amqp, None, None, self, false)
+                    .send(db, amqp, None, None, &new_chnl, false)
                     .await
                     .ok();
                 }

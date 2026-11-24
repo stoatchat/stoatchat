@@ -1,9 +1,13 @@
 use std::{
+    borrow::Cow,
     sync::{Arc, OnceLock},
     time::Duration,
 };
 
-use crate::events::{client::EventV1, rabbit::*};
+use crate::{
+    Channel as RevoltChannel,
+    events::{client::EventV1, rabbit::*},
+};
 use crate::{Message, User};
 use lapin::{
     BasicProperties, Channel, Connection, ConnectionProperties, Error as AMQPError,
@@ -213,10 +217,17 @@ impl AMQP {
         Ok(())
     }
 
-    pub async fn message_sent(&self, message: Message) -> Result<(), AMQPError> {
+    pub async fn message_sent(
+        &self,
+        message: &Message,
+        channel: &RevoltChannel,
+    ) -> Result<(), AMQPError> {
         let config = revolt_config::config().await;
 
-        let payload = MessageSentPayload { message };
+        let payload = MessageSentPayload {
+            message: Cow::Borrowed(message),
+            channel: Cow::Borrowed(channel),
+        };
         let payload = to_string(&payload).unwrap();
 
         debug!(

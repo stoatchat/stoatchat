@@ -1093,13 +1093,6 @@ pub async fn webhook_execute_github(
     #[allow(clippy::disallowed_methods)]
     message.attach_sendable_embed(db, sendable_embed).await?;
     message
-        .send(
-            db,
-            amqp,
-            None,
-            None,
-            &channel,
-            false,
-        )
+        .send(db, amqp, None, None, &channel, false)
         .await
 }

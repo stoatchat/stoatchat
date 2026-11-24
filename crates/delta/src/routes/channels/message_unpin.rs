@@ -63,14 +63,7 @@ pub async fn message_unpin(
         by: user.id.clone(),
     }
     .into_message(channel.id().to_string())
-    .send(
-        db,
-        amqp,
-        None,
-        None,
-        &channel,
-        false,
-    )
+    .send(db, amqp, None, None, &channel, false)
     .await?;
 
     if let Some(server_id) = channel.server() {
@@ -134,7 +127,7 @@ mod test {
 
         let message = Message::create_from_api(
             &harness.db,
-            None,
+            &harness.amqp,
             channel.clone(),
             v0::DataMessageSend {
                 content: Some("Test message".to_string()),

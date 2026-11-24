@@ -128,7 +128,8 @@ impl Consumer for MessageConsumer {
     /// This consumer handles adding mentions to unreads and delegating messages into their respective platform queues.
     async fn consume(&self, delivery: Delivery, context: &WideContextRepository) -> Result<()> {
         let payload: MessageSentPayload = serde_json::from_slice(&delivery.data)?;
-        let message = payload.message;
+        let message = payload.message.into_owned();
+        let channel = payload.channel.into_owned();
 
         context.add("message_id", message.id.clone());
         context.add("channel_id", message.channel.clone());
@@ -144,20 +145,6 @@ impl Consumer for MessageConsumer {
             context.add("push.dropped", "suppressed");
             return Ok(());
         }
-
-        // channel might've been deleted in the meantime
-        let channel = match self.db.fetch_channel(&message.channel).await {
-            Ok(channel) => channel,
-            Err(error) => {
-                context.add("push.dropped", "fetch_channel_failed");
-                warn!(
-                    reason = "fetch_channel_failed",
-                    error = ?error,
-                    "push notification dropped"
-                );
-                return Ok(());
-            }
-        };
 
         let is_dm_or_group = matches!(
             channel,

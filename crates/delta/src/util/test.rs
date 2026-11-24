@@ -6,7 +6,8 @@ use redis_kiss::redis::aio::PubSub;
 use revolt_database::util::email::normalise_email;
 use revolt_database::util::password::hash_password;
 use revolt_database::{
-    AMQP, Bot, Channel, Database, Member, Message, PartialRole, Server, User, events::client::EventV1,
+    AMQP, Bot, Channel, Database, Member, Message, PartialRole, Server, User,
+    events::client::EventV1,
 };
 use revolt_database::{Account, EmailVerification, Session};
 use revolt_database::{Role, util::idempotency::IdempotencyKey};
@@ -153,7 +154,7 @@ impl TestHarness {
         let channel = &channels[0];
         let message = Message::create_from_api(
             &self.db,
-            None,
+            &self.amqp,
             channel.clone(),
             v0::DataMessageSend {
                 content: Some("Test message".to_string()),
@@ -219,7 +220,7 @@ impl TestHarness {
         panic!("Email not found.")
     }
 
-    pub async fn new_bot(&self, user: &User,) -> (Bot, User) {
+    pub async fn new_bot(&self, user: &User) -> (Bot, User) {
         let (bot, bot_user) = Bot::create(&self.db, TestHarness::rand_string(), user, None)
             .await
             .expect("`Bot`");

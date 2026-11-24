@@ -37,12 +37,6 @@ struct Task {
 
 static Q: Lazy<Queue<Data>> = Lazy::new(|| Queue::new(10_000));
 
-/// Send pushes once the channel has been quiet for this long
-const PROCESS_MESSAGE_SAVE_AFTER: Duration = Duration::from_secs(1);
-
-/// but never hold them back longer than this
-const PROCESS_MESSAGE_EXPIRE_AFTER: Duration = Duration::from_secs(3);
-
 /// Queue a new task for a worker
 pub async fn queue_ack(channel: String, user: String, event: AckEvent) {
     Q.try_push(Data {
