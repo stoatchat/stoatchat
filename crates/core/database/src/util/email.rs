@@ -12,6 +12,12 @@ static SPLIT: LazyLock<Regex> = LazyLock::new(|| Regex::new("([^@]+)(@.+)").unwr
 static SYMBOL_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new("\\+.+|\\.").unwrap());
 static HANDLEBARS: LazyLock<handlebars::Handlebars<'static>> =
     LazyLock::new(handlebars::Handlebars::new);
+/// Renderer for plain text templates, which must not be HTML-escaped
+static HANDLEBARS_TEXT: LazyLock<handlebars::Handlebars<'static>> = LazyLock::new(|| {
+    let mut handlebars = handlebars::Handlebars::new();
+    handlebars.register_escape_fn(handlebars::no_escape);
+    handlebars
+});
 static REVOLT_SOURCE_LIST: LazyLock<HashSet<String>> = LazyLock::new(|| {
     include_str!("../../assets/revolt_source_list.txt")
         .split('\n')
@@ -298,8 +304,12 @@ pub fn create_transport(smtp: &ApiSmtp) -> SmtpTransport {
 }
 
 /// Render an email template
-fn render_template(text: &str, variables: &handlebars::JsonValue) -> Result<String> {
-    HANDLEBARS
+fn render_template(
+    renderer: &handlebars::Handlebars,
+    text: &str,
+    variables: &handlebars::JsonValue,
+) -> Result<String> {
+    renderer
         .render_template(text, variables)
         .map_err(|_| create_error!(RenderFail))
 }
@@ -322,12 +332,13 @@ pub fn send_email(
         m
     };
 
-    let text = render_template(&template.text, &variables).expect("valid `template`");
+    let text =
+        render_template(&HANDLEBARS_TEXT, &template.text, &variables).expect("valid `template`");
 
     let m = if let Some(html) = &template.html {
         m.multipart(lettre::message::MultiPart::alternative_plain_html(
             text,
-            render_template(html, &variables).expect("valid `template`"),
+            render_template(&HANDLEBARS, html, &variables).expect("valid `template`"),
         ))
     } else {
         m.body(text)

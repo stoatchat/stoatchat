@@ -37,8 +37,8 @@ pub async fn delete(
     #[allow(deprecated)]
     match &channel {
         Channel::SavedMessages { .. } => Err(create_error!(NoEffect))?,
-        Channel::DirectMessage { recipients, .. } => {
-            if recipients.iter().any(|id| id == v0::SYSTEM_USER_ID) {
+        Channel::DirectMessage { .. } => {
+            if channel.is_system_dm() {
                 return Err(create_error!(InvalidOperation));
             }
 
@@ -138,7 +138,7 @@ mod test {
         let (_, session, user) = harness.new_user().await;
 
         let message = user
-            .send_system_dm(&harness.db, "Account notice".to_string(), false)
+            .send_system_dm(&harness.db, "Account notice".to_string())
             .await
             .expect("`Message`");
 

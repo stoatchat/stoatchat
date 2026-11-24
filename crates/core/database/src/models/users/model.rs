@@ -396,12 +396,7 @@ impl User {
     }
 
     /// Send a direct message to this user from the official system account
-    pub async fn send_system_dm(
-        &self,
-        db: &Database,
-        content: String,
-        send_notification: bool,
-    ) -> Result<Message> {
+    pub async fn send_system_dm(&self, db: &Database, content: String) -> Result<Message> {
         let system = User::fetch_or_create_system(db).await?;
         let channel = Channel::create_dm(db, &system, self).await?;
 
@@ -415,25 +410,10 @@ impl User {
             ..Default::default()
         };
 
-        if send_notification {
-            let model_user = system.clone().into_known_static(false).await;
-
-            message
-                .send(
-                    db,
-                    None,
-                    v0::MessageAuthor::User(&author),
-                    Some(model_user),
-                    None,
-                    &channel,
-                    true,
-                )
-                .await?;
-        } else {
-            message
-                .send_without_notifications(db, Some(author), None, true, true, !send_notification)
-                .await?;
-        }
+        // Push notifications for system DMs are sent separately by `send_system_notice`
+        message
+            .send_without_notifications(db, Some(author), None, true, true, true)
+            .await?;
 
         Ok(message)
     }
@@ -445,21 +425,30 @@ impl User {
         amqp: &AMQP,
         notice: SystemNotice,
     ) -> Result<()> {
-        let dm = self.send_system_dm(db, notice.content(), false).await;
+        let dm_and_push = async {
+            let dm = self.send_system_dm(db, notice.content()).await;
 
-        // Link the push to the system DM so clients can navigate to it
-        let message = match &dm {
-            Ok(message) => Some(SystemNoticeMessage {
-                channel_id: message.channel.clone(),
-                message_id: message.id.clone(),
-                url: format!(
-                    "{}/channel/{}/{}",
-                    config().await.hosts.app,
-                    message.channel,
-                    message.id
-                ),
-            }),
-            Err(_) => None,
+            // Link the push to the system DM so clients can navigate to it
+            let message = match &dm {
+                Ok(message) => Some(SystemNoticeMessage {
+                    channel_id: message.channel.clone(),
+                    message_id: message.id.clone(),
+                    url: format!(
+                        "{}/channel/{}/{}",
+                        config().await.hosts.app,
+                        message.channel,
+                        message.id
+                    ),
+                }),
+                Err(_) => None,
+            };
+
+            let push = amqp
+                .system_notice(&self.id, notice.for_push(), message)
+                .await
+                .map_err(|_| create_error!(InternalError));
+
+            dm.map(|_| ()).and(push)
         };
 
         let email = async {
@@ -476,17 +465,17 @@ impl User {
 
             let templates = email_templates().await;
             let (template, variables) = notice.email(&templates, &address);
+            let template = template.clone();
+            let smtp = config.api.smtp.clone();
 
-            send_email(&config.api.smtp, address, template, variables)
-        }
-        .await;
+            // lettre's SMTP transport is blocking, keep it off the async executor
+            tokio::task::spawn_blocking(move || send_email(&smtp, address, &template, variables))
+                .await
+                .map_err(|_| create_error!(InternalError))?
+        };
 
-        let push = amqp
-            .system_notice(&self.id, notice.for_push(), message)
-            .await
-            .map_err(|_| create_error!(InternalError));
-
-        dm.map(|_| ()).and(email).and(push)
+        let (dm_and_push, email) = futures::join!(dm_and_push, email);
+        dm_and_push.and(email)
     }
 
     /// Get limits for this user

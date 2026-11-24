@@ -18,20 +18,18 @@ pub async fn verify_email(
     // Find the account
     let mut account = db.fetch_account_with_email_verification(&code).await?;
 
-    let old_email = account.email.clone();
-    let is_moving: bool;
+    // Previous email, if this verification moved the account to a new one
+    let mut old_email = None;
 
     // Update account email
     let response = if let EmailVerification::Moving { new_email, .. } = &account.verification {
-        account.email = new_email.clone();
+        old_email = Some(std::mem::replace(&mut account.email, new_email.clone()));
         account.email_normalised = normalise_email(new_email.clone());
-        is_moving = true;
         v0::ResponseVerify::NoTicket
     } else {
         let mut ticket = MFATicket::new(account.id.to_string(), false);
         ticket.authorised = true;
         ticket.save(db).await?;
-        is_moving = false;
         v0::ResponseVerify::WithTicket {
             ticket: ticket.into(),
         }
@@ -43,7 +41,9 @@ pub async fn verify_email(
     // Save to database
     account.save(db).await?;
 
-    if is_moving && let Ok(user) = db.fetch_user(&account.id).await {
+    if let Some(old_email) = old_email
+        && let Ok(user) = db.fetch_user(&account.id).await
+    {
         _ = user
             .send_system_notice(
                 db,
