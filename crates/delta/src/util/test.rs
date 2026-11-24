@@ -205,9 +205,11 @@ impl TestHarness {
         for entry in results.into_iter().rev() {
             if entry.envelope.to[0].address == mailbox {
                 client
-                    .delete(format!("http://localhost:14080/delete/{}", &entry.id))
+                    .delete(format!("http://localhost:14080/email/{}", &entry.id))
                     .send()
                     .await
+                    .unwrap()
+                    .error_for_status()
                     .unwrap();
 
                 let code = re.captures_iter(&entry.text).next().unwrap()[1].to_string();
