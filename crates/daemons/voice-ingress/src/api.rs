@@ -1,21 +1,21 @@
 use livekit_api::{access_token::TokenVerifier, webhooks::WebhookReceiver};
 use livekit_protocol::TrackType;
 use revolt_database::{
+    AMQP, Channel, Database, PartialMessage, SystemMessage,
     events::client::EventV1,
     iso8601_timestamp::{Duration, Timestamp},
     util::reference::Reference,
     voice::{
-        create_voice_state, delete_channel_voice_state, delete_voice_state,
-        get_call_notification_recipients, get_user_moved_from_voice, get_user_moved_to_voice,
-        get_voice_channel_members, set_channel_call_started_system_message,
-        take_channel_call_started_system_message, update_voice_state_tracks, RoomMetadata,
-        UserVoiceChannel, VoiceClient,
+        RoomMetadata, UserVoiceChannel, VoiceClient, create_voice_state,
+        delete_channel_voice_state, delete_voice_state, get_call_notification_recipients,
+        get_user_moved_from_voice, get_user_moved_to_voice, get_voice_channel_members,
+        set_channel_call_started_system_message, take_channel_call_started_system_message,
+        update_voice_state_tracks,
     },
-    Channel, Database, PartialMessage, SystemMessage, AMQP,
 };
 use revolt_models::v0;
 use revolt_result::{Result, ToRevoltError};
-use rocket::{post, State};
+use rocket::{State, post};
 use rocket_empty::EmptyResponse;
 use ulid::Ulid;
 
@@ -123,16 +123,11 @@ pub async fn ingress(
                     .await?;
 
                 call_started_message
-                    .send(
+                    .send_without_notifications(
                         db,
-                        Some(amqp),
-                        v0::MessageAuthor::System {
-                            username: &user.username,
-                            avatar: user.avatar.as_ref().map(|file| file.id.as_ref()),
-                        },
                         None,
                         None,
-                        &channel,
+                        matches!(channel, Channel::DirectMessage { .. }),
                         false,
                     )
                     .await?;
@@ -261,7 +256,10 @@ pub async fn ingress(
                                 )
                                 .await?;
                         } else {
-                            log::error!("Broken State: Call started message ID ({}) does not contain a CallStarted system message.", &message.id)
+                            log::error!(
+                                "Broken State: Call started message ID ({}) does not contain a CallStarted system message.",
+                                &message.id
+                            )
                         }
                     };
                 };
@@ -313,7 +311,9 @@ pub async fn ingress(
                 };
 
                 if disconnect {
-                    log::debug!("Removing user {user_id} from channel {channel_id} {event:?} due to forbidden track.");
+                    log::debug!(
+                        "Removing user {user_id} from channel {channel_id} {event:?} due to forbidden track."
+                    );
 
                     let _ = voice_client.remove_user(node, user_id, channel_id).await;
                     delete_voice_state(&channel, user_id).await?;

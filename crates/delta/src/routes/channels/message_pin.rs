@@ -2,7 +2,6 @@ use revolt_database::{
     AMQP, AuditLogEntryAction, Channel, Database, PartialMessage, SystemMessage, User,
     util::{permissions::DatabasePermissionQuery, reference::Reference},
 };
-use revolt_models::v0::MessageAuthor;
 use revolt_permissions::{ChannelPermission, calculate_channel_permissions};
 use revolt_result::{Result, create_error};
 use rocket::State;
@@ -70,18 +69,7 @@ pub async fn message_pin(
         by: user.id.clone(),
     }
     .into_message(channel.id().to_string())
-    .send(
-        db,
-        Some(amqp),
-        MessageAuthor::System {
-            username: &user.username,
-            avatar: user.avatar.as_ref().map(|file| file.id.as_ref()),
-        },
-        None,
-        None,
-        &channel,
-        false,
-    )
+    .send(db, amqp, None, None, &channel, false)
     .await?;
 
     if let Some(server_id) = channel.server() {
@@ -140,7 +128,7 @@ mod test {
 
         let message = Message::create_from_api(
             &harness.db,
-            None,
+            &harness.amqp,
             channel.clone(),
             v0::DataMessageSend {
                 content: Some("Test message".to_string()),

@@ -651,6 +651,52 @@ impl From<Masquerade> for crate::Masquerade {
     }
 }
 
+impl From<crate::NotificationSettingPreference> for NotificationSettingPreference {
+    fn from(value: crate::NotificationSettingPreference) -> Self {
+        match value {
+            crate::NotificationSettingPreference::AllMessages => {
+                NotificationSettingPreference::AllMessages
+            }
+            crate::NotificationSettingPreference::Mentions => NotificationSettingPreference::Mentions,
+            crate::NotificationSettingPreference::None => NotificationSettingPreference::None,
+        }
+    }
+}
+
+impl From<NotificationSettingPreference> for crate::NotificationSettingPreference {
+    fn from(value: NotificationSettingPreference) -> Self {
+        match value {
+            NotificationSettingPreference::AllMessages => {
+                crate::NotificationSettingPreference::AllMessages
+            }
+            NotificationSettingPreference::Mentions => crate::NotificationSettingPreference::Mentions,
+            NotificationSettingPreference::None => crate::NotificationSettingPreference::None,
+        }
+    }
+}
+
+impl From<crate::NotificationSetting> for NotificationSetting {
+    fn from(value: crate::NotificationSetting) -> Self {
+        NotificationSetting {
+            channel: value.channel,
+            server: value.server,
+            user: value.user,
+            preference: value.preference.into(),
+        }
+    }
+}
+
+impl From<NotificationSetting> for crate::NotificationSetting {
+    fn from(value: NotificationSetting) -> Self {
+        crate::NotificationSetting {
+            channel: value.channel,
+            server: value.server,
+            user: value.user,
+            preference: value.preference.into(),
+        }
+    }
+}
+
 impl From<crate::PolicyChange> for PolicyChange {
     fn from(value: crate::PolicyChange) -> Self {
         PolicyChange {

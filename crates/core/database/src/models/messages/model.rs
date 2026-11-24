@@ -1,12 +1,12 @@
 use indexmap::{IndexMap, IndexSet};
 use iso8601_timestamp::Timestamp;
-use revolt_config::{FeaturesLimits, config};
+use revolt_config::{FeaturesLimits, capture_error, config};
 use revolt_models::v0::{
     self, BulkMessageResponse, DataMessageSend, Embed, MessageAuthor, MessageFlags, MessageSort,
-    MessageWebhook, PushNotification, ReplyIntent, SendableEmbed, Text,
+    MessageWebhook, ReplyIntent, SendableEmbed, Text,
 };
 use revolt_permissions::{ChannelPermission, PermissionValue, calculate_channel_permissions};
-use revolt_result::{ErrorType, Result};
+use revolt_result::{ErrorType, Result, ToRevoltError};
 use std::str::FromStr;
 use std::time::SystemTime;
 use std::{collections::HashSet, hash::RandomState};
@@ -23,7 +23,7 @@ use crate::{
 };
 
 #[cfg(feature = "tasks")]
-use crate::tasks::{self, ack::AckEvent};
+use crate::tasks;
 
 auto_derived_partial!(
     /// Message
@@ -269,7 +269,7 @@ impl Message {
     #[allow(clippy::too_many_arguments)]
     pub async fn create_from_api(
         db: &Database,
-        amqp: Option<&AMQP>,
+        amqp: &AMQP,
         channel: Channel,
         data: DataMessageSend,
         author: MessageAuthor<'_>,
@@ -631,7 +631,7 @@ impl Message {
 
         // Send the message
         message
-            .send(db, amqp, author, user, member, &channel, generate_embeds)
+            .send(db, amqp, user, member, &channel, generate_embeds)
             .await?;
 
         Ok(message)
@@ -645,9 +645,6 @@ impl Message {
         member: Option<v0::Member>,
         is_dm: bool,
         generate_embeds: bool,
-        // This determines if this function should queue the mentions task or if somewhere else will.
-        // If this is true, you MUST call tasks::ack::queue yourself.
-        mentions_elsewhere: bool,
     ) -> Result<()> {
         db.insert_message(self).await?;
 
@@ -660,48 +657,25 @@ impl Message {
         #[cfg(feature = "tasks")]
         tasks::last_message_id::queue(self.channel.to_string(), self.id.to_string(), is_dm).await;
 
-        // Add mentions for affected users
-        #[cfg(feature = "tasks")]
-        if !mentions_elsewhere {
-            if let Some(mentions) = &self.mentions {
-                tasks::ack::queue_message(
-                    self.channel.to_string(),
-                    AckEvent::ProcessMessage {
-                        messages: vec![(
-                            None,
-                            self.clone(),
-                            mentions.clone(),
-                            self.has_suppressed_notifications(),
-                        )],
-                    },
-                )
-                .await;
-            }
-        }
-
         // Generate embeds
         #[cfg(feature = "tasks")]
-        if generate_embeds {
-            if let Some(content) = &self.content {
-                tasks::process_embeds::queue(
-                    self.channel.to_string(),
-                    self.id.to_string(),
-                    content.clone(),
-                )
-                .await;
-            }
+        if generate_embeds && let Some(content) = &self.content {
+            tasks::process_embeds::queue(
+                self.channel.to_string(),
+                self.id.to_string(),
+                content.clone(),
+            )
+            .await;
         }
 
         Ok(())
     }
 
     /// Send a message
-    #[allow(clippy::too_many_arguments)]
     pub async fn send(
         &mut self,
         db: &Database,
-        _amqp: Option<&AMQP>, // this is optional mostly for tests.
-        author: MessageAuthor<'_>,
+        amqp: &AMQP,
         user: Option<v0::User>,
         member: Option<v0::Member>,
         channel: &Channel,
@@ -713,52 +687,12 @@ impl Message {
             member.clone(),
             matches!(channel, Channel::DirectMessage { .. }),
             generate_embeds,
-            true,
         )
         .await?;
 
-        let is_dm_or_group = matches!(
-            channel,
-            Channel::DirectMessage { .. } | Channel::Group { .. }
-        );
-
-        if !self.has_suppressed_notifications()
-            && (is_dm_or_group || self.mentions.is_some() || self.contains_mass_push_mention())
-        {
-            // send Push notifications
-            #[cfg(feature = "tasks")]
-            tasks::ack::queue_message(
-                self.channel.to_string(),
-                AckEvent::ProcessMessage {
-                    messages: vec![(
-                        Some(
-                            PushNotification::from(
-                                self.clone().into_model(user, member),
-                                Some(author.clone()),
-                                channel.to_owned().into(),
-                            )
-                            .await,
-                        ),
-                        self.clone(),
-                        match channel {
-                            Channel::DirectMessage { recipients, .. }
-                            | Channel::Group { recipients, .. } => recipients
-                                .iter()
-                                .filter(|uid| *uid != author.id())
-                                .cloned()
-                                .collect(),
-                            Channel::TextChannel { .. } => {
-                                self.mentions.clone().unwrap_or_default()
-                            }
-                            _ => vec![],
-                        },
-                        false, // branch already dictates this
-                    )],
-                },
-            )
-            .await;
+        if let Err(e) = amqp.message_sent(self, channel).await {
+            capture_error(&e);
         }
-
         Ok(())
     }
 
@@ -1171,7 +1105,7 @@ impl Message {
     }
 
     /// Remove a reaction from a message
-    pub async fn remove_reaction(&self, db: &Database, user: &str,  mut emoji: &str) -> Result<()> {
+    pub async fn remove_reaction(&self, db: &Database, user: &str, mut emoji: &str) -> Result<()> {
         emoji = emoji.strip_prefix('\u{200C}').unwrap_or(emoji);
         // Check if it actually exists
         let empty = if let Some(users) = self.reactions.get(emoji) {
