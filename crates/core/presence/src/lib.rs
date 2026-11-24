@@ -165,7 +165,10 @@ pub async fn filter_online(user_ids: &'_ [String]) -> HashSet<String> {
 /// Reset any stale presence data
 pub async fn clear_region(region_id: Option<&str>) {
     let region_id = region_id.unwrap_or(&*REGION_KEY);
-    let mut conn = get_connection().await.expect("Redis connection");
+    let mut conn = get_connection().await.expect(
+        "Failed to connect to Redis. Check that it is running and that \
+        `database.redis` in Revolt.toml (or REDIS_URI) points to it",
+    );
 
     let sessions = __get_set_members_as_string(&mut conn, region_id).await;
     if !sessions.is_empty() {
