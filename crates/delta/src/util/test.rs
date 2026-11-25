@@ -6,7 +6,8 @@ use redis_kiss::redis::aio::PubSub;
 use revolt_database::util::email::normalise_email;
 use revolt_database::util::password::hash_password;
 use revolt_database::{
-    AMQP, Bot, Channel, Database, Member, Message, PartialRole, Server, User, events::client::EventV1,
+    AMQP, Bot, Channel, Database, Emoji, EmojiParent, Member, Message, PartialRole, Server, User,
+    events::client::EventV1,
 };
 use revolt_database::{Account, EmailVerification, Session};
 use revolt_database::{Role, util::idempotency::IdempotencyKey};
@@ -16,6 +17,7 @@ use rocket::http::Header;
 use rocket::local::asynchronous::{Client, LocalRequest, LocalResponse};
 use rocket::tokio;
 use serde::{Deserialize, Serialize};
+use ulid::Ulid;
 
 pub struct TestHarness {
     pub client: Client,
@@ -225,6 +227,22 @@ impl TestHarness {
             .expect("`Bot`");
 
         (bot, bot_user)
+    }
+
+    pub async fn new_emoji(&self, server: &Server, creator: &User) -> Emoji {
+        let emoji = Emoji {
+            id: Ulid::new().to_string(),
+            parent: EmojiParent::Server {
+                id: server.id.clone(),
+            },
+            creator_id: creator.id.clone(),
+            name: "test_emoji".to_string(),
+            animated: false,
+            nsfw: false,
+        };
+
+        emoji.create(&self.db).await.expect("Failed to create emoji");
+        emoji
     }
 }
 

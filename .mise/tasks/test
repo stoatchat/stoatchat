@@ -5,4 +5,4 @@ set -e
 : "${TEST_DB:=REFERENCE}"
 export TEST_DB
 
-cargo nextest run
+cargo nextest run -j 5
