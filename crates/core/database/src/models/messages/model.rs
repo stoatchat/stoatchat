@@ -389,9 +389,14 @@ impl Message {
             mut role_mentions,
             mut mentions_everyone,
             mut mentions_online,
-            emojis,
+            mut emojis,
             ..
         } = message_mentions;
+
+        emojis.extend(Message::collect_emojis(
+            None,
+            data.embeds.as_deref().unwrap_or_default(),
+        ));
 
         if allow_mass_mentions && server_id.is_some() && !role_mentions.is_empty() {
             let server_data = db
@@ -966,12 +971,47 @@ impl Message {
         Ok(())
     }
 
+    /// Collect custom emoji IDs used in message content and embed text
+    pub fn collect_emojis(content: Option<&str>, embeds: &[SendableEmbed]) -> HashSet<String> {
+        let embed_text = embeds
+            .iter()
+            .flat_map(|embed| [embed.title.as_deref(), embed.description.as_deref()])
+            .flatten();
+
+        content
+            .into_iter()
+            .chain(embed_text)
+            .flat_map(|text| revolt_parser::parse_message(text).emojis)
+            .collect()
+    }
+
+    /// Ensure the given emoji IDs may be used in this channel with these permissions
+    pub async fn validate_external_emojis(
+        db: &Database,
+        channel: &Channel,
+        permissions: &PermissionValue,
+        emoji_ids: &[String],
+    ) -> Result<()> {
+        if let Some(server_id) = channel.server()
+            && Message::any_foreign_emoji(db, server_id, emoji_ids).await?
+        {
+            permissions
+                .throw_if_lacking_channel_permission(ChannelPermission::UseExternalEmojis)?;
+        }
+
+        Ok(())
+    }
+
     /// Check whether any of the given emoji IDs belong to a server other than `server_id`
     async fn any_foreign_emoji(
         db: &Database,
         server_id: &str,
         emoji_ids: &[String],
     ) -> Result<bool> {
+        if emoji_ids.is_empty() {
+            return Ok(false);
+        }
+
         let resolved = db.fetch_emojis(emoji_ids).await.map_err(|e| {
             revolt_config::capture_error(&e);
             create_database_error!("find", "emojis")
@@ -1171,7 +1211,7 @@ impl Message {
     }
 
     /// Remove a reaction from a message
-    pub async fn remove_reaction(&self, db: &Database, user: &str,  mut emoji: &str) -> Result<()> {
+    pub async fn remove_reaction(&self, db: &Database, user: &str, mut emoji: &str) -> Result<()> {
         emoji = emoji.strip_prefix('\u{200C}').unwrap_or(emoji);
         // Check if it actually exists
         let empty = if let Some(users) = self.reactions.get(emoji) {
@@ -1241,7 +1281,12 @@ impl SystemMessage {
 
 impl Interactions {
     /// Validate interactions info is correct
-    pub async fn validate(&self, db: &Database, permissions: &PermissionValue) -> Result<()> {
+    pub async fn validate(
+        &self,
+        db: &Database,
+        channel: &Channel,
+        permissions: &PermissionValue,
+    ) -> Result<()> {
         let config = config().await;
 
         if let Some(reactions) = &self.reactions {
@@ -1256,6 +1301,14 @@ impl Interactions {
                     return Err(create_error!(InvalidOperation));
                 }
             }
+
+            let emoji_ids: Vec<String> = reactions
+                .iter()
+                .filter(|reaction| Ulid::from_str(reaction).is_ok())
+                .cloned()
+                .collect();
+
+            Message::validate_external_emojis(db, channel, permissions, &emoji_ids).await?;
         }
 
         Ok(())
