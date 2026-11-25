@@ -35,6 +35,7 @@ jxl-oxide = { workspace = true, features = ["image"] }
 image = { workspace = true, features = [
     "avif-native",
 ] } # AVIF decoding requires dav1d
+gif = { workspace = true }
 
 # svg rendering
 usvg = { workspace = true }

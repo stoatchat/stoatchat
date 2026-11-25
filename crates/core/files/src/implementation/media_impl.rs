@@ -1,5 +1,5 @@
 use anyhow::Result;
-use image::{AnimationDecoder, DynamicImage, ImageBuffer, ImageDecoder, ImageReader, Limits};
+use image::{DynamicImage, ImageBuffer, ImageDecoder, ImageReader, Limits};
 use jxl_oxide::integration::JxlDecoder;
 use revolt_config::report_internal_error;
 use std::io::{BufRead, Read, Seek};
@@ -28,26 +28,20 @@ fn is_animated_reader<R: BufRead + Seek>(reader: R, mime: &str) -> Option<bool> 
     match mime {
         // Current behaviour is to assume GIFs are animated, this checks for at least 2 frames
         "image/gif" => {
-            let mut decoder = image::codecs::gif::GifDecoder::new(reader).ok()?;
 
-            // Frames have to be decoded to be counted, so apply the same limits as decode_image
-            let (width, height) = decoder.dimensions();
-            if exceeds_decode_limits(width.into(), height.into()) {
+            let mut options = gif::DecodeOptions::new();
+            options.skip_frame_decoding(true);
+            let mut decoder = options.read_info(reader).ok()?;
+
+            if exceeds_decode_limits(decoder.width().into(), decoder.height().into()) {
                 return None;
             }
-            decoder.set_limits(decode_limits()).ok()?;
 
-            let mut frames = decoder.into_frames();
-            match frames.next() {
-                // The first frame must decode, otherwise this isn't a usable GIF
-                Some(Ok(_)) => {}
-                Some(Err(_)) => return None,
-                None => return Some(false),
+            if decoder.next_frame_info().ok()?.is_none() {
+                return Some(false);
             }
 
-            // A second frame record means the GIF is animated, even if that frame fails to
-            // decode here (e.g. truncated data), as browsers will still play what they can
-            Some(frames.next().is_some())
+            Some(decoder.next_frame_info().ok()?.is_some())
         }
         "image/png" | "image/apng" => {
             let decoder = image::codecs::png::PngDecoder::new(reader).ok()?;
@@ -547,5 +541,30 @@ mod tests {
         buf.extend_from_slice(&[0, 0, 0, 0x3B]);
 
         assert_eq!(media.is_animated_vec(&buf, "image/gif"), None);
+    }
+
+    #[tokio::test]
+    async fn asset_test_large_canvas_gif_is_animated() {
+        let media = MediaImpl::from_config().await;
+
+        // A 9000x4000 logical screen (within decode limits) holding tiny 1x1 frames, decoding
+        // these frames as full canvases would allocate ~144 MiB each
+        let gif = |frames: usize| {
+            let mut buf = b"GIF89a".to_vec();
+            buf.extend_from_slice(&9000u16.to_le_bytes());
+            buf.extend_from_slice(&4000u16.to_le_bytes());
+            // Global colour table of 2 entries, background colour, aspect ratio, palette
+            buf.extend_from_slice(&[0x80, 0, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF]);
+            for _ in 0..frames {
+                // Image descriptor for a 1x1 frame at 0,0 followed by its LZW data
+                buf.extend_from_slice(&[0x2C, 0, 0, 0, 0, 1, 0, 1, 0, 0]);
+                buf.extend_from_slice(&[0x02, 0x02, 0x44, 0x01, 0x00]);
+            }
+            buf.push(0x3B);
+            buf
+        };
+
+        assert_eq!(media.is_animated_vec(&gif(1), "image/gif"), Some(false));
+        assert_eq!(media.is_animated_vec(&gif(2), "image/gif"), Some(true));
     }
 }

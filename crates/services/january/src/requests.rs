@@ -205,16 +205,8 @@ impl Request {
                                 is_animated_vec(&bytes, mime.essence_str()).unwrap_or(false);
 
                             if animated || is_gif {
-                                // Animated images (GIF, APNG, animated WebP) and GIFs are passed
-                                // through as-is, since thumbnailing would discard all but the
-                                // first frame.
-                                //
-                                // The animation check already decoded (within limits) the frames
-                                // of an animated GIF, other formats only had their headers parsed
-                                // so they still need validating.
-                                if (animated && is_gif)
-                                    || is_valid_image(reader, mime.essence_str())
-                                {
+                                // Animated images (GIF, APNG, animated WebP) and GIFs are passed through
+                                if is_valid_image(reader, mime.essence_str()) {
                                     Ok((mime.essence_str().to_owned(), bytes))
                                 } else {
                                     Err(create_error!(FileTypeNotAllowed))
@@ -277,7 +269,7 @@ impl Request {
 
             if let Some((width, height)) = image_size_vec(&bytes, mime) {
                 // Don't advertise an image that we would refuse to proxy
-                if exceeds_decode_limits(width as u64, height as u64) {
+                if mime != "image/svg+xml" && exceeds_decode_limits(width as u64, height as u64) {
                     return Ok(None);
                 }
 
@@ -377,7 +369,7 @@ impl Request {
             EMBED_CACHE.insert(url.to_owned(), embed.clone()).await;
 
             Ok(embed)
-        }  else {
+        } else {
             let request = Request::new_from_str(&url).await?;
             let embed = match (request.mime.type_(), request.mime.subtype()) {
                 (_, mime::HTML) => {

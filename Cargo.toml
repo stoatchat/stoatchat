@@ -136,6 +136,7 @@ sha2 = "0.10.8"
 kamadak-exif = "0.5.4"
 webp = "0.3.0"
 image = "0.25.2"
+gif = "0.14" # keep in sync with the version used by image
 thumbhash = "0.1.0"
 lcms2 = "6.1.1" # for color profile processing
 

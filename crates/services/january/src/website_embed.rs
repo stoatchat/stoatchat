@@ -5,6 +5,7 @@ use regex::Regex;
 use revolt_models::v0::{
     BandcampType, Image, ImageSize, LightspeedType, Special, TwitchType, Video, WebsiteMetadata,
 };
+use revolt_result::{Error, ErrorType};
 use scraper::{Html, Selector};
 use url::Url;
 
@@ -171,16 +172,18 @@ pub async fn create_website_embed(original_url: &str, document: &str) -> Option<
             if url.is_empty() {
                 metadata.image.take();
             } else {
-                match crate::requests::Request::fetch_image_metadata(url, None, size.clone())
-                    .await
+                match crate::requests::Request::fetch_image_metadata(url, None, size.clone()).await
                 {
                     Ok(Some(image)) => metadata.image = Some(image),
-                    // keep the image as given by the page if it provided a size,
-                    // otherwise we have no way to display it
-                    _ if width == &0 || height == &0 => {
+                    // Keep the image as given by the page if it provided a size after an error
+                    Err(Error {
+                        error_type: ErrorType::ProxyError | ErrorType::InternalError,
+                        ..
+                    })
+                    if width != &0 && height != &0 => {}
+                    _ => {
                         metadata.image.take();
                     }
-                    _ => {}
                 }
             }
         }
