@@ -14,6 +14,8 @@ mod member_experimental_query;
 mod member_fetch;
 mod member_fetch_all;
 mod member_remove;
+mod notifications_get;
+mod notifications_set;
 mod permissions_set;
 mod permissions_set_default;
 mod roles_create;
@@ -56,5 +58,7 @@ pub fn routes() -> (Vec<Route>, OpenApi) {
         discover::discover_add::discover_add,
         discover::discover_get::discover_get,
         discover::discover_remove::discover_remove,
+        notifications_get::notifications_get,
+        notifications_set::notifications_set,
     ]
 }

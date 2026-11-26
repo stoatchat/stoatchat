@@ -153,8 +153,33 @@ Data for use by client, data structures match the API specification.
     "user_settings"?: [{..}],
     "channel_unreads"?: [{..}],
     "policy_changes"?: [{..}],
+    "notification_settings"?: [{..}],
 }
 ```
+
+#### Notification Settings
+
+`notification_settings` lists each notification preference you've changed, across your servers, their channels, your DMs and your groups. An entry looks like this:
+
+```json
+{
+    "user": "user id",
+    "server"?: "server id",
+    "channel"?: "channel id",
+    "preference": "AllMessages"
+}
+```
+
+`preference` is one of `AllMessages`, `Mentions` or `None`. The fields you get tell you what the entry covers:
+
+- `server` alone: the whole server.
+- `server` and `channel`: one channel, overriding its server's entry.
+- `channel` alone: a DM or group.
+
+The server will never provide any channels/servers that are set to `Mentions`, 
+as this is considered the default and is not stored.
+
+`AllMessages` only takes effect for small servers, regardless of what the user sets.
 
 ### Message
 

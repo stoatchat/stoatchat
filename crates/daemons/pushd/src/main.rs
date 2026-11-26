@@ -1,5 +1,5 @@
 #[macro_use]
-extern crate log;
+extern crate tracing;
 
 use std::sync::Arc;
 
@@ -27,8 +27,10 @@ use crate::utils::{Consumer, Delegate};
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() {
-    // Configure logging and environment
-    revolt_config::configure!(pushd);
+    let _telemetry = stoat_otel::init(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+    info!(version = env!("CARGO_PKG_VERSION"), "Starting pushd");
+
+    revolt_config::config().await;
 
     // Setup database
     let db = revolt_database::DatabaseInfo::Auto.connect().await.unwrap();
@@ -273,10 +275,10 @@ where
         .await
         .unwrap();
     info!(
-        "Consuming routing key {} as queue {}, tag {}",
         routing_key,
-        queue_name,
-        consumer.tag()
+        queue = queue_name,
+        tag = %consumer.tag(),
+        "Consuming queue"
     );
 
     let delegate = Delegate(

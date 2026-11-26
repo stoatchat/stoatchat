@@ -26,7 +26,7 @@ struct MigrationInfo {
     revision: i32,
 }
 
-pub const LATEST_REVISION: i32 = 55; // MUST BE +1 to last migration
+pub const LATEST_REVISION: i32 = 56; // MUST BE +1 to last migration
 
 pub async fn migrate_database(db: &MongoDb) {
     let migrations = db.col::<Document>("migrations");
@@ -1599,6 +1599,33 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             )
             .await
             .expect("Failed to update default_permissions");
+    };
+
+    if revision <= 55 {
+        info!("Running migration [revision 55 / 19-11-2026]: Add notification settings collection");
+
+        db.db()
+            .create_collection("notification_settings")
+            .await
+            .expect("Failed to create notification_settings collection");
+
+        db.db()
+            .run_command(doc! {
+                "createIndexes": "notification_settings",
+                "indexes": [
+                    {
+                        "key": {
+                            "user": 1_i32,
+                            "server": 1_i32,
+                            "channel": 1_i32,
+                        },
+                        "name": "user_server_channel",
+                        "unique": true
+                    }
+                ]
+            })
+            .await
+            .expect("Failed to create notification_settings index");
     };
 
     // Reminder to update LATEST_REVISION when adding new migrations.

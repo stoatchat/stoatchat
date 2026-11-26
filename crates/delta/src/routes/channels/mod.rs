@@ -22,6 +22,8 @@ mod message_search;
 mod message_send;
 mod message_unpin;
 mod message_unreact;
+mod notifications_get;
+mod notifications_set;
 mod permissions_set;
 mod permissions_set_default;
 mod voice_join;
@@ -58,5 +60,7 @@ pub fn routes() -> (Vec<Route>, OpenApi) {
         message_clear_reactions::clear_reactions,
         webhook_create::create_webhook,
         webhook_fetch_all::fetch_webhooks,
+        notifications_get::notifications_get,
+        notifications_set::notifications_set,
     ]
 }

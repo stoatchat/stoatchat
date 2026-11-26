@@ -37,16 +37,19 @@ The Bonfire service supports additional query parameters:
 
 The ready query parameter can be passed multiple times to specify multiple fields, supported fields are:
 
-| Value             | Description                                                                                                     |
-| ----------------- | --------------------------------------------------------------------------------------------------------------- |
-| `users`           | Includes all users you have a relation with.                                                                    |
-| `servers`         | Includes all servers you are in.                                                                                |
-| `channels`        | Includes all channels you have access to.                                                                       |
-| `members`         | Includes all members you have a relation with.                                                                  |
-| `emojis`          | Includes all emojis you have access to.                                                                         |
-| `user_settings`   | Specify which settings to pre-fetch, specify a setting by setting the value to `user_settings[<setting_name>]`. |
-| `channel_unreads` | Includes all channel unreads you have.                                                                          |
-| `policy_changes`  | Includes all new policy changes you should be aware of, this is not sent to bots.                               |
+| Value                   | Description                                                                                                     |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `users`                 | Includes all users you have a relation with.                                                                    |
+| `servers`               | Includes all servers you are in.                                                                                |
+| `channels`              | Includes all channels you have access to.                                                                       |
+| `members`               | Includes all members you have a relation with.                                                                  |
+| `emojis`                | Includes all emojis you have access to.                                                                         |
+| `user_settings`         | Specify which settings to pre-fetch, specify a setting by setting the value to `user_settings[<setting_name>]`. |
+| `channel_unreads`       | Includes all channel unreads you have.                                                                          |
+| `policy_changes`        | Includes all new policy changes you should be aware of, this is not sent to bots.                               |
+| `notification_settings` | Includes your notification setting overrides. This is not sent to bots. |
+
+The server leaves out `channel_unreads` and `notification_settings` unless you ask for them.
 
 For example:
 
