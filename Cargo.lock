@@ -7649,6 +7649,7 @@ dependencies = [
  "aws-sdk-s3",
  "base64 0.21.7",
  "ffprobe",
+ "gif 0.14.2",
  "image",
  "imagesize",
  "jxl-oxide",

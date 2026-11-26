@@ -5,6 +5,7 @@ use regex::Regex;
 use revolt_models::v0::{
     BandcampType, Image, ImageSize, LightspeedType, Special, TwitchType, Video, WebsiteMetadata,
 };
+use revolt_result::{Error, ErrorType};
 use scraper::{Html, Selector};
 use url::Url;
 
@@ -100,6 +101,7 @@ pub async fn create_website_embed(original_url: &str, document: &str) -> Option<
                         .parse()
                         .unwrap_or(0),
                     size,
+                    animated: false,
                 }
             }),
         video: meta
@@ -157,21 +159,32 @@ pub async fn create_website_embed(original_url: &str, document: &str) -> Option<
         metadata.image.take();
     }
 
-    // fetch image size if missing
+    // fetch image metadata (actual size and whether it is animated)
     if metadata.special.is_none() {
         if let Some(Image {
-            width, height, url, ..
+            width,
+            height,
+            url,
+            size,
+            ..
         }) = &metadata.image
         {
             if url.is_empty() {
                 metadata.image.take();
-            } else if width == &0 || height == &0 {
-                let size = metadata.image.as_ref().unwrap().size.clone();
-                metadata.image =
-                    match crate::requests::Request::fetch_image_metadata(url, None, size).await {
-                        Ok(Some(image)) => Some(image),
-                        _ => None,
+            } else {
+                match crate::requests::Request::fetch_image_metadata(url, None, size.clone()).await
+                {
+                    Ok(Some(image)) => metadata.image = Some(image),
+                    // Keep the image as given by the page if it provided a size after an error
+                    Err(Error {
+                        error_type: ErrorType::ProxyError | ErrorType::InternalError,
+                        ..
+                    })
+                    if width != &0 && height != &0 => {}
+                    _ => {
+                        metadata.image.take();
                     }
+                }
             }
         }
     }

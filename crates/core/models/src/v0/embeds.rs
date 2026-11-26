@@ -19,6 +19,11 @@ auto_derived!(
         pub height: usize,
         /// Positioning and size
         pub size: ImageSize,
+        /// Whether the image is animated (GIF, APNG or animated WebP)
+        ///
+        /// `false` if this could not be determined
+        #[serde(default)]
+        pub animated: bool,
     }
 
     /// Video

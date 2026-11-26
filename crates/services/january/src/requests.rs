@@ -10,7 +10,10 @@ use reqwest::{
     redirect,
 };
 use revolt_config::{config, report_internal_error};
-use revolt_files::{create_thumbnail, decode_image, image_size_vec, is_valid_image, video_size};
+use revolt_files::{
+    create_thumbnail, decode_image, exceeds_decode_limits, image_size_vec, is_animated_vec,
+    is_valid_image, video_size,
+};
 use revolt_models::v0::{Embed, Image, ImageSize, Video};
 use revolt_result::{Error, Result, ToRevoltError, create_error};
 use std::net::{IpAddr, SocketAddr};
@@ -146,6 +149,32 @@ impl reqwest::dns::Resolve for CachedDnsResolver {
     }
 }
 
+/// Maximum size of a remote image we are willing to download
+///
+/// Images larger than this are almost always beyond the decode limits anyway
+const MAX_IMAGE_BYTES: usize = 50 * 1024 * 1024;
+
+/// Read a response body into memory, failing if it is larger than `limit` bytes
+async fn read_body_limited(mut response: Response, limit: usize) -> Result<Vec<u8>> {
+    if response
+        .content_length()
+        .is_some_and(|length| length > limit as u64)
+    {
+        return Err(create_error!(PayloadTooLarge));
+    }
+
+    let mut buf = Vec::new();
+    while let Some(chunk) = report_internal_error!(response.chunk().await)? {
+        if buf.len() + chunk.len() > limit {
+            return Err(create_error!(PayloadTooLarge));
+        }
+
+        buf.extend_from_slice(&chunk);
+    }
+
+    Ok(buf)
+}
+
 /// Information about a successful request
 pub struct Request {
     pub response: Response,
@@ -161,16 +190,24 @@ impl Request {
             let Request { response, mime } = Request::new_from_str(url).await?;
 
             if matches!(mime.type_(), mime::IMAGE | mime::VIDEO) {
-                let bytes = report_internal_error!(response.bytes().await);
+                let bytes = if matches!(mime.type_(), mime::IMAGE) {
+                    read_body_limited(response, MAX_IMAGE_BYTES).await
+                } else {
+                    report_internal_error!(response.bytes().await).map(|bytes| bytes.to_vec())
+                };
 
                 let result = match bytes {
                     Ok(bytes) => {
                         if matches!(mime.type_(), mime::IMAGE) {
                             let reader = &mut Cursor::new(&bytes);
+                            let is_gif = matches!(mime.subtype(), mime::GIF);
+                            let animated =
+                                is_animated_vec(&bytes, mime.essence_str()).unwrap_or(false);
 
-                            if matches!(mime.subtype(), mime::GIF) {
-                                if is_valid_image(reader, "image/gif") {
-                                    Ok(("image/gif".to_owned(), bytes.to_vec()))
+                            if animated || is_gif {
+                                // Animated images (GIF, APNG, animated WebP) and GIFs are passed through
+                                if is_valid_image(reader, mime.essence_str()) {
+                                    Ok((mime.essence_str().to_owned(), bytes))
                                 } else {
                                     Err(create_error!(FileTypeNotAllowed))
                                 }
@@ -189,7 +226,7 @@ impl Request {
                             report_internal_error!(file.write_all(&bytes))?;
 
                             if video_size(&file).is_some() {
-                                Ok((mime.to_string(), bytes.to_vec()))
+                                Ok((mime.to_string(), bytes))
                             } else {
                                 Err(create_error!(FileTypeNotAllowed))
                             }
@@ -212,11 +249,9 @@ impl Request {
         request: Option<Request>,
         size: ImageSize,
     ) -> Result<Option<Image>> {
-        if let Some(hit) = EMBED_CACHE.get(url).await {
-            match hit {
-                Embed::Image(img) => Ok(Some(img)),
-                _ => Ok(None),
-            }
+        // The cached embed may have been generated with a different size
+        if let Some(Embed::Image(img)) = EMBED_CACHE.get(url).await {
+            Ok(Some(Image { size, ..img }))
         } else {
             let request = if let Some(request) = request {
                 request
@@ -229,15 +264,21 @@ impl Request {
                 }
             };
 
-            if let Some((width, height)) = image_size_vec(
-                &report_internal_error!(request.response.bytes().await)?,
-                request.mime.as_ref(),
-            ) {
+            let bytes = read_body_limited(request.response, MAX_IMAGE_BYTES).await?;
+            let mime = request.mime.essence_str();
+
+            if let Some((width, height)) = image_size_vec(&bytes, mime) {
+                // Don't advertise an image that we would refuse to proxy
+                if mime != "image/svg+xml" && exceeds_decode_limits(width as u64, height as u64) {
+                    return Ok(None);
+                }
+
                 Ok(Some(Image {
                     url: url.to_owned(),
                     width,
                     height,
                     size,
+                    animated: is_animated_vec(&bytes, mime).unwrap_or(false),
                 }))
             } else {
                 Ok(None)
@@ -328,7 +369,7 @@ impl Request {
             EMBED_CACHE.insert(url.to_owned(), embed.clone()).await;
 
             Ok(embed)
-        }  else {
+        } else {
             let request = Request::new_from_str(&url).await?;
             let embed = match (request.mime.type_(), request.mime.subtype()) {
                 (_, mime::HTML) => {
