@@ -1,4 +1,7 @@
-use crate::{AbstractAccounts, Account, DeletionInfo, EmailVerification, Lockout, ReferenceDb};
+use crate::{
+    AbstractAccounts, Account, DeletionInfo, EmailVerification, Lockout, PasskeyCredential,
+    ReferenceDb, util::webauthn::encode_credential_id,
+};
 use iso8601_timestamp::{Duration, Timestamp};
 use revolt_result::Result;
 
@@ -72,6 +75,22 @@ impl AbstractAccounts for ReferenceDb {
             .ok_or_else(|| create_error!(InvalidToken))
     }
 
+    /// Find account owning a passkey by its WebAuthn credential id
+    async fn fetch_account_by_passkey(&self, credential_id: &[u8]) -> Result<Option<Account>> {
+        let credential_id = encode_credential_id(credential_id);
+        let accounts = self.accounts.lock().await;
+        Ok(accounts
+            .values()
+            .find(|account| {
+                account
+                    .mfa
+                    .passkeys
+                    .iter()
+                    .any(|passkey| passkey.credential_id == credential_id)
+            })
+            .cloned())
+    }
+
     /// Find accounts which are due to be deleted
     async fn fetch_accounts_due_for_deletion(&self) -> Result<Vec<Account>> {
         let now = Timestamp::now_utc();
@@ -93,7 +112,65 @@ impl AbstractAccounts for ReferenceDb {
     // Save account
     async fn save_account(&self, account: &Account) -> Result<()> {
         let mut accounts = self.accounts.lock().await;
+
+        // Mirror the unique `mfa.passkeys.credential_id` index
+        if accounts.values().any(|other| {
+            other.id != account.id
+                && other.mfa.passkeys.iter().any(|passkey| {
+                    account
+                        .mfa
+                        .passkeys
+                        .iter()
+                        .any(|ours| ours.credential_id == passkey.credential_id)
+                })
+        }) {
+            return Err(create_database_error!("update_one", "accounts"));
+        }
+
         accounts.insert(account.id.to_string(), account.clone());
+        Ok(())
+    }
+
+    /// Add a newly registered passkey
+    async fn add_passkey(&self, account_id: &str, passkey: &PasskeyCredential) -> Result<()> {
+        let mut accounts = self.accounts.lock().await;
+
+        // Mirror the unique `mfa.passkeys.credential_id` index
+        if accounts.values().any(|account| {
+            account
+                .mfa
+                .passkeys
+                .iter()
+                .any(|other| other.credential_id == passkey.credential_id)
+        }) {
+            return Err(create_error!(PasskeyAlreadyRegistered));
+        }
+
+        accounts
+            .get_mut(account_id)
+            .ok_or_else(|| create_error!(UnknownUser))?
+            .mfa
+            .passkeys
+            .push(passkey.clone());
+        Ok(())
+    }
+
+    /// Save a passkey's credential and last use after it has been used to authenticate
+    async fn save_passkey(&self, account_id: &str, passkey: &PasskeyCredential) -> Result<()> {
+        let mut accounts = self.accounts.lock().await;
+        let stored = accounts
+            .get_mut(account_id)
+            .and_then(|account| {
+                account
+                    .mfa
+                    .passkeys
+                    .iter_mut()
+                    .find(|stored| stored.id == passkey.id)
+            })
+            .ok_or_else(|| create_error!(InvalidCredentials))?;
+
+        stored.credential = passkey.credential.clone();
+        stored.last_used = passkey.last_used;
         Ok(())
     }
 

@@ -251,6 +251,10 @@ pub enum ErrorType {
 
     TotpAlreadyEnabled,
     DisallowedMFAMethod,
+    TooManyPasskeys {
+        max: usize,
+    },
+    PasskeyAlreadyRegistered,
 }
 
 #[macro_export]

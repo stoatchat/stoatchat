@@ -137,7 +137,7 @@ kamadak-exif = "0.5.4"
 webp = "0.3.0"
 image = "0.25.2"
 thumbhash = "0.1.0"
-lcms2 = "6.1.1" # for color profile processing
+lcms2 = "6.1.1"        # for color profile processing
 
 # File processing
 revolt_clamav-client = "0.1.5"
@@ -188,6 +188,12 @@ lazy_static = "1.5.0"
 mime = "0.3.17"
 totp-lite = "2.0.0"
 rust-argon2 = "1.0.0"
+webauthn-rs = { version = "0.6.2", features = [
+    "danger-allow-state-serialisation",
+    "conditional-ui",
+] }
+webauthn-rs-proto = "=0.6.2"
+webauthn-authenticator-rs = { version = "0.6.2", features = ["softpasskey"] }
 base32 = "0.4.0"
 sha1 = "0.10.6"
 futures-lite = "2.6.1"

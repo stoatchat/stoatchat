@@ -4,13 +4,13 @@ use std::time::Duration;
 
 use iso8601_timestamp::Timestamp;
 use revolt_database::{
+    Account, Database, EmailVerification, MFATicket, PartialAccount,
     util::{email::normalise_email, password::assert_safe},
-    Database, EmailVerification, MFATicket,
 };
 use revolt_models::v0;
-use revolt_result::{create_error, Result};
-use rocket::serde::json::Json;
+use revolt_result::{Result, create_error};
 use rocket::State;
+use rocket::serde::json::Json;
 use tokio::time::sleep;
 
 /// # Login
@@ -108,13 +108,12 @@ pub async fn login(
             let mut account = db.fetch_account(&ticket.account_id).await?;
 
             // Check for account lockout
-            if let Some(lockout) = &account.lockout {
-                if let Some(expiry) = lockout.expiry {
-                    if expiry > Timestamp::now_utc() {
-                        db.bump_lockout_count(&account.id).await?;
-                        return Err(create_error!(LockedOut));
-                    }
-                }
+            if let Some(lockout) = &account.lockout
+                && let Some(expiry) = lockout.expiry
+                && expiry > Timestamp::now_utc()
+            {
+                db.bump_lockout_count(&account.id).await?;
+                return Err(create_error!(LockedOut));
             }
 
             // Verify the MFA response
@@ -139,6 +138,36 @@ pub async fn login(
 
             (account, friendly_name)
         }
+        v0::DataLogin::Passkey {
+            passkey_challenge,
+            passkey_response,
+            friendly_name,
+        } => {
+            // Find the account this passkey belongs to
+            let (mut account, passkey_login) =
+                Account::identify_passkey_login(db, &passkey_challenge, passkey_response).await?;
+
+            // Check for account lockout
+            if let Some(lockout) = &account.lockout
+                && let Some(expiry) = lockout.expiry
+                && expiry > Timestamp::now_utc()
+            {
+                db.bump_lockout_count(&account.id).await?;
+                return Err(create_error!(LockedOut));
+            }
+
+            // Verify the passkey, user verification makes this sufficient on its own
+            if let Err(err) = account.finish_passkey_login(db, passkey_login).await {
+                db.bump_lockout_count(&account.id).await?;
+                return Err(err);
+            }
+
+            // Passkey passed, clear lockout information and save passkey usage
+            account.lockout = None;
+            account.save(db).await?;
+
+            (account, friendly_name)
+        }
     };
 
     // Generate a session name
@@ -159,15 +188,20 @@ pub async fn login(
 
 #[cfg(test)]
 mod tests {
+    use crate::util::{
+        passkey::{register_passkey, sign_challenge, sign_login_challenge},
+        test::PubSubTestHelper,
+    };
     use crate::{rocket, util::test::TestHarness};
     use iso8601_timestamp::Timestamp;
     use revolt_database::{
-        events::client::EventV1, Account, EmailVerification, Lockout, MFATicket, Totp,
+        Account, EmailVerification, Lockout, MFATicket, Totp, events::client::EventV1,
+        util::webauthn::encode_credential_id,
     };
     use revolt_models::v0;
     use revolt_result::{Error, ErrorType};
-    use crate::util::test::PubSubTestHelper;
-    use rocket::http::{ContentType, Status};
+    use rocket::http::{ContentType, Header, Status};
+    use webauthn_authenticator_rs::softpasskey::SoftPasskey;
 
     #[rocket::async_test]
     async fn success() {
@@ -201,10 +235,12 @@ mod tests {
         assert_eq!(res.status(), Status::Ok);
         assert!(res.into_json::<v0::Session>().await.is_some());
 
-        let event = pubsub.wait_for_event(|event| match event {
-            EventV1::CreateSession { session } => session.user_id == account.id,
-            _ => false,
-        }).await;
+        let event = pubsub
+            .wait_for_event(|event| match event {
+                EventV1::CreateSession { session } => session.user_id == account.id,
+                _ => false,
+            })
+            .await;
         if !matches!(event, EventV1::CreateSession { .. }) {
             panic!("Received incorrect event type. {:?}", event);
         }
@@ -359,6 +395,299 @@ mod tests {
         } else {
             panic!("expected `ResponseLogin::MFA`")
         }
+    }
+
+    /// Fetch a passwordless login challenge
+    async fn passkey_login_challenge(harness: &TestHarness) -> v0::ResponsePasskeyChallenge {
+        harness
+            .client
+            .post("/auth/session/login/passkey")
+            .dispatch()
+            .await
+            .into_json::<v0::ResponsePasskeyChallenge>()
+            .await
+            .unwrap()
+    }
+
+    #[rocket::async_test]
+    async fn success_passkey_mfa() {
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
+
+        let mut authenticator = SoftPasskey::new(true);
+        register_passkey(&harness, &account, &session, &mut authenticator).await;
+
+        let res = harness
+            .client
+            .post("/auth/session/login")
+            .json(&json!({
+                "email": &account.email,
+                "password": "password_insecure"
+            }))
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Ok);
+        let v0::ResponseLogin::MFA {
+            ticket,
+            allowed_methods,
+        } = res.into_json::<v0::ResponseLogin>().await.unwrap()
+        else {
+            panic!("expected `ResponseLogin::MFA`")
+        };
+
+        assert!(allowed_methods.contains(&v0::MFAMethod::Passkey));
+
+        let challenge = harness
+            .client
+            .post("/auth/mfa/passkeys/challenge")
+            .header(Header::new("X-MFA-Ticket", ticket.clone()))
+            .dispatch()
+            .await
+            .into_json::<v0::ResponsePasskeyChallenge>()
+            .await
+            .unwrap();
+
+        let response = sign_challenge(&mut authenticator, challenge.options).await;
+
+        let res = harness
+            .client
+            .post("/auth/session/login")
+            .json(&json!({
+                "mfa_ticket": ticket,
+                "mfa_response": {
+                    "passkey_challenge": challenge.challenge,
+                    "passkey_response": response
+                }
+            }))
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Ok);
+        assert!(serde_json::from_str::<v0::Session>(&res.into_string().await.unwrap()).is_ok());
+
+        let account = harness.db.fetch_account(&account.id).await.unwrap();
+        assert!(account.mfa.passkeys[0].last_used.is_some());
+    }
+
+    #[rocket::async_test]
+    async fn fail_password_mfa_with_passkey() {
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
+
+        let mut authenticator = SoftPasskey::new(true);
+        register_passkey(&harness, &account, &session, &mut authenticator).await;
+
+        let res = harness
+            .client
+            .post("/auth/session/login")
+            .json(&json!({
+                "email": &account.email,
+                "password": "password_insecure"
+            }))
+            .dispatch()
+            .await;
+
+        let v0::ResponseLogin::MFA { ticket, .. } =
+            res.into_json::<v0::ResponseLogin>().await.unwrap()
+        else {
+            panic!("expected `ResponseLogin::MFA`")
+        };
+
+        // A password can't stand in as the second factor
+        let res = harness
+            .client
+            .post("/auth/session/login")
+            .json(&json!({
+                "mfa_ticket": ticket,
+                "mfa_response": {
+                    "password": "password_insecure"
+                }
+            }))
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::BadRequest);
+        assert!(matches!(
+            res.into_json::<Error>().await.unwrap().error_type,
+            ErrorType::DisallowedMFAMethod,
+        ));
+    }
+
+    #[rocket::async_test]
+    async fn success_passkey_login() {
+        let harness = TestHarness::new().await;
+        let (mut account, session, _) = harness.new_user().await;
+
+        let mut authenticator = SoftPasskey::new(true);
+        register_passkey(&harness, &account, &session, &mut authenticator).await;
+
+        // TOTP is not required when logging in with a passkey
+        account = harness.db.fetch_account(&account.id).await.unwrap();
+        account.mfa.totp_token = Totp::Enabled {
+            secret: "secret".to_string(),
+        };
+        account.save(&harness.db).await.unwrap();
+
+        let challenge = passkey_login_challenge(&harness).await;
+        let response =
+            sign_login_challenge(&harness, &account, &mut authenticator, challenge.options).await;
+
+        let res = harness
+            .client
+            .post("/auth/session/login")
+            .json(&json!({
+                "passkey_challenge": challenge.challenge,
+                "passkey_response": response
+            }))
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Ok);
+        let session = serde_json::from_str::<v0::Session>(&res.into_string().await.unwrap())
+            .expect("`Session`");
+        assert_eq!(session.user_id, account.id);
+    }
+
+    #[rocket::async_test]
+    async fn fail_passkey_login_reused_challenge() {
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
+
+        let mut authenticator = SoftPasskey::new(true);
+        register_passkey(&harness, &account, &session, &mut authenticator).await;
+
+        let challenge = passkey_login_challenge(&harness).await;
+        let response =
+            sign_login_challenge(&harness, &account, &mut authenticator, challenge.options).await;
+
+        let body = json!({
+            "passkey_challenge": challenge.challenge,
+            "passkey_response": response
+        });
+
+        let res = harness
+            .client
+            .post("/auth/session/login")
+            .json(&body)
+            .dispatch()
+            .await;
+        assert_eq!(res.status(), Status::Ok);
+
+        let res = harness
+            .client
+            .post("/auth/session/login")
+            .json(&body)
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Unauthorized);
+        assert!(matches!(
+            res.into_json::<Error>().await.unwrap().error_type,
+            ErrorType::InvalidToken,
+        ));
+    }
+
+    #[rocket::async_test]
+    async fn fail_passkey_login_wrong_user_handle() {
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
+        let (other_account, _, _) = harness.new_user().await;
+
+        let mut authenticator = SoftPasskey::new(true);
+        register_passkey(&harness, &account, &session, &mut authenticator).await;
+
+        let challenge = passkey_login_challenge(&harness).await;
+        let mut response =
+            sign_login_challenge(&harness, &account, &mut authenticator, challenge.options).await;
+
+        response["response"]["userHandle"] = serde_json::Value::String(encode_credential_id(
+            other_account.id_as_uuid().unwrap().as_bytes(),
+        ));
+
+        let res = harness
+            .client
+            .post("/auth/session/login")
+            .json(&json!({
+                "passkey_challenge": challenge.challenge,
+                "passkey_response": response
+            }))
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Unauthorized);
+        assert!(matches!(
+            res.into_json::<Error>().await.unwrap().error_type,
+            ErrorType::InvalidCredentials,
+        ));
+    }
+
+    #[rocket::async_test]
+    async fn fail_passkey_login_bad_signature() {
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
+
+        let mut authenticator = SoftPasskey::new(true);
+        register_passkey(&harness, &account, &session, &mut authenticator).await;
+
+        // Sign a different challenge than the one we submit against
+        let signed = passkey_login_challenge(&harness).await;
+        let response =
+            sign_login_challenge(&harness, &account, &mut authenticator, signed.options).await;
+        let challenge = passkey_login_challenge(&harness).await;
+
+        let res = harness
+            .client
+            .post("/auth/session/login")
+            .json(&json!({
+                "passkey_challenge": challenge.challenge,
+                "passkey_response": response
+            }))
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Unauthorized);
+        assert!(matches!(
+            res.into_json::<Error>().await.unwrap().error_type,
+            ErrorType::InvalidCredentials,
+        ));
+
+        // Failure counts towards lockout
+        let account = harness.db.fetch_account(&account.id).await.unwrap();
+        assert_eq!(account.lockout.unwrap().attempts, 1);
+    }
+
+    #[rocket::async_test]
+    async fn fail_passkey_login_disabled_account() {
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
+
+        let mut authenticator = SoftPasskey::new(true);
+        register_passkey(&harness, &account, &session, &mut authenticator).await;
+
+        let mut account = harness.db.fetch_account(&account.id).await.unwrap();
+        account.disabled = true;
+        account.save(&harness.db).await.unwrap();
+
+        let challenge = passkey_login_challenge(&harness).await;
+        let response =
+            sign_login_challenge(&harness, &account, &mut authenticator, challenge.options).await;
+
+        let res = harness
+            .client
+            .post("/auth/session/login")
+            .json(&json!({
+                "passkey_challenge": challenge.challenge,
+                "passkey_response": response
+            }))
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Ok);
+        assert!(matches!(
+            res.into_json::<v0::ResponseLogin>().await.unwrap(),
+            v0::ResponseLogin::Disabled { .. }
+        ));
     }
 
     #[rocket::async_test]

@@ -42,11 +42,84 @@ pub async fn create_ticket(
 
 #[cfg(test)]
 mod tests {
-    use crate::{rocket, util::test::TestHarness};
+    use crate::{
+        rocket,
+        util::{
+            passkey::{register_passkey, sign_challenge},
+            test::TestHarness,
+        },
+    };
     use revolt_database::Totp;
     use rocket::http::{Header, Status};
     use revolt_models::v0;
     use revolt_result::{Error, ErrorType};
+    use webauthn_authenticator_rs::softpasskey::SoftPasskey;
+
+    #[rocket::async_test]
+    async fn success_passkey() {
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
+
+        let mut authenticator = SoftPasskey::new(true);
+        register_passkey(&harness, &account, &session, &mut authenticator).await;
+
+        let challenge = harness
+            .client
+            .post("/auth/mfa/passkeys/challenge")
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .dispatch()
+            .await
+            .into_json::<v0::ResponsePasskeyChallenge>()
+            .await
+            .unwrap();
+
+        let response = sign_challenge(&mut authenticator, challenge.options).await;
+
+        let res = harness
+            .client
+            .put("/auth/mfa/ticket")
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .body(
+                json!({
+                    "passkey_challenge": challenge.challenge,
+                    "passkey_response": response
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::Ok);
+        assert!(res.into_json::<v0::MFATicket>().await.unwrap().validated);
+    }
+
+    #[rocket::async_test]
+    async fn failure_password_with_passkey() {
+        let harness = TestHarness::new().await;
+        let (account, session, _) = harness.new_user().await;
+
+        let mut authenticator = SoftPasskey::new(true);
+        register_passkey(&harness, &account, &session, &mut authenticator).await;
+
+        let res = harness
+            .client
+            .put("/auth/mfa/ticket")
+            .header(Header::new("X-Session-Token", session.token.clone()))
+            .body(
+                json!({
+                    "password": "password_insecure"
+                })
+                .to_string(),
+            )
+            .dispatch()
+            .await;
+
+        assert_eq!(res.status(), Status::BadRequest);
+        assert!(matches!(
+            res.into_json::<Error>().await.unwrap().error_type,
+            ErrorType::DisallowedMFAMethod,
+        ));
+    }
 
     #[rocket::async_test]
     async fn success() {
