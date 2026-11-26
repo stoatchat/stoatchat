@@ -135,6 +135,37 @@ auto_derived!(
         pub users: Vec<User>,
     }
 
+    /// Member search options
+    #[cfg_attr(feature = "validator", derive(Validate))]
+    #[cfg_attr(feature = "rocket", derive(FromForm))]
+    pub struct OptionsMemberSearch {
+        /// Search string; matches nickname, display name or username (supports username#1234)
+        /// usernames are 32 characters long and #1234 is 5 characters adding up to a maximum of 37.
+        #[cfg_attr(feature = "validator", validate(length(min = 1, max = 37)))]
+        pub query: Option<String>,
+        /// Search with roles, the member must have all the roles provided,
+        /// 10 is a sane limit for amount of roles you should use to search
+        #[cfg_attr(feature = "validator", validate(length(min = 1, max = 10)))]
+        pub roles: Option<Vec<String>>,
+        /// Return members after this user id
+        #[cfg_attr(feature = "validator", validate(length(min = 26, max = 26)))]
+        pub after: Option<String>,
+        /// Maximum number of members to return, defaults to 25
+        #[cfg_attr(feature = "validator", validate(range(min = 1, max = 100)))]
+        pub limit: Option<i64>,
+    }
+
+    /// Member search results
+    pub struct MemberSearchResponse {
+        /// List of matching members
+        pub members: Vec<Member>,
+        /// Users of the matching members
+        pub users: Vec<User>,
+        /// Cursor to pass as `after` for the next page.
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+        pub next: Option<String>,
+    }
+
     /// New member information
     #[cfg_attr(feature = "validator", derive(Validate))]
     pub struct DataMemberEdit {

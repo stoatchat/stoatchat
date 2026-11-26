@@ -4,7 +4,7 @@ use iso8601_timestamp::Timestamp;
 use mongodb::options::ReadConcern;
 use revolt_result::Result;
 
-use crate::{FieldsMember, Member, MemberCompositeKey, PartialMember};
+use crate::{FieldsMember, Member, MemberCompositeKey, MemberSearchQuery, PartialMember};
 use crate::{IntoDocumentPath, MongoDb};
 
 use super::{AbstractServerMembers, ChunkedServerMembersGenerator};
@@ -76,6 +76,87 @@ impl AbstractServerMembers for MongoDb {
             })
             .await
             .map_err(|_| create_database_error!("find", COL))?
+            .filter_map(|s| async {
+                if cfg!(debug_assertions) {
+                    Some(s.unwrap())
+                } else {
+                    s.ok()
+                }
+            })
+            .collect()
+            .await)
+    }
+
+    /// Search members in a server, ordered by user id
+    async fn search_members(
+        &self,
+        server_id: &str,
+        query: MemberSearchQuery,
+    ) -> Result<Vec<Member>> {
+        let mut filter = doc! {
+            "_id.server": server_id,
+            "pending_deletion_at": {"$exists": false}
+        };
+
+        if let Some(roles) = query.roles {
+            filter.insert("roles", doc! { "$all": roles });
+        }
+
+        if let Some(after) = query.after {
+            filter.insert("_id.user", doc! { "$gt": after });
+        }
+
+        let mut pipeline = vec![
+            doc! { "$match": filter },
+            doc! { "$sort": { "_id.user": 1_i32 } },
+        ];
+
+        if let Some(text) = query.query {
+            let contains = |value: &str| {
+                doc! {
+                    "$regex": regex::escape(value),
+                    "$options": "i"
+                }
+            };
+
+            let username_match = match MemberSearchQuery::split_discriminator(&text) {
+                (name, Some(discriminator)) => doc! {
+                    "user.username": contains(name),
+                    "user.discriminator": discriminator
+                },
+                (name, None) => doc! { "user.username": contains(name) },
+            };
+
+            pipeline.push(doc! {
+                "$lookup": {
+                    "from": "users",
+                    "localField": "_id.user",
+                    "foreignField": "_id",
+                    "as": "user"
+                }
+            });
+
+            pipeline.push(doc! {
+                "$match": {
+                    "$or": [
+                        username_match,
+                        { "nickname": contains(&text) },
+                        { "user.display_name": contains(&text) }
+                    ]
+                }
+            });
+
+            pipeline.push(doc! { "$project": { "user": 0_i32 } });
+        }
+
+        pipeline.push(doc! { "$limit": query.limit });
+
+        Ok(self
+            .col::<Member>(COL)
+            .aggregate(pipeline)
+            .await
+            .map_err(|_| create_database_error!("aggregate", COL))?
+            .with_type::<Member>()
             .filter_map(|s| async {
                 if cfg!(debug_assertions) {
                     Some(s.unwrap())

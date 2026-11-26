@@ -10,10 +10,10 @@ mod discover;
 mod emoji_list;
 mod invites_fetch;
 mod member_edit;
-mod member_experimental_query;
 mod member_fetch;
 mod member_fetch_all;
 mod member_remove;
+mod member_search;
 mod permissions_set;
 mod permissions_set_default;
 mod roles_create;
@@ -39,7 +39,7 @@ pub fn routes() -> (Vec<Route>, OpenApi) {
         member_remove::kick,
         member_fetch::fetch,
         member_edit::edit,
-        member_experimental_query::member_experimental_query,
+        member_search::search,
         ban_create::ban,
         ban_remove::unban,
         ban_list::list,

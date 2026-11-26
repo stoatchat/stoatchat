@@ -26,7 +26,7 @@ struct MigrationInfo {
     revision: i32,
 }
 
-pub const LATEST_REVISION: i32 = 55; // MUST BE +1 to last migration
+pub const LATEST_REVISION: i32 = 56; // MUST BE +1 to last migration
 
 pub async fn migrate_database(db: &MongoDb) {
     let migrations = db.col::<Document>("migrations");
@@ -1600,6 +1600,27 @@ pub async fn run_migrations(db: &MongoDb, revision: i32) -> i32 {
             .await
             .expect("Failed to update default_permissions");
     };
+
+    if revision <= 55 {
+        info!("Running migration [revision 55 / 26-11-2026]: Add server roles index to server_members");
+
+        db.db()
+            .run_command(doc! {
+                "createIndexes": "server_members",
+                "indexes": [
+                    {
+                        "key": {
+                            "_id.server": 1_i32,
+                            "roles": 1_i32,
+                            "_id.user": 1_i32,
+                        },
+                        "name": "server_roles"
+                    }
+                ]
+            })
+            .await
+            .expect("Failed to create server_members server_roles index.");
+    }
 
     // Reminder to update LATEST_REVISION when adding new migrations.
     LATEST_REVISION.max(revision)
