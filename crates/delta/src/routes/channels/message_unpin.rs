@@ -34,7 +34,7 @@ pub async fn message_unpin(
                 .throw_if_lacking_channel_permission(ChannelPermission::ManageMessages)?;
         }
         Channel::DirectMessage { recipients, .. } => {
-            if !recipients.contains(&user.id) {
+            if !recipients.contains(&user.id) || channel.is_system_dm() {
                 return Err(create_error!(MissingPermission {
                     permission: ChannelPermission::ManageMessages.to_string()
                 }));

@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use crate::utils::Consumer;
+use crate::utils::{record_push_target, record_skip, Consumer};
+use stoat_otel::WideContextRepository;
 use anyhow::{bail, Result};
 use async_trait::async_trait;
 use fcm_v1::{
@@ -10,8 +11,9 @@ use fcm_v1::{
 };
 use lapin::{message::Delivery, Channel as AMQPChannel, Connection};
 use revolt_config::config;
-use revolt_database::{events::rabbit::*, Database};
+use revolt_database::{events::rabbit::*, Database, SystemNotice};
 use serde_json::Value;
+use tracing::Instrument;
 
 /// Custom notification data
 #[derive(Debug, Clone, PartialEq)]
@@ -44,6 +46,10 @@ pub enum NotificationData {
         ended: bool,
         duration: usize,
     },
+    SystemNotice {
+        notice: SystemNotice,
+        message: Option<SystemNoticeMessage>,
+    },
 }
 
 impl NotificationData {
@@ -54,6 +60,7 @@ impl NotificationData {
             NotificationData::Generic { .. } => "push.generic",
             NotificationData::Message { .. } => "push.message",
             NotificationData::DmCallStartEnd { .. } => "push.dm.call",
+            NotificationData::SystemNotice { .. } => "push.system",
         }
     }
 
@@ -109,6 +116,25 @@ impl NotificationData {
                 data.insert("ended".to_string(), Value::Bool(ended));
                 data.insert("duration".to_string(), Value::Number(duration.into()));
             }
+            NotificationData::SystemNotice { notice, message } => {
+                data.insert(
+                    "loc_key".to_string(),
+                    Value::String(notice.localization_key().to_string()),
+                );
+                // FCM data values must be strings, so objects are sent as encoded JSON
+                data.insert(
+                    "notice".to_string(),
+                    Value::String(serde_json::to_string(&notice).unwrap_or_default()),
+                );
+
+                if let Some(message) = message {
+                    data.insert("url".to_string(), Value::String(message.url.clone()));
+                    data.insert(
+                        "message".to_string(),
+                        Value::String(serde_json::to_string(&message).unwrap_or_default()),
+                    );
+                }
+            }
         }
 
         data
@@ -122,6 +148,15 @@ pub struct FcmOutboundConsumer {
     connection: Arc<Connection>,
     channel: Arc<AMQPChannel>,
     client: Client,
+}
+
+impl FcmOutboundConsumer {
+    async fn send(&self, message: &Message) -> Result<Message, FcmError> {
+        self.client
+            .send(message)
+            .instrument(info_span!("fcm.send", otel.kind = "client"))
+            .await
+    }
 }
 
 #[async_trait]
@@ -163,8 +198,9 @@ impl Consumer for FcmOutboundConsumer {
         &self.channel
     }
 
-    async fn consume(&self, delivery: Delivery) -> Result<()> {
+    async fn consume(&self, delivery: Delivery, context: &WideContextRepository) -> Result<()> {
         let payload: PayloadToService = serde_json::from_slice(&delivery.data)?;
+        record_push_target(context, "fcm", &payload);
 
         #[allow(clippy::needless_late_init)]
         let resp: Result<Message, FcmError>;
@@ -189,7 +225,7 @@ impl Consumer for FcmOutboundConsumer {
                     ..Default::default()
                 };
 
-                resp = self.client.send(&msg).await;
+                resp = self.send(&msg).await;
             }
 
             PayloadKind::FRAccepted(alert) => {
@@ -211,7 +247,7 @@ impl Consumer for FcmOutboundConsumer {
                     ..Default::default()
                 };
 
-                resp = self.client.send(&msg).await;
+                resp = self.send(&msg).await;
             }
             PayloadKind::Generic(alert) => {
                 let data = NotificationData::Generic {
@@ -226,7 +262,7 @@ impl Consumer for FcmOutboundConsumer {
                     ..Default::default()
                 };
 
-                resp = self.client.send(&msg).await;
+                resp = self.send(&msg).await;
             }
 
             PayloadKind::MessageNotification(alert) => {
@@ -245,7 +281,7 @@ impl Consumer for FcmOutboundConsumer {
                     ..Default::default()
                 };
 
-                resp = self.client.send(&msg).await;
+                resp = self.send(&msg).await;
             }
 
             PayloadKind::DmCallStartEnd(alert) => {
@@ -263,7 +299,22 @@ impl Consumer for FcmOutboundConsumer {
                     ..Default::default()
                 };
 
-                resp = self.client.send(&msg).await;
+                resp = self.send(&msg).await;
+            }
+
+            PayloadKind::SystemNotice(alert) => {
+                let data = NotificationData::SystemNotice {
+                    notice: alert.notice,
+                    message: alert.message,
+                };
+
+                let msg = Message {
+                    token: Some(payload.token),
+                    data: Some(data.into_payload()),
+                    ..Default::default()
+                };
+
+                resp = self.send(&msg).await;
             }
 
             PayloadKind::BadgeUpdate(_) => {
@@ -273,12 +324,26 @@ impl Consumer for FcmOutboundConsumer {
 
         match resp {
             Err(FcmError::Auth) => {
+                context.add("push.dropped", "invalid_token");
+                info!(
+                    reason = "invalid_token",
+                    provider = "fcm",
+                    user_id = %payload.user_id,
+                    session_id = %payload.session_id,
+                    "push notification dropped, removing subscription"
+                );
+                record_skip(&payload.user_id, Some(&payload.session_id), "invalid_token");
+
                 if let Err(err) = self
                     .db
                     .remove_push_subscription_by_session_id(&payload.session_id)
                     .await
                 {
-                    revolt_config::capture_error(&err);
+                    error!(
+                        error = ?err,
+                        session_id = %payload.session_id,
+                        "Failed to remove push subscription"
+                    );
                 }
             }
             res => {

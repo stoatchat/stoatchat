@@ -1,9 +1,9 @@
 use std::{collections::HashSet, str::FromStr, time::Duration};
 
 use crate::{
-    AMQP, Database, File, RatelimitEvent,
-    events::client::EventV1,
-    util::email::{email_templates, send_email},
+    AMQP, Channel, Database, File, MFAMethod, Message, RatelimitEvent,
+    events::{client::EventV1, rabbit::SystemNoticeMessage},
+    util::email::{Template, Templates, email_templates, send_email},
 };
 
 use futures::future::join_all;
@@ -12,7 +12,7 @@ use once_cell::sync::Lazy;
 use rand::seq::SliceRandom;
 use regex::{Regex, RegexBuilder};
 use revolt_config::{FeaturesLimits, config};
-use revolt_models::v0::{self, UserBadges, UserFlags};
+use revolt_models::v0::{self, SYSTEM_USER_ID, UserBadges, UserFlags};
 use revolt_presence::filter_online;
 use revolt_result::{Result, create_error};
 use serde_json::json;
@@ -187,6 +187,137 @@ static USERNAME_CODEPOINT_REGEX: Lazy<Regex> = Lazy::new(|| {
         .unwrap()
 });
 
+/// Notices which can be sent to a user from the official system account
+///
+/// Sent as-is in push notifications so clients can localize them
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(tag = "type")]
+pub enum SystemNotice {
+    /// Users password was changed
+    PasswordChanged,
+    /// Users email was changed
+    EmailChanged { from: String, to: String },
+    /// MFA methods were updated
+    MfaUpdated {
+        add: Option<Vec<MFAMethod>>,
+        remove: Option<Vec<MFAMethod>>,
+    },
+    /// Notice from platform moderation
+    ModerationNotice { content: String },
+    /// Notice regarding a bot owned by the user
+    BotNotice { content: String },
+}
+
+impl SystemNotice {
+    /// Render this notice as message content
+    pub fn content(&self) -> String {
+        match self {
+            SystemNotice::PasswordChanged => {
+                "Your password was changed. If this wasn't you, reset your password immediately."
+                    .to_string()
+            }
+            SystemNotice::EmailChanged { from, to } => format!(
+                "Your account email was changed from `{from}` to `{to}`. If this wasn't you, contact support immediately."
+            ),
+            SystemNotice::MfaUpdated { add, remove } => format!(
+                "Your two-factor authentication settings were updated ({}). If this wasn't you, contact support immediately.",
+                Self::describe_mfa_changes(add, remove)
+            ),
+            SystemNotice::ModerationNotice { content } | SystemNotice::BotNotice { content } => {
+                content.clone()
+            }
+        }
+    }
+
+    /// Shorten free-form content to its first line, as push payloads are size limited
+    pub fn for_push(&self) -> SystemNotice {
+        let shorten = |content: &str| match content.split_once('\n') {
+            Some((first, _)) => format!("{}...", first.trim_end()),
+            None => content.to_string(),
+        };
+
+        match self {
+            SystemNotice::ModerationNotice { content } => SystemNotice::ModerationNotice {
+                content: shorten(content),
+            },
+            SystemNotice::BotNotice { content } => SystemNotice::BotNotice {
+                content: shorten(content),
+            },
+            notice => notice.clone(),
+        }
+    }
+
+    /// Localization key clients use to render this notice in a push notification
+    pub fn localization_key(&self) -> &'static str {
+        match self {
+            SystemNotice::PasswordChanged => "push.system.password_changed",
+            SystemNotice::EmailChanged { .. } => "push.system.email_changed",
+            SystemNotice::MfaUpdated { .. } => "push.system.mfa_updated",
+            SystemNotice::ModerationNotice { .. } => "push.system.moderation_notice",
+            SystemNotice::BotNotice { .. } => "push.system.bot_notice",
+        }
+    }
+
+    /// Describe added and removed MFA methods, e.g. `added: authenticator app; removed: recovery codes`
+    fn describe_mfa_changes(
+        add: &Option<Vec<MFAMethod>>,
+        remove: &Option<Vec<MFAMethod>>,
+    ) -> String {
+        let describe = |factors: &Option<Vec<MFAMethod>>| {
+            factors
+                .iter()
+                .flatten()
+                .map(|factor| match factor {
+                    MFAMethod::Password => "password",
+                    MFAMethod::Recovery => "recovery codes",
+                    MFAMethod::Totp => "authenticator app",
+                })
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+
+        let added = describe(add);
+        let removed = describe(remove);
+
+        match (added.is_empty(), removed.is_empty()) {
+            (false, false) => format!("added: {added}; removed: {removed}"),
+            (false, true) => format!("added: {added}"),
+            (true, false) => format!("removed: {removed}"),
+            (true, true) => unreachable!("At least one change must be provided"),
+        }
+    }
+
+    /// Pick the email template and template variables for this notice
+    fn email<'a>(
+        &self,
+        templates: &'a Templates,
+        email: &str,
+    ) -> (&'a Template, serde_json::Value) {
+        match self {
+            SystemNotice::PasswordChanged => (
+                &templates.password_changed,
+                json!({ "email": email, "url": templates.password_changed.url }),
+            ),
+            SystemNotice::EmailChanged { from, to } => (
+                &templates.email_changed,
+                json!({ "email": email, "from": from, "to": to }),
+            ),
+            SystemNotice::MfaUpdated { add, remove } => (
+                &templates.mfa_updated,
+                json!({ "email": email, "changes": Self::describe_mfa_changes(add, remove) }),
+            ),
+            SystemNotice::ModerationNotice { content } => (
+                &templates.moderation_notice,
+                json!({ "email": email, "content": content }),
+            ),
+            SystemNotice::BotNotice { content } => (
+                &templates.bot_notice,
+                json!({ "email": email, "content": content }),
+            ),
+        }
+    }
+}
+
 #[allow(clippy::derivable_impls)]
 impl Default for User {
     fn default() -> Self {
@@ -241,6 +372,110 @@ impl User {
 
         db.insert_user(&user).await?;
         Ok(user)
+    }
+
+    /// Fetch the official system account, creating it if it doesn't exist yet
+    pub async fn fetch_or_create_system(db: &Database) -> Result<User> {
+        if let Ok(user) = db.fetch_user(SYSTEM_USER_ID).await {
+            return Ok(user);
+        }
+
+        let user = User {
+            id: SYSTEM_USER_ID.to_string(),
+            username: "Stoat".to_string(),
+            discriminator: "0000".to_string(),
+            last_acknowledged_policy_change: Timestamp::now_utc(),
+            ..Default::default()
+        };
+
+        match db.insert_user(&user).await {
+            Ok(()) => Ok(user),
+            // Another node may have created it concurrently
+            Err(_) => db.fetch_user(SYSTEM_USER_ID).await,
+        }
+    }
+
+    /// Send a direct message to this user from the official system account
+    pub async fn send_system_dm(&self, db: &Database, content: String) -> Result<Message> {
+        let system = User::fetch_or_create_system(db).await?;
+        let channel = Channel::create_dm(db, &system, self).await?;
+
+        let author: v0::User = system.clone().into(db, Some(&system)).await;
+
+        let mut message = Message {
+            id: Ulid::new().to_string(),
+            channel: channel.id().to_string(),
+            author: system.id.clone(),
+            content: Some(content),
+            ..Default::default()
+        };
+
+        // Push notifications for system DMs are sent separately by `send_system_notice`
+        message
+            .send_without_notifications(db, Some(author), None, true, true, true)
+            .await?;
+
+        Ok(message)
+    }
+
+    /// Notify this user through every available channel: push notification, system DM and email
+    pub async fn send_system_notice(
+        &self,
+        db: &Database,
+        amqp: &AMQP,
+        notice: SystemNotice,
+    ) -> Result<()> {
+        let dm_and_push = async {
+            let dm = self.send_system_dm(db, notice.content()).await;
+
+            // Link the push to the system DM so clients can navigate to it
+            let message = match &dm {
+                Ok(message) => Some(SystemNoticeMessage {
+                    channel_id: message.channel.clone(),
+                    message_id: message.id.clone(),
+                    url: format!(
+                        "{}/channel/{}/{}",
+                        config().await.hosts.app,
+                        message.channel,
+                        message.id
+                    ),
+                }),
+                Err(_) => None,
+            };
+
+            let push = amqp
+                .system_notice(&self.id, notice.for_push(), message)
+                .await
+                .map_err(|_| create_error!(InternalError));
+
+            dm.map(|_| ()).and(push)
+        };
+
+        let email = async {
+            let config = config().await;
+            if config.api.smtp.host.is_empty() {
+                return Ok(());
+            }
+
+            // Send email
+            let address = match &notice {
+                SystemNotice::EmailChanged { from, .. } => from.clone(),
+                _ => db.fetch_account(&self.id).await?.email,
+            };
+
+            let templates = email_templates().await;
+            let (template, variables) = notice.email(&templates, &address);
+            let template = template.clone();
+            let smtp = config.api.smtp.clone();
+
+            // lettre's SMTP transport is blocking, keep it off the async executor
+            tokio::task::spawn_blocking(move || send_email(&smtp, address, &template, variables))
+                .await
+                .map_err(|_| create_error!(InternalError))?
+        };
+
+        let (dm_and_push, email) = futures::join!(dm_and_push, email);
+        dm_and_push.and(email)
     }
 
     /// Get limits for this user
@@ -550,6 +785,10 @@ impl User {
         amqp: &AMQP,
         target: &mut User,
     ) -> Result<()> {
+        if target.id == SYSTEM_USER_ID {
+            return Err(create_error!(InvalidOperation));
+        }
+
         match self.relationship_with(&target.id) {
             RelationshipStatus::User => Err(create_error!(NoEffect)),
             RelationshipStatus::Friend => Err(create_error!(AlreadyFriends)),
@@ -622,6 +861,10 @@ impl User {
 
     /// Block another user
     pub async fn block_user(&mut self, db: &Database, target: &mut User) -> Result<()> {
+        if target.id == SYSTEM_USER_ID {
+            return Err(create_error!(InvalidOperation));
+        }
+
         match self.relationship_with(&target.id) {
             RelationshipStatus::User | RelationshipStatus::Blocked => Err(create_error!(NoEffect)),
             RelationshipStatus::BlockedOther => {
@@ -842,10 +1085,11 @@ impl User {
         let config = config().await;
         let badges = self.badges.unwrap_or_default() as u32;
 
-        if let Some(cutoff) = config.api.users.early_adopter_cutoff {
-            if Ulid::from_string(&self.id).unwrap().timestamp_ms() < cutoff {
-                return badges + UserBadges::EarlyAdopter as u32;
-            };
+        if let Some(cutoff) = config.api.users.early_adopter_cutoff
+            && self.id != SYSTEM_USER_ID
+            && Ulid::from_string(&self.id).unwrap().timestamp_ms() < cutoff
+        {
+            return badges + UserBadges::EarlyAdopter as u32;
         };
 
         badges
@@ -904,7 +1148,53 @@ impl User {
 
 #[cfg(test)]
 mod tests {
-    use crate::User;
+    use crate::{MFAMethod, SystemNotice, User};
+
+    #[test]
+    fn system_notice_for_push() {
+        let notice = SystemNotice::ModerationNotice {
+            content: "First line  \nSecond line\nThird".to_string(),
+        };
+        assert_eq!(
+            notice.for_push(),
+            SystemNotice::ModerationNotice {
+                content: "First line...".to_string()
+            }
+        );
+
+        let notice = SystemNotice::BotNotice {
+            content: "Only line".to_string(),
+        };
+        assert_eq!(notice.for_push(), notice);
+
+        assert_eq!(
+            SystemNotice::PasswordChanged.for_push(),
+            SystemNotice::PasswordChanged
+        );
+    }
+
+    #[test]
+    fn system_notice_serialization() {
+        let notice = SystemNotice::MfaUpdated {
+            add: Some(vec![MFAMethod::Totp]),
+            remove: None,
+        };
+
+        let value = serde_json::to_value(&notice).unwrap();
+        assert_eq!(
+            value,
+            serde_json::json!({ "type": "MfaUpdated", "add": ["Totp"], "remove": null })
+        );
+        assert_eq!(
+            serde_json::from_value::<SystemNotice>(value).unwrap(),
+            notice
+        );
+
+        assert_eq!(
+            serde_json::to_value(SystemNotice::PasswordChanged).unwrap(),
+            serde_json::json!({ "type": "PasswordChanged" })
+        );
+    }
 
     #[test]
     fn username_validation_blocked_names() {

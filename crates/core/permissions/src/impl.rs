@@ -1,7 +1,7 @@
 use crate::{
-    ChannelPermission, ChannelType, PermissionQuery, PermissionValue, RelationshipStatus,
-    UserPermission, ALLOW_IN_TIMEOUT, DEFAULT_PERMISSION_DIRECT_MESSAGE,
-    DEFAULT_PERMISSION_SAVED_MESSAGES, DEFAULT_PERMISSION_VIEW_ONLY,
+    ALLOW_IN_TIMEOUT, ChannelPermission, ChannelType, DEFAULT_PERMISSION_DIRECT_MESSAGE,
+    DEFAULT_PERMISSION_SAVED_MESSAGES, DEFAULT_PERMISSION_VIEW_ONLY, PermissionQuery,
+    PermissionValue, RelationshipStatus, UserPermission,
 };
 
 /// Calculate permissions against a user
@@ -10,11 +10,15 @@ pub async fn calculate_user_permissions<P: PermissionQuery>(query: &mut P) -> Pe
         return u64::MAX.into();
     }
 
+    if query.user_is_system().await {
+        return (UserPermission::Access as u64 + UserPermission::ViewProfile as u64).into();
+    }
+
     let mut permissions = 0_u64;
     match query.user_relationship().await {
         RelationshipStatus::Friend => return u64::MAX.into(),
         RelationshipStatus::Blocked | RelationshipStatus::BlockedOther => {
-            return (UserPermission::Access as u64).into()
+            return (UserPermission::Access as u64).into();
         }
         RelationshipStatus::Incoming | RelationshipStatus::Outgoing => {
             permissions = UserPermission::Access as u64;
@@ -26,7 +30,9 @@ pub async fn calculate_user_permissions<P: PermissionQuery>(query: &mut P) -> Pe
         permissions = UserPermission::Access as u64 + UserPermission::ViewProfile as u64;
     };
 
-    if query.have_mutual_connection().await && (query.are_we_a_bot().await || query.user_is_bot().await) {
+    if query.have_mutual_connection().await
+        && (query.are_we_a_bot().await || query.user_is_bot().await)
+    {
         permissions += UserPermission::SendMessage as u64;
     };
 
@@ -116,7 +122,8 @@ pub async fn calculate_channel_permissions<P: PermissionQuery>(query: &mut P) ->
             if query.are_we_server_owner().await {
                 ChannelPermission::GrantAllSafe.into()
             } else if query.are_we_a_member().await {
-                let mut permissions = PermissionValue::from(query.get_default_server_permissions().await);
+                let mut permissions =
+                    PermissionValue::from(query.get_default_server_permissions().await);
                 permissions.apply(query.get_default_channel_permissions().await);
 
                 for role_override in query.get_our_server_role_overrides().await {

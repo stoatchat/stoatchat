@@ -56,7 +56,7 @@ pub async fn send_password_reset(
 #[cfg(test)]
 mod tests {
     use crate::{rocket, util::test::TestHarness};
-    use revolt_database::Account;
+    use revolt_database::{Account, User};
     use revolt_models::v0;
     use rocket::http::{ContentType, Status};
 
@@ -64,7 +64,7 @@ mod tests {
     async fn success() {
         let harness = TestHarness::new().await;
 
-        Account::new(
+        let account = Account::new(
             &harness.db,
             "password_reset@smtp.test".into(),
             "password".into(),
@@ -72,6 +72,10 @@ mod tests {
         )
         .await
         .unwrap();
+
+        User::create(&harness.db, TestHarness::rand_string(), account.id, None)
+            .await
+            .unwrap();
 
         let res = harness.client
             .post("/auth/account/reset_password")

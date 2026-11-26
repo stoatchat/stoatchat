@@ -3,7 +3,7 @@ use iso8601_timestamp::Timestamp;
 use revolt_config::{FeaturesLimits, config};
 use revolt_models::v0::{
     self, BulkMessageResponse, DataMessageSend, Embed, MessageAuthor, MessageFlags, MessageSort,
-    MessageWebhook, PushNotification, ReplyIntent, SendableEmbed, Text,
+    MessageWebhook, PushNotification, ReplyIntent, SYSTEM_USER_ID, SendableEmbed, Text,
 };
 use revolt_permissions::{ChannelPermission, PermissionValue, calculate_channel_permissions};
 use revolt_result::{ErrorType, Result};
@@ -354,7 +354,7 @@ impl Message {
         let (author_id, webhook) = match &author {
             MessageAuthor::User(user) => (user.id.clone(), None),
             MessageAuthor::Webhook(webhook) => (webhook.id.clone(), Some((*webhook).clone())),
-            MessageAuthor::System { .. } => ("00000000000000000000000000".to_string(), None),
+            MessageAuthor::System { .. } => (SYSTEM_USER_ID.to_string(), None),
         };
 
         // Start constructing the message
@@ -1271,7 +1271,7 @@ impl SystemMessage {
         Message {
             id: Ulid::new().to_string(),
             channel,
-            author: "00000000000000000000000000".to_string(),
+            author: SYSTEM_USER_ID.to_string(),
             system: Some(self),
 
             ..Default::default()

@@ -1,0 +1,16 @@
+The email address for your account was changed to {{to}}.
+
+If you made this change, you can safely ignore this email.
+
+If this wasn't you, contact support (contact@stoat.chat) immediately.
+
+This email is intended for {{email}}
+Sent by Stoat
+Made in Europe
+
+Revolt Platforms Ltd. is a company incorporated and registered under the laws of England and Wales.
+
+Registration Number: 16260658
+Registered Office:
+60 Tottenham Court Road, Suite 5703a
+Fitzrovia, London, United Kingdom, W1T 2EW

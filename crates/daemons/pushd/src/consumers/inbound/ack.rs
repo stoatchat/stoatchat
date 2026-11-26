@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
-use crate::utils::Consumer;
+use crate::utils::{record_skip, Consumer};
 use anyhow::Result;
 use async_trait::async_trait;
 use lapin::{message::Delivery, Channel, Connection};
+use stoat_otel::WideContextRepository;
 use revolt_database::{events::rabbit::*, Database};
 
 #[derive(Clone)]
@@ -33,29 +34,53 @@ impl Consumer for AckConsumer {
     }
 
     /// This consumer processes all acks the platform receives, and sends relevant badge updates to apple platforms.
-    async fn consume(&self, delivery: Delivery) -> Result<()> {
+    async fn consume(&self, delivery: Delivery, context: &WideContextRepository) -> Result<()> {
         let payload: AckPayload = serde_json::from_slice(&delivery.data)?;
+        context.add("user_id", payload.user_id.clone());
 
         // Step 1: fetch unreads and don't continue if there's no unreads
         // #[allow(clippy::disallowed_methods)]
 
-        debug!("Processing unreads for {:}", &payload.user_id);
+        debug!(user_id = %payload.user_id, "Processing unreads");
 
-        let unreads = if let Ok(u) = self.db.fetch_unread_mentions(&payload.user_id).await {
-            if u.is_empty() {
+        let unreads = match self.db.fetch_unread_mentions(&payload.user_id).await {
+            Ok(u) if u.is_empty() => {
                 debug!(
-                    "Discarding unread task (no mentions found) for {:}",
-                    &payload.user_id
+                    user_id = %payload.user_id,
+                    "Discarding unread task (no mentions found)"
                 );
+                record_skip(&payload.user_id, None, "no_unread_mentions");
                 return Ok(());
-            };
-
-            u
-        } else {
-            return Ok(());
+            }
+            Ok(u) => u,
+            Err(error) => {
+                context.add("push.dropped", "fetch_unreads_failed");
+                warn!(
+                    reason = "fetch_unreads_failed",
+                    error = ?error,
+                    user_id = %payload.user_id,
+                    "push notification dropped"
+                );
+                record_skip(&payload.user_id, None, "fetch_unreads_failed");
+                return Ok(());
+            }
         };
 
-        if let Ok(sessions) = self.db.fetch_sessions(&payload.user_id).await {
+        if let Ok(sessions) = self
+            .db
+            .fetch_sessions(&payload.user_id)
+            .await
+            .inspect_err(|error| {
+                context.add("push.dropped", "fetch_sessions_failed");
+                warn!(
+                    reason = "fetch_sessions_failed",
+                    error = ?error,
+                    user_id = %payload.user_id,
+                    "push notification dropped"
+                );
+                record_skip(&payload.user_id, None, "fetch_sessions_failed");
+            })
+        {
             let config = revolt_config::config().await;
             // Step 2: find any apple sessions, since we don't need to calculate this for anything else.
             // If there's no apple sessions, we can return early
@@ -72,9 +97,10 @@ impl Consumer for AckConsumer {
 
             if apple_sessions.peek().is_none() {
                 debug!(
-                    "Discarding unread task (no apn sessions found) for {:}",
-                    &payload.user_id
+                    user_id = %payload.user_id,
+                    "Discarding unread task (no apn sessions found)"
                 );
+                record_skip(&payload.user_id, None, "no_apn_sessions");
                 return Ok(());
             }
 
@@ -83,6 +109,8 @@ impl Consumer for AckConsumer {
             for u in &unreads {
                 mention_count += u.mentions.as_ref().unwrap().len()
             }
+            context.add("mention_count", mention_count as i64);
+            let mut queued = 0;
 
             // Step 4: loop through each apple session and send the badge update
             for session in apple_sessions {
@@ -95,10 +123,7 @@ impl Consumer for AckConsumer {
                 };
                 let payload = serde_json::to_string(&service_payload)?;
 
-                log::debug!(
-                    "Publishing ack to apn session {}",
-                    session.subscription.as_ref().unwrap().auth
-                );
+                debug!(session_id = %session.id, "Publishing ack to apn session");
 
                 self.publish_message(
                     payload.as_bytes(),
@@ -106,7 +131,10 @@ impl Consumer for AckConsumer {
                     &config.pushd.apn.queue,
                 )
                 .await?;
+                queued += 1;
             }
+
+            context.add("pushes.queued", queued);
         }
 
         Ok(())

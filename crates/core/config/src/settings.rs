@@ -290,6 +290,7 @@ pub struct Pushd {
     pub fr_accepted_queue: String,
     pub fr_received_queue: String,
     pub generic_queue: String,
+    pub system_notice_queue: String,
     pub ack_queue: String,
 
     pub vapid: PushVapid,
@@ -331,6 +332,10 @@ impl Pushd {
 
     pub fn get_generic_routing_key(&self) -> String {
         self.get_routing_key(self.generic_queue.clone())
+    }
+
+    pub fn get_system_notice_routing_key(&self) -> String {
+        self.get_routing_key(self.system_notice_queue.clone())
     }
 }
 

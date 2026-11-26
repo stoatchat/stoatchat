@@ -1,9 +1,9 @@
 //! Re-generate recovery codes for an account.
 //! PATCH /mfa/recovery
-use revolt_database::{Account, ValidatedTicket, Database};
+use revolt_database::{AMQP, Account, Database, MFAMethod, User, ValidatedTicket};
 use revolt_result::Result;
-use rocket::serde::json::Json;
 use rocket::State;
+use rocket::serde::json::Json;
 
 /// # Generate Recovery Codes
 ///
@@ -12,7 +12,9 @@ use rocket::State;
 #[patch("/recovery")]
 pub async fn generate_recovery(
     db: &State<Database>,
+    amqp: &State<AMQP>,
     mut account: Account,
+    user: User,
     _ticket: ValidatedTicket,
 ) -> Result<Json<Vec<String>>> {
     // Generate new codes
@@ -20,6 +22,17 @@ pub async fn generate_recovery(
 
     // Save account model
     account.save(db).await?;
+
+    _ = user
+        .send_system_notice(
+            db,
+            amqp,
+            revolt_database::SystemNotice::MfaUpdated {
+                add: Some(vec![MFAMethod::Recovery]),
+                remove: None,
+            },
+        )
+        .await;
 
     // Return them to the user
     Ok(Json(account.mfa.recovery_codes))
@@ -41,7 +54,8 @@ mod tests {
         let ticket2 = MFATicket::new(account.id, true);
         ticket2.save(&harness.db).await.unwrap();
 
-        let res = harness.client
+        let res = harness
+            .client
             .patch("/auth/mfa/recovery")
             .header(Header::new("X-Session-Token", session.token.clone()))
             .header(Header::new("X-MFA-Ticket", ticket1.token))
@@ -52,7 +66,8 @@ mod tests {
         assert_eq!(res.status(), Status::Ok);
         assert!(res.into_json::<Vec<String>>().await.is_some());
 
-        let res = harness.client
+        let res = harness
+            .client
             .post("/auth/mfa/recovery")
             .header(Header::new("X-Session-Token", session.token))
             .header(Header::new("X-MFA-Ticket", ticket2.token))

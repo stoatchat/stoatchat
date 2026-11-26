@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
 use crate::{
-    events::client::EventV1, Database, File, PartialServer, Server, SystemMessage, User, AMQP,
+    AMQP, Database, File, PartialServer, Server, SystemMessage, User, events::client::EventV1,
 };
 
 #[cfg(feature = "mongodb")]
@@ -434,6 +434,11 @@ impl Channel {
             | Channel::SavedMessages { id, .. }
             | Channel::TextChannel { id, .. } => id,
         }
+    }
+
+    /// Whether this is a direct message with the official system account
+    pub fn is_system_dm(&self) -> bool {
+        matches!(self, Channel::DirectMessage { recipients, .. } if recipients.iter().any(|id| id == v0::SYSTEM_USER_ID))
     }
 
     /// Clone this channel's server id
@@ -902,9 +907,9 @@ impl IntoDocumentPath for FieldsChannel {
 
 #[cfg(test)]
 mod tests {
-    use revolt_permissions::{calculate_channel_permissions, ChannelPermission};
-    use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
     use crate::{fixture, util::permissions::DatabasePermissionQuery};
+    use lapin::{ExchangeKind, options::ExchangeDeclareOptions, types::FieldTable};
+    use revolt_permissions::{ChannelPermission, calculate_channel_permissions};
 
     #[tokio::test]
     async fn permissions_group_channel() {
@@ -916,19 +921,25 @@ mod tests {
                 channel channel 3);
 
             let mut query = DatabasePermissionQuery::new(&db, &owner).channel(&channel);
-            assert!(calculate_channel_permissions(&mut query)
-                .await
-                .has_channel_permission(ChannelPermission::SendMessage));
+            assert!(
+                calculate_channel_permissions(&mut query)
+                    .await
+                    .has_channel_permission(ChannelPermission::SendMessage)
+            );
 
             let mut query = DatabasePermissionQuery::new(&db, &member1).channel(&channel);
-            assert!(calculate_channel_permissions(&mut query)
-                .await
-                .has_channel_permission(ChannelPermission::SendMessage));
+            assert!(
+                calculate_channel_permissions(&mut query)
+                    .await
+                    .has_channel_permission(ChannelPermission::SendMessage)
+            );
 
             let mut query = DatabasePermissionQuery::new(&db, &member2).channel(&channel);
-            assert!(!calculate_channel_permissions(&mut query)
-                .await
-                .has_channel_permission(ChannelPermission::SendMessage));
+            assert!(
+                !calculate_channel_permissions(&mut query)
+                    .await
+                    .has_channel_permission(ChannelPermission::SendMessage)
+            );
         });
     }
 
@@ -942,19 +953,25 @@ mod tests {
                 channel channel 3);
 
             let mut query = DatabasePermissionQuery::new(&db, &owner).channel(&channel);
-            assert!(calculate_channel_permissions(&mut query)
-                .await
-                .has_channel_permission(ChannelPermission::SendMessage));
+            assert!(
+                calculate_channel_permissions(&mut query)
+                    .await
+                    .has_channel_permission(ChannelPermission::SendMessage)
+            );
 
             let mut query = DatabasePermissionQuery::new(&db, &moderator).channel(&channel);
-            assert!(calculate_channel_permissions(&mut query)
-                .await
-                .has_channel_permission(ChannelPermission::SendMessage));
+            assert!(
+                calculate_channel_permissions(&mut query)
+                    .await
+                    .has_channel_permission(ChannelPermission::SendMessage)
+            );
 
             let mut query = DatabasePermissionQuery::new(&db, &user).channel(&channel);
-            assert!(!calculate_channel_permissions(&mut query)
-                .await
-                .has_channel_permission(ChannelPermission::SendMessage));
+            assert!(
+                !calculate_channel_permissions(&mut query)
+                    .await
+                    .has_channel_permission(ChannelPermission::SendMessage)
+            );
         });
     }
 }

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use revolt_models::v0::PushNotification;
 use serde::{Deserialize, Serialize};
 
-use crate::User;
+use crate::{SystemNotice, User};
 
 #[derive(Serialize, Deserialize)]
 pub struct MessageSentPayload {
@@ -37,6 +37,22 @@ pub struct GenericPayload {
     pub user: User,
 }
 
+/// The system DM a notice was posted in, so clients can navigate to it
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct SystemNoticeMessage {
+    pub channel_id: String,
+    pub message_id: String,
+    pub url: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct SystemNoticePayload {
+    pub notice: SystemNotice,
+    /// Absent if the system DM couldn't be sent
+    pub message: Option<SystemNoticeMessage>,
+    pub user: String,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DmCallPayload {
     pub initiator_id: String,
@@ -61,6 +77,7 @@ pub enum PayloadKind {
     BadgeUpdate(usize),
     Generic(GenericPayload),
     DmCallStartEnd(DmCallPayload),
+    SystemNotice(SystemNoticePayload),
 }
 
 #[derive(Serialize, Deserialize)]

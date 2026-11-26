@@ -1,9 +1,9 @@
 //! Verify an account
 //! POST /verify/<code>
-use rocket::{serde::json::Json, State};
-use revolt_database::{Database, EmailVerification, MFATicket, util::email::normalise_email};
-use revolt_result::Result;
+use revolt_database::{AMQP, Database, EmailVerification, MFATicket, util::email::normalise_email};
 use revolt_models::v0;
+use revolt_result::Result;
+use rocket::{State, serde::json::Json};
 
 /// # Verify Email
 ///
@@ -12,23 +12,27 @@ use revolt_models::v0;
 #[post("/verify/<code>")]
 pub async fn verify_email(
     db: &State<Database>,
+    amqp: &State<AMQP>,
     code: String,
 ) -> Result<Json<v0::ResponseVerify>> {
     // Find the account
-    let mut account = db
-        .fetch_account_with_email_verification(&code)
-        .await?;
+    let mut account = db.fetch_account_with_email_verification(&code).await?;
+
+    // Previous email, if this verification moved the account to a new one
+    let mut old_email = None;
 
     // Update account email
     let response = if let EmailVerification::Moving { new_email, .. } = &account.verification {
-        account.email = new_email.clone();
+        old_email = Some(std::mem::replace(&mut account.email, new_email.clone()));
         account.email_normalised = normalise_email(new_email.clone());
         v0::ResponseVerify::NoTicket
     } else {
         let mut ticket = MFATicket::new(account.id.to_string(), false);
         ticket.authorised = true;
         ticket.save(db).await?;
-        v0::ResponseVerify::WithTicket { ticket: ticket.into() }
+        v0::ResponseVerify::WithTicket {
+            ticket: ticket.into(),
+        }
     };
 
     // Mark as verified
@@ -36,18 +40,34 @@ pub async fn verify_email(
 
     // Save to database
     account.save(db).await?;
+
+    if let Some(old_email) = old_email
+        && let Ok(user) = db.fetch_user(&account.id).await
+    {
+        _ = user
+            .send_system_notice(
+                db,
+                amqp,
+                revolt_database::SystemNotice::EmailChanged {
+                    from: old_email,
+                    to: account.email.clone(),
+                },
+            )
+            .await;
+    }
+
     Ok(Json(response))
 }
 
 #[cfg(test)]
 mod tests {
-    use iso8601_timestamp::{Timestamp, Duration};
-    use revolt_database::EmailVerification;
     use crate::{rocket, util::test::TestHarness};
-    use rocket::http::{ContentType, Status};
+    use iso8601_timestamp::{Duration, Timestamp};
+    use revolt_database::EmailVerification;
     use revolt_models::v0;
     use revolt_result::{Error, ErrorType};
-    
+    use rocket::http::{ContentType, Status};
+
     #[rocket::async_test]
     async fn success() {
         let harness = TestHarness::new().await;
@@ -60,22 +80,32 @@ mod tests {
 
         account.save(&harness.db).await.unwrap();
 
-        let res = harness.client.post("/auth/account/verify/token").dispatch().await;
+        let res = harness
+            .client
+            .post("/auth/account/verify/token")
+            .dispatch()
+            .await;
 
         assert_eq!(res.status(), Status::Ok);
 
         // Make sure it was used and can't be used again
-        assert!(harness.db
-            .fetch_account_with_email_verification("token")
-            .await
-            .is_err());
+        assert!(
+            harness
+                .db
+                .fetch_account_with_email_verification("token")
+                .await
+                .is_err()
+        );
 
         // Check that we can login using the received MFA ticket
-        let response = res.into_json::<v0::ResponseVerify>().await
+        let response = res
+            .into_json::<v0::ResponseVerify>()
+            .await
             .expect("`ResponseVerify`");
 
         if let v0::ResponseVerify::WithTicket { ticket } = response {
-            let res = harness.client
+            let res = harness
+                .client
                 .post("/auth/session/login")
                 .header(ContentType::JSON)
                 .body(json!({ "mfa_ticket": ticket.token }).to_string())
@@ -93,7 +123,11 @@ mod tests {
     async fn fail_invalid_token() {
         let harness = TestHarness::new().await;
 
-        let res = harness.client.post("/auth/account/verify/token").dispatch().await;
+        let res = harness
+            .client
+            .post("/auth/account/verify/token")
+            .dispatch()
+            .await;
 
         assert_eq!(res.status(), Status::Unauthorized);
         assert!(matches!(
