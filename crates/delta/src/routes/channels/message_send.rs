@@ -137,7 +137,7 @@ pub async fn message_send(
     // Ensure interactions information is correct
     if let Some(interactions) = &data.interactions {
         let interactions: Interactions = interactions.clone().into();
-        interactions.validate(db, &permissions).await?;
+        interactions.validate(db, &channel, &permissions).await?;
     }
 
     // Disallow mentions for new users (TRUST-0: <12 hours age) in public servers
@@ -200,10 +200,13 @@ mod test {
     use revolt_database::{
         util::{idempotency::IdempotencyKey, reference::Reference},
         Channel, Member, Message, MessageFlagsValue, PartialChannel, PartialMember, Role, Server,
+        Session,
     };
     use revolt_models::v0::{self, DataCreateServerChannel, MessageFlags};
     use revolt_permissions::{ChannelPermission, OverrideField};
     use revolt_result::ErrorType;
+    use rocket::http::{ContentType, Header, Status};
+    use serde_json::Value;
 
     #[rocket::async_test]
     async fn message_mention_constraints() {
@@ -753,5 +756,95 @@ mod test {
             message_with_mentions.role_mentions.is_some(),
             "Message has no role mentions"
         );
+    }
+
+    async fn send_external_emoji(
+        harness: &TestHarness,
+        session: &Session,
+        channel: &Channel,
+        body: Value,
+    ) -> Status {
+        harness
+            .client
+            .post(format!("/channels/{}/messages", channel.id()))
+            .header(ContentType::JSON)
+            .header(Header::new("x-session-token", session.token.to_string()))
+            .body(body.to_string())
+            .dispatch()
+            .await
+            .status()
+    }
+
+    async fn assert_external_emoji_gated(field: &str, body: impl Fn(&str) -> Value) {
+        let harness = TestHarness::new().await;
+        let (_, _, owner) = harness.new_user().await;
+        let (server, channels) = harness.new_server(&owner).await;
+        let (other_server, _) = harness.new_server(&owner).await;
+        let emoji = harness.new_emoji(&other_server, &owner).await;
+
+        let (_, session, user) = harness.new_user().await;
+        Member::create(&harness.db, &server, &user, Some(channels))
+            .await
+            .expect("Failed to create member");
+
+        let allowed = harness.new_channel(&server).await;
+        let mut denied = harness.new_channel(&server).await;
+        denied
+            .update(
+                &harness.db,
+                PartialChannel {
+                    default_permissions: Some(OverrideField {
+                        a: 0,
+                        d: ChannelPermission::UseExternalEmojis as i64,
+                    }),
+                    ..Default::default()
+                },
+                vec![],
+            )
+            .await
+            .expect("Failed to deny UseExternalEmojis");
+
+        let body = body(&emoji.id);
+
+        assert_eq!(
+            send_external_emoji(&harness, &session, &allowed, body.clone()).await,
+            Status::Ok,
+            "Sending external emoji in {field} failed with UseExternalEmojis"
+        );
+        assert_eq!(
+            send_external_emoji(&harness, &session, &denied, body).await,
+            Status::Forbidden,
+            "Sent external emoji in {field} without UseExternalEmojis"
+        );
+    }
+
+    #[rocket::async_test]
+    async fn send_content_external_emoji() {
+        assert_external_emoji_gated("content", |id| json!({ "content": format!(":{id}:") }))
+            .await;
+    }
+
+    #[rocket::async_test]
+    async fn send_embed_description_external_emoji() {
+        assert_external_emoji_gated("embed description", |id| {
+            json!({ "embeds": [{ "description": format!(":{id}:") }] })
+        })
+        .await;
+    }
+
+    #[rocket::async_test]
+    async fn send_embed_title_external_emoji() {
+        assert_external_emoji_gated("embed title", |id| {
+            json!({ "embeds": [{ "title": format!(":{id}:") }] })
+        })
+        .await;
+    }
+
+    #[rocket::async_test]
+    async fn send_interactions_reactions_external_emoji() {
+        assert_external_emoji_gated("interactions.reactions", |id| {
+            json!({ "content": "react", "interactions": { "reactions": [id] } })
+        })
+        .await;
     }
 }
