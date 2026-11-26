@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 revolt-result = { workspace = true }
-revolt-config = { workspace = true, features = ["report-macros", "anyhow"] }
+revolt-config = { workspace = true }
 revolt-database = { workspace = true }
 revolt-models = { workspace = true, features = ["validator"] }
 revolt-presence = { workspace = true, features = ["redis-is-patched"] }
@@ -27,8 +27,13 @@ tokio = { workspace = true }
 async-trait = { workspace = true }
 ulid = { workspace = true }
 
-log = { workspace = true }
-pretty_env_logger = { workspace = true }
+# Logging
+tracing = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+opentelemetry = { workspace = true }
+
+# Common
+stoat-otel = { workspace = true, features = ["amqp"] }
 
 regex = { workspace = true }
 

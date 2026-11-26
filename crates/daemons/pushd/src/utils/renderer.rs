@@ -15,6 +15,7 @@ async fn get_connection() -> Result<Conn> {
     _get_conn().await.map_err(|_| create_error!(InternalError))
 }
 
+#[tracing::instrument(name = "render_notification", skip_all)]
 pub async fn render_notification_content(
     notification: &PushNotification,
     db: &Database,

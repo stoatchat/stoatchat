@@ -11,7 +11,7 @@ use rocket::{FromForm, FromFormField};
 
 use iso8601_timestamp::Timestamp;
 
-use super::{Channel, Embed, File, Member, MessageWebhook, User, Webhook, RE_COLOUR};
+use super::{Channel, Embed, File, Member, MessageWebhook, User, Webhook, RE_COLOUR, SYSTEM_USER_ID};
 
 auto_derived_partial!(
     /// Message
@@ -413,7 +413,7 @@ impl MessageAuthor<'_> {
         match self {
             MessageAuthor::User(user) => &user.id,
             MessageAuthor::Webhook(webhook) => &webhook.id,
-            MessageAuthor::System { .. } => "00000000000000000000000000",
+            MessageAuthor::System { .. } => SYSTEM_USER_ID,
         }
     }
 
