@@ -1,7 +1,7 @@
 use revolt_result::Result;
 
 use crate::ReferenceDb;
-use crate::{FieldsMember, Member, MemberCompositeKey, PartialMember};
+use crate::{FieldsMember, Member, MemberCompositeKey, MemberSearchQuery, PartialMember};
 
 use super::{AbstractServerMembers, ChunkedServerMembersGenerator};
 
@@ -38,6 +38,67 @@ impl AbstractServerMembers for ReferenceDb {
             .filter(|member| member.id.server == server_id)
             .cloned()
             .collect())
+    }
+
+    /// Search members in a server, ordered by user id
+    async fn search_members(
+        &self,
+        server_id: &str,
+        query: MemberSearchQuery,
+    ) -> Result<Vec<Member>> {
+        let mut members: Vec<Member> = {
+            let server_members = self.server_members.lock().await;
+            server_members
+                .values()
+                .filter(|member| member.id.server == server_id)
+                .filter(|member| {
+                    query
+                        .roles
+                        .as_ref()
+                        .is_none_or(|roles| roles.iter().all(|role| member.roles.contains(role)))
+                })
+                .filter(|member| {
+                    query
+                        .after
+                        .as_ref()
+                        .is_none_or(|after| member.id.user.as_str() > after.as_str())
+                })
+                .cloned()
+                .collect()
+        };
+
+        if let Some(text) = &query.query {
+            let users = self.users.lock().await;
+            let contains =
+                |value: &str, needle: &str| value.to_lowercase().contains(&needle.to_lowercase());
+
+            let (name, discriminator) = MemberSearchQuery::split_discriminator(text);
+
+            members.retain(|member| {
+                let user = users.get(&member.id.user);
+
+                let username_match = user.is_some_and(|user| {
+                    contains(&user.username, name)
+                        && discriminator.is_none_or(|d| user.discriminator == d)
+                });
+
+                let nickname_match = member
+                    .nickname
+                    .as_deref()
+                    .is_some_and(|nickname| contains(nickname, text));
+
+                let display_name_match = user
+                    .and_then(|user| user.display_name.as_deref())
+                    .is_some_and(|display_name| contains(display_name, text));
+
+                username_match || nickname_match || display_name_match
+            });
+        }
+
+        members.sort_by(|a, b| a.id.user.cmp(&b.id.user));
+        members.truncate(query.limit.max(0) as usize);
+
+        Ok(members)
     }
 
     /// Fetch all members in a server as an iterator

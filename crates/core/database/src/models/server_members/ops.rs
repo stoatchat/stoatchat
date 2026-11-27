@@ -3,7 +3,7 @@ use ::mongodb::{ClientSession, SessionCursor};
 
 use revolt_result::Result;
 
-use crate::{FieldsMember, Member, MemberCompositeKey, PartialMember};
+use crate::{FieldsMember, Member, MemberCompositeKey, MemberSearchQuery, PartialMember};
 
 #[cfg(feature = "mongodb")]
 mod mongodb;
@@ -80,6 +80,14 @@ pub trait AbstractServerMembers: Sync + Send {
 
     /// Fetch all members in a server
     async fn fetch_all_members(&self, server_id: &str) -> Result<Vec<Member>>;
+
+    /// Search members in a server, ordered by user id.
+    /// No query and no roles returns every member, paginated.
+    async fn search_members(
+        &self,
+        server_id: &str,
+        query: MemberSearchQuery,
+    ) -> Result<Vec<Member>>;
 
     /// Fetch all members in a server as an iterator
     async fn fetch_all_members_chunked(

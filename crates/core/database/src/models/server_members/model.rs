@@ -86,6 +86,37 @@ auto_derived!(
     }
 );
 
+/// Member search query
+#[derive(Debug, Clone, Default)]
+pub struct MemberSearchQuery {
+    /// Case-insensitive partial match against nickname, display name or username,
+    /// `username#1234` matches the discriminator exactly
+    pub query: Option<String>,
+    /// Members must have all of these roles
+    pub roles: Option<Vec<String>>,
+    /// Only return members whose user id is greater than this
+    pub after: Option<String>,
+    /// Maximum number of members to return
+    pub limit: i64,
+}
+
+impl MemberSearchQuery {
+    /// Split a query into its name part and an optional discriminator,
+    /// `name#1234` becomes `("name", Some("1234"))`
+    pub fn split_discriminator(query: &str) -> (&str, Option<&str>) {
+        if let Some((name, discriminator)) = query.rsplit_once('#') {
+            if !name.is_empty()
+                && discriminator.len() == 4
+                && discriminator.chars().all(|c| c.is_ascii_digit())
+            {
+                return (name, Some(discriminator));
+            }
+        }
+
+        (query, None)
+    }
+}
+
 impl Default for Member {
     fn default() -> Self {
         Self {

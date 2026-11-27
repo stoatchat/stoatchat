@@ -218,6 +218,14 @@ pub async fn create_database(db: &MongoDb) {
                     "_id.user": 1_i32,
                 },
                 "name": "user_id"
+            },
+            {
+                "key": {
+                    "_id.server": 1_i32,
+                    "roles": 1_i32,
+                    "_id.user": 1_i32,
+                },
+                "name": "server_roles"
             }
         ]
     })
